@@ -1,0 +1,304 @@
+/* General layout */
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    margin: 0;
+    overscroll-behavior: none;
+}
+
+.game-container {
+    text-align: center;
+}
+
+/* Card styles */
+.card {
+    width: 250px;
+    height: 250px;
+    perspective: 1000px;
+}
+
+.card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    text-align: center;
+    transition: transform 0.8s;
+    transform-style: preserve-3d;
+}
+
+.card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+
+.card-front, .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+}
+
+.card-front {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.card-back {
+    background-color: #FFF;
+    transform: rotateY(180deg);
+    border: 2px solid #ddd;
+}
+
+img {
+    max-width: 80%;
+    max-height: 80%;
+    border-radius: 10px;
+}
+
+.feedback {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Feedback animations */
+.feedback.success {
+    color: #4CAF50;
+    font-size: 1.2em;
+}
+
+.feedback.error {
+    color: #f44336;
+}
+
+.animate {
+    animation: pop 0.3s ease-in-out;
+}
+
+.animate-shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Confetti animation */
+.confetti {
+    position: fixed;
+    top: -10px;
+    width: 10px;
+    height: 10px;
+    animation: fall 3s linear forwards;
+}
+
+/* Animations */
+@keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+@keyframes fall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Input styling */
+input[type="text"] {
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    margin-right: 10px;
+    transition: all 0.3s ease;
+}
+
+input[type="text"]:focus {
+    border-color: #4CAF50;
+    outline: none;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+}
+
+button {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+/* Add these to your existing CSS */
+html {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.letter-boxes-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.letter-box {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #333;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background: white;
+}
+
+.available-letters-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.draggable-letter {
+    width: 40px;
+    height: 40px;
+    background: #4CAF50;
+    color: white;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: move;
+    user-select: none;
+    transition: opacity 0.3s ease;
+}
+
+.draggable-letter.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.draggable-letter.dragging {
+    opacity: 0.5;
+}
+
+.letter-box.correct {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #45a049;
+}
+
+.letter-box.incorrect {
+    background-color: #f44336;
+    color: white;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+#check-button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#check-button:hover {
+    background-color: #45a049;
+}
+
+#letter-boxes, #available-letters {
+    display: none; /* Initially hidden */
+}
+
+.completion-message {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    animation: fadeIn 1s ease-out;
+}
+
+.completion-message h1 {
+    color: #4CAF50;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.completion-message button {
+    margin-top: 1rem;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.completion-message button:hover {
+    transform: scale(1.1);
+}
+
+.special-confetti {
+    position: fixed;
+    font-size: 2rem;
+    color: white;
+    user-select: none;
+    animation: specialFall 5s linear forwards;
+}
+
+@keyframes specialFall {
+    0% {
+        transform: translateY(-10vh) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
