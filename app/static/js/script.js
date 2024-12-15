@@ -60,22 +60,101 @@ function createLetterBoxes(word) {
 
 // Function to create draggable letters
 function createDraggableLetters(word) {
-    const lettersContainer = document.getElementById('available-letters');
-    lettersContainer.innerHTML = '';
+    const container = document.getElementById('available-letters');
+    const shuffledLetters = word.split('').sort(() => Math.random() - 0.5);
     
-    // Shuffle the letters
-    const letters = word.split('').sort(() => Math.random() - 0.5);
-    
-    letters.forEach((letter, index) => {
+    container.innerHTML = '';
+    shuffledLetters.forEach((letter, index) => {
         const letterDiv = document.createElement('div');
         letterDiv.className = 'draggable-letter';
+        letterDiv.id = `letter-${index}`;
         letterDiv.textContent = letter;
-        letterDiv.draggable = true;
-        letterDiv.id = `letter-${index}`; // Add unique ID
-        letterDiv.addEventListener('dragstart', handleDragStart);
+        
+        // Add touch events
+        letterDiv.addEventListener('touchstart', handleTouchStart, { passive: false });
+        letterDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
+        letterDiv.addEventListener('touchend', handleTouchEnd);
+        
+        // Keep mouse events for desktop
+        letterDiv.addEventListener('mousedown', handleDragStart);
         letterDiv.addEventListener('dragend', handleDragEnd);
-        lettersContainer.appendChild(letterDiv);
+        letterDiv.setAttribute('draggable', 'true');
+        
+        container.appendChild(letterDiv);
     });
+}
+
+// Touch event handlers
+function handleTouchStart(e) {
+    e.preventDefault();
+    this.classList.add('dragging');
+    const touch = e.touches[0];
+    this.initialX = touch.clientX - this.offsetLeft;
+    this.initialY = touch.clientY - this.offsetTop;
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (!this.classList.contains('dragging')) return;
+    
+    const touch = e.touches[0];
+    const currentX = touch.clientX - this.initialX;
+    const currentY = touch.clientY - this.initialY;
+    
+    this.style.position = 'fixed';
+    this.style.left = currentX + 'px';
+    this.style.top = currentY + 'px';
+    
+    // Find the closest letter box
+    const letterBoxes = document.getElementsByClassName('letter-box');
+    let closestBox = null;
+    let closestDistance = Infinity;
+    
+    Array.from(letterBoxes).forEach(box => {
+        const rect = box.getBoundingClientRect();
+        const distance = Math.hypot(
+            touch.clientX - (rect.left + rect.width/2),
+            touch.clientY - (rect.top + rect.height/2)
+        );
+        if (distance < closestDistance && !box.textContent) {
+            closestDistance = distance;
+            closestBox = box;
+        }
+    });
+    
+    // Highlight the closest empty box if it's close enough
+    Array.from(letterBoxes).forEach(box => box.classList.remove('hover'));
+    if (closestBox && closestDistance < 50) {
+        closestBox.classList.add('hover');
+    }
+}
+
+function handleTouchEnd(e) {
+    this.classList.remove('dragging');
+    this.style.position = '';
+    this.style.left = '';
+    this.style.top = '';
+    
+    const letterBoxes = document.getElementsByClassName('letter-box');
+    const touch = e.changedTouches[0];
+    let placed = false;
+    
+    Array.from(letterBoxes).forEach(box => {
+        box.classList.remove('hover');
+        const rect = box.getBoundingClientRect();
+        if (!box.textContent &&
+            touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+            box.textContent = this.textContent;
+            box.dataset.originalLetter = this.id;
+            this.classList.add('hidden');
+            placed = true;
+        }
+    });
+    
+    if (!placed) {
+        this.style.transform = '';
+    }
 }
 
 // Drag and Drop handlers
@@ -111,12 +190,94 @@ function playRandomSound(soundArray) {
     soundArray[randomIndex].play();
 }
 
-// Update the checkAnswer function to use random sounds
+// Add difficulty settings
+const difficultySettings = {
+    easy: {
+        showCorrectLetters: true,
+        hasWordAudio: true,
+        name: "Easy"
+    },
+    medium: {
+        showCorrectLetters: false,
+        hasWordAudio: true,
+        name: "Medium"
+    },
+    hard: {
+        showCorrectLetters: false,
+        hasWordAudio: false,
+        name: "Hard"
+    }
+};
+
+let currentDifficulty = 'easy'; // Default difficulty
+
+// Add difficulty selector to HTML
+function createDifficultySelector() {
+    const container = document.getElementById('game-container');
+    const selector = document.createElement('div');
+    selector.className = 'difficulty-selector';
+    selector.innerHTML = `
+        <h3>Select Difficulty:</h3>
+        <div class="difficulty-buttons">
+            <button onclick="setDifficulty('easy')" class="difficulty-btn active">Easy</button>
+            <button onclick="setDifficulty('medium')" class="difficulty-btn">Medium</button>
+            <button onclick="setDifficulty('hard')" class="difficulty-btn">Hard</button>
+        </div>
+    `;
+    container.insertBefore(selector, container.firstChild);
+}
+
+// Function to set difficulty
+function setDifficulty(difficulty) {
+    currentDifficulty = difficulty;
+    
+    // Update active button but don't disable yet
+    document.querySelectorAll('.difficulty-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase() === difficulty) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// Add scoring and attempts system
+let gameStats = {
+    lives: 3
+};
+
+// Create lives display function
+function createLivesDisplay() {
+    const livesContainer = document.createElement('div');
+    livesContainer.className = 'lives-container';
+    livesContainer.innerHTML = `
+        <div class="hearts">
+            <span>❤️</span>
+            <span>❤️</span>
+            <span>❤️</span>
+        </div>
+    `;
+    
+    // Insert lives display after difficulty selector
+    const difficultySelector = document.querySelector('.difficulty-selector');
+    difficultySelector.after(livesContainer);
+}
+
+// Update lives display
+function updateLivesDisplay() {
+    const hearts = document.querySelectorAll('.hearts span');
+    hearts.forEach((heart, index) => {
+        if (index < gameStats.lives) {
+            heart.textContent = '❤️';
+        } else {
+            heart.textContent = '🖤';
+        }
+    });
+}
+
+// Modify checkAnswer function to include lives logic
 function checkAnswer() {
-    console.log('Checking answer...'); // Debug log
     const boxes = Array.from(document.getElementsByClassName('letter-box'));
     
-    // First check if all boxes are filled
     if (!boxes.every(box => box.textContent)) {
         const feedback = document.getElementById('feedback');
         feedback.textContent = "Fill all boxes first!";
@@ -125,8 +286,6 @@ function checkAnswer() {
     }
 
     const attempt = boxes.map(box => box.textContent).join('');
-    console.log('Attempt:', attempt);
-    console.log('Current word:', currentWord);
     
     if (attempt === currentWord) {
         // Correct answer
@@ -136,40 +295,92 @@ function checkAnswer() {
     } else {
         // Wrong answer
         playRandomSound(sounds.wrong);
-        boxes.forEach((box, index) => {
-            if (box.textContent === currentWord[index]) {
-                box.classList.add('correct');
-            } else {
+        gameStats.lives--;
+        updateLivesDisplay();
+        
+        if (gameStats.lives <= 0) {
+            // Game over logic
+            setTimeout(() => {
+                gameStats.lives = 3; // Reset lives
+                updateLivesDisplay();
+                loadNewWord();
+            }, 1500);
+        }
+        
+        // Keep existing wrong answer handling
+        if (difficultySettings[currentDifficulty].showCorrectLetters) {
+            boxes.forEach((box, index) => {
+                if (box.textContent === currentWord[index]) {
+                    box.classList.add('correct');
+                } else {
+                    box.classList.add('incorrect');
+                    const originalLetter = document.getElementById(box.dataset.originalLetter);
+                    if (originalLetter) {
+                        originalLetter.classList.remove('hidden');
+                    }
+                    setTimeout(() => {
+                        box.classList.remove('incorrect');
+                        box.textContent = '';
+                        box.dataset.originalLetter = '';
+                    }, 500);
+                }
+            });
+        } else {
+            // Medium/Hard mode - return all letters
+            boxes.forEach(box => {
                 box.classList.add('incorrect');
-                // Get the original letter and make it visible again
                 const originalLetter = document.getElementById(box.dataset.originalLetter);
                 if (originalLetter) {
                     originalLetter.classList.remove('hidden');
                 }
-                
-                // Clear the box after animation
                 setTimeout(() => {
                     box.classList.remove('incorrect');
                     box.textContent = '';
                     box.dataset.originalLetter = '';
                 }, 500);
-            }
-        });
+            });
+        }
     }
 }
 
-// Function to flip card and load new word
-function flipCard() {
+// Add visual elements for score and attempts
+function createGameStats() {
+    const statsContainer = document.createElement('div');
+    statsContainer.className = 'game-stats';
+    statsContainer.innerHTML = `
+        <div class="hearts">
+            <span>❤️</span>
+            <span>❤️</span>
+            <span>❤️</span>
+        </div>
+        <div class="score">Score: 0</div>
+        <div class="streak">Streak: 0</div>
+    `;
+    
+    document.getElementById('game-container').insertBefore(
+        statsContainer,
+        document.querySelector('.card')
+    );
+}
+
+// Function to flip card and handle audio based on difficulty
+function flipCard(e) {
     const card = document.getElementById('card');
     if (!card.classList.contains('flipped')) {
-        // If this is the first flip or after a success, load new word
+        // First flip - lock difficulty
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.disabled = true; // Disable all buttons after first flip
+        });
+        
         card.classList.add('flipped');
         loadNewWord();
-        showGameElements(); // Show elements only after flip
+        showGameElements();
     } else {
-        // Only play the word audio when clicking on the image
+        // Only play word audio if not in hard mode
         const cardImage = document.getElementById('card-image');
-        if (e.target === cardImage && currentWordAudio) {
+        if (e.target === cardImage && 
+            currentWordAudio && 
+            currentDifficulty !== 'hard') {
             currentWordAudio.play();
         }
     }
@@ -189,6 +400,10 @@ function loadNewWord() {
         return;
     }
     
+    // Reset lives for new word
+    gameStats.lives = 3;
+    updateLivesDisplay();
+    
     // Get random word from remaining words
     currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
     usedWords.add(currentWord);
@@ -197,16 +412,23 @@ function loadNewWord() {
     const cardImage = document.getElementById('card-image');
     cardImage.src = wordData[currentWord].image;
     
-    // Load audio but don't play it
-    currentWordAudio = new Audio(wordData[currentWord].audio);
-    
-    // Add click event listener to the image for playing audio
-    cardImage.onclick = (e) => {
-        e.stopPropagation(); // Prevent card flip
-        if (currentWordAudio) {
-            currentWordAudio.play();
-        }
-    };
+    // Only set up audio if not in hard mode
+    if (currentDifficulty !== 'hard') {
+        currentWordAudio = new Audio(wordData[currentWord].audio);
+        // Add click event listener to the image for playing audio
+        cardImage.onclick = (e) => {
+            e.stopPropagation(); // Prevent card flip
+            if (currentWordAudio) {
+                currentWordAudio.play();
+            }
+        };
+    } else {
+        // Remove audio functionality in hard mode
+        currentWordAudio = null;
+        cardImage.onclick = (e) => {
+            e.stopPropagation(); // Only prevent card flip
+        };
+    }
     
     // Create letter boxes and draggable letters
     createLetterBoxes(currentWord);
@@ -418,6 +640,11 @@ function restartGame() {
         completionMessage.remove();
     }
     
+    // Re-enable difficulty buttons
+    document.querySelectorAll('.difficulty-btn').forEach(btn => {
+        btn.disabled = false;
+    });
+    
     const card = document.getElementById('card');
     card.style.display = 'block';
     card.classList.remove('flipped');
@@ -443,6 +670,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const card = document.getElementById('card');
     card.addEventListener('click', flipCard);
     hideGameElements(); // Hide elements initially
+    createDifficultySelector();
+    createLivesDisplay(); // Add this line
     
     // Pre-load the first word but don't show elements yet
     loadNewWord();

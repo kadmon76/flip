@@ -12,6 +12,15 @@ body {
 
 .game-container {
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+h1 {
+    margin-bottom: 20px;
+    color: #333;
 }
 
 /* Card styles */
@@ -19,6 +28,7 @@ body {
     width: 250px;
     height: 250px;
     perspective: 1000px;
+    margin: 0 auto;
 }
 
 .card-inner {
@@ -56,111 +66,15 @@ body {
     border: 2px solid #ddd;
 }
 
-img {
+.card-back img {
     max-width: 80%;
     max-height: 80%;
     border-radius: 10px;
+    object-fit: contain;
+    margin: auto;
 }
 
-.feedback {
-    margin-top: 10px;
-    font-weight: bold;
-    color: #333;
-}
-
-/* Feedback animations */
-.feedback.success {
-    color: #4CAF50;
-    font-size: 1.2em;
-}
-
-.feedback.error {
-    color: #f44336;
-}
-
-.animate {
-    animation: pop 0.3s ease-in-out;
-}
-
-.animate-shake {
-    animation: shake 0.5s ease-in-out;
-}
-
-.shake {
-    animation: shake 0.5s ease-in-out;
-}
-
-/* Confetti animation */
-.confetti {
-    position: fixed;
-    top: -10px;
-    width: 10px;
-    height: 10px;
-    animation: fall 3s linear forwards;
-}
-
-/* Animations */
-@keyframes pop {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-}
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
-}
-
-@keyframes fall {
-    0% {
-        transform: translateY(0) rotate(0deg);
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(100vh) rotate(360deg);
-        opacity: 0;
-    }
-}
-
-/* Input styling */
-input[type="text"] {
-    padding: 10px;
-    border: 2px solid #ddd;
-    border-radius: 5px;
-    margin-right: 10px;
-    transition: all 0.3s ease;
-}
-
-input[type="text"]:focus {
-    border-color: #4CAF50;
-    outline: none;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
-}
-
-button {
-    padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-button:hover {
-    background-color: #45a049;
-}
-
-/* Add these to your existing CSS */
-html {
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
+/* Letter boxes and available letters */
 .letter-boxes-container {
     display: flex;
     justify-content: center;
@@ -199,7 +113,8 @@ html {
     font-size: 24px;
     cursor: move;
     user-select: none;
-    transition: opacity 0.3s ease;
+    touch-action: none;
+    -webkit-user-select: none;
 }
 
 .draggable-letter.hidden {
@@ -211,26 +126,58 @@ html {
     opacity: 0.5;
 }
 
-.letter-box.correct {
-    background-color: #4CAF50;
+/* Difficulty selector styles */
+.difficulty-selector {
+    width: 100%;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.difficulty-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin: 10px auto;
+    max-width: 400px;
+}
+
+.difficulty-btn {
+    padding: 8px 16px;
+    border: 2px solid #4CAF50;
+    border-radius: 5px;
+    background: white;
+    color: #4CAF50;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.difficulty-btn:hover {
+    background: #4CAF50;
     color: white;
-    border-color: #45a049;
 }
 
-.letter-box.incorrect {
-    background-color: #f44336;
+.difficulty-btn.active {
+    background: #4CAF50;
     color: white;
-    animation: shake 0.5s ease-in-out;
 }
 
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
+.difficulty-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    border-color: #999;
 }
 
+.difficulty-btn:disabled.active {
+    background: #4CAF50;
+    color: white;
+    opacity: 1;
+}
+
+/* Check button */
 #check-button {
-    margin-top: 20px;
+    display: block;
+    margin: 20px auto;
     padding: 10px 20px;
     background-color: #4CAF50;
     color: white;
@@ -244,17 +191,30 @@ html {
     background-color: #45a049;
 }
 
-#letter-boxes, #available-letters {
-    display: none; /* Initially hidden */
+/* Feedback styles */
+.feedback {
+    margin-top: 10px;
+    font-weight: bold;
 }
 
+img {
+    max-width: 80%;
+    max-height: 80%;
+    border-radius: 10px;
+}
+
+/* Completion message styles */
 .completion-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     text-align: center;
     padding: 2rem;
     background: rgba(255, 255, 255, 0.9);
     border-radius: 15px;
     box-shadow: 0 0 20px rgba(0,0,0,0.1);
-    animation: fadeIn 1s ease-out;
+    z-index: 1000;
 }
 
 .completion-message h1 {
@@ -285,6 +245,7 @@ html {
     color: white;
     user-select: none;
     animation: specialFall 5s linear forwards;
+    z-index: 999;
 }
 
 @keyframes specialFall {
@@ -298,7 +259,94 @@ html {
     }
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
+.game-stats {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 20px;
+    font-size: 1.2em;
+}
+
+.hearts {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin: 0 auto;
+    max-width: 200px;
+}
+
+.hearts span.lost {
+    opacity: 0.3;
+}
+
+.score, .streak {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.streak {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.streak::after {
+    content: '🔥';
+    display: none;
+}
+
+.streak.active::after {
+    display: inline;
+}
+
+/* Letter status styles */
+.letter-box.correct {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #45a049;
+}
+
+.letter-box.incorrect {
+    background-color: #f44336;
+    color: white;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+.lives-container {
+    width: 100%;
+    text-align: center;
+    margin: 15px 0;
+}
+
+.hearts span {
+    font-size: 28px;
+    line-height: 1;
+}
+
+/* Mobile touch optimizations */
+.letter-box.hover {
+    background-color: #e0e0e0;
+    border-color: #4CAF50;
+}
+
+@media (max-width: 768px) {
+    .draggable-letter {
+        font-size: 20px;
+        width: 35px;
+        height: 35px;
+    }
+    
+    .letter-box {
+        width: 35px;
+        height: 35px;
+        font-size: 20px;
+    }
 }
