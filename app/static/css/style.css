@@ -1,3 +1,7 @@
+/* Hide boxes and letters initially */
+#letter-boxes, #available-letters {
+    display: none;
+}
 /* General layout */
 body {
     display: flex;
@@ -83,15 +87,22 @@ h1 {
 }
 
 .letter-box {
-    width: 40px;
-    height: 40px;
-    border: 2px solid #333;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    background: white;
+    width: 50px; /* Set width */
+    height: 50px; /* Set height */
+    border: 1px solid #000; /* Border for visibility */
+    display: inline-block; /* Align boxes horizontally */
+    margin: 5px; /* Space between boxes */
+    text-align: center; /* Center text */
+    line-height: 50px; /* Center text vertically */
+    background-color: #f0f0f0; /* Background color for visibility */
+}
+
+.letter-box:hover {
+    background-color: #f0f0f0;
+}
+
+.letter-box.returnable {
+    border: 2px dashed #4CAF50;
 }
 
 .available-letters-container {
@@ -102,19 +113,15 @@ h1 {
 }
 
 .draggable-letter {
-    width: 40px;
-    height: 40px;
-    background: #4CAF50;
+    width: 50px;
+    height: 50px;
+    background-color: #4CAF50; /* Vibrant green */
     color: white;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: move;
-    user-select: none;
-    touch-action: none;
-    -webkit-user-select: none;
+    text-align: center;
+    line-height: 50px;
+    cursor: grab;
+    transition: all 0.3s ease; /* Smooth transition for color or positioning */
+    border-radius: 5px; /* Rounded edges for visual clarity */
 }
 
 .draggable-letter.hidden {
@@ -123,7 +130,9 @@ h1 {
 }
 
 .draggable-letter.dragging {
-    opacity: 0.5;
+    z-index: 1000;
+    transform: scale(1.1);
+    opacity: 0.9;
 }
 
 /* Difficulty selector styles */
@@ -335,6 +344,8 @@ img {
 .letter-box.hover {
     background-color: #e0e0e0;
     border-color: #4CAF50;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
 }
 
 @media (max-width: 768px) {
@@ -349,4 +360,120 @@ img {
         height: 35px;
         font-size: 20px;
     }
+}
+
+.draggable-letter {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: move;
+}
+
+.draggable-letter.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.draggable-letter.dragging {
+    opacity: 0.5;
+}
+
+.letter-box.hover {
+    background-color: #e0e0e0;
+    border-color: #4CAF50;
+    transition: all 0.2s ease;
+}
+
+.return-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-image: url('path/to/return-icon.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    margin-left: 5px;
+}
+
+/* Color indicators */
+.letter-box {
+    background-color: #f9f9f9;
+}
+
+.draggable-letter {
+    background-color: #4CAF50;
+    color: white;
+    transition: background-color 0.3s ease;
+}
+
+/* Return animation */
+.returning {
+    animation: returnAnimation 0.5s forwards;
+}
+
+@keyframes returnAnimation {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(-20px);
+    }
+}
+
+/* Hand cursor for draggable letters */
+.draggable-letter {
+    cursor: grab;
+}
+
+.draggable-letter:active {
+    cursor: grabbing;
+}
+.draggable-letter.in-box {
+    background-color: #FFD700; /* Gold color to indicate it's in a box */
+    color: black; /* Black text for contrast */
+    border: 2px solid #FFA500; /* Orange border to emphasize placement */
+    box-shadow: 0px 0px 5px #FFA500; /* Subtle glow effect */
+    cursor: grab; /* Still draggable */
+}
+
+/* Maintain the same color for letters in and out of the box */
+.draggable-letter {
+    background-color: #4CAF50; /* Vibrant color for available letters */
+    color: white;
+    transition: background-color 0.3s ease; /* Smooth transition for color change */
+}
+
+/* Letter box styles */
+.letter-box {
+    background-color: #f9f9f9; /* Light background for boxes */
+    cursor: pointer; /* Change cursor to pointer */
+    transition: background-color 0.3s ease, transform 0.3s ease; /* Add transition for smooth animation */
+}
+
+/* Return animation */
+.returning {
+    animation: returnAnimation 0.5s forwards; /* Apply return animation */
+}
+
+@keyframes returnAnimation {
+    from {
+        transform: translateY(0); /* Start at original position */
+    }
+    to {
+        transform: translateY(-20px); /* Move up slightly */
+    }
+}
+
+/* Hand cursor for draggable letters */
+.draggable-letter {
+    cursor: grab; /* Change cursor to grab */
+}
+
+.draggable-letter:active {
+    cursor: grabbing; /* Change cursor to grabbing when active */
+}
+
+#card-image {
+    width: 100%; /* Set width to fit the card */
+    height: auto; /* Maintain aspect ratio */
+    display: block; /* Ensure it is displayed */
 }

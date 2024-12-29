@@ -40,149 +40,152 @@ const sounds = {
     wrong: [
         new Audio('/static/sounds/error/error1.mp3'),
         new Audio('/static/sounds/error/error2.mp3')
-    ]
+    ],
+    dog: new Audio('/static/sounds/words/dog.mp3') // Add the audio file for the word
 };
 
 // Function to create letter boxes for the word
 function createLetterBoxes(word) {
-    const boxesContainer = document.getElementById('letter-boxes');
-    boxesContainer.innerHTML = '';
-    
-    word.split('').forEach((letter, index) => {
+    const container = document.getElementById('letter-boxes');
+    container.innerHTML = ''; // Clear existing boxes
+
+    for (let i = 0; i < word.length; i++) {
         const box = document.createElement('div');
         box.className = 'letter-box';
-        box.dataset.index = index;
-        box.addEventListener('dragover', handleDragOver);
-        box.addEventListener('drop', handleDrop);
-        boxesContainer.appendChild(box);
+        box.dataset.index = i; // Store the box index
+        box.textContent = ''; // Ensure boxes are empty initially
+        container.appendChild(box);
+    }
+
+    // Initialize dropzones for the boxes
+    interact('.letter-box').dropzone({
+        accept: '.draggable-letter', // Only accept draggable letters
+        overlap: 0.5, // Letter must overlap 50% to drop
+        ondrop(event) {
+            const draggedElement = event.relatedTarget;
+            const dropzone = event.target;
+    
+            // Handle moving a letter between boxes
+            const currentParent = draggedElement.parentElement;
+            if (currentParent && currentParent.classList.contains('letter-box')) {
+                currentParent.textContent = ''; // Clear the old box
+                currentParent.dataset.originalLetter = ''; // Reset box data
+            }
+    
+            // Place the draggable letter into the new box
+            if (!dropzone.hasChildNodes()) {
+                dropzone.appendChild(draggedElement);
+                draggedElement.style.transform = ''; // Reset position within the box
+                draggedElement.setAttribute('data-x', 0);
+                draggedElement.setAttribute('data-y', 0);
+    
+                // Apply the "in-box" class
+                draggedElement.classList.add('in-box');
+                dropzone.dataset.originalLetter = draggedElement.id; // Update box data
+            }
+        },
+        ondragleave(event) {
+            const draggedElement = event.relatedTarget;
+            const dropzone = event.target;
+    
+            if (dropzone.contains(draggedElement)) {
+                // Remove the letter from the box
+                dropzone.removeChild(draggedElement);
+                draggedElement.classList.remove('in-box');
+    
+                // Reattach the letter to the pool
+                const pool = document.getElementById('available-letters');
+                pool.appendChild(draggedElement);
+    
+                // Ensure it remains draggable
+                draggedElement.style.transform = ''; // Reset position
+                draggedElement.setAttribute('data-x', 0);
+                draggedElement.setAttribute('data-y', 0);
+            }
+        },
     });
+    
+    
+    
+
+    console.log('Letter boxes created:', container.innerHTML); // Debugging log
 }
 
 // Function to create draggable letters
 function createDraggableLetters(word) {
     const container = document.getElementById('available-letters');
     const shuffledLetters = word.split('').sort(() => Math.random() - 0.5);
-    
-    container.innerHTML = '';
+
+    container.innerHTML = ''; // Clear existing letters
     shuffledLetters.forEach((letter, index) => {
         const letterDiv = document.createElement('div');
         letterDiv.className = 'draggable-letter';
         letterDiv.id = `letter-${index}`;
         letterDiv.textContent = letter;
-        
-        // Add touch events
-        letterDiv.addEventListener('touchstart', handleTouchStart, { passive: false });
-        letterDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
-        letterDiv.addEventListener('touchend', handleTouchEnd);
-        
-        // Keep mouse events for desktop
-        letterDiv.addEventListener('mousedown', handleDragStart);
-        letterDiv.addEventListener('dragend', handleDragEnd);
-        letterDiv.setAttribute('draggable', 'true');
-        
+        letterDiv.setAttribute('data-x', 0);
+        letterDiv.setAttribute('data-y', 0);
+
         container.appendChild(letterDiv);
     });
-}
 
-// Touch event handlers
-function handleTouchStart(e) {
-    e.preventDefault();
-    this.classList.add('dragging');
-    const touch = e.touches[0];
-    this.initialX = touch.clientX - this.offsetLeft;
-    this.initialY = touch.clientY - this.offsetTop;
-}
-
-function handleTouchMove(e) {
-    e.preventDefault();
-    if (!this.classList.contains('dragging')) return;
+    // Initialize draggable functionality for all letters
+    interact('.draggable-letter').draggable({
+        listeners: {
+            move: dragMoveListener,
+            end(event) {
+                const target = event.target;
+                const parentBox = target.parentElement;
     
-    const touch = e.touches[0];
-    const currentX = touch.clientX - this.initialX;
-    const currentY = touch.clientY - this.initialY;
+                // If the letter is not in a valid box, return it to the pool
+                if (!parentBox || !parentBox.classList.contains('letter-box')) {
+                    const pool = document.getElementById('available-letters');
+                    pool.appendChild(target);
     
-    this.style.position = 'fixed';
-    this.style.left = currentX + 'px';
-    this.style.top = currentY + 'px';
+                    // Reset position
+                    target.style.transform = '';
+                    target.setAttribute('data-x', 0);
+                    target.setAttribute('data-y', 0);
     
-    // Find the closest letter box
-    const letterBoxes = document.getElementsByClassName('letter-box');
-    let closestBox = null;
-    let closestDistance = Infinity;
-    
-    Array.from(letterBoxes).forEach(box => {
-        const rect = box.getBoundingClientRect();
-        const distance = Math.hypot(
-            touch.clientX - (rect.left + rect.width/2),
-            touch.clientY - (rect.top + rect.height/2)
-        );
-        if (distance < closestDistance && !box.textContent) {
-            closestDistance = distance;
-            closestBox = box;
-        }
+                    // Remove the "in-box" class
+                    target.classList.remove('in-box');
+                }
+            },
+        },
+        inertia: true,
     });
     
-    // Highlight the closest empty box if it's close enough
-    Array.from(letterBoxes).forEach(box => box.classList.remove('hover'));
-    if (closestBox && closestDistance < 50) {
-        closestBox.classList.add('hover');
+    console.log('Draggable functionality initialized for letters');
+
+    console.log('Draggable letters created:', container.innerHTML); // Debugging log
+}
+
+
+// Function to handle the dragging movement
+function dragMoveListener(event) {
+    const target = event.target;
+
+    // Calculate new position
+    const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+    const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+    // Apply the transformation
+    target.style.transform = `translate(${x}px, ${y}px)`;
+    target.setAttribute('data-x', x);
+    target.setAttribute('data-y', y);
+
+    // Clear the parent box only if dragging out of a box
+    const parentBox = target.parentElement;
+    if (parentBox && parentBox.classList.contains('letter-box')) {
+        parentBox.textContent = ''; // Clear the box
+        parentBox.dataset.originalLetter = ''; // Reset the box's reference
     }
 }
 
-function handleTouchEnd(e) {
-    this.classList.remove('dragging');
-    this.style.position = '';
-    this.style.left = '';
-    this.style.top = '';
-    
-    const letterBoxes = document.getElementsByClassName('letter-box');
-    const touch = e.changedTouches[0];
-    let placed = false;
-    
-    Array.from(letterBoxes).forEach(box => {
-        box.classList.remove('hover');
-        const rect = box.getBoundingClientRect();
-        if (!box.textContent &&
-            touch.clientX >= rect.left && touch.clientX <= rect.right &&
-            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-            box.textContent = this.textContent;
-            box.dataset.originalLetter = this.id;
-            this.classList.add('hidden');
-            placed = true;
-        }
-    });
-    
-    if (!placed) {
-        this.style.transform = '';
-    }
-}
 
-// Drag and Drop handlers
-function handleDragStart(e) {
-    e.dataTransfer.setData('text/plain', e.target.textContent);
-    e.target.classList.add('dragging');
-}
 
-function handleDragOver(e) {
-    e.preventDefault();
-}
 
-function handleDrop(e) {
-    e.preventDefault();
-    const letter = e.dataTransfer.getData('text/plain');
-    const draggedElement = document.querySelector('.dragging');
-    const box = e.target;
-    
-    if (box.classList.contains('letter-box') && !box.textContent) {
-        box.textContent = letter;
-        draggedElement.classList.add('hidden');
-        box.dataset.originalLetter = draggedElement.id;
-    }
-}
 
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-}
+
 
 // Helper function to play a random sound from an array
 function playRandomSound(soundArray) {
@@ -274,30 +277,33 @@ function updateLivesDisplay() {
     });
 }
 
-// Modify checkAnswer function to include lives logic
 function checkAnswer() {
     const boxes = Array.from(document.getElementsByClassName('letter-box'));
-    
+    const feedback = document.getElementById('feedback');
+
+    // Ensure all boxes are filled before checking
     if (!boxes.every(box => box.textContent)) {
-        const feedback = document.getElementById('feedback');
         feedback.textContent = "Fill all boxes first!";
         feedback.className = "feedback error animate-shake";
         return;
     }
 
     const attempt = boxes.map(box => box.textContent).join('');
-    
+
+    // Handle correct answer
     if (attempt === currentWord) {
-        // Correct answer
-        boxes.forEach(box => box.classList.add('correct'));
+        boxes.forEach(box => {
+            box.classList.add('correct');
+            box.style.backgroundColor = "#4CAF50"; // Highlight correct letter
+        });
         playRandomSound(sounds.correct);
         showSuccess();
     } else {
-        // Wrong answer
+        // Handle wrong answer
         playRandomSound(sounds.wrong);
         gameStats.lives--;
         updateLivesDisplay();
-        
+
         if (gameStats.lives <= 0) {
             // Game over logic
             setTimeout(() => {
@@ -306,42 +312,52 @@ function checkAnswer() {
                 loadNewWord();
             }, 1500);
         }
-        
-        // Keep existing wrong answer handling
-        if (difficultySettings[currentDifficulty].showCorrectLetters) {
-            boxes.forEach((box, index) => {
-                if (box.textContent === currentWord[index]) {
+
+        // Difficulty-based logic for incorrect answers
+        boxes.forEach((box, index) => {
+            const correctLetter = currentWord[index];
+            const placedLetter = box.textContent;
+
+            if (placedLetter === correctLetter) {
+                // Easy: Keep correct letters
+                if (currentDifficulty === 'easy') {
                     box.classList.add('correct');
-                } else {
-                    box.classList.add('incorrect');
+                } else if (currentDifficulty === 'medium') {
+                    // Medium: Do not provide feedback for correct letters
+                    box.textContent = '';
+                    box.dataset.originalLetter = '';
+                }
+            } else {
+                box.classList.add('incorrect');
+
+                if (currentDifficulty !== 'hard') {
+                    // Easy/Medium: Reset incorrect letters
                     const originalLetter = document.getElementById(box.dataset.originalLetter);
                     if (originalLetter) {
                         originalLetter.classList.remove('hidden');
+                        originalLetter.style.transform = ''; // Reset position
+                        originalLetter.setAttribute('data-x', 0);
+                        originalLetter.setAttribute('data-y', 0);
                     }
                     setTimeout(() => {
-                        box.classList.remove('incorrect');
                         box.textContent = '';
                         box.dataset.originalLetter = '';
+                        box.classList.remove('incorrect');
+                    }, 500);
+                } else {
+                    // Hard: Do not reset boxes or provide feedback
+                    setTimeout(() => {
+                        box.classList.remove('incorrect');
                     }, 500);
                 }
-            });
-        } else {
-            // Medium/Hard mode - return all letters
-            boxes.forEach(box => {
-                box.classList.add('incorrect');
-                const originalLetter = document.getElementById(box.dataset.originalLetter);
-                if (originalLetter) {
-                    originalLetter.classList.remove('hidden');
-                }
-                setTimeout(() => {
-                    box.classList.remove('incorrect');
-                    box.textContent = '';
-                    box.dataset.originalLetter = '';
-                }, 500);
-            });
-        }
+            }
+        });
+
+        feedback.textContent = "Try again!";
+        feedback.className = "feedback error";
     }
 }
+
 
 // Add visual elements for score and attempts
 function createGameStats() {
@@ -364,25 +380,17 @@ function createGameStats() {
 }
 
 // Function to flip card and handle audio based on difficulty
-function flipCard(e) {
+window.flipCard = function() {
     const card = document.getElementById('card');
+
     if (!card.classList.contains('flipped')) {
-        // First flip - lock difficulty
-        document.querySelectorAll('.difficulty-btn').forEach(btn => {
-            btn.disabled = true; // Disable all buttons after first flip
-        });
-        
-        card.classList.add('flipped');
-        loadNewWord();
+        console.log('Flip card function called');
+        card.classList.add('flipped'); // Flip the card
+
+        // Show game elements and load the first word
         showGameElements();
-    } else {
-        // Only play word audio if not in hard mode
-        const cardImage = document.getElementById('card-image');
-        if (e.target === cardImage && 
-            currentWordAudio && 
-            currentDifficulty !== 'hard') {
-            currentWordAudio.play();
-        }
+        loadNewWord();
+        createCheckButton();
     }
 }
 
@@ -391,72 +399,59 @@ let usedWords = new Set();
 const totalWords = Object.keys(wordData).length;
 
 // Function to load a new word
-function loadNewWord() {
-    const availableWords = Object.keys(wordData).filter(word => !usedWords.has(word));
-    
-    // Check if all words have been used
-    if (availableWords.length === 0) {
-        showGameCompletion();
-        return;
+function loadNewWord(showElements = true) {
+    if (!currentWord) {
+        // Dynamically select an unused word
+        const availableWords = Object.keys(wordData).filter(word => !usedWords.has(word));
+        if (availableWords.length === 0) {
+            console.error('No more words available');
+            showGameCompletion(); // Show game completion message
+            return;
+        }
+        currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+        usedWords.add(currentWord);
     }
-    
-    // Reset lives for new word
-    gameStats.lives = 3;
-    updateLivesDisplay();
-    
-    // Get random word from remaining words
-    currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
-    usedWords.add(currentWord);
-    
-    // Load image
+
+    console.log('Loading new word:', currentWord);
+
+    // Set card image
     const cardImage = document.getElementById('card-image');
     cardImage.src = wordData[currentWord].image;
-    
-    // Only set up audio if not in hard mode
-    if (currentDifficulty !== 'hard') {
-        currentWordAudio = new Audio(wordData[currentWord].audio);
-        // Add click event listener to the image for playing audio
-        cardImage.onclick = (e) => {
-            e.stopPropagation(); // Prevent card flip
-            if (currentWordAudio) {
-                currentWordAudio.play();
-            }
-        };
-    } else {
-        // Remove audio functionality in hard mode
-        currentWordAudio = null;
-        cardImage.onclick = (e) => {
-            e.stopPropagation(); // Only prevent card flip
-        };
-    }
-    
+    cardImage.alt = `Image of ${currentWord}`;
+    console.log('Card image set to:', cardImage.src);
+
     // Create letter boxes and draggable letters
     createLetterBoxes(currentWord);
     createDraggableLetters(currentWord);
-    
-    // Create check button if it doesn't exist
-    if (!document.getElementById('check-button')) {
-        createCheckButton();
+
+    // Show game elements only if explicitly allowed
+    if (showElements) {
+        showGameElements();
     }
-    
-    document.getElementById('feedback').textContent = "";
+
+    // Reset feedback
+    document.getElementById('feedback').textContent = '';
 }
+
+
 
 function createCheckButton() {
     const container = document.getElementById('game-container');
-    const existingButton = document.getElementById('check-button');
-    
-    // Remove existing button if it exists
-    if (existingButton) {
-        existingButton.remove();
+    let checkButton = document.getElementById('check-button');
+
+    // If the button already exists, don't recreate it
+    if (!checkButton) {
+        checkButton = document.createElement('button');
+        checkButton.textContent = 'Check Answer';
+        checkButton.id = 'check-button';
+        checkButton.addEventListener('click', checkAnswer);
+        container.appendChild(checkButton);
     }
-    
-    const checkBtn = document.createElement('button');
-    checkBtn.textContent = 'Check Answer';
-    checkBtn.id = 'check-button';
-    checkBtn.addEventListener('click', checkAnswer);
-    container.appendChild(checkBtn);
+
+    // Ensure the button is visible
+    checkButton.style.display = 'block';
 }
+
 
 // Function to show success and prepare next word
 function showSuccess() {
@@ -500,6 +495,7 @@ function showGameElements() {
     
     letterBoxes.style.display = 'flex';
     availableLetters.style.display = 'flex';
+    console.log('Game elements are now visible');
 }
 
 function registerUser() {
@@ -623,7 +619,7 @@ function createSpecialCelebration() {
             confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 50%, 50%)`;
             
             // Random shapes
-            const shapes = ['★', '●', '♦', '♠', '♣', '♥'];
+            const shapes = ['★', '●', '��', '♠', '♣', '♥'];
             confetti.innerHTML = shapes[Math.floor(Math.random() * shapes.length)];
             
             document.body.appendChild(confetti);
@@ -669,10 +665,117 @@ if ('serviceWorker' in navigator) {
 document.addEventListener('DOMContentLoaded', () => {
     const card = document.getElementById('card');
     card.addEventListener('click', flipCard);
-    hideGameElements(); // Hide elements initially
+
+    hideGameElements(); // Hide game elements initially
     createDifficultySelector();
-    createLivesDisplay(); // Add this line
-    
-    // Pre-load the first word but don't show elements yet
-    loadNewWord();
+    createLivesDisplay();
+
+    // Load the first word without showing elements
+    loadNewWord(false); // Pass a flag to avoid showing elements initially
 });
+
+
+// Touch event handlers for letter boxes
+function handleBoxTouchStart(e) {
+    if (!this.textContent) return; // Only handle filled boxes
+    e.preventDefault();
+    
+    // Create a temporary draggable letter
+    const tempLetter = document.createElement('div');
+    tempLetter.className = 'draggable-letter dragging';
+    tempLetter.textContent = this.textContent;
+    tempLetter.id = this.dataset.originalLetter;
+    document.body.appendChild(tempLetter);
+    
+    // Clear the original box
+    const originalLetter = document.getElementById(this.dataset.originalLetter);
+    if (originalLetter) {
+        originalLetter.classList.remove('hidden');
+    }
+    this.textContent = '';
+    this.dataset.originalLetter = '';
+    
+    // Position the temporary letter at touch position
+    const touch = e.touches[0];
+    tempLetter.style.position = 'fixed';
+    tempLetter.style.left = (touch.clientX - 20) + 'px';
+    tempLetter.style.top = (touch.clientY - 20) + 'px';
+    
+    // Store reference to temp letter
+    this.tempLetter = tempLetter;
+}
+
+function handleBoxTouchMove(e) {
+    if (!this.tempLetter) return;
+    e.preventDefault();
+    
+    const touch = e.touches[0];
+    this.tempLetter.style.left = (touch.clientX - 20) + 'px';
+    this.tempLetter.style.top = (touch.clientY - 20) + 'px';
+    
+    // Find and highlight closest empty box
+    const letterBoxes = document.getElementsByClassName('letter-box');
+    let closestBox = null;
+    let closestDistance = Infinity;
+    
+    Array.from(letterBoxes).forEach(box => {
+        const rect = box.getBoundingClientRect();
+        const distance = Math.hypot(
+            touch.clientX - (rect.left + rect.width/2),
+            touch.clientY - (rect.top + rect.height/2)
+        );
+        if (distance < closestDistance && !box.textContent) {
+            closestDistance = distance;
+            closestBox = box;
+        }
+    });
+    
+    Array.from(letterBoxes).forEach(box => box.classList.remove('hover'));
+    if (closestBox && closestDistance < 50) {
+        closestBox.classList.add('hover');
+    }
+}
+
+function handleBoxTouchEnd(e) {
+    if (!this.tempLetter) return;
+    
+    const touch = e.changedTouches[0];
+    let placed = false;
+    
+    // Try to place in a letter box
+    const letterBoxes = document.getElementsByClassName('letter-box');
+    Array.from(letterBoxes).forEach(box => {
+        box.classList.remove('hover');
+        const rect = box.getBoundingClientRect();
+        if (!box.textContent &&
+            touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+            box.textContent = this.tempLetter.textContent;
+            box.dataset.originalLetter = this.tempLetter.id;
+            document.getElementById(this.tempLetter.id).classList.add('hidden');
+            placed = true;
+        }
+    });
+    
+    // If not placed, return to available letters
+    if (!placed) {
+        const originalLetter = document.getElementById(this.tempLetter.id);
+        if (originalLetter) {
+            originalLetter.classList.remove('hidden');
+        }
+    }
+    
+    // Remove temporary letter
+    this.tempLetter.remove();
+    this.tempLetter = null;
+}
+
+// Allow letters to be dragged out of the boxes
+function handleBoxDragStart(e) {
+    const letterId = this.dataset.originalLetter;
+    const letter = document.getElementById(letterId);
+    if (letter) {
+        e.dataTransfer.setData('text/plain', letterId);
+        this.classList.add('hover');
+    }
+}

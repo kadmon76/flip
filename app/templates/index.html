@@ -16,7 +16,7 @@
 <body>
     <div id="game-container">
         <h1>Flip to Spell the Word</h1>
-        <div class="card" id="card" onclick="flipCard()">
+        <div class="card" id="card">
             <div class="card-inner">
                 <div class="card-front">
                     <p>Flip to Start</p>
@@ -30,7 +30,7 @@
         <div id="available-letters" class="available-letters-container"></div>
         <div id="feedback" class="feedback"></div>
     </div>
-
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
