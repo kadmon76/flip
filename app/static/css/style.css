@@ -1,294 +1,156 @@
-/* Hide boxes and letters initially */
-#letter-boxes,
-#available-letters {
-    display: none;
-}
+/* style.css */
 
-/* General layout */
+/* Basic reset-ish */
 body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
     margin: 0;
-    overscroll-behavior: none;
+    padding: 0;
+    font-family: "Arial", sans-serif;
+    background: #fafafa;
 }
 
 #game-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
     text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
     position: relative;
-    z-index: 1; /* Lower z-index than dragging letter */
-}
-
-h1 {
-    margin-bottom: 20px;
-    color: #333;
+    padding-top: 20px;
 }
 
 /* Card styles */
 .card {
-    width: 250px;
+    width: 200px;
     height: 250px;
-    perspective: 1000px;
-    margin: 0 auto;
+    margin: 20px auto;
+    perspective: 800px;
+    cursor: pointer;
 }
 
 .card-inner {
     width: 100%;
     height: 100%;
-    position: relative;
-    text-align: center;
-    transition: transform 0.8s;
+    transition: transform 0.6s ease;
     transform-style: preserve-3d;
 }
 
-.card.flipped .card-inner {
+#card.flipped .card-inner {
     transform: rotateY(180deg);
 }
 
-.card-front,
-.card-back {
-    position: absolute;
+.card-front, .card-back {
     width: 100%;
     height: 100%;
     backface-visibility: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 15px;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
 .card-front {
-    background-color: #4CAF50;
-    color: white;
+    background: #ffb3b3; /* Light red/pinkish */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
 }
 
 .card-back {
-    background-color: #FFF;
+    background: #ececec;
     transform: rotateY(180deg);
-    border: 2px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.card-back img {
-    max-width: 80%;
-    max-height: 80%;
-    border-radius: 10px;
-    object-fit: contain;
-    margin: auto;
+#card-image {
+    max-width: 100%;
+    max-height: 100%;
 }
 
-/* Letter boxes and available letters */
+/* Letter Boxes */
 .letter-boxes-container {
     display: flex;
     justify-content: center;
-    gap: 10px;
-    margin: 20px 0;
+    margin: 1rem 0;
 }
 
 .letter-box {
-    width: 60px;
-    height: 60px;
-    border: 2px dashed #cccccc;
-    background-color: #f9f9f9;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    margin: 5px;
-    transition: background-color 0.3s, border-color 0.3s;
-    border-radius: 8px;
-    pointer-events: all; /* Ensure drop zones are interactive */
-}
-
-.letter-box.correct {
-    background-color: #4CAF50;
-    color: white;
-    border-color: #45a049;
-}
-
-.letter-box.incorrect {
-    background-color: #f44336;
-    color: white;
-    animation: shake 0.5s ease-in-out;
-}
-
-@keyframes shake {
-    0%, 100% {
-        transform: translateX(0);
-    }
-    25% {
-        transform: translateX(-10px);
-    }
-    75% {
-        transform: translateX(10px);
-    }
-}
-
-.available-letters-container {
+    width: 50px;
+    height: 50px;
+    margin: 0 5px;
+    border: 2px dashed #ccc;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px;
-    border: 2px solid #cccccc;
-    border-radius: 8px;
-    position: relative;
-    min-height: 80px;
-    background-color: #f0f0f0;
-    margin: 0 auto;
-    width: auto;
+    font-size: 1.5em;
+    transition: background-color 0.3s ease;
+}
+
+/* Boxes highlight when hovered by a letter */
+.box-hovered {
+    background-color: #cdeffb; /* Light bluish highlight */
+    border-color: #4ebffa;
+}
+
+/* When a letter is placed in-box */
+.letter-box.in-box,
+.letter-box .in-box {
+    background-color: #ddffee; /* a pastel green */
+    border-color: #88cc99;
+}
+
+/* Draggable Letters */
+.available-letters-container {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
 }
 
 .draggable-letter {
-    position: relative;
-    z-index: 10;
-    background-color: #4CAF50;
-    color: white;
-    border: 2px solid #FFA500;
-    box-shadow: 0px 0px 5px #FFA500;
-    cursor: grab;
-    width: 50px;
-    height: 50px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 0 10px;
-    transition: transform 0.1s ease;
-    font-size: 16px;
-    box-sizing: border-box;
-}
-
-.draggable-letter.dragging {
-    z-index: 1000; /* Ensure it stays above other elements */
-    pointer-events: none; /* Prevent interference during drag */
-}
-.draggable-letter.in-box {
-    width: 50px;       /* same as your original .draggable-letter */
-    height: 50px;      /* same as your original .draggable-letter */
-    margin: 0 !important; 
-    /* maybe a slightly different look if you want:
-    background-color: #cce5ff;
-    border-color: #66b0ff;
-    */
-  }
-/* Responsive design */
-@media (max-width: 768px) {
-    .draggable-letter {
-        width: 60px;
-        height: 60px;
-        font-size: 24px;
-    }
-}
-
-@media (min-width: 769px) {
-    .draggable-letter {
-        width: 50px;
-        height: 50px;
-        font-size: 16px;
-    }
-}
-
-/* Difficulty selector styles */
-.difficulty-selector {
-    width: 100%;
+    width: 40px;
+    height: 40px;
+    background-color: #ffe5b9; 
+    border: 2px solid #ddd;
+    border-radius: 4px;
     text-align: center;
-    margin: 20px 0;
-}
-
-.difficulty-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-}
-
-.difficulty-btn {
-    padding: 8px 16px;
-    border: 2px solid #4CAF50;
-    border-radius: 5px;
-    background: white;
-    color: #4CAF50;
+    line-height: 40px;
+    font-size: 1.5em;
     cursor: pointer;
-    transition: all 0.3s ease;
+    user-select: none; /* prevent text selection */
+    transition: background-color 0.2s ease;
 }
 
-.difficulty-btn:hover {
-    background: #4CAF50;
-    color: white;
+/* Add a slight highlight on hover */
+.draggable-letter:hover {
+    background-color: #ffe0a0;
 }
 
-.difficulty-btn.active {
-    background: #4CAF50;
-    color: white;
-}
-
-.difficulty-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-/* Feedback styles */
+/* Feedback styling */
 .feedback {
-    margin-top: 10px;
-    font-weight: bold;
-}
-
-/* Completion message */
-.completion-message {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    margin: 10px auto;
+    width: 80%;
     text-align: center;
-    padding: 2rem;
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    font-weight: bold;
+    padding: 8px 0;
+    border-radius: 4px;
 }
 
-.completion-message h1 {
-    color: #4CAF50;
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
+.feedback.success {
+    color: #228B22;
 }
 
-.completion-message button {
-    margin-top: 1rem;
-    padding: 1rem 2rem;
-    font-size: 1.2rem;
-    background: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: transform 0.2s;
+.feedback.error {
+    color: #c00;
 }
 
-.completion-message button:hover {
-    transform: scale(1.1);
-}
-
-/* Special confetti styles */
-.special-confetti {
-    position: fixed;
-    font-size: 2rem;
-    color: white;
-    user-select: none;
-    animation: specialFall 5s linear forwards;
+/* Star Confetti for success */
+.star-confetti {
+    position: absolute;
+    font-size: 2em;
+    color: gold;
+    pointer-events: none; /* so clicks pass through */
     z-index: 999;
-}
-
-@keyframes specialFall {
-    0% {
-        transform: translateY(-10vh) rotate(0deg);
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(100vh) rotate(720deg);
-        opacity: 0;
-    }
+    mix-blend-mode: screen; 
 }

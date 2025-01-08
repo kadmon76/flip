@@ -17,14 +17,20 @@ let currentWord = "";
 let currentWordAudio = null;
 
 const sounds = {
-    correct: [new Audio('/static/sounds/correct/correct1.mp3'), new Audio('/static/sounds/correct/correct2.mp3')],
-    wrong: [new Audio('/static/sounds/error/error1.mp3'), new Audio('/static/sounds/error/error2.mp3')],
+    correct: [
+        new Audio('/static/sounds/correct/correct1.mp3'),
+        new Audio('/static/sounds/correct/correct2.mp3')
+    ],
+    wrong: [
+        new Audio('/static/sounds/error/error1.mp3'),
+        new Audio('/static/sounds/error/error2.mp3')
+    ],
 };
 
 const difficultySettings = {
-    easy: { showCorrectLetters: true, hasWordAudio: true },
+    easy:   { showCorrectLetters: true, hasWordAudio: true },
     medium: { showCorrectLetters: false, hasWordAudio: true },
-    hard: { showCorrectLetters: false, hasWordAudio: false },
+    hard:   { showCorrectLetters: false, hasWordAudio: false },
 };
 
 let currentDifficulty = "easy";
@@ -33,7 +39,9 @@ let gameStats = { lives: 3 };
 const usedWords = new Set();
 const totalWords = Object.keys(wordData).length;
 
-// Create letter boxes
+/* ======================
+   CREATE LETTER BOXES
+====================== */
 function createLetterBoxes(word) {
     const container = document.querySelector(".letter-boxes-container");
     container.innerHTML = "";
@@ -45,121 +53,114 @@ function createLetterBoxes(word) {
     });
 }
 
-// Create draggable letters with improved drag-and-drop handling
+/* ======================
+   CREATE DRAGGABLE LETTERS 
+   + HOVER/HIGHLIGHT + ANIM
+====================== */
 function createDraggableLetters(word) {
     const container = document.querySelector(".available-letters-container");
     container.innerHTML = "";
     const shuffledLetters = word.split("").sort(() => Math.random() - 0.5);
-  
+
     shuffledLetters.forEach(letter => {
-      const letterDiv = document.createElement("div");
-      letterDiv.className = "draggable-letter";
-      letterDiv.textContent = letter;
-      container.appendChild(letterDiv);
-  
-      Draggable.create(letterDiv, {
-        type: "x,y",
-        zIndexBoost: true,
-        onDragEnd: function() {
-          const letterBoxes = document.querySelectorAll(".letter-box");
-          const letterContainer = document.querySelector(".available-letters-container");
-          
-          let droppedInBox = false;
-  
-          // 1) Check if dropped on any letter box
-          letterBoxes.forEach(box => {
-            if (this.hitTest(box, "50%")) {
-              box.appendChild(this.target);
-              this.target.classList.add("in-box");
-              gsap.set(this.target, {
-                x: 0,
-                y: 0,
-                position: "relative",
-                left: "0px",
-                top: "0px"
-              });
-              // Optionally add some styling for "in-box"
-              this.target.classList.add("in-box");
-              droppedInBox = true;
+        const letterDiv = document.createElement("div");
+        letterDiv.className = "draggable-letter";
+        letterDiv.textContent = letter;
+        container.appendChild(letterDiv);
+
+        Draggable.create(letterDiv, {
+            type: "x,y",
+            zIndexBoost: true,
+            
+            // Give letters a slight tilt when picking them up
+            onDragStart: function() {
+                gsap.to(this.target, { 
+                    rotation: 10, 
+                    duration: 0.2, 
+                    ease: "power1.out" 
+                });
+            },
+            
+            // Hover effect for letter boxes
+            onDrag: function() {
+                const letterBoxes = document.querySelectorAll(".letter-box");
+                letterBoxes.forEach(box => {
+                    if (this.hitTest(box, "50%")) {
+                        box.classList.add("box-hovered");
+                    } else {
+                        box.classList.remove("box-hovered");
+                    }
+                });
+            },
+            
+            onDragEnd: function() {
+                gsap.to(this.target, { rotation: 0, duration: 0.2 }); // reset rotation
+                const letterBoxes = document.querySelectorAll(".letter-box");
+                const letterContainer = document.querySelector(".available-letters-container");
+                
+                // Remove all hovered states after drop
+                letterBoxes.forEach(box => box.classList.remove("box-hovered"));
+
+                let droppedInBox = false;
+
+                // Check if dropped on any letter box
+                letterBoxes.forEach(box => {
+                    if (this.hitTest(box, "50%")) {
+                        box.appendChild(this.target);
+                        this.target.classList.add("in-box");
+                        gsap.set(this.target, {
+                            x: 0,
+                            y: 0,
+                            position: "relative",
+                            left: "0px",
+                            top: "0px"
+                        });
+                        droppedInBox = true;
+                        
+                        // Tiny bounce animation for the box
+                        gsap.fromTo(box, 
+                            { y: -5 },
+                            { 
+                                y: 0, 
+                                duration: 0.3, 
+                                ease: "bounce.out" 
+                            }
+                        );
+                    }
+                });
+
+                // If NOT dropped in a box, check if it’s on the container
+                if (!droppedInBox) {
+                    if (this.hitTest(letterContainer, "50%")) {
+                        letterContainer.appendChild(this.target);
+                        this.target.classList.remove("in-box");
+                        gsap.set(this.target, {
+                            x: 0,
+                            y: 0,
+                            position: "relative",
+                            left: "0px",
+                            top: "0px"
+                        });
+                    } else {
+                        // Snap it back to the letter container
+                        letterContainer.appendChild(this.target);
+                        gsap.set(this.target, {
+                            x: 0,
+                            y: 0,
+                            position: "relative",
+                            left: "0px",
+                            top: "0px"
+                        });
+                    }
+                }
             }
-          });
-  
-          // 2) If NOT dropped in a box, check if it’s on the container
-          if (!droppedInBox) {
-            if (this.hitTest(letterContainer, "50%")) {
-              // If dropped back onto the letter container
-              letterContainer.appendChild(this.target);
-              this.target.classList.remove("in-box");
-              gsap.set(this.target, {
-                x: 0,
-                y: 0,
-                position: "relative",
-                left: "0px",
-                top: "0px"
-              });
-              // this.target.classList.remove("in-box");
-            } else {
-              // 3) Otherwise, snap it back to the letter container
-              letterContainer.appendChild(this.target);
-              gsap.set(this.target, {
-                x: 0,
-                y: 0,
-                position: "relative",
-                left: "0px",
-                top: "0px"
-              });
-              // this.target.classList.remove("in-box");
-            }
-          }
-        }
-      });
+        });
     });
-  }
-  
-function moveLetterToContainer(draggableLetter, letterContainer) {
-  // 1) Get the letter's current global bounding rectangle
-  let rect = draggableLetter.getBoundingClientRect();
-  let currentX = rect.left;
-  let currentY = rect.top;
-
-  // 2) Append to container
-  letterContainer.appendChild(draggableLetter);
-
-  // 3) Now get the letter’s new bounding rect
-  //    and figure out how much we need to shift to keep it
-  //    at the same spot visually
-  let newRect = draggableLetter.getBoundingClientRect();
-  let deltaX = currentX - newRect.left;
-  let deltaY = currentY - newRect.top;
-
-  // 4) Set its position so it looks like it never moved
-  gsap.set(draggableLetter, {
-    x: deltaX,
-    y: deltaY,
-    position: "absolute",  // or "fixed" if you prefer
-    left: 0,
-    top: 0
-  });
-
-  // 5) Now animate smoothly to 0,0 (the container’s top-left corner)
-  gsap.to(draggableLetter, {
-    x: 0,
-    y: 0,
-    duration: 1.5,
-    ease: "power1.inOut",
-    onComplete: () => {
-      // If you prefer it "relative" after finishing:
-      gsap.set(draggableLetter, {
-        position: "relative", 
-        left: "0px",
-        top: "0px"
-      });
-    }
-  });
 }
 
-
-// Check the player's answer
+/* ===============
+   CHECK ANSWER
+=============== */
 function checkAnswer() {
     const feedback = document.querySelector("#feedback");
     const boxes = [...document.querySelectorAll(".letter-box")];
@@ -175,6 +176,10 @@ function checkAnswer() {
         feedback.textContent = "Correct!";
         feedback.className = "feedback success";
         playRandomSound(sounds.correct);
+
+        // Show confetti or star pop
+        showStarPop();
+
         showSuccess();
     } else {
         feedback.textContent = "Incorrect, try again!";
@@ -186,12 +191,50 @@ function checkAnswer() {
     }
 }
 
-// Play random sound
+/* ===============
+   RANDOM SOUND
+=============== */
 function playRandomSound(soundArray) {
     soundArray[Math.floor(Math.random() * soundArray.length)].play();
 }
 
-// Show success and load next word
+/* =================
+   CONFETTI / STARS
+================= */
+function showStarPop() {
+    // Create a few floating stars near center of screen or box
+    const gameContainer = document.querySelector("#game-container");
+
+    for (let i = 0; i < 8; i++) {
+        let star = document.createElement("div");
+        star.className = "star-confetti";
+        star.textContent = "★";
+        
+        // Random position offset
+        star.style.left = `${50 + Math.random() * 20 - 10}%`;
+        star.style.top = `${40 + Math.random() * 20 - 10}%`;
+
+        gameContainer.appendChild(star);
+
+        // Animate star outward and fade
+        gsap.fromTo(star,
+            { scale: 0, opacity: 1 },
+            { 
+                scale: 1, 
+                opacity: 0, 
+                duration: 1.2 + Math.random(), 
+                x: (Math.random() - 0.5) * 200, 
+                y: (Math.random() - 0.5) * 200, 
+                ease: "power2.out",
+                onComplete: () => star.remove() 
+            }
+        );
+    }
+}
+
+/* ===============
+   SHOW SUCCESS
+=============== */
 function showSuccess() {
     setTimeout(() => {
         currentWord = "";
@@ -199,15 +242,31 @@ function showSuccess() {
     }, 1500);
 }
 
-// Update lives display
+/* ===============
+   UPDATE LIVES
+=============== */
 function updateLivesDisplay() {
+    // Use your hearts logic as before
+    // (Just make sure you have the .hearts element in your HTML or adapt as necessary)
     const hearts = document.querySelectorAll(".hearts span");
     hearts.forEach((heart, i) => {
         heart.textContent = i < gameStats.lives ? "❤️" : "🖤";
     });
 }
 
-// Load new word
+/* ===============
+   END GAME
+=============== */
+function endGame() {
+    const feedback = document.querySelector("#feedback");
+    feedback.textContent = "Game Over! No more lives!";
+    feedback.className = "feedback error";
+    // You might disable further interactions or do something fancy
+}
+
+/* ===============
+   LOAD NEW WORD
+=============== */
 function loadNewWord() {
     if (usedWords.size === totalWords) {
         showGameCompletion();
@@ -223,7 +282,9 @@ function loadNewWord() {
     document.querySelector("#feedback").textContent = "";
 }
 
-// Register new user
+/* ===============
+   REGISTER USER
+=============== */
 function registerUser() {
     const input = document.querySelector("#username");
     if (input.value) {
@@ -233,13 +294,17 @@ function registerUser() {
     }
 }
 
-// Show game completion
+/* =====================
+   SHOW GAME COMPLETION
+===================== */
 function showGameCompletion() {
     const gameContainer = document.querySelector("#game-container");
     gameContainer.innerHTML = `<h1>Congratulations! You completed all ${totalWords} words!</h1>`;
 }
 
-// Flip card and start game
+/* ===============
+   FLIP CARD
+=============== */
 function flipCard() {
     const card = document.querySelector("#card");
     if (!card.classList.contains("flipped")) {
@@ -248,7 +313,9 @@ function flipCard() {
     }
 }
 
-// Initialize the game
+/* ===============
+   INIT GAME
+=============== */
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelector("#card").addEventListener("click", flipCard);
     createLetterBoxes("");
