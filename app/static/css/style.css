@@ -2,12 +2,47 @@
 
 /* Basic reset-ish */
 body {
+    font-family: "Comic Sans MS", "Fredoka One", cursive, sans-serif;
+    font-size: 18px;
+    background: #fafafa;
     margin: 0;
     padding: 0;
-    font-family: "Arial", sans-serif;
-    background: #fafafa;
 }
 
+/* We can enlarge hearts */
+.hearts span {
+    font-size: 2rem; /* bigger hearts */
+    margin: 0 0.3em;
+  }
+
+  .child-text {
+    font-size: 1.5rem; 
+    font-weight: bold;
+    color: #333;
+  }
+
+/* Optionally add an emoji style or highlight text more. 
+   We can also define .child-emoji or something if you want extra flair. */
+   .child-emoji {
+    font-size: 2rem;  /* even bigger for emphasis */
+    text-align: center;
+  }
+
+  button {
+    font-family: "Comic Sans MS", "Fredoka One", cursive, sans-serif;
+    font-size: 1.2rem;
+    padding: 0.6em 1.2em;
+    margin: 1em 0;
+    border: none;
+    border-radius: 0.5em;
+    background-color: #ffb3b3;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: #ffa4a4;
+  }
+  
 #game-container {
     width: 100%;
     max-width: 600px;

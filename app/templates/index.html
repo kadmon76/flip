@@ -2,33 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" 
+          content="width=device-width, 
+                   initial-scale=1.0, 
+                   maximum-scale=1.0, 
+                   user-scalable=no">
     <title>Flip Card Spelling Game</title>
     
     <!-- PWA meta tags and icons -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Spelling Game">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1">
+    <link rel="apple-touch-icon" 
+          href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="manifest" 
+          href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="stylesheet" 
+          href="{{ url_for('static', filename='css/style.css') }}?v=1">
 </head>
 <body>
     <div id="game-container">
         <h1>Flip to Spell the Word</h1>
+
+        <!-- Card Container -->
         <div class="card" id="card">
             <div class="card-inner">
                 <div class="card-front">
                     <p>Flip to Start</p>
                 </div>
                 <div class="card-back">
-                    <img id="card-image" src="" alt="Guess the word image" />
+                    <img id="card-image" 
+                         src="" 
+                         alt="Guess the word image" />
                 </div>
             </div>
         </div>
+
+        <!-- Lives (Hearts) Container -->
+        <div class="hearts">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <!-- Letter Boxes (for dropping letters) -->
         <div class="letter-boxes-container"></div>
+
+        <!-- Draggable Letters Container -->
         <div class="available-letters-container"></div>
+
+        <!-- Feedback Messages -->
         <div id="feedback" class="feedback"></div>
+
+        <!-- Check Answer Button -->
+        <button id="check-btn">Check Answer</button>
     </div>
 
     <!-- Include GSAP and Draggable -->
