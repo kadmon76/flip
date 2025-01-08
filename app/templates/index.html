@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-title" content="Spelling Game">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1">
 </head>
 <body>
     <div id="game-container">
@@ -26,11 +26,16 @@
                 </div>
             </div>
         </div>
-        <div id="letter-boxes" class="letter-boxes-container"></div>
-        <div id="available-letters" class="available-letters-container"></div>
+        <div class="letter-boxes-container"></div>
+        <div class="available-letters-container"></div>
         <div id="feedback" class="feedback"></div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+    <!-- Include GSAP and Draggable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
+    
+    <!-- Include your custom script -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
