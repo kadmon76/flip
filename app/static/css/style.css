@@ -183,11 +183,20 @@ body {
 /* Star Confetti for success */
 .star-confetti {
     position: absolute;
-    font-size: 2em;
-    color: gold;
-    pointer-events: none; /* so clicks pass through */
-    z-index: 999;
-    mix-blend-mode: screen; 
+    width: 10px;
+    height: 10px;
+    background: gold;
+    border-radius: 50%;
+    animation: fall 2s linear infinite;
+}
+
+@keyframes fall {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(100vh);
+    }
 }
 /* Add a glowing highlight to incorrect letters */
 .letter-box.shake.highlight {

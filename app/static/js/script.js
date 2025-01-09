@@ -97,7 +97,6 @@ function snapLetterToBox(letterDiv) {
             box.appendChild(letterDiv);
             letterDiv.classList.add("in-box");
             gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
-            letterDiv.setAttribute('draggable', 'false'); // Disable dragging when in the correct box
             droppedInBox = true;
         }
     });
@@ -179,6 +178,22 @@ function revealAnswerAndFlip(playSound = true) {
 }
 
 /* ===============
+   LOCK LETTERS AFTER CHECKING
+=============== */
+function lockCorrectLetters() {
+    const boxes = document.querySelectorAll(".letter-box");
+    boxes.forEach((box, index) => {
+        if (box.textContent === currentWord[index]) {
+            const letterDiv = box.querySelector(".draggable-letter");
+            if (letterDiv) {
+                letterDiv.setAttribute("draggable", "false");
+                letterDiv.style.pointerEvents = "none";
+            }
+        }
+    });
+}
+
+/* ===============
    LOAD NEW WORD WITH RESET
 =============== */
 function loadNewWordWithReset() {
@@ -229,28 +244,27 @@ function showGameCompletion() {
     feedback.className = "feedback success child-text";
 
     // Add confetti effect
-    const confettiContainer = document.createElement("div");
-    confettiContainer.className = "confetti-container";
-    document.body.appendChild(confettiContainer);
-
     for (let i = 0; i < 100; i++) {
-        const confetti = document.createElement("div");
-        confetti.className = "confetti";
-        confetti.style.left = `${Math.random() * 100}%`;
-        confetti.style.animationDelay = `${Math.random()}s`;
-        confettiContainer.appendChild(confetti);
+        const star = document.createElement("div");
+        star.className = "star-confetti";
+        star.style.left = `${Math.random() * 100}%`;
+        star.style.top = `${Math.random() * 100}%`;
+        document.body.appendChild(star);
+
+        setTimeout(() => {
+            star.remove();
+        }, 5000); // Remove confetti after 5 seconds
     }
 
-    setTimeout(() => {
-        confettiContainer.remove();
-    }, 5000); // Remove confetti after 5 seconds
+    // Add restart button in place of the check button
+    const checkBtn = document.querySelector("#check-btn");
+    checkBtn.style.display = "none";
 
-    // Add restart button
     const restartButton = document.createElement("button");
     restartButton.textContent = "Restart Game";
-    restartButton.className = "restart-btn";
+    restartButton.id = "check-btn";
     restartButton.onclick = restartGame;
-    document.body.appendChild(restartButton);
+    document.querySelector("#game-container").appendChild(restartButton);
 }
 
 /* ===============
@@ -259,7 +273,12 @@ function showGameCompletion() {
 function restartGame() {
     console.log("Restarting the game...");
     usedWords.clear();
-    document.querySelector(".restart-btn").remove();
+    document.querySelector("#check-btn").remove();
+    const newCheckBtn = document.createElement("button");
+    newCheckBtn.textContent = "Check Answer";
+    newCheckBtn.id = "check-btn";
+    newCheckBtn.onclick = checkAnswer;
+    document.querySelector("#game-container").appendChild(newCheckBtn);
     loadNewWordWithReset();
 }
 
@@ -303,6 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelector("#check-btn").addEventListener("click", () => {
         console.log("Checking answer...");
         checkAnswer();
+        lockCorrectLetters();
     });
 
     const heartsContainer = document.querySelector(".hearts");
