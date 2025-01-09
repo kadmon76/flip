@@ -1,8 +1,8 @@
-/* style.css */
+/* style.css */ewWord
 
 /* Basic reset-ish */
 body {
-    font-family: "Comic Sans MS", "Fredoka One", cursive, sans-serif;
+    font-family: 'Fredoka One', cursive, sans-serif;
     font-size: 18px;
     background: #fafafa;
     margin: 0;
@@ -29,7 +29,7 @@ body {
   }
 
   button {
-    font-family: "Comic Sans MS", "Fredoka One", cursive, sans-serif;
+    font-family: 'Fredoka One', cursive, sans-serif;
     font-size: 1.2rem;
     padding: 0.6em 1.2em;
     margin: 1em 0;
@@ -37,7 +37,7 @@ body {
     border-radius: 0.5em;
     background-color: #ffb3b3;
     cursor: pointer;
-  }
+}
   
   button:hover {
     background-color: #ffa4a4;
@@ -188,4 +188,38 @@ body {
     pointer-events: none; /* so clicks pass through */
     z-index: 999;
     mix-blend-mode: screen; 
+}
+/* Add a glowing highlight to incorrect letters */
+.letter-box.shake.highlight {
+    animation: shake 0.3s ease-in-out, glow 0.8s ease-in-out;
+    border: 2px solid red;
+}
+
+/* Shake effect for incorrect letters */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    50% {
+        transform: translateX(5px);
+    }
+    75% {
+        transform: translateX(-5px);
+    }
+}
+
+/* Glow effect for incorrect letters */
+@keyframes glow {
+    0% {
+        box-shadow: 0 0 5px red;
+    }
+    50% {
+        box-shadow: 0 0 15px red;
+    }
+    100% {
+        box-shadow: 0 0 5px red;
+    }
 }
