@@ -170,14 +170,15 @@ function checkAnswer() {
         playRandomSound(sounds.wrong);
         updateLivesDisplay();
 
-        // 3) Lock the letters that are correct so far
-        lockCorrectLetters();
+        // Call the highlightIncorrectLetters function
+        highlightIncorrectLetters();
 
         if (gameStats.lives === 0) {
             endGame();
         }
     }
 }
+
 
 /* ===============
    LOCK CORRECT LETTERS
@@ -197,6 +198,109 @@ function lockCorrectLetters() {
         }
     });
 }
+
+// Update Font Selection and Attempts Logic
+function highlightIncorrectLetters() {
+    const boxes = document.querySelectorAll(".letter-box");
+
+    if (boxes.length === 0) return; // Exit early if no letter boxes
+
+    boxes.forEach((box, i) => {
+        const letterDiv = box.querySelector(".draggable-letter");
+
+        if (!letterDiv || letterDiv.textContent === currentWord[i]) return;
+
+        // Highlight in red
+        letterDiv.style.backgroundColor = "#ffcccc"; // Light red
+
+        // Shake animation
+        gsap.to(letterDiv, {
+            x: -10,
+            repeat: 3,
+            yoyo: true,
+            duration: 0.1,
+            onComplete: () => {
+                // Reset color after animation
+                letterDiv.style.backgroundColor = "";
+
+                // Slide back to initial position
+                const originalContainer = document.querySelector(".available-letters-container");
+                gsap.to(letterDiv, {
+                    x: 0,
+                    y: 0,
+                    duration: 0.3,
+                    onComplete: () => {
+                        originalContainer.appendChild(letterDiv);
+                        letterDiv.style.position = "relative";
+                        letterDiv.style.left = "0px";
+                        letterDiv.style.top = "0px";
+                    }
+                });
+            }
+        });
+    });
+
+    // Play incorrect answer sound
+    new Audio('/static/sounds/incorrect.mp3').play();
+}
+
+function revealCorrectAnswer() {
+    const boxes = document.querySelectorAll(".letter-box");
+
+    boxes.forEach((box, i) => {
+        const letterDiv = document.createElement("div");
+        letterDiv.className = "draggable-letter";
+        letterDiv.textContent = currentWord[i];
+
+        gsap.to(box, {
+            backgroundColor: "#ddffee",
+            duration: 0.5,
+            onComplete: () => {
+                box.appendChild(letterDiv);
+            }
+        });
+    });
+
+    // Play answer reveal sound
+    new Audio('/static/sounds/reveal.mp3').play();
+}
+
+function handleAttempts() {
+    const feedback = document.querySelector("#feedback");
+
+    if (gameStats.attempts > 1) {
+        gameStats.attempts--;
+        feedback.textContent = `Try again! ${gameStats.attempts} attempts left.`;
+        feedback.className = "feedback error child-text";
+    } else {
+        feedback.textContent = "Out of attempts! Here's the correct answer.";
+        feedback.className = "feedback error child-text";
+        revealCorrectAnswer();
+    }
+}
+
+function resetLifeBar() {
+    const hearts = document.querySelectorAll(".hearts span");
+    hearts.forEach(heart => (heart.textContent = "❤️"));
+}
+
+function loadNewWordWithReset() {
+    // Reset attempts
+    gameStats.attempts = 3;
+
+    // Reset life bar
+    resetLifeBar();
+
+    // Load the new word
+    loadNewWord();
+
+    // Positive reinforcement animation
+    const feedback = document.querySelector("#feedback");
+    feedback.textContent = "Great job! Ready for the next word?";
+    feedback.className = "feedback success child-text";
+    gsap.fromTo(feedback, { scale: 0.8 }, { scale: 1, duration: 0.3 });
+}
+
 
 /* ===============
    RANDOM SOUND
