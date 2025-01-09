@@ -6,8 +6,8 @@ let username = "";
 
 // Word list with images and audio
 const wordData = {
-    dog: { image: "/static/images/animals/dog.svg", audio: "/static/sounds/words/dog.mp3" },
-    cat: { image: "/static/images/animals/cat.svg", audio: "/static/sounds/words/cat.mp3" },
+    dog:  { image: "/static/images/animals/dog.svg",  audio: "/static/sounds/words/dog.mp3"  },
+    cat:  { image: "/static/images/animals/cat.svg",  audio: "/static/sounds/words/cat.mp3"  },
     fish: { image: "/static/images/animals/fish.svg", audio: "/static/sounds/words/fish.mp3" },
     bird: { image: "/static/images/animals/bird.svg", audio: "/static/sounds/words/bird.mp3" },
     frog: { image: "/static/images/animals/frog.svg", audio: "/static/sounds/words/frog.mp3" }
@@ -54,7 +54,7 @@ function createLetterBoxes(word) {
 }
 
 /* ======================
-   CREATE DRAGGABLE LETTERS 
+   CREATE DRAGGABLE LETTERS
 ====================== */
 function createDraggableLetters(word) {
     const container = document.querySelector(".available-letters-container");
@@ -72,10 +72,10 @@ function createDraggableLetters(word) {
             zIndexBoost: true,
             onDragStart: function() {
                 // Little rotation for fun
-                gsap.to(this.target, { 
-                    rotation: 10, 
-                    duration: 0.2, 
-                    ease: "power1.out" 
+                gsap.to(this.target, {
+                    rotation: 10,
+                    duration: 0.2,
+                    ease: "power1.out"
                 });
             },
             onDrag: function() {
@@ -98,9 +98,9 @@ function createDraggableLetters(word) {
 
                 let droppedInBox = false;
 
-                // Check if dropped on any letter box
+                // 1) Only allow one letter per box
                 letterBoxes.forEach(box => {
-                    if (this.hitTest(box, "50%")) {
+                    if (this.hitTest(box, "50%") && box.children.length === 0) {
                         box.appendChild(this.target);
                         this.target.classList.add("in-box");
                         gsap.set(this.target, {
@@ -112,19 +112,19 @@ function createDraggableLetters(word) {
                         });
                         droppedInBox = true;
                         
-                        // Tiny bounce animation for the box
-                        gsap.fromTo(box, 
+                        // Tiny bounce animation
+                        gsap.fromTo(box,
                             { y: -5 },
-                            { 
-                                y: 0, 
-                                duration: 0.3, 
-                                ease: "bounce.out" 
+                            {
+                                y: 0,
+                                duration: 0.3,
+                                ease: "bounce.out"
                             }
                         );
                     }
                 });
 
-                // If not dropped in a box, snap back to container
+                // If not dropped in a box, snap back
                 if (!droppedInBox) {
                     letterContainer.appendChild(this.target);
                     this.target.classList.remove("in-box");
@@ -170,10 +170,32 @@ function checkAnswer() {
         playRandomSound(sounds.wrong);
         updateLivesDisplay();
 
+        // 3) Lock the letters that are correct so far
+        lockCorrectLetters();
+
         if (gameStats.lives === 0) {
             endGame();
         }
     }
+}
+
+/* ===============
+   LOCK CORRECT LETTERS
+   (So user can't drag them after they’re correct)
+=============== */
+function lockCorrectLetters() {
+    const boxes = document.querySelectorAll(".letter-box");
+    boxes.forEach((box, i) => {
+        const letterDiv = box.querySelector(".draggable-letter");
+        if (letterDiv && letterDiv.textContent === currentWord[i]) {
+            // Mark as correct and disable dragging
+            letterDiv.classList.add("correct-letter");
+            const dragInstance = Draggable.get(letterDiv);
+            if (dragInstance) {
+                dragInstance.disable();
+            }
+        }
+    });
 }
 
 /* ===============
@@ -200,14 +222,14 @@ function showStarPop() {
 
         gsap.fromTo(star,
             { scale: 0, opacity: 1 },
-            { 
-                scale: 1, 
-                opacity: 0, 
-                duration: 1.2 + Math.random(), 
-                x: (Math.random() - 0.5) * 200, 
-                y: (Math.random() - 0.5) * 200, 
+            {
+                scale: 1,
+                opacity: 0,
+                duration: 1.2 + Math.random(),
+                x: (Math.random() - 0.5) * 200,
+                y: (Math.random() - 0.5) * 200,
                 ease: "power2.out",
-                onComplete: () => star.remove() 
+                onComplete: () => star.remove()
             }
         );
     }
@@ -227,7 +249,6 @@ function showSuccess() {
    UPDATE LIVES
 =============== */
 function updateLivesDisplay() {
-    // We assume there's a .hearts container with 3 <span> elements
     const hearts = document.querySelectorAll(".hearts span");
     hearts.forEach((heart, i) => {
         heart.textContent = i < gameStats.lives ? "❤️" : "🖤";
@@ -238,23 +259,30 @@ function updateLivesDisplay() {
    END GAME
 =============== */
 function endGame() {
-    // Provide a clear message that the game is over
     const feedback = document.querySelector("#feedback");
     feedback.textContent = "Oh no! No more hearts left. Game Over! 💔";
     feedback.className = "feedback error child-text";
 
-    // Optional: Play an end-game sound if you want
-    // endGameSound.play();
+    // 2) Show some dramatic shake animation
+    gsap.to("#game-container", {
+        x: -10,
+        duration: 0.1,
+        repeat: 5,
+        yoyo: true,
+        onComplete: () => {
+            gsap.set("#game-container", { x: 0 });
+        }
+    });
 
-    // Disable all draggable elements so user can’t continue playing
+    // Disable all draggables
     Draggable.getAll().forEach(dragInstance => {
         dragInstance.disable();
     });
 
-    // Also disable the "Check Answer" button
+    // Disable "Check Answer" button
     document.querySelector("#check-btn").disabled = true;
 
-    // Show the "Restart Game" button so the user can start again
+    // Show "Restart Game" button
     document.querySelector("#restart-btn").style.display = "inline-block";
 }
 
@@ -273,7 +301,16 @@ function loadNewWord() {
     currentWord = Object.keys(wordData).find(word => !usedWords.has(word));
     usedWords.add(currentWord);
 
-    document.querySelector("#card-image").src = wordData[currentWord].image;
+    // Set the card image
+    const cardImage = document.querySelector("#card-image");
+    cardImage.src = wordData[currentWord].image;
+
+    // 5) Play the word's sound when image is clicked
+    cardImage.onclick = () => {
+        if (wordData[currentWord].audio) {
+            new Audio(wordData[currentWord].audio).play();
+        }
+    };
 
     // Clear feedback
     feedback.textContent = "";
@@ -300,7 +337,7 @@ function registerUser() {
 ===================== */
 function showGameCompletion() {
     const gameContainer = document.querySelector("#game-container");
-    gameContainer.innerHTML = `<h1>Congratulations! You completed all ${totalWords} words!</h1>`;
+    gameContainer.innerHTML = `<h1>Congratulations! You spelled all ${totalWords} words!</h1>`;
 }
 
 /* ===============
@@ -312,8 +349,10 @@ function flipCard() {
         card.classList.add("flipped");
         loadNewWord();
 
-        // Show hearts and the check button once the game truly starts
+        // Show hearts
         document.querySelector(".hearts").style.display = "block";
+        
+        // 4) Show the check button only after flipping
         document.querySelector("#check-btn").style.display = "inline-block";
         updateLivesDisplay();
     }
@@ -323,24 +362,28 @@ function flipCard() {
    INIT GAME
 =============== */
 document.addEventListener("DOMContentLoaded", () => {
+    // Hide the check button initially (in case it's visible in HTML/CSS by default)
+    document.querySelector("#check-btn").style.display = "none";
+
     // Flip card to start
     document.querySelector("#card").addEventListener("click", flipCard);
 
     // Check Answer button (initially hidden)
     document.querySelector("#check-btn").addEventListener("click", checkAnswer);
 
-    // Restart button (initially hidden)
+    // Restart button (initially hidden in CSS)
     document.querySelector("#restart-btn").addEventListener("click", restartGame);
 
     // Initialize empty letter boxes (no word before flipping)
     createLetterBoxes("");
 
     // Hearts will remain hidden until the card is flipped
-    // so no call to updateLivesDisplay() here. We'll do it in flipCard.
 });
-// New function to restart the game
+
+/* ===============
+   RESTART GAME
+=============== */
 function restartGame() {
-    // Reset the card flip
     const card = document.querySelector("#card");
     card.classList.remove("flipped");
 
@@ -356,7 +399,7 @@ function restartGame() {
     // Enable the "Check Answer" button again
     document.querySelector("#check-btn").disabled = false;
 
-    // Hide the restart button and hearts, so the user sees them only when new game starts
+    // Hide restart button, hearts, and check button
     document.querySelector("#restart-btn").style.display = "none";
     document.querySelector(".hearts").style.display = "none";
     document.querySelector("#check-btn").style.display = "none";
