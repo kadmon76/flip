@@ -256,16 +256,17 @@ function showGameCompletion() {
         }, 5000); // Remove confetti after 5 seconds
     }
 
-    // Add restart button in place of the check button
+    // Add restart button with a unique ID
     const checkBtn = document.querySelector("#check-btn");
-    checkBtn.style.display = "none";
+    if (checkBtn) checkBtn.style.display = "none";
 
     const restartButton = document.createElement("button");
     restartButton.textContent = "Restart Game";
-    restartButton.id = "check-btn";
+    restartButton.id = "restart-btn"; // Unique ID for restart button
     restartButton.onclick = restartGame;
     document.querySelector("#game-container").appendChild(restartButton);
 }
+
 
 /* ===============
    RESTART GAME
@@ -273,14 +274,40 @@ function showGameCompletion() {
 function restartGame() {
     console.log("Restarting the game...");
     usedWords.clear();
-    document.querySelector("#check-btn").remove();
+
+    // Select and remove the restart button
+    const restartButton = document.querySelector("#restart-btn");
+    if (restartButton) {
+        restartButton.remove();
+        console.log("Restart button removed.");
+    }
+
+    // Reset all draggable letters and boxes
+    const allDraggableLetters = document.querySelectorAll(".draggable-letter");
+    allDraggableLetters.forEach(letter => {
+        letter.removeAttribute("draggable");
+        letter.style.pointerEvents = "";
+    });
+
+    const allBoxes = document.querySelectorAll(".letter-box");
+    allBoxes.forEach(box => {
+        box.innerHTML = ""; // Clear any locked letters
+    });
+
+    // Create a new "Check Answer" button
     const newCheckBtn = document.createElement("button");
     newCheckBtn.textContent = "Check Answer";
     newCheckBtn.id = "check-btn";
-    newCheckBtn.onclick = checkAnswer;
+    newCheckBtn.onclick = () => {
+        checkAnswer();
+        lockCorrectLetters(); // Reapply lock logic after check
+    };
     document.querySelector("#game-container").appendChild(newCheckBtn);
+
+    // Reset the game
     loadNewWordWithReset();
 }
+
 
 /* ===============
    INIT GAME
