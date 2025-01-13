@@ -1,0 +1,14 @@
+{
+    "boat": { "image": "/static/images/transportation/boat.svg", "audio": "/static/sounds/transportation/boat.mp3" },
+    "bus": { "image": "/static/images/transportation/bus.svg", "audio": "/static/sounds/transportation/bus.mp3" },
+    "bicycle": { "image": "/static/images/transportation/bicycle.svg", "audio": "/static/sounds/transportation/bicycle.mp3" },
+    "car": { "image": "/static/images/transportation/car.svg", "audio": "/static/sounds/transportation/car.mp3" },
+    "helicopter": { "image": "/static/images/transportation/helicopter.svg", "audio": "/static/sounds/transportation/helicopter.mp3" },
+    "motorbike": { "image": "/static/images/transportation/motorbike.svg", "audio": "/static/sounds/transportation/motorbike.mp3" },
+    "plane": { "image": "/static/images/transportation/plane.svg", "audio": "/static/sounds/transportation/plane.mp3" },
+    "scooter": { "image": "/static/images/transportation/scooter.svg", "audio": "/static/sounds/transportation/scooter.mp3" },
+    "submarine": { "image": "/static/images/transportation/submarine.svg", "audio": "/static/sounds/transportation/submarine.mp3" },
+    "taxi": { "image": "/static/images/transportation/taxi.svg", "audio": "/static/sounds/transportation/taxi.mp3" },
+    "train": { "image": "/static/images/transportation/train.svg", "audio": "/static/sounds/transportation/train.mp3" },
+    "truck": { "image": "/static/images/transportation/truck.svg", "audio": "/static/sounds/transportation/truck.mp3" }
+}

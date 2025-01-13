@@ -47,7 +47,7 @@
         </div>
 
         <!-- Letter Boxes (for dropping letters) -->
-        <div class="letter-boxes-container"></div>
+        <div class="letter-boxes-container" id="letter-container"></div>
 
         <!-- Draggable Letters Container -->
         <div class="available-letters-container"></div>
@@ -63,7 +63,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
     
-    <!-- Include your custom script -->
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <!-- Include your custom script as a module -->
+    <script type="module" src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
