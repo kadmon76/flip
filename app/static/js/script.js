@@ -1,32 +1,12 @@
 // script.js
-import { createLetterBoxes, createDraggableLetters, snapLetterToBox, updateLifeBar, revealAnswerAndFlip, showGameCompletion, setupCardClickHandler, setupCheckButtonHandler  } from './ui.js';
+import { createLetterBoxes, createDraggableLetters, setupCardClickHandler, setupCheckButtonHandler, updateLifeBar, revealAnswerAndFlip  } from './ui.js';
+import { loadWordData } from './data.js';
 
-
-let registeredUsers = [];
-let userData = {};
-let username = "";
-
-// Word list with images and audio
-const wordData = {
-    duck:{ image: "/static/images/animals/duck.svg", audio: "/static/sounds/words/duck.mp3"},
-    rabbit:{ image: "/static/images/animals/rabbit.svg", audio: "/static/sounds/words/rabbit.mp3"},
-    horse:{ image: "/static/images/animals/horse.svg", audio: "/static/sounds/words/horse.mp3"},
-    mouse:{ image: "/static/images/animals/mouse.svg", audio: "/static/sounds/words/mouse.mp3"},
-    deer:{ image: "/static/images/animals/deer.svg", audio: "/static/sounds/words/deer.mp3"},
-    wolf:{ image: "/static/images/animals/wolf.svg", audio: "/static/sounds/words/wolf.mp3"},
-    bear:{ image: "/static/images/animals/bear.svg", audio: "/static/sounds/words/bear.mp3"},
-    tiger:{ image: "/static/images/animals/tiger.svg", audio: "/static/sounds/words/tiger.mp3"},
-    lion: { image: "/static/images/animals/lion.svg", audio: "/static/sounds/words/lion.mp3"},
-    dog:  { image: "/static/images/animals/dog.svg",  audio: "/static/sounds/words/dog.mp3"  },
-    cat:  { image: "/static/images/animals/cat.svg",  audio: "/static/sounds/words/cat.mp3"  },
-    fish: { image: "/static/images/animals/fish.svg", audio: "/static/sounds/words/fish.mp3" },
-    bird: { image: "/static/images/animals/bird.svg", audio: "/static/sounds/words/bird.mp3" },
-    frog: { image: "/static/images/animals/frog.svg", audio: "/static/sounds/words/frog.mp3" }
-};
-
+let wordData = {};
+let currentTheme = "";
 let currentWord = "";
 let currentWordAudio = null;
-
+let totalWords = 0;
 
 const sounds = {
     correct: [
@@ -39,65 +19,82 @@ const sounds = {
     ]
 };
 
-const difficultySettings = {
-    easy:   { showCorrectLetters: true,  hasWordAudio: true },
-    medium: { showCorrectLetters: false, hasWordAudio: true },
-    hard:   { showCorrectLetters: false, hasWordAudio: false },
-};
-
-// Game stats, starting with 3 attempts
-let gameStats = { attempts: 3 };
-
+const gameStats = { attempts: 3 };
 const usedWords = new Set();
-const totalWords = Object.keys(wordData).length;
-
 
 /* ===============
-   HANDLE ATTEMPTS
+   THEME SELECTION
 =============== */
-function handleAttempts() {
-    console.log("Handling attempts. Remaining attempts:", gameStats.attempts);
-    const feedback = document.querySelector("#feedback");
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("Initializing game...");
+    showThemeSelection();
+});
 
-    if (gameStats.attempts > 1) {
-        gameStats.attempts--;
-        feedback.textContent = `Try again! ${gameStats.attempts} attempts left.`;
-        feedback.className = "feedback error child-text";
-        updateLifeBar(gameStats);
-        
-        // Play incorrect sound
-        const incorrectSound = sounds.wrong[Math.floor(Math.random() * sounds.wrong.length)];
-        incorrectSound.play();
-    } else {
-        feedback.textContent = "Out of attempts! Here's the correct answer.";
-        feedback.className = "feedback error child-text";
-        setTimeout(() => {
-            revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, false);
-            setTimeout(() => {
-                if (currentWordAudio) {
-                    currentWordAudio.play();
-                }
-            }, 1000); // Play word sound after a delay to avoid overlap
-        }, 1500);
+function showThemeSelection() {
+    const themeContainer = document.querySelector("#theme-container");
+    themeContainer.style.display = "block"; // Show theme selection menu
+
+    const themeButtons = document.querySelectorAll(".theme-btn");
+    themeButtons.forEach(button => {
+        button.addEventListener("click", async (event) => {
+            currentTheme = event.target.dataset.theme; // Get the selected theme
+            console.log(`Theme selected: ${currentTheme}`);
+            themeContainer.style.display = "none"; // Hide the theme selection menu
+
+            try {
+                // Dynamically load the selected theme data
+                wordData = await loadWordData(`/static/data/${currentTheme}.json`);
+                totalWords = Object.keys(wordData).length;
+                console.log("Word data loaded:", wordData);
+
+                // Start the game after loading the theme
+                initializeGame();
+            } catch (error) {
+                console.error("Error loading theme data:", error);
+            }
+        });
+    });
+}
+
+/* ===============
+   INITIALIZE GAME
+=============== */
+function initializeGame() {
+    console.log("Initializing game with theme:", currentTheme);
+
+    const heartsContainer = document.querySelector(".hearts");
+    heartsContainer.innerHTML = "";
+    for (let i = 0; i < 3; i++) {
+        const heart = document.createElement("span");
+        heart.textContent = "❤️";
+        heartsContainer.appendChild(heart);
     }
+
+    const gameContainer = document.querySelector("#game-container");
+    gameContainer.style.display = "block"; // Show game container
+
+    createLetterBoxes("");
+    setupCardClickHandler(flipCard);
+    setupCheckButtonHandler(checkAnswer, lockCorrectLetters);
 }
 
 
-
 /* ===============
-   LOCK LETTERS AFTER CHECKING
+   FLIP CARD
 =============== */
-function lockCorrectLetters() {
-    const boxes = document.querySelectorAll(".letter-box");
-    boxes.forEach((box, index) => {
-        if (box.textContent === currentWord[index]) {
-            const letterDiv = box.querySelector(".draggable-letter");
-            if (letterDiv) {
-                letterDiv.setAttribute("draggable", "false");
-                letterDiv.style.pointerEvents = "none";
-            }
-        }
-    });
+function flipCard() {
+    console.log("Flipping the card...");
+    const card = document.querySelector("#card");
+    if (!card.classList.contains("flipped")) {
+        card.classList.add("flipped");
+        loadNewWordWithReset();
+
+        // Show hearts
+        document.querySelector(".hearts").style.display = "block";
+
+        // Show the check button only after flipping
+        document.querySelector("#check-btn").style.display = "inline-block";
+    }
 }
 
 /* ===============
@@ -138,88 +135,8 @@ function loadNewWord() {
     createDraggableLetters(currentWord);
 
     // Log audio association
-    console.log("Associated audio for the word:", currentWordAudio.src);
+    console.log("Associated audio for the word:", currentWordAudio?.src || "No audio available");
 }
-
-/* ===============
-   RESTART GAME
-=============== */
-function restartGame() {
-    console.log("Restarting the game...");
-    usedWords.clear();
-
-    // Select and remove the restart button
-    const restartButton = document.querySelector("#restart-btn");
-    if (restartButton) {
-        restartButton.remove();
-        console.log("Restart button removed.");
-    }
-
-    // Reset all draggable letters and boxes
-    const allDraggableLetters = document.querySelectorAll(".draggable-letter");
-    allDraggableLetters.forEach(letter => {
-        letter.removeAttribute("draggable");
-        letter.style.pointerEvents = "";
-    });
-
-    const allBoxes = document.querySelectorAll(".letter-box");
-    allBoxes.forEach(box => {
-        box.innerHTML = ""; // Clear any locked letters
-    });
-
-    // Create a new "Check Answer" button
-    const newCheckBtn = document.createElement("button");
-    newCheckBtn.textContent = "Check Answer";
-    newCheckBtn.id = "check-btn";
-    newCheckBtn.onclick = () => {
-        checkAnswer();
-        lockCorrectLetters(); // Reapply lock logic after check
-    };
-    document.querySelector("#game-container").appendChild(newCheckBtn);
-
-    // Reset the game
-    loadNewWordWithReset();
-}
-
-
-/* ===============
-   INIT GAME
-=============== */
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Initializing game...");
-    document.querySelector("#check-btn").style.display = "none";
-
-    // Flip card function
-    function flipCard() {
-        console.log("Flipping the card...");
-        const card = document.querySelector("#card");
-        if (!card.classList.contains("flipped")) {
-            card.classList.add("flipped");
-            loadNewWordWithReset();
-
-            // Show hearts
-            document.querySelector(".hearts").style.display = "block";
-
-            // Show the check button only after flipping
-            document.querySelector("#check-btn").style.display = "inline-block";
-        }
-    }
-
-    // Set up event handlers using the new functions from ui.js
-    setupCardClickHandler(flipCard);
-    setupCheckButtonHandler(checkAnswer, lockCorrectLetters);
-
-    const heartsContainer = document.querySelector(".hearts");
-    heartsContainer.innerHTML = "";
-    for (let i = 0; i < gameStats.attempts; i++) {
-        const heart = document.createElement("span");
-        heart.textContent = "❤️";
-        heartsContainer.appendChild(heart);
-    }
-
-    createLetterBoxes("");
-});
-
 
 /* ===============
    CHECK ANSWER
@@ -232,24 +149,71 @@ function checkAnswer() {
         console.log("Correct answer provided:", userAnswer);
         const correctSound = sounds.correct[Math.floor(Math.random() * sounds.correct.length)];
         correctSound.play();
-        revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, false); // Prevent word audio overlap
+        revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, false);
     } else {
         console.log("Incorrect answer provided:", userAnswer);
-        boxes.forEach((box, index) => {
-            if (box.textContent !== currentWord[index]) {
-                box.classList.add("shake", "highlight");
-                gsap.to(box, { x: 10, y: -10, repeat: 1, yoyo: true, duration: 0.2 });
-                setTimeout(() => {
-                    box.classList.remove("shake", "highlight");
-                    const letterDiv = box.querySelector(".draggable-letter");
-                    if (letterDiv) {
-                        document.querySelector(".available-letters-container").appendChild(letterDiv);
-                        gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
-                    }
-                    box.textContent = "";
-                }, 600);
-            }
-        });
-        handleAttempts();
+        handleIncorrectAnswer(boxes);
     }
+}
+
+function handleIncorrectAnswer(boxes) {
+    boxes.forEach((box, index) => {
+        if (box.textContent !== currentWord[index]) {
+            box.classList.add("shake", "highlight");
+            gsap.to(box, { x: 10, y: -10, repeat: 1, yoyo: true, duration: 0.2 });
+            setTimeout(() => {
+                box.classList.remove("shake", "highlight");
+                const letterDiv = box.querySelector(".draggable-letter");
+                if (letterDiv) {
+                    document.querySelector(".available-letters-container").appendChild(letterDiv);
+                    gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
+                }
+                box.textContent = "";
+            }, 600);
+        }
+    });
+
+    console.log("Playing wrong sound..."); // Debug log
+
+    // Play a random wrong sound
+    const wrongSound = sounds.wrong[Math.floor(Math.random() * sounds.wrong.length)];
+    if (wrongSound) {
+        wrongSound.play().catch(err => console.error("Sound playback error:", err)); // Error handling
+    } else {
+        console.error("No wrong sound available in the sounds array."); // Additional debug log
+    }
+
+    handleAttempts();
+}
+
+/* ===============
+   HANDLE ATTEMPTS
+=============== */
+function handleAttempts() {
+    console.log("Handling attempts. Remaining attempts:", gameStats.attempts);
+    const feedback = document.querySelector("#feedback");
+
+    if (gameStats.attempts > 1) {
+        gameStats.attempts--;
+        feedback.textContent = `Try again! ${gameStats.attempts} attempts left.`;
+        feedback.className = "feedback error child-text";
+        updateLifeBar(gameStats);
+    } else {
+        feedback.textContent = "Out of attempts! Here's the correct answer.";
+        feedback.className = "feedback error child-text";
+        revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, false);
+    }
+}
+function lockCorrectLetters() {
+    console.log("Locking correct letters...");
+    const boxes = document.querySelectorAll(".letter-box");
+    boxes.forEach((box, index) => {
+        if (box.textContent === currentWord[index]) {
+            const letterDiv = box.querySelector(".draggable-letter");
+            if (letterDiv) {
+                letterDiv.setAttribute("draggable", "false");
+                letterDiv.style.pointerEvents = "none";
+            }
+        }
+    });
 }

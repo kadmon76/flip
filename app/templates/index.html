@@ -22,7 +22,15 @@
           href="{{ url_for('static', filename='css/style.css') }}?v=1">
 </head>
 <body>
-    <div id="game-container">
+    <!-- Theme Selection Menu -->
+    <div id="theme-container" class="theme-selection">
+        <h2>Select a Theme</h2>
+        <button class="theme-btn" data-theme="animals">Animals</button>
+        <button class="theme-btn" data-theme="transportation">Transportation</button>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" style="display: none;">
         <h1>Flip to Spell the Word</h1>
 
         <!-- Card Container -->
