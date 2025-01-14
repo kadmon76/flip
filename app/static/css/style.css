@@ -232,3 +232,38 @@ body {
         box-shadow: 0 0 5px red;
     }
 }
+@media (max-width: 600px) {
+    .letter-boxes-container {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
+    }
+
+    .letter-box {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2em;
+    }
+
+    .draggable-letter {
+        width: 30px;
+        height: 30px;
+        font-size: 1.2em;
+        line-height: 30px;
+    }
+}
+
+@media (max-width: 400px) {
+    .letter-box {
+        width: 30px;
+        height: 30px;
+        font-size: 1em;
+    }
+
+    .draggable-letter {
+        width: 25px;
+        height: 25px;
+        font-size: 1em;
+        line-height: 25px;
+    }
+}

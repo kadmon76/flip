@@ -22,6 +22,16 @@ const sounds = {
 const gameStats = { attempts: 3 };
 const usedWords = new Set();
 
+function adjustGameScaling() {
+    const gameContainer = document.querySelector("#game-container");
+    const scaleFactor = Math.min(1, window.innerWidth / 600); // Scale proportionally
+    gameContainer.style.transform = `scale(${scaleFactor})`;
+    gameContainer.style.transformOrigin = "top center"; // Ensures scaling from the center
+}
+
+window.addEventListener("resize", adjustGameScaling);
+document.addEventListener("DOMContentLoaded", adjustGameScaling);
+
 /* ===============
    THEME SELECTION
 =============== */
@@ -217,3 +227,17 @@ function lockCorrectLetters() {
         }
     });
 }
+const cardImage = document.querySelector("#card-image");
+
+// This is a new event listener added to handle playing the word's audio when the image is clicked.
+cardImage.addEventListener("click", () => {
+    // Added condition to check if the audio for the current word is available before attempting to play.
+    if (currentWordAudio) {
+        console.log("Playing audio:", currentWordAudio.src);
+        currentWordAudio.play().catch(err => {
+            console.error("Error playing audio:", err);
+        });
+    } else {
+        console.log("No audio set for the current word.");
+    }
+});
