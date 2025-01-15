@@ -8,7 +8,29 @@ let currentWord = "";
 let currentWordAudio = null;
 
 let totalWords = 0;
+// Swipe sounds array
+const swipeSounds = [
+    new Audio('/static/sounds/swipe/swipe1.mp3'),
+    new Audio('/static/sounds/swipe/swipe2.mp3'),
+    new Audio('/static/sounds/swipe/swipe3.mp3'),
+    new Audio('/static/sounds/swipe/swipe4.mp3')
+];
+swipeSounds.forEach((sound, index) => {
+    sound.addEventListener('error', (e) => {
+        console.error(`Swipe sound ${index + 1} failed to load:`, e);
+    });
+    console.log(`Swipe sound ${index + 1} loaded:`, sound.src);
+});
 
+// Ensure that the playSwipeSound function is firing
+export function playSwipeSound() {
+    const randomSound = swipeSounds[Math.floor(Math.random() * swipeSounds.length)];
+    randomSound.playbackRate = 1 + (Math.random() * 0.2 - 0.1); // Slight pitch variation
+    randomSound.volume = 0.8 + (Math.random() * 0.2 - 0.1); // Slight volume variation
+    randomSound.play()
+        .then(() => console.log("Sound played successfully"))
+        .catch(err => console.error("Sound playback error:", err));
+}
 const sounds = {
     correct: [
         new Audio('/static/sounds/correct/correct1.mp3'),
@@ -257,3 +279,5 @@ if (cardImage) {
         }
     });
 }
+
+

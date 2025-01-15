@@ -2,6 +2,7 @@
 // This script contains all functions related to updating and interacting with the user interface.
 // Functions here create and manipulate HTML elements, handle animations, and manage the game's visual feedback.
 
+import { playSwipeSound } from './script.js';
 /* ======================
    CREATE LETTER BOXES
 ====================== */
@@ -52,6 +53,8 @@ export function createDraggableLetters(word) {
 /* ===============
    SNAP LETTER
 =============== */
+
+// Check if snapLetterToBox is firing correctly
 export function snapLetterToBox(letterDiv) {
     console.log("Attempting to snap letter to box:", letterDiv.textContent);
     const letterBoxes = document.querySelectorAll(".letter-box");
@@ -66,6 +69,7 @@ export function snapLetterToBox(letterDiv) {
             letterDiv.classList.add("in-box");
             gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
             droppedInBox = true;
+            playSwipeSound(); // Play swipe sound on successful drop
         }
     });
 
@@ -76,6 +80,7 @@ export function snapLetterToBox(letterDiv) {
         gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
     }
 }
+
 
 /* ===============
    UPDATE LIFE BAR
