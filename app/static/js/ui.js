@@ -97,17 +97,18 @@ export function updateLifeBar(gameStats) {
    REVEAL ANSWER AND FLIP
 =============== */
 export function revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, playSound = true) {
-    console.log("Revealing answer and flipping card. Current word:", currentWord);
-    const boxes = document.querySelectorAll(".letter-box");
+    console.log("[DEBUG] revealAnswerAndFlip triggered for:", currentWord);
 
+    const boxes = document.querySelectorAll(".letter-box");
     boxes.forEach((box, i) => {
         box.textContent = currentWord[i];
         gsap.to(box, { y: -10, duration: 0.5, ease: "bounce.out" });
     });
 
     if (playSound && wordData[currentWord]?.audio) {
-        console.log("Playing word audio for:", currentWord);
-        new Audio(wordData[currentWord].audio).play();
+        const wordAudio = new Audio(wordData[currentWord].audio);
+        console.log(`[DEBUG] Word audio triggered. Function: revealAnswerAndFlip, Sound: ${wordAudio.src}`);
+        wordAudio.play();
     }
 
     setTimeout(() => {

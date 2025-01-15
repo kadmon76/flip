@@ -32,14 +32,55 @@ export function playSwipeSound() {
 }
 const sounds = {
     correct: [
-        new Audio('/static/sounds/correct/correct1.mp3'),
-        new Audio('/static/sounds/correct/correct2.mp3')
+        new Audio('/static/sounds/correct/correct your brain deserve a high five.mp3'),
+        new Audio('/static/sounds/correct/correct2.mp3'),
+        new Audio('/static/sounds/correct/ding ding ding your on fire.mp3'),
+        new Audio('/static/sounds/correct/holy cow you got it right.mp3'),
+        new Audio('/static/sounds/correct/you are on fire.mp3'),
+        new Audio('/static/sounds/correct/you have a spelling superpower.mp3'),
+        new Audio('static/sounds/correct/bingo.mp3')
     ],
     wrong: [
         new Audio('/static/sounds/error/error1.mp3'),
         new Audio('/static/sounds/error/error2.mp3')
     ]
 };
+
+let lastCorrectSoundIndex = -1; // Variable to track the last played sound index
+
+// Function to stop all currently playing sounds
+function stopAllSounds(soundsArray) {
+    soundsArray.forEach(sound => {
+        sound.pause();
+        sound.currentTime = 0; // Reset to start
+    });
+}
+
+// Function to play a random sound ensuring no repeat
+function playRandomSound(soundsArray) {
+    stopAllSounds(soundsArray); // Stop any currently playing sounds
+
+    let nextIndex;
+    do {
+        nextIndex = Math.floor(Math.random() * soundsArray.length);
+    } while (nextIndex === lastCorrectSoundIndex);
+
+    lastCorrectSoundIndex = nextIndex; // Update last played index
+    const sound = soundsArray[nextIndex];
+    console.log(`[DEBUG] playRandomSound triggered. Function: playRandomSound, Sound: ${sound.src}`);
+    sound.play().catch(error => {
+        console.error(`Audio playback failed for ${sound.src}: ${error.message}`);
+    });
+}
+
+// Remove this duplicate listener from script.js
+// document.getElementById('check-btn').addEventListener('click', () => {
+//     try {
+//         checkAnswer(); // Delegate all logic to checkAnswer
+//     } catch (error) {
+//         console.error(`Unexpected error: ${error.message}`);
+//     }
+// });
 
 const gameStats = { attempts: 3 };
 const usedWords = new Set();
@@ -202,12 +243,17 @@ function checkAnswer() {
     const userAnswer = Array.from(boxes).map(box => box.textContent).join("");
 
     if (userAnswer.toLowerCase() === currentWord.toLowerCase()) {
-        console.log("Correct answer provided:", userAnswer);
+        console.log("[DEBUG] Correct answer detected in checkAnswer:", userAnswer);
+
+        // Play a random correct sound
         const correctSound = sounds.correct[Math.floor(Math.random() * sounds.correct.length)];
+        console.log(`[DEBUG] Correct sound triggered. Function: checkAnswer, Sound: ${correctSound.src}`);
         correctSound.play();
+
+        // Reveal answer and proceed
         revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, false);
     } else {
-        console.log("Incorrect answer provided:", userAnswer);
+        console.log("[DEBUG] Incorrect answer detected in checkAnswer:", userAnswer);
         handleIncorrectAnswer(boxes);
     }
 }
