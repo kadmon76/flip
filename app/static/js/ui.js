@@ -5,13 +5,18 @@
 /* ======================
    CREATE LETTER BOXES
 ====================== */
+
+
 export function createLetterBoxes(word) {
-    console.log("Creating letter boxes for:", word);
     const container = document.querySelector(".letter-boxes-container");
     container.innerHTML = "";
+
+    const boxWidth = Math.min(window.innerWidth / word.length, 50); // Adjust size
     word.split("").forEach((_, i) => {
         const box = document.createElement("div");
         box.className = "letter-box";
+        box.style.width = `${boxWidth}px`;
+        box.style.height = `${boxWidth}px`;
         box.dataset.index = i;
         container.appendChild(box);
     });
@@ -21,22 +26,23 @@ export function createLetterBoxes(word) {
    CREATE DRAGGABLE LETTERS
 ====================== */
 export function createDraggableLetters(word) {
-    console.log("Creating draggable letters for:", word);
     const container = document.querySelector(".available-letters-container");
     container.innerHTML = "";
-    const shuffledLetters = word.split("").sort(() => Math.random() - 0.5);
 
-    shuffledLetters.forEach(letter => {
+    const boxWidth = Math.min(window.innerWidth / word.length, 50); // Adjust size
+    word.split("").sort(() => Math.random() - 0.5).forEach(letter => {
         const letterDiv = document.createElement("div");
         letterDiv.className = "draggable-letter";
         letterDiv.textContent = letter;
+        letterDiv.style.width = `${boxWidth - 10}px`; // Slightly smaller
+        letterDiv.style.height = `${boxWidth - 10}px`;
+        letterDiv.style.fontSize = `${boxWidth / 2}px`;
         container.appendChild(letterDiv);
 
         Draggable.create(letterDiv, {
             type: "x,y",
             zIndexBoost: true,
             onDragEnd: function () {
-                console.log("Dragging ended for letter:", this.target.textContent);
                 snapLetterToBox(this.target);
             }
         });
@@ -165,3 +171,54 @@ export function setupCheckButtonHandler(checkAnswer, lockCorrectLetters) {
         });
     }
 }
+
+
+/**
+ * Resize and animate letter boxes and letters dynamically based on screen size.
+ * Ensure the word and the letter boxes stay on one line.
+ * Maintain the square shape of empty letter boxes.
+ * If the letters become too small, exclude the word.
+ * @param {string} word - The current word being displayed.
+ */
+ export function resizeLetterBoxesAndLetters(word) {
+    const container = document.querySelector(".letter-boxes-container");
+    const letterContainer = document.querySelector(".available-letters-container");
+
+    const maxBoxWidth = Math.min(window.innerWidth / word.length, 50);
+    const minBoxWidth = 30;
+
+    if (maxBoxWidth < minBoxWidth) {
+        console.warn(`Word '${word}' is too long to fit on the screen. Skipping...`);
+        container.innerHTML = "<p class='error-message'>This word is too long for the screen size.</p>";
+        return;
+    }
+
+    container.style.display = "flex";
+    container.style.flexWrap = "nowrap";
+    container.style.justifyContent = "center";
+
+    const boxes = container.querySelectorAll(".letter-box");
+    boxes.forEach(box => {
+        box.style.flex = "0 0 auto"; // Prevent flex shrinking
+        box.style.width = `${maxBoxWidth}px`;
+        box.style.height = `${maxBoxWidth}px`;
+        box.style.lineHeight = `${maxBoxWidth}px`; // Center content vertically
+        box.style.aspectRatio = "1 / 1"; // Force square shape
+    });
+
+    gsap.to(boxes, {
+        fontSize: maxBoxWidth / 2,
+        duration: 0.5,
+        ease: "power1.out",
+    });
+
+    const letters = letterContainer.querySelectorAll(".draggable-letter");
+    gsap.to(letters, {
+        width: maxBoxWidth - 10,
+        height: maxBoxWidth - 10,
+        fontSize: maxBoxWidth / 2.5,
+        duration: 0.5,
+        ease: "power1.out",
+    });
+}
+

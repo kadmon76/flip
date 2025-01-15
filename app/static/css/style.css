@@ -110,15 +110,16 @@ body {
 }
 
 .letter-box {
-    width: 50px;
-    height: 50px;
-    margin: 0 5px;
-    border: 2px dashed #ccc;
     display: flex;
-    align-items: center;
     justify-content: center;
-    font-size: 1.5em;
-    transition: background-color 0.3s ease;
+    align-items: center;
+    border: 2px dashed #ccc;
+    box-sizing: border-box; /* Ensure padding and border are included */
+    aspect-ratio: 1 / 1; /* Keeps boxes square */
+    transition: all 0.3s ease-in-out;
+    min-width: 30px; /* Prevents shrinking */
+    min-height: 30px;
+    overflow: hidden; /* Avoid text overflow issues */
 }
 
 /* Boxes highlight when hovered by a letter */
@@ -230,40 +231,5 @@ body {
     }
     100% {
         box-shadow: 0 0 5px red;
-    }
-}
-@media (max-width: 600px) {
-    .letter-boxes-container {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 5px;
-    }
-
-    .letter-box {
-        width: 40px;
-        height: 40px;
-        font-size: 1.2em;
-    }
-
-    .draggable-letter {
-        width: 30px;
-        height: 30px;
-        font-size: 1.2em;
-        line-height: 30px;
-    }
-}
-
-@media (max-width: 400px) {
-    .letter-box {
-        width: 30px;
-        height: 30px;
-        font-size: 1em;
-    }
-
-    .draggable-letter {
-        width: 25px;
-        height: 25px;
-        font-size: 1em;
-        line-height: 25px;
     }
 }

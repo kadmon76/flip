@@ -1,5 +1,5 @@
 // script.js
-import { createLetterBoxes, createDraggableLetters, setupCardClickHandler, setupCheckButtonHandler, updateLifeBar, revealAnswerAndFlip  } from './ui.js';
+import { createLetterBoxes, createDraggableLetters, setupCardClickHandler, setupCheckButtonHandler, updateLifeBar, revealAnswerAndFlip, resizeLetterBoxesAndLetters   } from './ui.js';
 import { loadWordData } from './data.js';
 
 let wordData = {};
@@ -144,8 +144,8 @@ function loadNewWord() {
     createLetterBoxes(currentWord);
     createDraggableLetters(currentWord);
 
-    // Log audio association
-    console.log("Associated audio for the word:", currentWordAudio?.src || "No audio available");
+    // Resize letter boxes and letters with animation
+    resizeLetterBoxesAndLetters(currentWord);
 }
 
 /* ===============
@@ -234,10 +234,16 @@ cardImage.addEventListener("click", () => {
     // Added condition to check if the audio for the current word is available before attempting to play.
     if (currentWordAudio) {
         console.log("Playing audio:", currentWordAudio.src);
+        // Handles errors that might occur during the audio playback.
         currentWordAudio.play().catch(err => {
             console.error("Error playing audio:", err);
         });
     } else {
         console.log("No audio set for the current word.");
+    }
+});
+window.addEventListener("resize", () => {
+    if (currentWord) {
+        resizeLetterBoxesAndLetters(currentWord);
     }
 });
