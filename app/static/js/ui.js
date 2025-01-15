@@ -221,4 +221,21 @@ export function setupCheckButtonHandler(checkAnswer, lockCorrectLetters) {
         ease: "power1.out",
     });
 }
+/**
+ * Scale the entire game container to fit the screen size dynamically.
+ */
+ export function scaleGameToFitScreen() {
+    const gameContainer = document.querySelector("#game-container");
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
 
+    // Calculate scaling factor
+    const scale = Math.min(screenWidth / gameContainer.offsetWidth, screenHeight / gameContainer.offsetHeight);
+
+    // Apply scaling using GSAP
+    gsap.to(gameContainer, {
+        scale: scale,
+        transformOrigin: "center top",
+        duration: 0.5,
+    });
+}

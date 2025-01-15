@@ -1,11 +1,12 @@
 // script.js
-import { createLetterBoxes, createDraggableLetters, setupCardClickHandler, setupCheckButtonHandler, updateLifeBar, revealAnswerAndFlip, resizeLetterBoxesAndLetters   } from './ui.js';
+import { createLetterBoxes, createDraggableLetters, setupCardClickHandler, setupCheckButtonHandler, updateLifeBar, revealAnswerAndFlip, resizeLetterBoxesAndLetters, scaleGameToFitScreen } from './ui.js';
 import { loadWordData } from './data.js';
 
 let wordData = {};
 let currentTheme = "";
 let currentWord = "";
 let currentWordAudio = null;
+
 let totalWords = 0;
 
 const sounds = {
@@ -22,6 +23,9 @@ const sounds = {
 const gameStats = { attempts: 3 };
 const usedWords = new Set();
 
+/*
+ * Adjust game scaling dynamically for responsive design.
+ */
 function adjustGameScaling() {
     const gameContainer = document.querySelector("#game-container");
     const scaleFactor = Math.min(1, window.innerWidth / 600); // Scale proportionally
@@ -29,17 +33,27 @@ function adjustGameScaling() {
     gameContainer.style.transformOrigin = "top center"; // Ensures scaling from the center
 }
 
-window.addEventListener("resize", adjustGameScaling);
-document.addEventListener("DOMContentLoaded", adjustGameScaling);
+/* ===============
+   EVENT LISTENERS
+=============== */
+// Handle dynamic scaling on window resize
+window.addEventListener("resize", () => {
+    scaleGameToFitScreen();
+    if (currentWord) {
+        resizeLetterBoxesAndLetters(currentWord);
+    }
+});
+
+// Initialize the game on DOM content loaded
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("Initializing game...");
+    scaleGameToFitScreen();
+    showThemeSelection();
+});
 
 /* ===============
    THEME SELECTION
 =============== */
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Initializing game...");
-    showThemeSelection();
-});
-
 function showThemeSelection() {
     const themeContainer = document.querySelector("#theme-container");
     themeContainer.style.display = "block"; // Show theme selection menu
@@ -87,7 +101,6 @@ function initializeGame() {
     setupCardClickHandler(flipCard);
     setupCheckButtonHandler(checkAnswer, lockCorrectLetters);
 }
-
 
 /* ===============
    FLIP CARD
@@ -227,23 +240,20 @@ function lockCorrectLetters() {
         }
     });
 }
-const cardImage = document.querySelector("#card-image");
 
-// This is a new event listener added to handle playing the word's audio when the image is clicked.
-cardImage.addEventListener("click", () => {
-    // Added condition to check if the audio for the current word is available before attempting to play.
-    if (currentWordAudio) {
-        console.log("Playing audio:", currentWordAudio.src);
-        // Handles errors that might occur during the audio playback.
-        currentWordAudio.play().catch(err => {
-            console.error("Error playing audio:", err);
-        });
-    } else {
-        console.log("No audio set for the current word.");
-    }
-});
-window.addEventListener("resize", () => {
-    if (currentWord) {
-        resizeLetterBoxesAndLetters(currentWord);
-    }
-});
+/* ===============
+   IMAGE CLICK: PLAY AUDIO
+=============== */
+const cardImage = document.querySelector("#card-image");
+if (cardImage) {
+    cardImage.addEventListener("click", () => {
+        if (currentWordAudio) {
+            console.log("Playing audio:", currentWordAudio.src);
+            currentWordAudio.play().catch(err => {
+                console.error("Error playing audio:", err);
+            });
+        } else {
+            console.log("No audio set for the current word.");
+        }
+    });
+}
