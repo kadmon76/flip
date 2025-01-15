@@ -1,4 +1,3 @@
-// script.js
 import { createLetterBoxes, createDraggableLetters, setupCardClickHandler, setupCheckButtonHandler, updateLifeBar, revealAnswerAndFlip, resizeLetterBoxesAndLetters, scaleGameToFitScreen } from './ui.js';
 import { loadWordData } from './data.js';
 
@@ -91,7 +90,17 @@ function showThemeSelection() {
                 // Dynamically load the selected theme data
                 wordData = await loadWordData(`/static/data/${currentTheme}.json`);
                 totalWords = Object.keys(wordData).length;
-                console.log("Word data loaded:", wordData);
+
+                // Rearrange words by difficulty and shuffle within each difficulty
+                wordData = Object.entries(wordData).sort(([, a], [, b]) => {
+                    const difficultyOrder = { easy: 0, medium: 1, hard: 2 };
+                    return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+                });
+
+                // Convert back to an object
+                wordData = Object.fromEntries(wordData);
+
+                console.log("Words rearranged by difficulty:", wordData);
 
                 // Start the game after loading the theme
                 initializeGame();
@@ -168,7 +177,9 @@ function loadNewWord() {
     currentWord = Object.keys(wordData).find(word => !usedWords.has(word));
     usedWords.add(currentWord);
 
-    console.log("New word selected:", currentWord);
+    const currentDifficulty = wordData[currentWord].difficulty;
+    console.log(`New word selected: ${currentWord} (Difficulty: ${currentDifficulty})`);
+
     document.querySelector("#card-image").src = wordData[currentWord].image;
 
     if (wordData[currentWord].audio) {
@@ -279,5 +290,3 @@ if (cardImage) {
         }
     });
 }
-
-
