@@ -41,8 +41,13 @@ const sounds = {
         new Audio('static/sounds/correct/bingo.mp3')
     ],
     wrong: [
-        new Audio('/static/sounds/error/error1.mp3'),
-        new Audio('/static/sounds/error/error2.mp3')
+        new Audio('/static/sounds/error/correct amm nope.mp3'),
+        new Audio('/static/sounds/error/no no no.mp3'),
+        new Audio('/static/sounds/error/so close but not really.mp3'),
+        new Audio('/static/sounds/error/that one way to spell it.mp3'),
+        new Audio('/static/sounds/error/actually that is cleverly wrong.mp3'),
+        new Audio('/static/sounds/error/hmm no.mp3'),
+        new Audio('/static/sounds/error/in one word no way.mp3')
     ]
 };
 
