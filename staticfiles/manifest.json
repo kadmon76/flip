@@ -1,0 +1,13 @@
+{
+    "name": "Flip Card Spelling Game",
+    "short_name": "Spelling Game",
+    "start_url": "/",
+    "display": "standalone",
+    "icons": [
+        {
+            "src": "/static/icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ]
+}
