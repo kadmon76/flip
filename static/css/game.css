@@ -173,6 +173,20 @@ body {
     border: 2px dashed var(--color-box-border);
     border-radius: var(--radius-small);
     background: rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* a box holding a tile: the tile covers the box, hide the dashed frame */
+.letter-box.filled {
+    border-color: transparent;
+    background: transparent;
+}
+
+.letter-box > .draggable-letter {
+    width: 100%;
+    height: 100%;
 }
 
 .letter-tray {
@@ -198,14 +212,36 @@ body {
     touch-action: none;
 }
 
+.draggable-letter.gsap-dragging {
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+body.dragging-active {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.hearts .lost {
+    color: #d6d6d6;
+}
+
+.result-line {
+    margin: 0;
+    min-height: 1.4em;
+    font-size: 1.1rem;
+    text-align: center;
+}
+
 /* --- Action row --- */
 
 .actions {
     width: 100%;
+    display: flex;
+    gap: 12px;
 }
 
 .action-btn {
-    width: 100%;
+    flex: 1 1 0;
     height: 56px;
     font-family: var(--font);
     font-size: 1.3rem;
@@ -216,8 +252,13 @@ body {
     cursor: pointer;
 }
 
-.action-btn:active {
+.action-btn:active:not(:disabled) {
     transform: scale(0.98);
+}
+
+.action-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
 /* --- Round-end screen --- */

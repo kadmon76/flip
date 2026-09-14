@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=2">
 </head>
 <body>
     <!-- Header: title + auth in one compact line -->
@@ -48,7 +48,9 @@
         </div>
         <div id="letter-boxes" class="letter-boxes"></div>
         <div id="letter-tray" class="letter-tray"></div>
+        <p id="result-line" class="result-line"></p>
         <div class="actions">
+            <button id="check-btn" class="action-btn" disabled>Check</button>
             <button id="next-btn" class="action-btn">Next</button>
         </div>
     </div>
@@ -64,7 +66,7 @@
     <!-- Gallery screen (placeholder) -->
     <div id="screen-gallery" class="screen" style="display: none;"></div>
 
-<!-- Include GSAP and Draggable (used again in a later step) -->
+<!-- GSAP + Draggable (drag.js) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
 

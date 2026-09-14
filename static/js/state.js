@@ -5,9 +5,20 @@ export const state = {
     screen: 'theme',            // 'theme' | 'play' | 'round-end' | 'gallery'
     theme: null,
     words: [],                  // [{ word, image, audio }] for the current round
-    round: { index: 0, size: 5, results: [] },
-    current: { word: null, image: null, audio: null, placed: [], tray: [] },
-    lives: 3,
+    round: { index: 0, size: 5, results: [] },   // results[i] = { word, correct }
+    current: {
+        word: null,
+        image: null,
+        audio: null,
+        // placed[i] is null or { letter, tileId }; one slot per letter of word
+        placed: [],
+        // tray is [{ id, letter, used }] in tray display order; id is stable
+        // for the life of the word so the DOM tile can be keyed to it
+        tray: [],
+        // 'playing' | 'wrong' (checked, lives left) | 'correct' | 'revealed'
+        status: 'playing',
+    },
+    lives: 3,                   // attempts left for the current word
 };
 
 const subscribers = [];
