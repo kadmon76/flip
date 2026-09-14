@@ -70,58 +70,36 @@
     </div>
     {% endif %}
 
-    <!-- Theme Selection Menu -->
-    <div id="theme-container" class="theme-selection">
+    <!-- Theme screen -->
+    <div id="screen-theme" class="theme-selection">
         <h2>Select a Theme</h2>
-        <button class="theme-btn" data-theme="animals">Animals</button>
-        <button class="theme-btn" data-theme="transportation">Transportation</button>
+        <div id="theme-buttons"></div>
     </div>
 
-    <!-- Game Container -->
-    <div id="game-container" style="display: none;">
-        <h1>Flip to Spell the Word</h1>
-
-        <!-- Card Container -->
-        <div class="card" id="card">
-            <div class="card-inner">
-                <div class="card-front">
-                    <p>Flip to Start</p>
-                </div>
-                <div class="card-back">
-                    <img id="card-image" 
-                         src="" 
-                         alt="Guess the word image" />
-                </div>
-            </div>
-        </div>
-
-        <!-- Lives (Hearts) Container -->
-        <div class="hearts">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-
-        <!-- Letter Boxes (for dropping letters) -->
-        <div class="letter-boxes-container" id="letter-container"></div>
-
-        <!-- Draggable Letters Container -->
-        <div class="available-letters-container"></div>
-
-        <!-- Feedback Messages -->
-        <div id="feedback" class="feedback"></div>
-
-        <!-- Check Answer Button -->
-        <button id="check-btn">Check Answer</button>
+    <!-- Play screen -->
+    <div id="screen-play" style="display: none;">
+        <h1>Spell the Word</h1>
+        <img id="play-image" src="" alt="" style="max-width: 200px;" />
+        <div id="letter-boxes" class="letter-boxes-container"></div>
+        <div id="letter-tray" class="available-letters-container"></div>
+        <button id="next-btn">Next</button>
     </div>
 
-<!-- Include GSAP and Draggable -->
+    <!-- Round-end screen -->
+    <div id="screen-round-end" style="display: none;">
+        <h2 id="round-score"></h2>
+        <button id="play-again-btn">Play again</button>
+    </div>
+
+    <!-- Gallery screen (placeholder) -->
+    <div id="screen-gallery" style="display: none;"></div>
+
+<!-- Include GSAP and Draggable (used again in a later step) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
 
-<!-- Game scripts -->
-<script src="{% static 'js/ui.js' %}" type="module"></script>
-<script type="module" src="{% static 'js/script.js' %}"></script>
+<!-- Game script -->
+<script type="module" src="{% static 'js/main.js' %}"></script>
 
 <!-- Mobile optimization script -->
 <script>
