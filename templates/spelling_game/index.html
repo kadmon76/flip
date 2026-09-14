@@ -18,81 +18,51 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v=2">
-          
-    <style>
-        /* Auth Panel Styles */
-        .auth-panel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 5px 10px;
-            border-radius: 20px;
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            font-family: 'Fredoka One', cursive;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        
-        .auth-panel .user-info {
-            margin-right: 10px;
-            font-size: 14px;
-            color: #555;
-        }
-        
-        .logout-btn {
-            background-color: #ff6b6b;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-family: 'Fredoka One', cursive;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
-        
-        .logout-btn:hover {
-            background-color: #ff5252;
-            transform: scale(1.05);
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=1">
 </head>
 <body>
-    <!-- Auth Panel -->
-    {% if user.is_authenticated %}
-    <div class="auth-panel">
-        <div class="user-info">Hi, {{ user.username }}!</div>
-        <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
-    </div>
-    {% endif %}
+    <!-- Header: title + auth in one compact line -->
+    <header class="app-header">
+        <span class="app-title">Flip</span>
+        {% if user.is_authenticated %}
+        <span class="auth">
+            <span class="user-info">Hi, {{ user.username }}!</span>
+            <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
+        </span>
+        {% endif %}
+    </header>
 
     <!-- Theme screen -->
-    <div id="screen-theme" class="theme-selection">
+    <div id="screen-theme" class="screen">
         <h2>Select a Theme</h2>
         <div id="theme-buttons"></div>
     </div>
 
     <!-- Play screen -->
-    <div id="screen-play" style="display: none;">
-        <h1>Spell the Word</h1>
-        <img id="play-image" src="" alt="" style="max-width: 200px;" />
-        <div id="letter-boxes" class="letter-boxes-container"></div>
-        <div id="letter-tray" class="available-letters-container"></div>
-        <button id="next-btn">Next</button>
+    <div id="screen-play" class="screen" style="display: none;">
+        <div class="card">
+            <img id="play-image" src="" alt="" />
+            <div class="hearts" aria-label="Lives">
+                <span>&hearts;</span><span>&hearts;</span><span>&hearts;</span>
+            </div>
+        </div>
+        <div id="letter-boxes" class="letter-boxes"></div>
+        <div id="letter-tray" class="letter-tray"></div>
+        <div class="actions">
+            <button id="next-btn" class="action-btn">Next</button>
+        </div>
     </div>
 
     <!-- Round-end screen -->
-    <div id="screen-round-end" style="display: none;">
+    <div id="screen-round-end" class="screen" style="display: none;">
         <h2 id="round-score"></h2>
-        <button id="play-again-btn">Play again</button>
+        <div class="actions">
+            <button id="play-again-btn" class="action-btn">Play again</button>
+        </div>
     </div>
 
     <!-- Gallery screen (placeholder) -->
-    <div id="screen-gallery" style="display: none;"></div>
+    <div id="screen-gallery" class="screen" style="display: none;"></div>
 
 <!-- Include GSAP and Draggable (used again in a later step) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
@@ -100,74 +70,5 @@
 
 <!-- Game script -->
 <script type="module" src="{% static 'js/main.js' %}"></script>
-
-<!-- Mobile optimization script -->
-<script>
-    // Prevent scrolling on game container touch events
-    document.addEventListener('DOMContentLoaded', function() {
-        // Detect mobile devices and add mobile-device class to body
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            document.body.classList.add('mobile-device');
-        }
-        
-        // Prevent default touch behaviors that interfere with the game
-        const gameContainer = document.getElementById('game-container');
-        if (gameContainer) {
-            gameContainer.addEventListener('touchmove', function(e) {
-                if (document.body.classList.contains('letter-dragging')) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-        }
-        
-        // Fix for iOS Safari bouncing effect
-        document.addEventListener('touchmove', function(e) {
-            if (document.body.classList.contains('letter-dragging')) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        
-        // Make card images unselectable to prevent unwanted behaviors
-        document.addEventListener('click', function(e) {
-            if (e.target.id === 'card-image') {
-                e.preventDefault();
-                // This still allows the click handler for audio to work
-            }
-        });
-    });
-</script>
-<script>
-    // Mobile Touch Event Fix
-    document.addEventListener('DOMContentLoaded', function() {
-        // Detect mobile devices and add mobile-device class to body
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            document.body.classList.add('mobile-device');
-            
-            // Fix for buttons on mobile
-            const allButtons = document.querySelectorAll('button');
-            allButtons.forEach(button => {
-                // Add touch-specific event handling
-                button.addEventListener('touchstart', function(e) {
-                    this.classList.add('button-active');
-                });
-                
-                button.addEventListener('touchend', function(e) {
-                    this.classList.remove('button-active');
-                });
-            });
-            
-            // Only prevent touchmove on draggable letters, not buttons
-            document.addEventListener('touchmove', function(e) {
-                // Only prevent default if we're dragging a letter and not interacting with a button
-                if (document.body.classList.contains('letter-dragging') && 
-                    e.target.closest('button') === null) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-        }
-    });
-    </script>
 </body>
 </html>

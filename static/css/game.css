@@ -1,0 +1,228 @@
+/* game.css — mobile-first layout for the rewritten screens.
+   Replaces style.css / mobile-fixes.css (kept on disk as reference). */
+
+:root {
+    /* sizing: 10 tiles (longest word "helicopter") must fit one row */
+    --page-pad: 16px;
+    --column-max: 480px;
+    --tile-gap: 6px;
+    --tile-size: clamp(28px,
+        calc((min(100vw, var(--column-max)) - 2 * var(--page-pad) - 9 * var(--tile-gap)) / 10),
+        48px);
+    --radius: 16px;
+    --radius-small: 8px;
+
+    /* colors */
+    --color-bg: #fdf6ec;
+    --color-text: #3b3b3b;
+    --color-card: #ffffff;
+    --color-tile: #ffe5b9;
+    --color-tile-border: #e8c98f;
+    --color-box-border: #c9c9c9;
+    --color-accent: #ff6b6b;
+    --color-accent-text: #ffffff;
+    --color-hearts: #ff5252;
+
+    --font: 'Fredoka One', 'Comic Sans MS', cursive, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    overscroll-behavior: none;
+}
+
+body {
+    font-family: var(--font);
+    color: var(--color-text);
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+    touch-action: manipulation;
+}
+
+/* --- Header: one compact line --- */
+
+.app-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px var(--page-pad);
+    min-height: 40px;
+}
+
+.app-title {
+    font-size: 1.25rem;
+}
+
+.auth {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.logout-btn {
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+    text-decoration: none;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+}
+
+/* --- Screens: one centered column --- */
+
+.screen {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: var(--column-max);
+    margin: 0 auto;
+    padding: var(--page-pad);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+/* --- Theme screen --- */
+
+#screen-theme h2 {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+#theme-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.theme-btn {
+    width: 100%;
+    min-height: 64px;
+    font-family: var(--font);
+    font-size: 1.3rem;
+    color: var(--color-text);
+    background: var(--color-tile);
+    border: 2px solid var(--color-tile-border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.theme-btn:active {
+    transform: scale(0.97);
+}
+
+/* --- Play screen --- */
+
+#screen-play {
+    touch-action: none;
+}
+
+.card {
+    position: relative;
+    width: min(60vw, calc(0.6 * var(--column-max)));
+    aspect-ratio: 1 / 1;
+    background: var(--color-card);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.hearts {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+    color: var(--color-hearts);
+    font-size: 1.1rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Letter boxes and tray: shared tile size --- */
+
+.letter-boxes {
+    display: flex;
+    justify-content: center;
+    gap: var(--tile-gap);
+}
+
+.letter-box {
+    width: var(--tile-size);
+    height: var(--tile-size);
+    border: 2px dashed var(--color-box-border);
+    border-radius: var(--radius-small);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.letter-tray {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--tile-gap);
+    min-height: var(--tile-size);
+}
+
+.draggable-letter {
+    width: var(--tile-size);
+    height: var(--tile-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--tile-size) * 0.55);
+    background: var(--color-tile);
+    border: 2px solid var(--color-tile-border);
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+}
+
+/* --- Action row --- */
+
+.actions {
+    width: 100%;
+}
+
+.action-btn {
+    width: 100%;
+    height: 56px;
+    font-family: var(--font);
+    font-size: 1.3rem;
+    color: var(--color-accent-text);
+    background: var(--color-accent);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.action-btn:active {
+    transform: scale(0.98);
+}
+
+/* --- Round-end screen --- */
+
+#round-score {
+    margin: 0;
+    font-size: 3.5rem;
+}
