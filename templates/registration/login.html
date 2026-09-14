@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log In - Flip Card Spelling Game</title>
+    <style>
+        body {
+            font-family: 'Fredoka One', Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+        }
+        form {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 280px;
+        }
+        h1 { font-size: 22px; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 4px; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 14px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background-color: #ff5252; }
+        .errorlist { color: #d33; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <form method="post">
+        {% csrf_token %}
+        <h1>Log In</h1>
+        {{ form.non_field_errors }}
+        <label for="id_username">Username</label>
+        {{ form.username }}
+        <label for="id_password">Password</label>
+        {{ form.password }}
+        <button type="submit">Log In</button>
+    </form>
+</body>
+</html>

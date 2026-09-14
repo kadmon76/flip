@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 import os
 from pathlib import Path
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,19 +21,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '***REMOVED-ROTATED-SECRET-KEY***'
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['flip.yaronl.com', 'localhost','127.0.0.1','139.162.135.47']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv())
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Disable SSL-specific settings since we don't have SSL yet
+# Secure cookies only make sense once served over HTTPS
 SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 # Application definition
 
 INSTALLED_APPS = [
@@ -46,8 +47,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'flip_project.middleware.DebuggingMiddleware',
-    'flip_project.middleware.MobileDetectionMiddleware', 
+    'django.middleware.gzip.GZipMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -55,14 +55,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # Place DevAuthMiddleware before CrossSiteAuthMiddleware
-    'spelling_game.middleware.DevAuthMiddleware',  # Moved up
-    'flip_project.middleware.CrossSiteAuthMiddleware',
-    'spelling_game.middleware.GameSessionMiddleware',
 ]
-# Add compression middleware to mimic production
-if 'django.middleware.gzip.GZipMiddleware' not in MIDDLEWARE:
-    MIDDLEWARE.insert(1, 'django.middleware.gzip.GZipMiddleware')
 
 # Set more production-like cache settings
 CACHES = {
@@ -72,7 +65,9 @@ CACHES = {
     }
 }
 
-SPELLING_GAME_DEBUG = True  # To enable your game's debug mode
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'spelling_game:index'
+LOGOUT_REDIRECT_URL = 'login'
 
 LOGGING = {
     'version': 1,
@@ -85,27 +80,28 @@ LOGGING = {
     },
     'handlers': {
         'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/srv/www/flip/debug.log',
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'maxBytes': 5 * 1024 * 1024,  # 5 MB
+            'backupCount': 3,
             'formatter': 'verbose',
         },
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
     },
+    'root': {
+        'handlers': ['file', 'console'],
+        'level': 'INFO',
+    },
     'loggers': {
-        'auth_middleware': {
-            'handlers': ['file', 'console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
         'django.request': {
             'handlers': ['file', 'console'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }

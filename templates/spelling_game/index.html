@@ -20,8 +20,6 @@
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1">
     <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v=2">
-    <!-- Debug panel CSS -->
-    <link rel="stylesheet" href="{% static 'css/debugPanel.css' %}">
           
     <style>
         /* Auth Panel Styles */
@@ -68,16 +66,10 @@
     {% if user.is_authenticated %}
     <div class="auth-panel">
         <div class="user-info">Hi, {{ user.username }}!</div>
-        <a href="/logout/?return_to=https://yaronl.com/login/" class="logout-btn">Logout</a>
-        <a href="/logout/?global=true&return_to=https://yaronl.com/login/" class="logout-btn">Logout Everywhere</a>
+        <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
     </div>
     {% endif %}
-    
-    <!-- Debug Button -->
-    <div id="debugButtonContainer" class="debug-button-container">
-        <button id="debugButton" class="debug-button">Debug Panel</button>
-    </div>
-    
+
     <!-- Theme Selection Menu -->
     <div id="theme-container" class="theme-selection">
         <h2>Select a Theme</h2>
@@ -127,13 +119,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
 
-<!-- Load debug and data scripts first -->
-<script src="{% static 'js/dataCollection.js' %}"></script>
-<script src="{% static 'js/gameDebug.js' %}"></script>
-<script src="{% static 'js/debugPanel.js' %}"></script>
-<script src="{% static 'js/fixCloseButton.js' %}"></script>
-<script src="{% static 'js/debugThemes.js' %}"></script>
-
 <!-- Game scripts -->
 <script src="{% static 'js/ui.js' %}" type="module"></script>
 <script type="module" src="{% static 'js/script.js' %}"></script>
@@ -171,52 +156,6 @@
                 // This still allows the click handler for audio to work
             }
         });
-    });
-</script>
-
-<!-- Debug panel initialization -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log("Initializing debug panel...");
-        
-        // Initialize the debug panel
-        if (typeof DebugPanel !== 'undefined' && DebugPanel.initialize) {
-            DebugPanel.initialize();
-            
-            // Set up debug button
-            const debugButton = document.getElementById('debugButton');
-            if (debugButton) {
-                debugButton.addEventListener('click', function() {
-                    console.log("Debug button clicked, toggling panel...");
-                    
-                    // Get the panel (it might have been created after this script loaded)
-                    const panel = document.getElementById('debugPanel');
-                    
-                    if (panel) {
-                        // Toggle panel visibility directly with styles
-                        if (panel.classList.contains('hidden')) {
-                            console.log('Showing panel with direct styles');
-                            panel.classList.remove('hidden');
-                            panel.style.transform = 'translateX(0)';
-                            panel.style.display = 'flex';
-                            panel.style.flexDirection = 'column';
-                            panel.style.right = '0';
-                            panel.style.visibility = 'visible';
-                            panel.style.zIndex = '10000';
-                        } else {
-                            console.log('Hiding panel');
-                            panel.classList.add('hidden');
-                            panel.style.transform = 'translateX(100%)';
-                        }
-                    } else {
-                        console.log('Panel not found, trying to use DebugPanel.togglePanel');
-                        DebugPanel.togglePanel();
-                    }
-                });
-            }
-        } else {
-            console.warn("DebugPanel not available - debug functionality will be limited");
-        }
     });
 </script>
 <script>
