@@ -2,13 +2,15 @@
    Replaces style.css / mobile-fixes.css (kept on disk as reference). */
 
 :root {
-    /* sizing: 10 tiles (longest word "helicopter") must fit one row */
+    /* sizing: tray tiles never go below 44px (touch-target minimum) and
+       the tray wraps; up to 8 tiles share one row at the column's max
+       width. Letter boxes shrink below this only when a longer word
+       would not fit one row (see .letter-boxes). */
     --page-pad: 16px;
     --column-max: 480px;
     --tile-gap: 6px;
-    --tile-size: clamp(28px,
-        calc((min(100vw, var(--column-max)) - 2 * var(--page-pad) - 9 * var(--tile-gap)) / 10),
-        48px);
+    --row-width: calc(min(100vw, var(--column-max)) - 2 * var(--page-pad));
+    --tile-size: clamp(44px, calc((var(--row-width) - 7 * var(--tile-gap)) / 8), 48px);
     --radius: 16px;
     --radius-small: 8px;
 
@@ -148,6 +150,9 @@ body {
     -webkit-user-drag: none;
 }
 
+/* Hearts are inline SVG, not the ♥ glyph: on Android the glyph falls
+   back to the colour-emoji font, which ignores CSS colour, so a lost
+   heart never looked any different. */
 .hearts {
     position: absolute;
     top: 8px;
@@ -155,21 +160,38 @@ body {
     display: flex;
     gap: 2px;
     color: var(--color-hearts);
-    font-size: 1.1rem;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-/* --- Letter boxes and tray: shared tile size --- */
+.hearts span {
+    display: flex;
+}
 
+.hearts svg {
+    width: 22px;
+    height: 22px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.hearts .lost {
+    color: #8a8a8a;
+}
+
+/* --- Letter boxes and tray --- */
+
+/* Boxes match the tile size unless the word is too long for one row;
+   then they shrink just enough to fit (card.js sets --letter-count). */
 .letter-boxes {
+    --letter-count: 1;
+    --box-size: min(var(--tile-size),
+        calc((var(--row-width) - (var(--letter-count) - 1) * var(--tile-gap)) / var(--letter-count)));
     display: flex;
     justify-content: center;
     gap: var(--tile-gap);
 }
 
 .letter-box {
-    width: var(--tile-size);
-    height: var(--tile-size);
+    width: var(--box-size);
+    height: var(--box-size);
     border: 2px dashed var(--color-box-border);
     border-radius: var(--radius-small);
     background: rgba(255, 255, 255, 0.5);
@@ -184,9 +206,11 @@ body {
     background: transparent;
 }
 
+/* a placed tile scales into its box */
 .letter-box > .draggable-letter {
     width: 100%;
     height: 100%;
+    font-size: calc(var(--box-size) * 0.55);
 }
 
 .letter-tray {
@@ -219,10 +243,6 @@ body {
 body.dragging-active {
     user-select: none;
     -webkit-user-select: none;
-}
-
-.hearts .lost {
-    color: #d6d6d6;
 }
 
 .result-line {

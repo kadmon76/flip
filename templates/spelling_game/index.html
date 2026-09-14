@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=2">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=3">
 </head>
 <body>
     <!-- Header: title + auth in one compact line -->
@@ -43,7 +43,9 @@
         <div class="card">
             <img id="play-image" src="" alt="" />
             <div class="hearts" aria-label="Lives">
-                <span>&hearts;</span><span>&hearts;</span><span>&hearts;</span>
+                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
+                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
+                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
             </div>
         </div>
         <div id="letter-boxes" class="letter-boxes"></div>

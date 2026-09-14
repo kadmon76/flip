@@ -59,6 +59,8 @@ function renderHearts(lives) {
 function renderBoxes(count) {
     const container = $('letter-boxes');
     if (container.children.length === count) return;
+    // Lets the CSS shrink boxes for words too long to fit one row.
+    container.style.setProperty('--letter-count', count);
     container.innerHTML = '';
     for (let i = 0; i < count; i++) {
         const box = document.createElement('div');

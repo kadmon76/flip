@@ -60,8 +60,7 @@ export function setDragEnabled(on) {
 
 function dropTile(el) {
     const tileId = el.dataset.tileId;
-    const boxes = Array.from(document.querySelectorAll('#letter-boxes .letter-box'));
-    const boxIndex = boxes.findIndex((box) => Draggable.hitTest(el, box, '50%'));
+    const boxIndex = nearestHitBox(el);
 
     if (boxIndex !== -1 && placeTile(tileId, boxIndex)) {
         gsap.set(el, { x: 0, y: 0 });
@@ -78,6 +77,28 @@ function dropTile(el) {
 
     // Dropped anywhere else: animate back to where it came from.
     gsap.to(el, { x: 0, y: 0, duration: 0.3, ease: 'back.out(1.4)' });
+}
+
+// Index of the box whose centre is closest to the tile's, among boxes the
+// tile overlaps by at least half of either area. Boxes can be smaller than
+// tiles (long words), so a tile may overlap two boxes; nearest centre wins.
+function nearestHitBox(el) {
+    const boxes = document.querySelectorAll('#letter-boxes .letter-box');
+    const t = el.getBoundingClientRect();
+    const cx = t.left + t.width / 2;
+    const cy = t.top + t.height / 2;
+    let best = -1;
+    let bestDist = Infinity;
+    boxes.forEach((box, i) => {
+        if (!Draggable.hitTest(el, box, '50%')) return;
+        const b = box.getBoundingClientRect();
+        const dist = Math.hypot(b.left + b.width / 2 - cx, b.top + b.height / 2 - cy);
+        if (dist < bestDist) {
+            best = i;
+            bestDist = dist;
+        }
+    });
+    return best;
 }
 
 function tapTile(el) {
