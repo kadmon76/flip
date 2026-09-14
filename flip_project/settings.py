@@ -23,14 +23,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = '***REMOVED-ROTATED-SECRET-KEY***'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = ['flip.yaronl.com', 'localhost']
+ALLOWED_HOSTS = ['flip.yaronl.com', 'localhost','127.0.0.1','139.162.135.47']
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Disable SSL-specific settings since we don't have SSL yet
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 # Application definition
@@ -46,6 +46,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'flip_project.middleware.DebuggingMiddleware',
+    'flip_project.middleware.MobileDetectionMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -53,14 +55,66 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Place DevAuthMiddleware before CrossSiteAuthMiddleware
+    'spelling_game.middleware.DevAuthMiddleware',  # Moved up
+    'flip_project.middleware.CrossSiteAuthMiddleware',
+    'spelling_game.middleware.GameSessionMiddleware',
 ]
+# Add compression middleware to mimic production
+if 'django.middleware.gzip.GZipMiddleware' not in MIDDLEWARE:
+    MIDDLEWARE.insert(1, 'django.middleware.gzip.GZipMiddleware')
 
+# Set more production-like cache settings
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+SPELLING_GAME_DEBUG = True  # To enable your game's debug mode
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/srv/www/flip/debug.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'auth_middleware': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
 ROOT_URLCONF = 'flip_project.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],  # This should point to /srv/www/flip/templates
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -133,6 +187,15 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+if not DEBUG:
+    # Use in production
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+else:
+    # In development, but want production-like behavior:
+    # Uncomment this when you want to test production-like static serving
+    # STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+    pass
 
 # Media files (User uploads)
 MEDIA_URL = '/media/'

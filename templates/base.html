@@ -1,0 +1,36 @@
+{% block extra_head %}
+    {# Debug panel resources - only load for staff or in debug mode #}
+    {% if debug or request.user.is_staff %}
+        {% load static %}
+        <link rel="stylesheet" href="{% static 'css/debugPanel.css' %}">
+    {% endif %}
+    {% block additional_head %}{% endblock %}
+{% endblock %}
+
+{% block scripts %}
+    {# Debug panel JS - only load for staff or in debug mode #}
+    {% if debug or request.user.is_staff %}
+        {% load static %}
+        <script src="{% static 'js/dataCollection.js' %}"></script>
+        <script src="{% static 'js/debugPanel.js' %}"></script>
+        <script src="{% static 'js/gameDebug.js' %}"></script>
+        
+        <script>
+            // Initialize debug panel if in debug mode
+            document.addEventListener('DOMContentLoaded', function() {
+                // Check debug status from server
+                fetch('/spelling_game/api/debug/status/')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.debug_allowed) {
+                            // Enable debug mode if server says it's allowed
+                            window.toggleDebugMode(data.debug_enabled);
+                            console.log('Debug mode:', data.debug_enabled ? 'enabled' : 'disabled');
+                        }
+                    })
+                    .catch(error => console.error('Error checking debug status:', error));
+            });
+        </script>
+    {% endif %}
+    {% block additional_scripts %}{% endblock %}
+{% endblock %}

@@ -1,18 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
 venv/
+__pycache__/
+*.pyc
+db.sqlite3
+debug.log
+logs/
+staticfiles/
 .env
-
-# IDE
 .vscode/
 .idea/
-
-# Flask
-instance/
-.webassets-cache
-
-# OS
 .DS_Store
 Thumbs.db

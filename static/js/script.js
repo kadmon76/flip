@@ -78,15 +78,6 @@ function playRandomSound(soundsArray) {
     });
 }
 
-// Remove this duplicate listener from script.js
-// document.getElementById('check-btn').addEventListener('click', () => {
-//     try {
-//         checkAnswer(); // Delegate all logic to checkAnswer
-//     } catch (error) {
-//         console.error(`Unexpected error: ${error.message}`);
-//     }
-// });
-
 const gameStats = { attempts: 3 };
 const usedWords = new Set();
 
@@ -177,6 +168,19 @@ function initializeGame() {
     createLetterBoxes("");
     setupCardClickHandler(flipCard);
     setupCheckButtonHandler(checkAnswer, lockCorrectLetters);
+
+    if (typeof GameDebug !== 'undefined' && GameDebug.trackGameSessionStart) {
+        try {
+            const sessionData = {
+                startTime: new Date().toISOString(),
+                theme: currentTheme
+            };
+            
+            GameDebug.trackGameSessionStart(sessionData);
+        } catch (e) {
+            console.log("Debug tracking error:", e);
+        }
+    }
 }
 
 /* ===============
@@ -238,28 +242,79 @@ function loadNewWord() {
 
     // Resize letter boxes and letters with animation
     resizeLetterBoxesAndLetters(currentWord);
+
+    if (typeof GameDebug !== 'undefined' && GameDebug.trackWordLoaded) {
+        try {
+            const wordData = {
+                word: currentWord,
+                difficulty: currentDifficulty,
+                timestamp: new Date().toISOString()
+            };
+            GameDebug.trackWordLoaded(wordData);
+        } catch (e) {
+            console.log("Debug tracking error:", e);
+        }
+    }
+}
+// Add these before your checkAnswer function
+function getUserAttempt() {
+    const boxes = document.querySelectorAll(".letter-box");
+    return Array.from(boxes).map(box => box.textContent).join("");
+}
+
+function calculateTimeTaken() {
+    return 0; // Placeholder until you implement timing
 }
 
 /* ===============
    CHECK ANSWER
 =============== */
 function checkAnswer() {
+    // Get the user's answer
+    const userAnswer = getUserAttempt();
+    // Get all letter boxes for error handling
     const boxes = document.querySelectorAll(".letter-box");
-    const userAnswer = Array.from(boxes).map(box => box.textContent).join("");
+    
+    console.log("[DEBUG] Answer check initiated. User answer:", userAnswer, "Correct word:", currentWord);
 
     if (userAnswer.toLowerCase() === currentWord.toLowerCase()) {
         console.log("[DEBUG] Correct answer detected in checkAnswer:", userAnswer);
 
         // Play a random correct sound
-        const correctSound = sounds.correct[Math.floor(Math.random() * sounds.correct.length)];
-        console.log(`[DEBUG] Correct sound triggered. Function: checkAnswer, Sound: ${correctSound.src}`);
-        correctSound.play();
+        playRandomSound(sounds.correct);
 
         // Reveal answer and proceed
         revealAnswerAndFlip(currentWord, wordData, usedWords, totalWords, loadNewWordWithReset, false);
     } else {
         console.log("[DEBUG] Incorrect answer detected in checkAnswer:", userAnswer);
         handleIncorrectAnswer(boxes);
+    }
+
+    // Debug tracking code with proper error handling
+    try {
+        if (typeof GameDebug !== 'undefined' && GameDebug.trackWordAttempt) {
+            const isCorrect = userAnswer.toLowerCase() === currentWord.toLowerCase();
+            
+            // Get difficulty safely from wordData instead of using currentDifficulty
+            let wordDifficulty = 'medium'; // Default value
+            if (wordData && currentWord && wordData[currentWord] && wordData[currentWord].difficulty) {
+                wordDifficulty = wordData[currentWord].difficulty;
+            }
+            
+            const attemptData = {
+                word: currentWord,
+                userAttempt: userAnswer,
+                isCorrect: isCorrect,
+                difficulty: wordDifficulty,
+                timeTaken: calculateTimeTaken(),
+                timestamp: new Date().toISOString()
+            };
+            
+            GameDebug.trackWordAttempt(attemptData);
+        }
+    } catch (e) {
+        console.log("Debug tracking error:", e);
+        // Continue execution even if tracking fails
     }
 }
 
@@ -341,3 +396,8 @@ if (cardImage) {
         }
     });
 }
+
+
+
+
+

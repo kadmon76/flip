@@ -1,136 +1,86 @@
-/* Clean up the mobile-fixes.css file */
+/* mobile-fixes.css - Consolidated mobile optimization */
 
-/* Mobile compatibility fixes */
+/* ==================
+   GLOBAL FIXES
+================== */
+html, body {
+  height: 100%;
+  position: relative;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
-    background-attachment: fixed !important;
-    overflow-x: hidden;
-    min-height: 100vh;
-  }
-  
-  /* Ensure containers are visible and properly sized */
-  #theme-container, 
-  #game-container {
-    visibility: visible !important;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-  
-  .theme-selection {
-    text-align: center;
-    padding: 20px;
-  }
-  
-  .theme-btn {
-    margin: 10px;
-    padding: 15px 25px;
-    min-width: 150px;
-    min-height: 50px;
-    background-color: #ffb3b3;
-    color: #333;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    position: relative;
-    z-index: 10;
-    font-family: 'Fredoka One', cursive, sans-serif;
-  }
-  
-  .theme-btn:active {
-    background-color: #ff8080;
-    transform: scale(0.98);
-  }
-  
-  /* Ensure card displays properly */
-  .card {
-    width: 300px;
-    height: 400px;
-    margin: 20px auto;
-    perspective: 1000px;
-  }
-  
-  /* Fix letter containers */
-  .letter-boxes-container,
-  .available-letters-container {
-    display: flex !important;
-    visibility: visible !important;
-    width: 100%;
-    padding: 0 10px;
-    box-sizing: border-box;
-  }
-  
-  .letter-boxes-container {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  
-  .available-letters-container {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-  }
-  
-  /* Draggable letters for mobile */
-  .draggable-letter {
-    touch-action: none !important;
-  }
-  
-  /* Mobile-specific adjustments */
-  @media (max-width: 768px) {
-    /* Background overlay for better contrast */
-    body.mobile-device:before {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(255, 255, 255, 0.3);
-      z-index: 1;
-    }
-    
-    /* Make card smaller on mobile */
-    .card {
-      width: 90%;
-      max-width: 280px;
-      height: 350px;
-    }
-    
-    /* Smaller image on mobile */
-    #card-image {
-      width: 100px;
-      height: 100px;
-    }
-    
-    /* Make check button larger for touch */
-    #check-btn {
-      min-height: 50px;
-      min-width: 180px;
-      padding: 12px 20px;
-      margin: 20px auto;
-      display: inline-block;
-      position: relative;
-      z-index: 10;
-    }
-    
-    /* Ensure all interactive elements are above the background */
-    .card, 
-    .letter-boxes-container,
-    .available-letters-container,
-    #feedback,
-    button {
-      position: relative;
-      z-index: 2;
-    }
-  }
+  background-attachment: fixed !important;
+  overflow-x: hidden;
+  min-height: 100vh;
+  /* Prevent pull-to-refresh on mobile browsers */
+  overscroll-behavior-y: contain;
+}
 
-  /* Card touch improvements */
+/* Special class added to body during letter dragging */
+body.letter-dragging {
+  overflow: hidden !important;
+  touch-action: none !important;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* ==================
+   CONTAINER STYLES
+================== */
+#theme-container, 
+#game-container {
+  visibility: visible !important;
+  max-width: 600px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+.theme-selection {
+  text-align: center;
+  padding: 20px;
+}
+
+.theme-btn {
+  margin: 10px;
+  padding: 15px 25px;
+  min-width: 150px;
+  min-height: 50px;
+  background-color: #ffb3b3;
+  color: #333;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  position: relative;
+  z-index: 10;
+  font-family: 'Fredoka One', cursive, sans-serif;
+}
+
+.theme-btn:active {
+  background-color: #ff8080;
+  transform: scale(0.98);
+}
+
+/* ==================
+   CARD STYLES
+================== */
 .card {
+  width: 300px;
+  height: 400px;
+  margin: 20px auto;
+  perspective: 1000px;
   cursor: pointer;
   touch-action: manipulation; /* Improves touch responsiveness */
   -webkit-tap-highlight-color: rgba(0,0,0,0); /* Remove tap highlight on iOS */
+  position: relative;
+  z-index: 5;
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
 }
 
-.card__inner {
+.card-inner {
   /* Make sure the entire area is clickable */
   -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
@@ -147,10 +97,329 @@ body {
   cursor: pointer;
 }
 
-/* Make sure this is removed once the card is flipped */
-#card:has(.card__inner.is-flipped):before {
+/* Make sure overlay is removed once the card is flipped */
+#card:has(.card-inner.is-flipped):before,
+#card.flipped:before {
   display: none;
 }
-.card__inner.is-flipped + #card:before {
-  display: none;
+
+/* ==================
+   LETTER CONTAINER STYLES
+================== */
+.letter-boxes-container,
+.available-letters-container {
+  position: relative;
+  z-index: 10;
+  visibility: visible !important;
+  display: flex !important;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 8px;
+  box-sizing: border-box;
+  touch-action: none; /* Prevent scrolling/zooming during interaction */
+}
+
+.letter-boxes-container {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.available-letters-container {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* ==================
+   LETTER BOX STYLES
+================== */
+.letter-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px dashed #ccc;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1; /* Keeps boxes square */
+  transition: all 0.2s ease-in-out;
+  min-width: 30px;
+  min-height: 30px;
+  overflow: hidden;
+  z-index: 5;
+  visibility: visible !important;
+}
+
+/* Highlight for potential drop targets */
+.letter-box.box-hovered {
+  background-color: rgba(77, 213, 240, 0.3);
+  border-color: #4ebffa;
+  transform: scale(1.05);
+}
+
+/* ==================
+   DRAGGABLE LETTER STYLES
+================== */
+.draggable-letter {
+  width: 40px;
+  height: 40px;
+  background-color: #ffe5b9;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+  line-height: 40px;
+  font-size: 1.5em;
+  cursor: pointer;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: none !important;
+  will-change: transform; /* Performance optimization */
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
+}
+
+.draggable-letter:hover {
+  background-color: #ffe0a0;
+}
+
+/* Active dragging state - ensures visibility */
+.draggable-letter.gsap-dragging {
+  z-index: 1000 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: absolute !important;
+}
+
+/* ==================
+   MOBILE SPECIFIC STYLES
+================== */
+@media (max-width: 768px) {
+  /* Background overlay for better contrast */
+  body.mobile-device:before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.3);
+    z-index: 1;
+  }
+  
+  /* Fixed container for dragging operations */
+  body.letter-dragging #game-container {
+    position: fixed !important;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) !important;
+    width: 100%;
+    max-width: 100%;
+    z-index: 100;
+  }
+  
+  /* Make card smaller on mobile */
+  .card {
+    width: 90%;
+    max-width: 280px;
+    height: 350px;
+  }
+  
+  /* Smaller image on mobile */
+  #card-image {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+  }
+  
+  /* Make check button larger for touch */
+  #check-btn {
+    min-height: 50px;
+    min-width: 180px;
+    padding: 12px 20px;
+    margin: 20px auto;
+    display: inline-block;
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Ensure all interactive elements are above the background */
+  .card, 
+  .letter-boxes-container,
+  .available-letters-container,
+  #feedback,
+  button {
+    position: relative;
+    z-index: 2;
+  }
+  
+  /* Improve touch target sizes */
+  .draggable-letter {
+    min-width: 44px;
+    min-height: 44px;
+    line-height: 44px;
+  }
+  
+  /* Prevent text selection during game interaction */
+  * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* ==================
+   ACCESSIBILITY FIXES
+================== */
+button:focus,
+.draggable-letter:focus,
+.card:focus {
+  outline: 2px solid #4a90e2;
+  outline-offset: 2px;
+}
+
+/* Hide focus outline when using mouse */
+body:not(.keyboard-navigation) button:focus,
+body:not(.keyboard-navigation) .draggable-letter:focus,
+body:not(.keyboard-navigation) .card:focus {
+  outline: none;
+}
+/* More specific button styles for mobile */
+@media (max-width: 768px) {
+  /* Improve button touch targets */
+  button {
+      min-height: 44px;
+      min-width: 44px;
+      padding: 12px 20px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(0,0,0,0.2);
+      position: relative;
+      z-index: 20;
+  }
+  
+  /* Visual feedback for active state */
+  button.button-active,
+  button:active {
+      transform: scale(0.96);
+      background-color: #ff8080;
+  }
+  
+  /* Special handling for theme buttons */
+  .theme-btn {
+      margin: 12px;
+      min-height: 50px;
+      min-width: 150px;
+  }
+  
+  /* Special handling for check button */
+  #check-btn {
+      min-height: 54px;
+      min-width: 180px;
+      font-size: 1.3rem;
+      margin: 24px auto;
+      display: block;
+  }
+  
+  /* Fix for letter dragging not affecting button clicks */
+  body.letter-dragging button {
+      pointer-events: auto !important;
+  }
+}
+
+/* This ensures buttons are not affected by the letter-dragging touch prevention */
+.theme-btn, #check-btn, .debug-button {
+  touch-action: manipulation !important;
+}
+
+/* Active state for buttons */
+.button-active {
+  transform: scale(0.96);
+  background-color: #ff8080;
+}/* More specific button styles for mobile */
+@media (max-width: 768px) {
+    /* Improve button touch targets */
+    button {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 12px 20px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(0,0,0,0.2);
+        position: relative;
+        z-index: 20;
+    }
+    
+    /* Visual feedback for active state */
+    button.button-active,
+    button:active {
+        transform: scale(0.96);
+        background-color: #ff8080;
+    }
+    
+    /* Special handling for theme buttons */
+    .theme-btn {
+        margin: 12px;
+        min-height: 50px;
+        min-width: 150px;
+    }
+    
+    /* Special handling for check button */
+    #check-btn {
+        min-height: 54px;
+        min-width: 180px;
+        font-size: 1.3rem;
+        margin: 24px auto;
+        display: block;
+    }
+    
+    /* Fix for letter dragging not affecting button clicks */
+    body.letter-dragging button {
+        pointer-events: auto !important;
+    }
+}
+
+/* This ensures buttons are not affected by the letter-dragging touch prevention */
+.theme-btn, #check-btn, .debug-button {
+    touch-action: manipulation !important;
+}
+
+/* Active state for buttons */
+.button-active {
+    transform: scale(0.96);
+    background-color: #ff8080;
+}
+
+/* Force hardware acceleration consistently */
+.letter {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Prevent elastic scrolling/bouncing effects in iOS */
+.dragging-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Enhance hardware acceleration and prevent layout shifts */
+.draggable-letter {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Apply when dragging is active on any device */
+.dragging-active {
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .dragging-active {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+  }
 }

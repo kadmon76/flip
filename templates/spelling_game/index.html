@@ -7,7 +7,8 @@
           content="width=device-width, 
                    initial-scale=1.0, 
                    maximum-scale=1.0, 
-                   user-scalable=no">
+                   user-scalable=no,
+                   minimal-ui">
     <title>Flip Card Spelling Game</title>
     
     <!-- PWA meta tags and icons -->
@@ -15,14 +16,68 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Spelling Game">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
-    <link rel="apple-touch-icon" 
-          href="{% static 'icons/icon-192x192.png' %}">
-    <link rel="manifest" 
-          href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" 
-          href="{% static 'css/style.css' %}?v=1">
+    <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v=2">
+    <!-- Debug panel CSS -->
+    <link rel="stylesheet" href="{% static 'css/debugPanel.css' %}">
+          
+    <style>
+        /* Auth Panel Styles */
+        .auth-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            font-family: 'Fredoka One', cursive;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .auth-panel .user-info {
+            margin-right: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .logout-btn {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-family: 'Fredoka One', cursive;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .logout-btn:hover {
+            background-color: #ff5252;
+            transform: scale(1.05);
+        }
+    </style>
 </head>
 <body>
+    <!-- Auth Panel -->
+    {% if user.is_authenticated %}
+    <div class="auth-panel">
+        <div class="user-info">Hi, {{ user.username }}!</div>
+        <a href="/logout/?return_to=https://yaronl.com/login/" class="logout-btn">Logout</a>
+        <a href="/logout/?global=true&return_to=https://yaronl.com/login/" class="logout-btn">Logout Everywhere</a>
+    </div>
+    {% endif %}
+    
+    <!-- Debug Button -->
+    <div id="debugButtonContainer" class="debug-button-container">
+        <button id="debugButton" class="debug-button">Debug Panel</button>
+    </div>
+    
     <!-- Theme Selection Menu -->
     <div id="theme-container" class="theme-selection">
         <h2>Select a Theme</h2>
@@ -68,11 +123,134 @@
         <button id="check-btn">Check Answer</button>
     </div>
 
-    <!-- Include GSAP and Draggable -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
-    
-    <!-- Include your custom script as a module -->
-    <script type="module" src="{% static 'js/script.js' %}"></script>
+<!-- Include GSAP and Draggable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/Draggable.min.js"></script>
+
+<!-- Load debug and data scripts first -->
+<script src="{% static 'js/dataCollection.js' %}"></script>
+<script src="{% static 'js/gameDebug.js' %}"></script>
+<script src="{% static 'js/debugPanel.js' %}"></script>
+<script src="{% static 'js/fixCloseButton.js' %}"></script>
+<script src="{% static 'js/debugThemes.js' %}"></script>
+
+<!-- Game scripts -->
+<script src="{% static 'js/ui.js' %}" type="module"></script>
+<script type="module" src="{% static 'js/script.js' %}"></script>
+
+<!-- Mobile optimization script -->
+<script>
+    // Prevent scrolling on game container touch events
+    document.addEventListener('DOMContentLoaded', function() {
+        // Detect mobile devices and add mobile-device class to body
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            document.body.classList.add('mobile-device');
+        }
+        
+        // Prevent default touch behaviors that interfere with the game
+        const gameContainer = document.getElementById('game-container');
+        if (gameContainer) {
+            gameContainer.addEventListener('touchmove', function(e) {
+                if (document.body.classList.contains('letter-dragging')) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+        
+        // Fix for iOS Safari bouncing effect
+        document.addEventListener('touchmove', function(e) {
+            if (document.body.classList.contains('letter-dragging')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Make card images unselectable to prevent unwanted behaviors
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'card-image') {
+                e.preventDefault();
+                // This still allows the click handler for audio to work
+            }
+        });
+    });
+</script>
+
+<!-- Debug panel initialization -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Initializing debug panel...");
+        
+        // Initialize the debug panel
+        if (typeof DebugPanel !== 'undefined' && DebugPanel.initialize) {
+            DebugPanel.initialize();
+            
+            // Set up debug button
+            const debugButton = document.getElementById('debugButton');
+            if (debugButton) {
+                debugButton.addEventListener('click', function() {
+                    console.log("Debug button clicked, toggling panel...");
+                    
+                    // Get the panel (it might have been created after this script loaded)
+                    const panel = document.getElementById('debugPanel');
+                    
+                    if (panel) {
+                        // Toggle panel visibility directly with styles
+                        if (panel.classList.contains('hidden')) {
+                            console.log('Showing panel with direct styles');
+                            panel.classList.remove('hidden');
+                            panel.style.transform = 'translateX(0)';
+                            panel.style.display = 'flex';
+                            panel.style.flexDirection = 'column';
+                            panel.style.right = '0';
+                            panel.style.visibility = 'visible';
+                            panel.style.zIndex = '10000';
+                        } else {
+                            console.log('Hiding panel');
+                            panel.classList.add('hidden');
+                            panel.style.transform = 'translateX(100%)';
+                        }
+                    } else {
+                        console.log('Panel not found, trying to use DebugPanel.togglePanel');
+                        DebugPanel.togglePanel();
+                    }
+                });
+            }
+        } else {
+            console.warn("DebugPanel not available - debug functionality will be limited");
+        }
+    });
+</script>
+<script>
+    // Mobile Touch Event Fix
+    document.addEventListener('DOMContentLoaded', function() {
+        // Detect mobile devices and add mobile-device class to body
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            document.body.classList.add('mobile-device');
+            
+            // Fix for buttons on mobile
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(button => {
+                // Add touch-specific event handling
+                button.addEventListener('touchstart', function(e) {
+                    this.classList.add('button-active');
+                });
+                
+                button.addEventListener('touchend', function(e) {
+                    this.classList.remove('button-active');
+                });
+            });
+            
+            // Only prevent touchmove on draggable letters, not buttons
+            document.addEventListener('touchmove', function(e) {
+                // Only prevent default if we're dragging a letter and not interacting with a button
+                if (document.body.classList.contains('letter-dragging') && 
+                    e.target.closest('button') === null) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+    });
+    </script>
 </body>
 </html>

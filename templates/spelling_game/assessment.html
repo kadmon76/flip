@@ -1,0 +1,22 @@
+<!-- templates/spelling_game/assessment.html -->
+{% extends 'spelling_game/base.html' %}
+
+{% block content %}
+<div class="assessment-container">
+    <h2>Initial Assessment</h2>
+    <p>Let's check your spelling skills! Drag the letters to spell each word correctly.</p>
+    
+    <div id="game-area" class="assessment-game">
+        <!-- Game will be rendered here by JavaScript -->
+    </div>
+</div>
+
+<script>
+    // Store session info
+    const sessionId = {{ session_id }};
+    const assessmentWords = {{ words|safe }};
+    
+    // Flag to let gameLogic.js know this is an assessment
+    const isAssessment = true;
+</script>
+{% endblock %}

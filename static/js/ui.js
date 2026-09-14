@@ -25,26 +25,90 @@ export function createLetterBoxes(word) {
 
 /* ======================
    CREATE DRAGGABLE LETTERS
-====================== */
-export function createDraggableLetters(word) {
+   ====================== */
+   export function createDraggableLetters(word) {
     const container = document.querySelector(".available-letters-container");
     container.innerHTML = "";
+    
+    // ADD THIS: Force consistent device detection
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-    const boxWidth = Math.min(window.innerWidth / word.length, 50); // Adjust size
+    const boxWidth = Math.min(window.innerWidth / word.length, 50);
     word.split("").sort(() => Math.random() - 0.5).forEach(letter => {
         const letterDiv = document.createElement("div");
         letterDiv.className = "draggable-letter";
         letterDiv.textContent = letter;
-        letterDiv.style.width = `${boxWidth - 10}px`; // Slightly smaller
+        letterDiv.style.width = `${boxWidth - 10}px`;
         letterDiv.style.height = `${boxWidth - 10}px`;
         letterDiv.style.fontSize = `${boxWidth / 2}px`;
         container.appendChild(letterDiv);
 
+        // KEEP THIS: Already handling touch events correctly
+        letterDiv.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // ADD THIS: Force hardware acceleration consistently
+        gsap.set(letterDiv, {
+            willChange: "transform",
+            z: 0.01,  // Force 3D rendering
+            backfaceVisibility: "hidden"
+        });
+
         Draggable.create(letterDiv, {
-            type: "x,y",
+            // UPDATE THIS: Use consistent event type based on device detection
+            type: isTouchDevice ? "touch" : "x,y",
             zIndexBoost: true,
-            onDragEnd: function () {
+            // ADD THIS: Disable inertia for consistent behavior
+            inertia: false,
+            dragClickables: true,
+            lockAxis: false,
+            cursor: "grab",
+            // ADD THIS: Prevent context menu
+            allowContextMenu: false,
+            onPress: function(e) {
+                if (e.pointerType === "touch") {
+                    e.preventDefault();
+                }
+                
+                gsap.set(this.target, { 
+                    zIndex: 100,
+                    autoAlpha: 1
+                });
+                
+                this.target.classList.add("gsap-dragging");
+                
+                // ADD THIS: Add a consistent class on ALL devices
+                document.body.classList.add("dragging-active");
+                
+                if (window.innerWidth <= 768) {
+                    document.body.style.overflow = "hidden";
+                }
+            },
+            // Keep your existing onDragStart, onDrag events...
+            onDragEnd: function() {
+                document.body.classList.remove("letter-dragging");
+                // ADD THIS: Remove the consistent class
+                document.body.classList.remove("dragging-active");
+                this.target.classList.remove("gsap-dragging");
+                
+                if (window.innerWidth <= 768) {
+                    document.body.style.overflow = "auto";
+                }
+                
+                document.querySelectorAll(".letter-box").forEach(box => {
+                    box.classList.remove("box-hovered");
+                });
+                
+                gsap.set("#game-container", {
+                    position: "relative",
+                    top: "auto",
+                    left: "auto",
+                    xPercent: 0
+                });
+                
                 snapLetterToBox(this.target);
+                gsap.set(this.target, { zIndex: "auto" });
             }
         });
     });
@@ -70,6 +134,25 @@ export function snapLetterToBox(letterDiv) {
             gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
             droppedInBox = true;
             playSwipeSound(); // Play swipe sound on successful drop
+            
+            // Data collection for letter placement
+            if (window.dataCollector && window.currentWord) {
+                const position = parseInt(box.dataset.index, 10);
+                const expectedLetter = window.currentWord[position];
+                const placedLetter = letterDiv.textContent;
+                
+                // Calculate time taken if we recorded start time
+                let timeTaken = null;
+                if (letterDiv.dataset.dragStartTime) {
+                    timeTaken = (Date.now() - letterDiv.dataset.dragStartTime) / 1000; // In seconds
+                    delete letterDiv.dataset.dragStartTime; // Clean up
+                }
+                
+                // Track this letter placement if trackLetterPlacement function exists
+                if (typeof window.trackLetterPlacement === 'function') {
+                    window.trackLetterPlacement(position, expectedLetter, placedLetter, timeTaken);
+                }
+            }
         }
     });
 
@@ -78,6 +161,10 @@ export function snapLetterToBox(letterDiv) {
         letterContainer.appendChild(letterDiv);
         letterDiv.classList.remove("in-box");
         gsap.set(letterDiv, { x: 0, y: 0, position: "relative" });
+        // Clear drag start time if we recorded it
+        if (letterDiv.dataset.dragStartTime) {
+            delete letterDiv.dataset.dragStartTime;
+        }
     }
 }
 
@@ -152,6 +239,11 @@ export function showGameCompletion() {
     restartButton.id = "restart-btn"; // Unique ID for restart button
     restartButton.onclick = restartGame;
     document.querySelector("#game-container").appendChild(restartButton);
+    
+    // End game session if data collection is active
+    if (typeof window.endGameSession === 'function') {
+        window.endGameSession();
+    }
 }
 
 /* ===============
