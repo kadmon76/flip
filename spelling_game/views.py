@@ -1,12 +1,10 @@
 # spelling_game/views.py
-from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 
 
-@login_required
 def index(request):
-    """Main game view"""
+    """Main game view. Free to play: no login (CLAUDE.md product rules)."""
     return render(request, 'spelling_game/index.html')
 
 
