@@ -1,0 +1,289 @@
+/* game.css — mobile-first layout for the rewritten screens.
+   Replaces style.css / mobile-fixes.css (kept on disk as reference). */
+
+:root {
+    /* sizing: tray tiles never go below 44px (touch-target minimum) and
+       the tray wraps; up to 8 tiles share one row at the column's max
+       width. Letter boxes shrink below this only when a longer word
+       would not fit one row (see .letter-boxes). */
+    --page-pad: 16px;
+    --column-max: 480px;
+    --tile-gap: 6px;
+    --row-width: calc(min(100vw, var(--column-max)) - 2 * var(--page-pad));
+    --tile-size: clamp(44px, calc((var(--row-width) - 7 * var(--tile-gap)) / 8), 48px);
+    --radius: 16px;
+    --radius-small: 8px;
+
+    /* colors */
+    --color-bg: #fdf6ec;
+    --color-text: #3b3b3b;
+    --color-card: #ffffff;
+    --color-tile: #ffe5b9;
+    --color-tile-border: #e8c98f;
+    --color-box-border: #c9c9c9;
+    --color-accent: #ff6b6b;
+    --color-accent-text: #ffffff;
+    --color-hearts: #ff5252;
+
+    --font: 'Fredoka One', 'Comic Sans MS', cursive, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    overscroll-behavior: none;
+}
+
+body {
+    font-family: var(--font);
+    color: var(--color-text);
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+    touch-action: manipulation;
+}
+
+/* --- Header: one compact line --- */
+
+.app-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px var(--page-pad);
+    min-height: 40px;
+}
+
+.app-title {
+    font-size: 1.25rem;
+}
+
+.auth {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.logout-btn {
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+    text-decoration: none;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+}
+
+/* --- Screens: one centered column --- */
+
+.screen {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: var(--column-max);
+    margin: 0 auto;
+    padding: var(--page-pad);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+/* --- Theme screen --- */
+
+#screen-theme h2 {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+#theme-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.theme-btn {
+    width: 100%;
+    min-height: 64px;
+    font-family: var(--font);
+    font-size: 1.3rem;
+    color: var(--color-text);
+    background: var(--color-tile);
+    border: 2px solid var(--color-tile-border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.theme-btn:active {
+    transform: scale(0.97);
+}
+
+/* --- Play screen --- */
+
+#screen-play {
+    touch-action: none;
+}
+
+.card {
+    position: relative;
+    width: min(60vw, calc(0.6 * var(--column-max)));
+    aspect-ratio: 1 / 1;
+    background: var(--color-card);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* Hearts are inline SVG, not the ♥ glyph: on Android the glyph falls
+   back to the colour-emoji font, which ignores CSS colour, so a lost
+   heart never looked any different. */
+.hearts {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+    color: var(--color-hearts);
+}
+
+.hearts span {
+    display: flex;
+}
+
+.hearts svg {
+    width: 22px;
+    height: 22px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.hearts .lost {
+    color: #8a8a8a;
+}
+
+/* --- Letter boxes and tray --- */
+
+/* Boxes match the tile size unless the word is too long for one row;
+   then they shrink just enough to fit (card.js sets --letter-count). */
+.letter-boxes {
+    --letter-count: 1;
+    --box-size: min(var(--tile-size),
+        calc((var(--row-width) - (var(--letter-count) - 1) * var(--tile-gap)) / var(--letter-count)));
+    display: flex;
+    justify-content: center;
+    gap: var(--tile-gap);
+}
+
+.letter-box {
+    width: var(--box-size);
+    height: var(--box-size);
+    border: 2px dashed var(--color-box-border);
+    border-radius: var(--radius-small);
+    background: rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* a box holding a tile: the tile covers the box, hide the dashed frame */
+.letter-box.filled {
+    border-color: transparent;
+    background: transparent;
+}
+
+/* a placed tile scales into its box */
+.letter-box > .draggable-letter {
+    width: 100%;
+    height: 100%;
+    font-size: calc(var(--box-size) * 0.55);
+}
+
+.letter-tray {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--tile-gap);
+    min-height: var(--tile-size);
+}
+
+.draggable-letter {
+    width: var(--tile-size);
+    height: var(--tile-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--tile-size) * 0.55);
+    background: var(--color-tile);
+    border: 2px solid var(--color-tile-border);
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+}
+
+.draggable-letter.gsap-dragging {
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+body.dragging-active {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.result-line {
+    margin: 0;
+    min-height: 1.4em;
+    font-size: 1.1rem;
+    text-align: center;
+}
+
+/* --- Action row --- */
+
+.actions {
+    width: 100%;
+    display: flex;
+    gap: 12px;
+}
+
+.action-btn {
+    flex: 1 1 0;
+    height: 56px;
+    font-family: var(--font);
+    font-size: 1.3rem;
+    color: var(--color-accent-text);
+    background: var(--color-accent);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.action-btn:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.action-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* --- Round-end screen --- */
+
+#round-score {
+    margin: 0;
+    font-size: 3.5rem;
+}

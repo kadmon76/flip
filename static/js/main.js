@@ -1,9 +1,14 @@
-// main.js — wiring: theme selection, round flow, screen renders.
+// main.js — wiring: theme selection, round flow, check/next, screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
+import { renderCard } from './card.js';
 
 const $ = (id) => document.getElementById(id);
+
+const ROUND_SIZE = 5;
+const LIVES = 3;
+let tileSeq = 0;
 
 function shuffle(arr) {
     const a = [...arr];
@@ -15,13 +20,27 @@ function shuffle(arr) {
 }
 
 function makeCurrent(entry) {
+    const letters = entry.word.split('');
     return {
         word: entry.word,
         image: entry.image,
         audio: entry.audio,
-        tray: shuffle(entry.word.split('')),
-        placed: new Array(entry.word.length).fill(null),
+        tray: shuffle(letters).map((letter) => ({ id: `t${++tileSeq}`, letter, used: false })),
+        placed: new Array(letters.length).fill(null),
+        status: 'playing',
     };
+}
+
+// Fill every box with the right letter using the word's own tiles.
+function revealed(current) {
+    const tray = current.tray.map((t) => ({ ...t, used: true }));
+    const taken = new Set();
+    const placed = current.word.split('').map((ch) => {
+        const tile = tray.find((t) => t.letter === ch && !taken.has(t.id));
+        taken.add(tile.id);
+        return { letter: tile.letter, tileId: tile.id };
+    });
+    return { ...current, tray, placed, status: 'revealed' };
 }
 
 // --- Theme screen ---
@@ -44,55 +63,70 @@ async function startRound(theme, dataUrl) {
     // data shape: { "duck": { image, audio, difficulty }, ... }
     const data = await fetch(dataUrl).then((r) => r.json());
     const words = shuffle(Object.keys(data))
-        .slice(0, 5)
+        .slice(0, ROUND_SIZE)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
     setState({
         theme,
         words,
         screen: 'play',
-        round: { index: 0, size: 5, results: [] },
+        round: { index: 0, size: ROUND_SIZE, results: [] },
         current: makeCurrent(words[0]),
+        lives: LIVES,
     });
 }
 
-// --- Play screen ---
+// --- Play screen: check / next ---
 
-function renderPlay(state) {
+const RESULT_TEXT = {
+    playing: '',
+    correct: 'Correct!',
+    wrong: 'Not quite, try again',
+    revealed: (word) => `The word is "${word}"`,
+};
+
+function renderActions(state) {
     if (state.screen !== 'play' || !state.current.word) return;
+    const { current } = state;
+    const allFilled = current.placed.every(Boolean);
+    const canCheck = current.status === 'playing' || current.status === 'wrong';
+    $('check-btn').disabled = !(allFilled && canCheck);
+    const text = RESULT_TEXT[current.status];
+    $('result-line').textContent = typeof text === 'function' ? text(current.word) : text;
+}
 
-    $('play-image').src = state.current.image;
-    $('play-image').alt = 'Guess the word image';
+function onCheck() {
+    const { current, round, lives } = state;
+    if (!current.placed.every(Boolean)) return;
+    if (current.status === 'correct' || current.status === 'revealed') return;
 
-    const boxes = $('letter-boxes');
-    boxes.innerHTML = '';
-    state.current.placed.forEach(() => {
-        const box = document.createElement('div');
-        box.className = 'letter-box';
-        boxes.appendChild(box);
-    });
+    const answer = current.placed.map((p) => p.letter).join('');
+    const correct = answer === current.word;
+    const results = [...round.results];
+    results[round.index] = { word: current.word, correct };
 
-    const tray = $('letter-tray');
-    tray.innerHTML = '';
-    state.current.tray.forEach((letter) => {
-        const tile = document.createElement('div');
-        tile.className = 'draggable-letter';
-        tile.textContent = letter;
-        tray.appendChild(tile);
-    });
+    if (correct) {
+        setState({ round: { ...round, results }, current: { ...current, status: 'correct' } });
+    } else if (lives - 1 <= 0) {
+        setState({ lives: 0, round: { ...round, results }, current: revealed(current) });
+    } else {
+        setState({ lives: lives - 1, round: { ...round, results }, current: { ...current, status: 'wrong' } });
+    }
 }
 
 function onNext() {
-    const results = [...state.round.results, { word: state.current.word, correct: true }];
-    const nextIndex = state.round.index + 1;
-    if (nextIndex >= state.round.size) {
-        setState({
-            round: { ...state.round, results },
-            screen: 'round-end',
-        });
+    const { round, current } = state;
+    const results = [...round.results];
+    // Skipping a word without checking counts as wrong.
+    if (!results[round.index]) results[round.index] = { word: current.word, correct: false };
+
+    const nextIndex = round.index + 1;
+    if (nextIndex >= round.size) {
+        setState({ round: { ...round, results }, screen: 'round-end' });
     } else {
         setState({
-            round: { ...state.round, index: nextIndex, results },
+            round: { ...round, index: nextIndex, results },
             current: makeCurrent(state.words[nextIndex]),
+            lives: LIVES,
         });
     }
 }
@@ -110,18 +144,20 @@ function onPlayAgain() {
         screen: 'theme',
         theme: null,
         words: [],
-        round: { index: 0, size: 5, results: [] },
-        current: { word: null, image: null, audio: null, placed: [], tray: [] },
-        lives: 3,
+        round: { index: 0, size: ROUND_SIZE, results: [] },
+        current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
+        lives: LIVES,
     });
 }
 
 // --- Wiring ---
 
 subscribe(renderScreens);
-subscribe(renderPlay);
+subscribe(renderCard);
+subscribe(renderActions);
 subscribe(renderRoundEnd);
 
+$('check-btn').addEventListener('click', onCheck);
 $('next-btn').addEventListener('click', onNext);
 $('play-again-btn').addEventListener('click', onPlayAgain);
 
