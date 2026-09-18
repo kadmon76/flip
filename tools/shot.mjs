@@ -1,15 +1,16 @@
 // tools/shot.mjs — phone-size screenshot of a page via headless Chromium over the DevTools protocol.
-// Usage: node tools/shot.mjs <url> <out.png> [--eval '<js>'] [--wait <ms>]
+// Usage: node tools/shot.mjs <url> <out.png> [--eval '<js>'] [--wait <ms>] [--viewport <WxH>]
 //   --eval  JS evaluated in the page after load; a returned promise is awaited. Drive screens with window.flip.setState(...).
 //   --wait  extra ms to sleep after document.fonts.ready before capturing (default 300).
-// Viewport 360x740 at device scale 2 -> a 720x1480 PNG. Node 22 built-ins only. Exits 1 on any failure.
+// --viewport WxH CSS px (default 360x740) at device scale 2 -> a 2Wx2H PNG (720x1480). Node 22 built-ins only. Exits 1 on any failure.
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const VIEWPORT = { width: 360, height: 740, deviceScaleFactor: 2, mobile: true };
+const DEFAULT_VIEWPORT = { width: 360, height: 740 };
+const DEVICE_SCALE = 2;
 const DEFAULT_WAIT_MS = 300;
 const STEP_TIMEOUT_MS = 15000;   // any single CDP step (launch, navigate, eval, capture)
 
@@ -17,7 +18,7 @@ const STEP_TIMEOUT_MS = 15000;   // any single CDP step (launch, navigate, eval,
 
 function usage(msg) {
     if (msg) console.error(`shot: ${msg}`);
-    console.error("usage: node tools/shot.mjs <url> <out.png> [--eval '<js>'] [--wait <ms>]");
+    console.error("usage: node tools/shot.mjs <url> <out.png> [--eval '<js>'] [--wait <ms>] [--viewport <WxH>]");
     process.exit(1);
 }
 
@@ -25,6 +26,7 @@ function parseArgs(argv) {
     const positional = [];
     let evalJs = null;
     let waitMs = DEFAULT_WAIT_MS;
+    let viewport = { ...DEFAULT_VIEWPORT };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === '--eval') {
@@ -34,6 +36,11 @@ function parseArgs(argv) {
             if (i + 1 >= argv.length) usage('--wait needs a value');
             waitMs = Number(argv[++i]);
             if (!Number.isInteger(waitMs) || waitMs < 0) usage('--wait must be a non-negative integer (ms)');
+        } else if (a === '--viewport') {
+            if (i + 1 >= argv.length) usage('--viewport needs a value');
+            const m = argv[++i].match(/^(\d+)x(\d+)$/);
+            if (!m || Number(m[1]) < 1 || Number(m[2]) < 1) usage('--viewport must be <width>x<height> in CSS px, e.g. 360x740');
+            viewport = { width: Number(m[1]), height: Number(m[2]) };
         } else if (a.startsWith('--')) {
             usage(`unknown option ${a}`);
         } else {
@@ -46,7 +53,7 @@ function parseArgs(argv) {
     try { parsed = new URL(url); } catch { usage(`invalid url ${url}`); }
     if (!['http:', 'https:'].includes(parsed.protocol)) usage('url must be http(s)');
     if (!out.toLowerCase().endsWith('.png')) usage('output file must end with .png');
-    return { url, out, evalJs, waitMs };
+    return { url, out, evalJs, waitMs, viewport };
 }
 
 // --- chromium -----------------------------------------------------------
@@ -185,7 +192,7 @@ function pngSize(buf) {
 
 // --- main ---------------------------------------------------------------
 
-async function shoot({ url, out, evalJs, waitMs }, cdp) {
+async function shoot({ url, out, evalJs, waitMs, viewport }, cdp) {
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     const page = (method, params) => cdp.send(method, params, sessionId);
@@ -206,7 +213,7 @@ async function shoot({ url, out, evalJs, waitMs }, cdp) {
     await page('Page.enable');
     await page('Runtime.enable');
     await page('Network.enable');
-    await page('Emulation.setDeviceMetricsOverride', VIEWPORT);
+    await page('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: DEVICE_SCALE, mobile: true });
     await page('Emulation.setTouchEmulationEnabled', { enabled: true });
 
     const loaded = cdp.once('Page.loadEventFired', (_, sid) => sid === sessionId);
@@ -231,7 +238,7 @@ async function shoot({ url, out, evalJs, waitMs }, cdp) {
     const { data } = await page('Page.captureScreenshot', { format: 'png' });
     const buf = Buffer.from(data, 'base64');
     const { width, height } = pngSize(buf);
-    const want = { width: VIEWPORT.width * VIEWPORT.deviceScaleFactor, height: VIEWPORT.height * VIEWPORT.deviceScaleFactor };
+    const want = { width: viewport.width * DEVICE_SCALE, height: viewport.height * DEVICE_SCALE };
     if (width !== want.width || height !== want.height) {
         throw new Error(`screenshot is ${width}x${height}, expected ${want.width}x${want.height}`);
     }

@@ -31,3 +31,21 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: the matches are not references to the deleted files, and content assets under `static/images/` are read-only in M1 (CLAUDE.md), so the only way to make the literal grep empty would break that rule.
 - considered: editing the two SVGs (forbidden); asking the human (reversible, no user-facing effect, so the ask-rule says decide and log).
 - reversible: yes.
+
+## 2026-09-19 — Themes live in state; theme screen renders from it (B-103)
+- chose: add `state.themes` (`[{ name, dataUrl, image }]`). `main.js` loads `static/config/themes.json` and every theme's data file once at start-up, takes the first word's `image`, and calls `setState({ themes })`; `renderThemeButtons(state)` is a subscriber that rebuilds the cards only when the array is replaced. `startRound` receives the theme entry and re-fetches its data file (browser cache hit).
+- because: CLAUDE.md says every screen is a render of state and state lives only in `state.js`; the previous code built the buttons once outside of state. The acceptance needs the first word's image, which is only in the per-theme data file, so those files must be read before the theme screen can render.
+- considered: fetching the images lazily per button (flash of image-less cards); keeping the buttons outside state (violates the architecture rule).
+- reversible: yes.
+
+## 2026-09-19 — Palette applied to the play and round-end screens too (B-103)
+- chose: to leave no colour literal outside `:root`, elements the theme item does not name were mapped as well: tiles and letter boxes are white surfaces with the DESIGN shadow (empty boxes keep a dashed frame in the muted colour); Check/Next/Play again and the logout pill are primary teal with the text colour as label (white on #7FB7BE is ~2.3:1 contrast); live hearts are the accent colour and lost hearts muted (B-106 owns the error-colour transition); the dragged-tile shadow is the DESIGN shadow colour at 0.24 alpha (`--shadow-lift`). Body text is the system sans-serif at 16px; Fredoka One is used for headings, tiles and buttons per DESIGN "Type".
+- because: the acceptance says no other colour literals remain in `game.css`; B-104/B-106 refine these screens later and can change the mapping.
+- considered: leaving old literals in place on non-theme screens (fails the acceptance); white button labels (contrast too low for a beginner reader).
+- reversible: yes.
+
+## 2026-09-19 — tools/shot.mjs gets `--viewport WxH` (B-103)
+- chose: an optional `--viewport <W>x<H>` (CSS px, default `360x740`) that only changes width and height; device scale stays 2 and mobile emulation stays on, so `theme-desktop.png` is 2048x1480. Bad values exit 1 with a usage line (test added). Usage comment stays five lines.
+- because: the acceptance needs a 1024x740 screenshot and the task said to extend the tool minimally rather than add another one.
+- considered: switching `mobile` off above a width threshold (extra heuristic nobody asked for).
+- reversible: yes.

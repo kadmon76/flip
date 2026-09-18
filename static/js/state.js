@@ -3,6 +3,7 @@
 
 export const state = {
     screen: 'theme',            // 'theme' | 'play' | 'round-end' | 'gallery'
+    themes: [],                 // [{ name, dataUrl, image }] from themes.json; image is the first word's
     theme: null,
     words: [],                  // [{ word, image, audio }] for the current round
     round: { index: 0, size: 5, results: [] },   // results[i] = { word, correct }
