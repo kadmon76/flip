@@ -6,4 +6,5 @@ app_name = 'spelling_game'
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('health', views.health, name='health'),
 ]

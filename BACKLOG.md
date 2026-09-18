@@ -6,4 +6,4 @@ Agents take the first item that has no `blocked:` and no `done:`.
 ### B-000 Add a health endpoint
 - why: prove the agent loop end to end
 - acceptance: GET /health returns JSON {"ok": true}; a test covers it; screenshot of the JSON in a phone-size browser exists
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/2
