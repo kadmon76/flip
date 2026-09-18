@@ -163,3 +163,7 @@ $('play-again-btn').addEventListener('click', onPlayAgain);
 
 renderScreens(state);
 renderThemeButtons();
+
+// Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
+// screens through setState. Nothing in the game reads window.flip.
+window.flip = { state, setState };
