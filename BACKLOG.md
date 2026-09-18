@@ -32,7 +32,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - `static/js/data.js` is deleted if nothing imports it; otherwise it stays and this is noted in the handoff.
   - The game still runs: `theme.png` and `play.png` show the same layout as B-101's screenshots.
   - `manage.py check` and `manage.py test` pass.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/5
 
 ### B-103 Theme screen to DESIGN
 - why: the first thing the kid sees; sets the palette and type for every later screen.
@@ -148,3 +148,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Background music loop with its own toggle.
 - Hebrew UI labels (RTL).
 - Adaptive word selection (unmastered words return more often).
+- Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).

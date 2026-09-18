@@ -19,3 +19,15 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - also: a main-document HTTP status >= 400 is treated as a navigation failure (exit 1), and page-side uncaught exceptions are printed as `shot: page error:` warnings without failing the shot, so reviewers see broken JS in the log.
 - considered: `--remote-debugging-pipe` (fd 3/4, more code); Playwright's own node module (not installed, and CLAUDE.md forbids new dependencies).
 - reversible: yes.
+
+## 2026-09-18 — Tracked copies under staticfiles/ left in place (B-102)
+- chose: delete only `static/js/script.js`, `static/js/ui.js`, `static/css/style.css`, `static/css/mobile-fixes.css` and the unimported `static/js/data.js`. The collected copies under `staticfiles/{css,js}/` stay.
+- because: `staticfiles/` is `STATIC_ROOT` (collectstatic output) and is listed in `.gitignore`, yet its files are tracked from an earlier commit. The acceptance names `templates static` only; untracking `staticfiles/` wholesale touches every admin asset and is unrelated to the frontend rewrite. In DEBUG, runserver serves from `static/` via the finders, so the stale copies are not what the browser loads.
+- considered: `git rm --cached -r staticfiles` (large unrelated diff); deleting just the five collected copies (leaves the directory half-tracked and inconsistent).
+- reversible: yes.
+
+## 2026-09-18 — Acceptance grep hits inside base64 image data treated as false positives (B-102)
+- chose: treat `grep -rn "script.js\|ui.js\|style.css\|mobile-fixes" templates static` as satisfied although it prints two lines: `static/images/animals/horse.svg:45` (`uiIjs`) and `static/images/transportation/bicycle.svg:45` (`uiwjs`). Both are inside base64 `data:image/jpeg` blobs; the unescaped `.` in `ui.js` matches any byte. The same grep with `ui\.js` (dot escaped), or with `--exclude-dir=images`, prints nothing.
+- because: the matches are not references to the deleted files, and content assets under `static/images/` are read-only in M1 (CLAUDE.md), so the only way to make the literal grep empty would break that rule.
+- considered: editing the two SVGs (forbidden); asking the human (reversible, no user-facing effect, so the ask-rule says decide and log).
+- reversible: yes.
