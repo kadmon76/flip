@@ -54,7 +54,10 @@ function parseArgs(argv) {
 // Newest chromium-<rev> under ~/.cache/ms-playwright, else newest
 // chromium_headless_shell-<rev>. CHROMIUM=/path overrides.
 function findChromium() {
-    if (process.env.CHROMIUM) return process.env.CHROMIUM;
+    if (process.env.CHROMIUM) {
+        if (!fs.existsSync(process.env.CHROMIUM)) throw new Error(`CHROMIUM=${process.env.CHROMIUM} does not exist`);
+        return process.env.CHROMIUM;
+    }
     const root = path.join(os.homedir(), '.cache', 'ms-playwright');
     let entries = [];
     try { entries = fs.readdirSync(root); } catch { throw new Error(`${root} not found`); }
@@ -239,20 +242,21 @@ async function shoot({ url, out, evalJs, waitMs }, cdp) {
 
 async function main() {
     const opts = parseArgs(process.argv.slice(2));
-    const binary = findChromium();
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flip-shot-'));
+    let userDataDir = null;
     let child = null;
     let cdp = null;
 
     const cleanup = () => {
         if (cdp) cdp.close();
         if (child && child.exitCode === null) child.kill('SIGKILL');
-        fs.rmSync(userDataDir, { recursive: true, force: true });
+        if (userDataDir) fs.rmSync(userDataDir, { recursive: true, force: true });
     };
     process.on('exit', cleanup);
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(1));
 
     try {
+        const binary = findChromium();
+        userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flip-shot-'));
         const launched = launch(binary, userDataDir);
         child = launched.child;
         const wsUrl = await withTimeout(launched.wsUrl, STEP_TIMEOUT_MS, 'chromium DevTools start');
