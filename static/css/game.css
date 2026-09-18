@@ -1,5 +1,5 @@
-/* game.css — mobile-first layout for the rewritten screens.
-   Replaces style.css / mobile-fixes.css (kept on disk as reference). */
+/* game.css — mobile-first layout for the rewritten screens; the only
+   stylesheet index.html loads. */
 
 :root {
     /* sizing: tray tiles never go below 44px (touch-target minimum) and
