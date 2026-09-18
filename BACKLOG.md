@@ -23,7 +23,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - A 5-line usage comment at the top of `tools/shot.mjs`.
   - Screenshots produced by the tool: `theme.png` (fresh load) and `play.png` (after `--eval` starts a round). Non-UI item: DESIGN checklist skipped; existing look is not yet restyled.
   - `manage.py check` and `manage.py test` pass.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/4
 
 ### B-102 Remove legacy frontend files
 - why: `script.js`, `ui.js`, `style.css`, `mobile-fixes.css` are old code that agents may copy from by mistake; the new modules already replace them.
