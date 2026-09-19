@@ -45,28 +45,58 @@ function revealed(current) {
 
 // --- Theme screen ---
 
-async function renderThemeButtons() {
-    // themes.json shape: { "animals": "/static/data/animals.json", ... }
-    const themes = await fetch('/static/config/themes.json').then((r) => r.json());
+// themes.json shape: { "animals": "/static/data/animals.json", ... }.
+// Each data file: { "duck": { image, audio, difficulty }, ... }; the
+// theme card shows the image of the first word.
+async function loadThemes() {
+    const index = await fetch('/static/config/themes.json').then((r) => r.json());
+    const themes = await Promise.all(Object.entries(index).map(async ([name, dataUrl]) => {
+        const data = await fetch(dataUrl).then((r) => r.json());
+        const first = Object.keys(data)[0];
+        return { name, dataUrl, image: first ? data[first].image : null };
+    }));
+    setState({ themes });
+}
+
+function capitalise(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// DOM cache: the themes array the buttons were last built from. Not game
+// state; the buttons are rebuilt whenever state.themes is replaced.
+let builtThemes = null;
+
+function renderThemeButtons(state) {
+    if (state.themes === builtThemes) return;
+    builtThemes = state.themes;
     const container = $('theme-buttons');
     container.innerHTML = '';
-    for (const [name, dataUrl] of Object.entries(themes)) {
+    for (const theme of state.themes) {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = 'theme-btn';
-        btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-        btn.addEventListener('click', () => startRound(name, dataUrl));
+        if (theme.image) {
+            const img = document.createElement('img');
+            img.src = theme.image;
+            img.alt = '';
+            btn.appendChild(img);
+        }
+        const label = document.createElement('span');
+        label.textContent = capitalise(theme.name);
+        btn.appendChild(label);
+        btn.addEventListener('click', () => startRound(theme));
         container.appendChild(btn);
     }
 }
 
-async function startRound(theme, dataUrl) {
+async function startRound({ name, dataUrl }) {
     // data shape: { "duck": { image, audio, difficulty }, ... }
     const data = await fetch(dataUrl).then((r) => r.json());
     const words = shuffle(Object.keys(data))
         .slice(0, ROUND_SIZE)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
     setState({
-        theme,
+        theme: name,
         words,
         screen: 'play',
         round: { index: 0, size: ROUND_SIZE, results: [] },
@@ -153,6 +183,7 @@ function onPlayAgain() {
 // --- Wiring ---
 
 subscribe(renderScreens);
+subscribe(renderThemeButtons);
 subscribe(renderCard);
 subscribe(renderActions);
 subscribe(renderRoundEnd);
@@ -162,7 +193,7 @@ $('next-btn').addEventListener('click', onNext);
 $('play-again-btn').addEventListener('click', onPlayAgain);
 
 renderScreens(state);
-renderThemeButtons();
+loadThemes();
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.

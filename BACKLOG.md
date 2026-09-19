@@ -43,7 +43,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - At 1024px wide the content is centred with max width 480px (screenshot `theme-desktop.png` at 1024x740).
   - Bottom-left 96x96 mascot corner is empty.
   - Screenshots: `theme.png`, `theme-desktop.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/6
 
 ### B-104 Play screen layout to DESIGN
 - why: the core screen; must fit a phone without scrolling and use the palette.
@@ -149,3 +149,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Hebrew UI labels (RTL).
 - Adaptive word selection (unmastered words return more often).
 - Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).
+- `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.

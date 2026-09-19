@@ -17,7 +17,7 @@ a phone.
   Drag-and-drop is GSAP Draggable loaded from cdnjs (already in the template).
 - Runs on: phone browser, portrait, 360px wide and up (primary). Desktop
   must work but is not optimised.
-- Content for M1: `static/data/*.json` plus the existing images and sounds
+- Content for M1: `static/config/themes.json` (theme index) and `static/data/*.json` (words) plus the existing images and sounds
   under `static/images/` and `static/sounds/`. Read-only: do not add, edit,
   regenerate or rename content or assets in M1.
 - Never: a build step; new dependencies (pip, npm or CDN) without a
