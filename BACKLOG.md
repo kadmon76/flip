@@ -150,3 +150,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Adaptive word selection (unmastered words return more often).
 - Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
+- Play screen: words of 7+ letters wrap their letter boxes into two rows at 360px (B-104); revisit once the mockup says how long words should look.
