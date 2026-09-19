@@ -1,9 +1,12 @@
-// card.js — renders the card image, hearts, letter boxes and letter tray
-// from state. Tile elements are keyed by tile id and kept alive across
-// renders: they are moved between tray and boxes, never recreated, so a
-// re-render can't destroy a tile that is mid-drag.
+// card.js — renders the card image, hearts, word counter, letter boxes
+// and letter tray from state. Tile elements are keyed by tile id and
+// kept alive across renders: they are moved between tray and boxes,
+// never recreated, so a re-render can't destroy a tile that is mid-drag.
 
 import { makeDraggable, destroyDraggable, setDragEnabled } from './drag.js';
+import { boxLayout } from './layout.js';
+
+const BOX_GAP = 6;   // must match --tile-gap in game.css
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,10 +19,11 @@ export function renderCard(state) {
         if (!state.current.word) removeStaleTiles([]);
         return;
     }
-    const { current, lives } = state;
+    const { current, lives, round } = state;
 
     renderImage(current);
     renderHearts(lives);
+    renderCounter(round);
     renderBoxes(current.placed.length);
 
     removeStaleTiles(current.tray);
@@ -56,11 +60,19 @@ function renderHearts(lives) {
     });
 }
 
+function renderCounter(round) {
+    $('word-counter').textContent = `${round.index + 1} / ${round.size}`;
+}
+
 function renderBoxes(count) {
     const container = $('letter-boxes');
+    // Size and columns depend on the row width, so this runs on every
+    // render (main.js also re-renders on resize); the boxes themselves
+    // are rebuilt only when the letter count changes.
+    const { size, cols } = boxLayout(count, container.clientWidth, BOX_GAP);
+    container.style.setProperty('--box-size', `${size}px`);
+    container.style.setProperty('--cols', cols);
     if (container.children.length === count) return;
-    // Lets the CSS shrink boxes for words too long to fit one row.
-    container.style.setProperty('--letter-count', count);
     container.innerHTML = '';
     for (let i = 0; i < count; i++) {
         const box = document.createElement('div');

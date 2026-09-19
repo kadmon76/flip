@@ -1,3 +1,4 @@
+import json
 import re
 import shutil
 import subprocess
@@ -94,3 +95,52 @@ class GameCssPaletteTests(TestCase):
         _, rest = self._root_and_rest()
         literals = re.findall(r'#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(', rest)
         self.assertEqual(literals, [])
+
+
+class BoxLayoutTests(TestCase):
+    """static/js/layout.js boxLayout(): 48px boxes on one row when they fit;
+    8+ letter words shrink toward 40px to stay on one row; otherwise 48px
+    boxes wrap into even rows (DESIGN.md "Type", BACKLOG B-104)."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def layout(self, count, width, gap=6):
+        script = (
+            f"import {{ boxLayout }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify(boxLayout({count}, {width}, {gap})));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_short_word_one_row_at_phone_width(self):
+        # 360px viewport minus 16px gutters = 328px row.
+        self.assertEqual(self.layout(4, 328), {'size': 48, 'cols': 4})
+        self.assertEqual(self.layout(6, 328), {'size': 48, 'cols': 6})
+
+    def test_seven_letters_never_shrink_below_48_so_they_wrap(self):
+        self.assertEqual(self.layout(7, 328), {'size': 48, 'cols': 4})   # 4 + 3
+
+    def test_long_words_wrap_into_even_rows_at_phone_width(self):
+        self.assertEqual(self.layout(8, 328), {'size': 48, 'cols': 4})   # 4 + 4
+        self.assertEqual(self.layout(9, 328), {'size': 48, 'cols': 5})   # 5 + 4
+        self.assertEqual(self.layout(10, 328), {'size': 48, 'cols': 5})  # 5 + 5
+
+    def test_eight_plus_letters_shrink_to_fit_one_row_on_a_wide_column(self):
+        # 480px column minus gutters = 448px row.
+        self.assertEqual(self.layout(8, 448), {'size': 48, 'cols': 8})
+        nine = self.layout(9, 448)
+        self.assertEqual(nine['cols'], 9)
+        self.assertGreaterEqual(nine['size'], 40)
+        self.assertLess(nine['size'], 48)
+        self.assertEqual(self.layout(10, 448), {'size': 48, 'cols': 5})  # 40px would not fit
+
+    def test_zero_letters_is_safe(self):
+        self.assertEqual(self.layout(0, 328), {'size': 48, 'cols': 1})
