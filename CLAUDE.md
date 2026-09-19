@@ -30,6 +30,7 @@ a phone.
   - Every screen is a render of state. `screens.js` shows/hides screens,
     `card.js` renders the card, boxes and tray, `drag.js` handles drag and
     snap, `main.js` wires it.
+  - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
   - `audio.js` (to be created) is the only place sounds play.
   - `script.js` and `ui.js` are old code for reference only. Do not import
     them. Delete each once nothing it does is still needed.
@@ -80,7 +81,7 @@ a phone.
 
 ## Project-specific rules (grow this from review feedback)
 - Do not rename the existing DOM ids in `templates/spelling_game/index.html`
-  (`screen-*`, `letter-boxes`, `letter-tray`, `check-btn`, `next-btn`,
+  (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `result-line`, `check-btn`, `next-btn`,
   `play-again-btn`) without a DECISIONS entry; card.js and main.js key on
   them.
 - Sound files under `static/sounds/` are the character's voice. Play the
