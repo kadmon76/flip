@@ -62,7 +62,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - Drag pick-up: scale 1.08 and lifted shadow in 120ms. Drop into a box: snap with `back.out(1.4)` in 200ms. Drop elsewhere: return in 300ms or less.
   - `prefers-reduced-motion`: no scale or overshoot, snaps are instant.
   - Screenshots: `play-tapped.png` (first box filled after one tap via `--eval` dispatching a click on a tile), `play-two-placed.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/10
 
 ### B-106 Check, wrong and reveal states
 - why: the mistake rules in CLAUDE.md must be visible and consistent.
