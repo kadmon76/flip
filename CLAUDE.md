@@ -31,6 +31,7 @@ a phone.
     `card.js` renders the card, boxes and tray, `drag.js` handles drag and
     snap, `main.js` wires it.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
+  - `motion.js` is pure motion specs (durations, easings, scale; no DOM); `drag.js` and later animation code read them via `motionFor(kind, reduced)`, a Django test runs it through `node`.
   - `audio.js` (to be created) is the only place sounds play.
   - `script.js` and `ui.js` are old code for reference only. Do not import
     them. Delete each once nothing it does is still needed.

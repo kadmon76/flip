@@ -73,3 +73,8 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: the acceptance says "no scale or overshoot, snaps are instant"; the shadow is a static state that tells the kid the tile is held, not motion, and DESIGN "reduce to opacity fades" is about animation.
 - considered: dropping the shadow too (loses the only held-state cue for reduced-motion users).
 - reversible: yes.
+
+## 2026-09-21 — Rule suggestions from the B-105 review applied (issue #11)
+- chose: the human answered issue #11 "A apply, B apply, C apply, D apply". Applied verbatim: (A) CLAUDE.md "Frontend architecture" now lists `motion.js` as the pure motion-spec module read via `motionFor(kind, reduced)`; (B) DESIGN.md "Motion" says tile moves are instant under `prefers-reduced-motion` (held-state shadow still shows) and other animations reduce to opacity fades; (C) DESIGN.md "Motion" documents that the box fills as soon as state changes, so the landing tile is teal and shadowless (state-first FLIP); (D) DESIGN.md "Screenshots" requires a real press/release (CDP touch or mouse events) for frames that show drag or tap motion.
+- because: question protocol; answers are consumed at the start of the next run and logged here.
+- reversible: yes (doc lines).
