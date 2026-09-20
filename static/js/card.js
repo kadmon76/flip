@@ -22,9 +22,9 @@ export function renderCard(state) {
     const { current, lives, round } = state;
 
     renderImage(current);
-    renderHearts(lives);
+    renderHearts(lives, current.status);
     renderCounter(round);
-    renderBoxes(current.placed.length);
+    renderBoxes(current.placed.length, current.status);
 
     removeStaleTiles(current.tray);
     current.tray.forEach((t) => {
@@ -54,9 +54,14 @@ function renderImage(current) {
     img.alt = 'Guess the word image';
 }
 
-function renderHearts(lives) {
+// Hearts beyond `lives` are lost (muted). Right after a miss the heart
+// that was just lost is `losing` (error colour) until the kid moves a
+// tile or checks again; the CSS transition then fades it to muted.
+function renderHearts(lives, status) {
+    const justLost = status === 'wrong' || status === 'revealed';
     document.querySelectorAll('.hearts span').forEach((heart, i) => {
         heart.classList.toggle('lost', i >= lives);
+        heart.classList.toggle('losing', justLost && i === lives);
     });
 }
 
@@ -64,8 +69,10 @@ function renderCounter(round) {
     $('word-counter').textContent = `${round.index + 1} / ${round.size}`;
 }
 
-function renderBoxes(count) {
+function renderBoxes(count, status) {
     const container = $('letter-boxes');
+    // A checked-correct word turns its boxes to the accent colour.
+    container.classList.toggle('correct', status === 'correct');
     // Size and columns depend on the row width, so this runs on every
     // render (main.js also re-renders on resize); the boxes themselves
     // are rebuilt only when the letter count changes.

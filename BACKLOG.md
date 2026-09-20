@@ -73,7 +73,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - Next always advances; an unchecked word counts as wrong. Word counter increments. After the fifth word Next shows the round-end screen.
   - A word is recorded as `correct: true` only when checked correct with at least one heart left.
   - Screenshots via `--eval`: `play-wrong.png`, `play-correct.png`, `play-revealed.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/12
 
 ### B-107 Round-end screen with stars
 - why: the session ends here; stars are the reward the kickoff asked for.

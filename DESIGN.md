@@ -40,14 +40,14 @@ at them. Text and voice should read as one character.
 Feel: calm-tactile. Durations 120–300ms, easing ease-out for moves and
 snaps, a small overshoot (back.out(1.4)) only for tile drop and star pop.
 - Tile pick-up: scale to 1.08 and lift shadow, 120ms.
-- Tile drop into box: snap with overshoot, 200ms.
+- Tile drop into box: snap with overshoot, 200ms. The box fills (primary colour) as soon as state changes, so the tile is teal and shadowless while it lands.
 - Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; heart
   fades out, 200ms.
 - Correct: boxes pulse once, confetti burst from the card, 600ms total,
   does not block input.
 - Screen change: crossfade 200ms.
 Never block input with animation longer than 300ms. Respect
-`prefers-reduced-motion`: reduce to opacity fades.
+`prefers-reduced-motion`: tile moves are instant (no scale, no overshoot; the held-state shadow still shows); other animations reduce to opacity fades.
 
 ## Sound
 ON by default; a mute toggle in the header (top-right), remembered in
@@ -75,6 +75,7 @@ lines are short and funny, never sarcastic toward the kid.
 - Non-UI items (backend, tests, tooling): screenshot the JSON or page that
   proves the change in the same viewport; the visual checklist below does
   not apply to it, the reviewer notes "non-UI" and skips it.
+- Frames that show drag or tap motion must be produced with a real press/release (CDP `Input.dispatchTouchEvent` or mouse events), not a dispatched `click`; a synthetic click skips Draggable's press path (no z-index boost, no pick-up) and misrepresents layering.
 
 ## Screen checklist (reviewer uses this on every screenshot)
 - Readable at 360px wide, nothing clipped or overlapping, no horizontal

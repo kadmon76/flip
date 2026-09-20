@@ -3,11 +3,11 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
+import { HEARTS, checkWord, revealPlacement, resultText } from './check.js';
 
 const $ = (id) => document.getElementById(id);
 
 const ROUND_SIZE = 5;
-const LIVES = 3;
 let tileSeq = 0;
 
 function shuffle(arr) {
@@ -29,18 +29,6 @@ function makeCurrent(entry) {
         placed: new Array(letters.length).fill(null),
         status: 'playing',
     };
-}
-
-// Fill every box with the right letter using the word's own tiles.
-function revealed(current) {
-    const tray = current.tray.map((t) => ({ ...t, used: true }));
-    const taken = new Set();
-    const placed = current.word.split('').map((ch) => {
-        const tile = tray.find((t) => t.letter === ch && !taken.has(t.id));
-        taken.add(tile.id);
-        return { letter: tile.letter, tileId: tile.id };
-    });
-    return { ...current, tray, placed, status: 'revealed' };
 }
 
 // --- Theme screen ---
@@ -101,46 +89,38 @@ async function startRound({ name, dataUrl }) {
         screen: 'play',
         round: { index: 0, size: ROUND_SIZE, results: [] },
         current: makeCurrent(words[0]),
-        lives: LIVES,
+        lives: HEARTS,
     });
 }
 
 // --- Play screen: check / next ---
 
-const RESULT_TEXT = {
-    playing: '',
-    correct: 'Correct!',
-    wrong: 'Not quite, try again',
-    revealed: (word) => `The word is "${word}"`,
-};
-
+// Check is enabled only while every box holds a tile and the word is
+// still open; Next is always enabled (an unchecked word counts as wrong).
 function renderActions(state) {
     if (state.screen !== 'play' || !state.current.word) return;
     const { current } = state;
     const allFilled = current.placed.every(Boolean);
-    const canCheck = current.status === 'playing' || current.status === 'wrong';
-    $('check-btn').disabled = !(allFilled && canCheck);
-    const text = RESULT_TEXT[current.status];
-    $('result-line').textContent = typeof text === 'function' ? text(current.word) : text;
+    const open = current.status === 'playing' || current.status === 'wrong';
+    $('check-btn').disabled = !(allFilled && open);
+    $('result-line').textContent = resultText(current.status, current.word);
 }
 
+// Mistake rules live in check.js; this only records the outcome. On the
+// third miss the boxes are filled with the right tiles (status 'revealed').
 function onCheck() {
     const { current, round, lives } = state;
     if (!current.placed.every(Boolean)) return;
     if (current.status === 'correct' || current.status === 'revealed') return;
 
-    const answer = current.placed.map((p) => p.letter).join('');
-    const correct = answer === current.word;
+    const letters = current.placed.map((p) => p.letter);
+    const result = checkWord(current.word, letters, lives);
     const results = [...round.results];
-    results[round.index] = { word: current.word, correct };
+    results[round.index] = { word: current.word, correct: result.correct };
 
-    if (correct) {
-        setState({ round: { ...round, results }, current: { ...current, status: 'correct' } });
-    } else if (lives - 1 <= 0) {
-        setState({ lives: 0, round: { ...round, results }, current: revealed(current) });
-    } else {
-        setState({ lives: lives - 1, round: { ...round, results }, current: { ...current, status: 'wrong' } });
-    }
+    const next = { ...current, status: result.status };
+    if (result.status === 'revealed') Object.assign(next, revealPlacement(current.word, current.tray));
+    setState({ lives: result.lives, round: { ...round, results }, current: next });
 }
 
 function onNext() {
@@ -156,7 +136,7 @@ function onNext() {
         setState({
             round: { ...round, index: nextIndex, results },
             current: makeCurrent(state.words[nextIndex]),
-            lives: LIVES,
+            lives: HEARTS,
         });
     }
 }
@@ -176,7 +156,7 @@ function onPlayAgain() {
         words: [],
         round: { index: 0, size: ROUND_SIZE, results: [] },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
-        lives: LIVES,
+        lives: HEARTS,
     });
 }
 
