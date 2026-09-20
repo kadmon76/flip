@@ -61,3 +61,15 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: with hearts, counter, two rows of boxes and two rows of tiles for a 10-letter word, the column needs about 640px above the mascot strip at 740px tall, which fixes the card at roughly 176px on a 360px phone. Reserving the whole bottom strip (not just the corner) is the simplest way to keep the bottom-left 96x96 free with full-width buttons, and a constant button position is easier for a kid's thumb. The tile covers the box, so "filled boxes use the primary colour" is only visible if the tile itself is teal.
 - considered: buttons right-aligned beside the corner (110px buttons, asymmetric); card that grows into free space (`flex: 1` + `aspect-ratio`, fragile across browsers); keeping the placed tile white on a teal box (teal never visible).
 - reversible: yes.
+
+## 2026-09-20 — Tile motion runs after setState, from the old position to the rendered one (B-105)
+- chose: a tap or drop first goes through `setState` (card.js moves the tile element into its box or back to the tray, transform reset), then `drag.js` measures where the tile was and where the render put it and tweens the difference to zero (FLIP). Tap-to-place uses the same drop snap as a drag (`back.out(1.4)`, 200ms) and so does tapping a placed tile back to the tray; a drop that hits neither a box nor the tray slides back with `power2.out` in 250ms. The numbers live in `static/js/motion.js` (pure, node-tested); `motionFor(kind, reduced)` returns duration 0, no scale, no overshoot when `prefers-reduced-motion` matches, which drag.js reads via `matchMedia` at each gesture.
+- because: CLAUDE.md says state is the only truth and every screen is a render of it, so the tile cannot animate "into" a box before the state says it is there; animating after the render keeps the motion purely visual and one code path serves drag and tap. DESIGN "Motion" allows the overshoot only for the drop into a box, so the stray-drop return (previously `back.out(1.4)` 300ms) is now a plain ease-out inside the 300ms cap.
+- considered: animating to the box first and committing state on tween end (state lags the finger, a second tap mid-tween would read stale state); a CSS transition on the tile (cannot move between parents); keeping the overshoot on the stray return (contradicts DESIGN).
+- reversible: yes.
+
+## 2026-09-20 — Reduced motion keeps the lifted shadow, instantly (B-105)
+- chose: under `prefers-reduced-motion` the picked-up tile still shows the lifted shadow (`.gsap-dragging`), but with no CSS transition and no scale; snaps and returns are `gsap.set`, not tweens.
+- because: the acceptance says "no scale or overshoot, snaps are instant"; the shadow is a static state that tells the kid the tile is held, not motion, and DESIGN "reduce to opacity fades" is about animation.
+- considered: dropping the shadow too (loses the only held-state cue for reduced-motion users).
+- reversible: yes.

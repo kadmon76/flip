@@ -297,9 +297,21 @@ h3 {
     touch-action: none;
 }
 
+/* pick-up (DESIGN "Motion"): the shadow lifts over 120ms while drag.js
+   scales the tile to 1.08; both are skipped under reduced motion */
+.draggable-letter {
+    transition: box-shadow 120ms ease-out;
+}
+
 .draggable-letter.gsap-dragging,
 .letter-box > .draggable-letter.gsap-dragging {
     box-shadow: var(--shadow-lift);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .draggable-letter {
+        transition: none;
+    }
 }
 
 body.dragging-active {
