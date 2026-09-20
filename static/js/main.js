@@ -195,6 +195,9 @@ $('play-again-btn').addEventListener('click', onPlayAgain);
 renderScreens(state);
 loadThemes();
 
+// Box sizing depends on the row width (layout.js); re-render on rotate.
+window.addEventListener('resize', () => renderCard(state));
+
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.
 window.flip = { state, setState };

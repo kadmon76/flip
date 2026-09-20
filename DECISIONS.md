@@ -49,3 +49,15 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: the acceptance needs a 1024x740 screenshot and the task said to extend the tool minimally rather than add another one.
 - considered: switching `mobile` off above a width threshold (extra heuristic nobody asked for).
 - reversible: yes.
+
+## 2026-09-20 — Letter boxes wrap into even rows instead of shrinking below 48px (B-104)
+- chose: boxes are 48px like the tiles. When a word does not fit one row, boxes of 8+ letters shrink toward 40px only if that makes the row fit; otherwise they stay 48px and wrap into rows as even as possible (7 letters at 360px -> 4 + 3, 9 -> 5 + 4, 10 -> 5 + 5). The rule lives in `static/js/layout.js` (`boxLayout(count, width, gap)`, pure, node-tested); `card.js` applies it as `--box-size` / `--cols` on `#letter-boxes` (CSS grid), and `main.js` re-renders the card on `resize`.
+- because: at 360px wide with 16px gutters the row is 328px. Seven 48px boxes (372px) and even eight 40px boxes (362px with 6px gaps) do not fit one row, so the DESIGN minimums (48px; 40px only for 8+ letters) force a second row for the 7-, 9- and 10-letter words that already exist in the content. Wrapping keeps every box a full tap target; even rows read better than flex-wrap's 6 + 1. On the 480px desktop column the shrink still applies (9 letters -> 44px, one row).
+- considered: shrinking boxes to whatever fits one row (the previous CSS: 27px boxes for "helicopter", fails the 40px floor); letting the box row bleed into the gutters (only rescues 8-letter words, and there are none in the content); hearts and counter on one line to buy height (the item lists them as separate rows).
+- reversible: yes.
+
+## 2026-09-20 — Play screen: fixed card, buttons pinned above a 96px mascot strip, primary tile inside a filled box (B-104)
+- chose: `#screen-play` is top-aligned with 8px gaps, a `min(48vw, 192px)` square card, and `padding-bottom: 96px` (`--mascot-corner`); the action row uses `margin-top: auto` so Check/Next sit just above that strip in the same place for every word length. A filled box is primary-coloured and the tile inside it also takes the primary colour (no shadow); a tile dragged out keeps the colour until it lands. Empty boxes are white with the DESIGN shadow and a dashed muted frame. Disabled Check is 0.4 opacity with no shadow.
+- because: with hearts, counter, two rows of boxes and two rows of tiles for a 10-letter word, the column needs about 640px above the mascot strip at 740px tall, which fixes the card at roughly 176px on a 360px phone. Reserving the whole bottom strip (not just the corner) is the simplest way to keep the bottom-left 96x96 free with full-width buttons, and a constant button position is easier for a kid's thumb. The tile covers the box, so "filled boxes use the primary colour" is only visible if the tile itself is teal.
+- considered: buttons right-aligned beside the corner (110px buttons, asymmetric); card that grows into free space (`flex: 1` + `aspect-ratio`, fragile across browsers); keeping the placed tile white on a teal box (teal never visible).
+- reversible: yes.

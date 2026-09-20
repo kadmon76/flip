@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=4">
 </head>
 <body>
     <!-- Header: title + auth in one compact line -->
@@ -38,16 +38,19 @@
         <div id="theme-buttons"></div>
     </div>
 
-    <!-- Play screen -->
+    <!-- Play screen: card, hearts, counter, boxes, tray, result, actions
+         (top to bottom per BACKLOG B-104). Ids are keyed on by card.js
+         and main.js; do not rename. -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
             <img id="play-image" src="" alt="" />
-            <div class="hearts" aria-label="Lives">
-                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
-                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
-                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
-            </div>
         </div>
+        <div class="hearts" aria-label="Lives">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
+        </div>
+        <p id="word-counter" class="word-counter"></p>
         <div id="letter-boxes" class="letter-boxes"></div>
         <div id="letter-tray" class="letter-tray"></div>
         <p id="result-line" class="result-line"></p>

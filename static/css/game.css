@@ -3,15 +3,15 @@
    live only in :root; every rule below uses the variables. */
 
 :root {
-    /* sizing: tray tiles never go below 44px (touch-target minimum) and
-       the tray wraps; up to 8 tiles share one row at the column's max
-       width. Letter boxes shrink below this only when a longer word
-       would not fit one row (see .letter-boxes). */
+    /* sizing (DESIGN.md "Type"): tiles and boxes are 48px squares. The
+       tray wraps; letter boxes are laid out by layout.js (one row, or
+       shrink to 40px for 8+ letters, or wrap into even rows). */
     --page-pad: 16px;
     --column-max: 480px;
     --tile-gap: 6px;
-    --row-width: calc(min(100vw, var(--column-max)) - 2 * var(--page-pad));
-    --tile-size: clamp(44px, calc((var(--row-width) - 7 * var(--tile-gap)) / 8), 48px);
+    --tile-size: 48px;
+    --tile-font: 28px;
+    --mascot-corner: 96px;    /* DESIGN "Mascot": bottom-left stays free */
     --radius: 16px;
     --radius-small: 8px;
 
@@ -167,13 +167,21 @@ h3 {
 
 /* --- Play screen --- */
 
+/* Top to bottom: card, hearts, counter, boxes, tray, result, actions.
+   Content starts at the top; the action row is pushed down to sit just
+   above the mascot strip so it lands in the same place for every word
+   length and never enters the bottom-left corner. */
 #screen-play {
     touch-action: none;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-top: 8px;
+    padding-bottom: var(--mascot-corner);
 }
 
 .card {
-    position: relative;
-    width: min(60vw, calc(0.6 * var(--column-max)));
+    flex: 0 0 auto;
+    width: min(48vw, 192px);
     aspect-ratio: 1 / 1;
     background: var(--color-surface);
     border-radius: var(--radius);
@@ -194,11 +202,8 @@ h3 {
    back to the colour-emoji font, which ignores CSS colour, so a lost
    heart never looked any different. */
 .hearts {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     display: flex;
-    gap: 2px;
+    gap: 4px;
     color: var(--color-accent);
 }
 
@@ -207,23 +212,33 @@ h3 {
 }
 
 .hearts svg {
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
 }
 
 .hearts .lost {
     color: var(--color-muted);
 }
 
+.word-counter {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    line-height: 1.2;
+    color: var(--color-muted);
+}
+
 /* --- Letter boxes and tray --- */
 
-/* Boxes match the tile size unless the word is too long for one row;
-   then they shrink just enough to fit (card.js sets --letter-count). */
+/* card.js sets --box-size and --cols from layout.js so a long word
+   either shrinks its boxes (8+ letters, never below 40px) or wraps into
+   even rows; boxes are otherwise the tile size. */
 .letter-boxes {
-    --letter-count: 1;
-    --box-size: min(var(--tile-size),
-        calc((var(--row-width) - (var(--letter-count) - 1) * var(--tile-gap)) / var(--letter-count)));
-    display: flex;
+    --box-size: var(--tile-size);
+    --cols: 1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), var(--box-size));
     justify-content: center;
     gap: var(--tile-gap);
 }
@@ -234,25 +249,28 @@ h3 {
     border: 2px dashed var(--color-muted);
     border-radius: var(--radius-small);
     background: var(--color-surface);
+    box-shadow: var(--shadow);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* a box holding a tile: the tile covers the box, hide the dashed frame */
+/* a box holding a tile: box and tile both take the primary colour; the
+   frame goes so the tile fills the full 48px (border-box) */
 .letter-box.filled {
-    border-color: transparent;
-    background: transparent;
+    border: 0;
+    background: var(--color-primary);
 }
 
-/* a placed tile scales into its box */
 .letter-box > .draggable-letter {
     width: 100%;
     height: 100%;
-    font-size: calc(var(--box-size) * 0.55);
+    background: var(--color-primary);
+    box-shadow: none;
 }
 
 .letter-tray {
+    width: 100%;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -267,7 +285,8 @@ h3 {
     align-items: center;
     justify-content: center;
     font-family: var(--font-display);
-    font-size: calc(var(--tile-size) * 0.55);
+    font-size: var(--tile-font);
+    line-height: 1;
     color: var(--color-text);
     background: var(--color-surface);
     border: none;
@@ -278,7 +297,8 @@ h3 {
     touch-action: none;
 }
 
-.draggable-letter.gsap-dragging {
+.draggable-letter.gsap-dragging,
+.letter-box > .draggable-letter.gsap-dragging {
     box-shadow: var(--shadow-lift);
 }
 
@@ -302,6 +322,10 @@ body.dragging-active {
     gap: 12px;
 }
 
+#screen-play .actions {
+    margin-top: auto;
+}
+
 .action-btn {
     flex: 1 1 0;
     height: 56px;
@@ -319,8 +343,10 @@ body.dragging-active {
     transform: scale(0.98);
 }
 
+/* muted: faded onto the paper, no shadow, no lift on press */
 .action-btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
+    box-shadow: none;
     cursor: default;
 }
 
