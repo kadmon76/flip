@@ -216,8 +216,17 @@ h3 {
     height: 26px;
 }
 
+/* a miss: the heart just lost turns to the error colour at once (card.js
+   adds `losing` while the wrong check stands) and fades to muted over
+   200ms once the kid moves a tile or checks again */
 .hearts .lost {
     color: var(--color-muted);
+    transition: color 200ms ease-out;
+}
+
+.hearts .lost.losing {
+    color: var(--color-error);
+    transition: none;
 }
 
 .word-counter {
@@ -267,6 +276,12 @@ h3 {
     height: 100%;
     background: var(--color-primary);
     box-shadow: none;
+}
+
+/* checked correct: boxes and the tiles in them take the accent colour */
+.letter-boxes.correct .letter-box.filled,
+.letter-boxes.correct .letter-box > .draggable-letter {
+    background: var(--color-accent);
 }
 
 .letter-tray {

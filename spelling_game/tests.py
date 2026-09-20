@@ -195,3 +195,87 @@ class MotionSpecTests(TestCase):
             capture_output=True, text=True, timeout=20,
         )
         self.assertNotEqual(result.returncode, 0)
+
+
+class CheckWordTests(TestCase):
+    """static/js/check.js: the M1 mistake rules (CLAUDE.md "Product rules",
+    BACKLOG B-106). 3 hearts per word; a wrong check costs one; the third
+    miss reveals the word; mastered only when checked correct with a heart
+    left. Also the reveal placement and the result-line text."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'check.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_js(self, body):
+        script = (
+            f"import {{ HEARTS, checkWord, revealPlacement, resultText }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify({body}));"
+        )
+        return subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+
+    def js(self, body):
+        result = self.run_js(body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_three_hearts_per_word(self):
+        self.assertEqual(self.js('HEARTS'), 3)
+
+    def test_correct_keeps_hearts_and_is_mastered(self):
+        self.assertEqual(
+            self.js('checkWord("duck", ["d","u","c","k"], 3)'),
+            {'status': 'correct', 'lives': 3, 'correct': True},
+        )
+
+    def test_correct_on_the_last_heart_still_counts(self):
+        # Two misses, then right: one heart left, so it is mastered.
+        self.assertEqual(
+            self.js('checkWord("duck", "duck", 1)'),
+            {'status': 'correct', 'lives': 1, 'correct': True},
+        )
+
+    def test_wrong_costs_one_heart_and_stays_open(self):
+        self.assertEqual(
+            self.js('checkWord("duck", ["d","c","u","k"], 3)'),
+            {'status': 'wrong', 'lives': 2, 'correct': False},
+        )
+        self.assertEqual(
+            self.js('checkWord("duck", "dcuk", 2)'),
+            {'status': 'wrong', 'lives': 1, 'correct': False},
+        )
+
+    def test_third_miss_reveals_and_is_not_mastered(self):
+        self.assertEqual(
+            self.js('checkWord("duck", "dcuk", 1)'),
+            {'status': 'revealed', 'lives': 0, 'correct': False},
+        )
+
+    def test_check_with_no_hearts_fails(self):
+        self.assertNotEqual(self.run_js('checkWord("duck", "duck", 0)').returncode, 0)
+
+    def test_reveal_places_the_words_own_tiles_in_order(self):
+        tray = '[{"id":"a","letter":"k","used":false},{"id":"b","letter":"c","used":true},' \
+               '{"id":"c","letter":"d","used":false},{"id":"d","letter":"u","used":true}]'
+        out = self.js(f'revealPlacement("duck", {tray})')
+        self.assertEqual([p['letter'] for p in out['placed']], ['d', 'u', 'c', 'k'])
+        self.assertEqual([p['tileId'] for p in out['placed']], ['c', 'd', 'b', 'a'])
+        self.assertTrue(all(t['used'] for t in out['tray']))
+
+    def test_reveal_uses_each_duplicate_letter_tile_once(self):
+        tray = '[{"id":"a","letter":"o"},{"id":"b","letter":"m"},{"id":"c","letter":"n"},{"id":"d","letter":"o"}]'
+        out = self.js(f'revealPlacement("moon", {tray})')
+        ids = [p['tileId'] for p in out['placed']]
+        self.assertEqual(len(set(ids)), 4)
+        self.assertEqual([p['letter'] for p in out['placed']], ['m', 'o', 'o', 'n'])
+
+    def test_result_line_text(self):
+        self.assertEqual(self.js('resultText("playing", "duck")'), '')
+        self.assertEqual(self.js('resultText("correct", "duck")'), 'Correct!')
+        self.assertEqual(self.js('resultText("wrong", "duck")'), 'Not quite, try again')
+        self.assertEqual(self.js('resultText("revealed", "duck")'), 'The word is "duck"')
