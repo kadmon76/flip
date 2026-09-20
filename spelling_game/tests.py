@@ -144,3 +144,54 @@ class BoxLayoutTests(TestCase):
 
     def test_zero_letters_is_safe(self):
         self.assertEqual(self.layout(0, 328), {'size': 48, 'cols': 1})
+
+
+class MotionSpecTests(TestCase):
+    """static/js/motion.js motionFor(): DESIGN.md "Motion" numbers for tile
+    pick-up, drop into a box and return; instant, no scale and no
+    overshoot under prefers-reduced-motion (BACKLOG B-105)."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def motion(self, kind, reduced):
+        script = (
+            f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify(motionFor({json.dumps(kind)}, {json.dumps(reduced)})));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_pickup_scales_to_1_08_in_120ms(self):
+        self.assertEqual(self.motion('pickup', False), {'duration': 0.12, 'ease': 'power2.out', 'scale': 1.08})
+
+    def test_snap_into_box_overshoots_in_200ms(self):
+        self.assertEqual(self.motion('snap', False), {'duration': 0.2, 'ease': 'back.out(1.4)', 'scale': 1})
+
+    def test_return_is_ease_out_within_300ms(self):
+        m = self.motion('return', False)
+        self.assertLessEqual(m['duration'], 0.3)
+        self.assertNotIn('back', m['ease'])
+        self.assertEqual(m['scale'], 1)
+
+    def test_reduced_motion_is_instant_without_scale_or_overshoot(self):
+        for kind in ('pickup', 'snap', 'return'):
+            self.assertEqual(self.motion(kind, True), {'duration': 0, 'ease': 'none', 'scale': 1}, kind)
+
+    def test_unknown_kind_fails(self):
+        script = (
+            f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
+            "motionFor('wiggle', false);"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertNotEqual(result.returncode, 0)
