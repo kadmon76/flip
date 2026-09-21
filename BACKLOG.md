@@ -83,7 +83,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - "Play again" starts a new round in the same theme (new random words, hearts and results reset). "Themes" returns to the theme screen. Both buttons at least 48px tall.
   - Mascot corner empty. Fits 360x740 without scrolling.
   - Screenshots via `--eval`: `round-end-3.png`, `round-end-1.png`, `round-end-0.png`. Checklist passes. `manage.py test` passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/14
 
 ### B-108 Character voice: audio.js and mute toggle
 - why: the character's voice is the reason the kid keeps playing; it must be the only place sound is played.
