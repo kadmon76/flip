@@ -195,3 +195,44 @@ class MotionSpecTests(TestCase):
             capture_output=True, text=True, timeout=20,
         )
         self.assertNotEqual(result.returncode, 0)
+
+
+class StarsTests(TestCase):
+    """static/js/score.js starsFor(): stars for a 5-word round, 5/5 -> 3,
+    4/5 -> 2, 2-3/5 -> 1, 0-1/5 -> 0 (BACKLOG B-107)."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'score.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        script = f"import {{ starsFor }} from '{self.MODULE.as_uri()}';{body}"
+        return subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+
+    def stars(self, correct, size=5):
+        result = self.run_node(f"console.log(JSON.stringify(starsFor({correct}, {size})));")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_all_five_is_three_stars(self):
+        self.assertEqual(self.stars(5), 3)
+
+    def test_four_of_five_is_two_stars(self):
+        self.assertEqual(self.stars(4), 2)
+
+    def test_two_or_three_of_five_is_one_star(self):
+        self.assertEqual(self.stars(3), 1)
+        self.assertEqual(self.stars(2), 1)
+
+    def test_zero_or_one_of_five_is_no_star(self):
+        self.assertEqual(self.stars(1), 0)
+        self.assertEqual(self.stars(0), 0)
+
+    def test_bad_score_fails(self):
+        for body in ("starsFor(6, 5);", "starsFor(-1, 5);", "starsFor(2.5, 5);", "starsFor(1, 0);"):
+            self.assertNotEqual(self.run_node(body).returncode, 0, body)
