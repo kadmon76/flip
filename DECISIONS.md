@@ -73,3 +73,8 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: the acceptance says "no scale or overshoot, snaps are instant"; the shadow is a static state that tells the kid the tile is held, not motion, and DESIGN "reduce to opacity fades" is about animation.
 - considered: dropping the shadow too (loses the only held-state cue for reduced-motion users).
 - reversible: yes.
+
+## 2026-09-22 — Rule suggestions from the B-106 review applied (issue #13)
+- chose: the human answered issue #13 "A apply, B apply". Applied verbatim: (A) DESIGN.md "Motion" now says the lost heart turns to the error colour at once and fades to muted over 200ms when the kid next moves a tile (or on Next); (B) BACKLOG.md B-109 acceptance says the lost heart (already error-coloured from B-106) fades to muted over 200ms when the kid next moves a tile, alongside the wrong tint clearing. Issue #11 (B-105 review) was consumed by the previous run and is logged on the B-106 branch (PR #12), so it is not repeated here.
+- because: question protocol; answers are consumed at the start of the next run and logged here.
+- reversible: yes (doc lines).

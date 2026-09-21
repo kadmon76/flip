@@ -99,7 +99,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
 - why: a mistake should feel gentle and clear, not punishing.
 - acceptance:
   - On a wrong check, tiles sitting in a box with the wrong letter wiggle ±6px horizontally for 300ms, and those boxes get a `wrong` tint in the error colour that stays until the kid next moves a tile.
-  - The lost heart fades out over 200ms. Input is never blocked.
+  - The lost heart (already error-coloured from B-106) fades to muted over 200ms when the kid next moves a tile, alongside the wrong tint clearing. Input is never blocked.
   - `prefers-reduced-motion`: no wiggle, tint only.
   - Screenshots via `--eval`: `play-wrong-boxes.png` showing the tinted wrong boxes and a lost heart. Checklist passes.
 - status:

@@ -41,8 +41,7 @@ Feel: calm-tactile. Durations 120–300ms, easing ease-out for moves and
 snaps, a small overshoot (back.out(1.4)) only for tile drop and star pop.
 - Tile pick-up: scale to 1.08 and lift shadow, 120ms.
 - Tile drop into box: snap with overshoot, 200ms.
-- Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; heart
-  fades out, 200ms.
+- Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; the lost heart turns to the error colour at once and fades to muted over 200ms when the kid next moves a tile (or on Next).
 - Correct: boxes pulse once, confetti burst from the card, 600ms total,
   does not block input.
 - Screen change: crossfade 200ms.
