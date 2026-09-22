@@ -3,6 +3,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
+import { starsFor } from './score.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -163,20 +164,66 @@ function onNext() {
 
 // --- Round-end screen ---
 
+const TICK = 'M5 12.5l4.5 4.5L19 7';
+const CROSS = 'M6 6l12 12M18 6L6 18';
+
+// Stars, score and one row per word (thumbnail, word, tick or cross).
+// The rows are rebuilt from state.round.results on every render; the
+// list is small and nothing on this screen is interactive per row.
 function renderRoundEnd(state) {
     if (state.screen !== 'round-end') return;
-    const correct = state.round.results.filter((r) => r.correct).length;
-    $('round-score').textContent = `${correct} / ${state.round.size}`;
+    const { results, size } = state.round;
+    const correct = results.filter((r) => r.correct).length;
+    const stars = starsFor(correct, size);
+
+    document.querySelectorAll('#round-stars span').forEach((star, i) => {
+        star.classList.toggle('earned', i < stars);
+    });
+    $('round-score').textContent = `${correct} / ${size}`;
+
+    const list = $('round-words');
+    list.innerHTML = '';
+    state.words.forEach((entry, i) => {
+        const ok = !!(results[i] && results[i].correct);
+        const li = document.createElement('li');
+        li.className = ok ? 'correct' : 'wrong';
+
+        const img = document.createElement('img');
+        img.src = entry.image;
+        img.alt = '';
+        li.appendChild(img);
+
+        const word = document.createElement('span');
+        word.className = 'word';
+        word.textContent = entry.word;
+        li.appendChild(word);
+
+        const mark = document.createElement('span');
+        mark.className = 'mark';
+        mark.setAttribute('aria-label', ok ? 'correct' : 'wrong');
+        mark.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ok ? TICK : CROSS}"/></svg>`;
+        li.appendChild(mark);
+
+        list.appendChild(li);
+    });
 }
 
+// New round in the same theme: new random words, hearts and results
+// reset by startRound. Falls back to the theme screen if the theme is
+// somehow missing from state.themes.
 function onPlayAgain() {
+    const theme = state.themes.find((t) => t.name === state.theme);
+    if (theme) startRound(theme);
+    else onThemes();
+}
+
+function onThemes() {
     setState({
         screen: 'theme',
         theme: null,
         words: [],
         round: { index: 0, size: ROUND_SIZE, results: [] },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
-        lives: LIVES,
     });
 }
 
@@ -191,6 +238,7 @@ subscribe(renderRoundEnd);
 $('check-btn').addEventListener('click', onCheck);
 $('next-btn').addEventListener('click', onNext);
 $('play-again-btn').addEventListener('click', onPlayAgain);
+$('themes-btn').addEventListener('click', onThemes);
 
 renderScreens(state);
 loadThemes();

@@ -83,7 +83,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - "Play again" starts a new round in the same theme (new random words, hearts and results reset). "Themes" returns to the theme screen. Both buttons at least 48px tall.
   - Mascot corner empty. Fits 360x740 without scrolling.
   - Screenshots via `--eval`: `round-end-3.png`, `round-end-1.png`, `round-end-0.png`. Checklist passes. `manage.py test` passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/14
 
 ### B-108 Character voice: audio.js and mute toggle
 - why: the character's voice is the reason the kid keeps playing; it must be the only place sound is played.
@@ -99,7 +99,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
 - why: a mistake should feel gentle and clear, not punishing.
 - acceptance:
   - On a wrong check, tiles sitting in a box with the wrong letter wiggle ±6px horizontally for 300ms, and those boxes get a `wrong` tint in the error colour that stays until the kid next moves a tile.
-  - The lost heart fades out over 200ms. Input is never blocked.
+  - The lost heart (already error-coloured from B-106) fades to muted over 200ms when the kid next moves a tile, alongside the wrong tint clearing. Input is never blocked.
   - `prefers-reduced-motion`: no wiggle, tint only.
   - Screenshots via `--eval`: `play-wrong-boxes.png` showing the tinted wrong boxes and a lost heart. Checklist passes.
 - status:

@@ -334,7 +334,8 @@ body.dragging-active {
     gap: 12px;
 }
 
-#screen-play .actions {
+#screen-play .actions,
+#screen-round-end .actions {
     margin-top: auto;
 }
 
@@ -364,7 +365,108 @@ body.dragging-active {
 
 /* --- Round-end screen --- */
 
+/* Top to bottom: stars, score, the five words, Play again / Themes.
+   Same shape as the play screen: content from the top, the action row
+   pushed down to sit just above the mascot strip (bottom-left stays
+   free). Budget at 360x740: header 48 + stars 64 + score 56 + five
+   48px rows + buttons 56 + strip 96 fits without scrolling. */
+#screen-round-end {
+    justify-content: flex-start;
+    gap: 12px;
+    padding-top: 8px;
+    padding-bottom: var(--mascot-corner);
+}
+
+/* Three star outlines in the accent colour; an earned star is filled.
+   Inline SVG (like the hearts) so CSS colour applies on every phone. */
+.stars {
+    display: flex;
+    gap: 8px;
+    color: var(--color-accent);
+}
+
+.stars span {
+    display: flex;
+}
+
+.stars svg {
+    width: 64px;
+    height: 64px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+
+.stars .earned svg {
+    fill: currentColor;
+}
+
 #round-score {
     margin: 0;
-    font-size: 3.5rem;
+    font-size: 2.5rem;
+    line-height: 1;
+}
+
+/* One row per word: image thumbnail, the word, a tick (accent) or a
+   cross (error) at the end. Rows are white paper strips. */
+.round-words {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.round-words li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 4px 12px 4px 4px;
+    background: var(--color-surface);
+    border-radius: var(--radius-small);
+    box-shadow: var(--shadow);
+}
+
+.round-words img {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radius-small);
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.round-words .word {
+    flex: 1 1 auto;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.round-words .mark {
+    flex: 0 0 auto;
+    display: flex;
+}
+
+.round-words .mark svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.round-words .correct .mark {
+    color: var(--color-accent);
+}
+
+.round-words .wrong .mark {
+    color: var(--color-error);
 }
