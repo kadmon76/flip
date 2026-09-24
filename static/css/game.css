@@ -79,6 +79,7 @@ h3 {
 }
 
 .app-title {
+    margin-right: auto;
     font-family: var(--font-display);
     font-size: 1.75rem;
     line-height: 1;
@@ -99,6 +100,57 @@ h3 {
     padding: 6px 14px;
     border-radius: 999px;
     font-size: 1rem;
+}
+
+/* Mute toggle, top-right: a 48px paper disc with the speaker icon in the
+   text colour; muted shows the crossed speaker in the muted colour.
+   The title takes the free space, so the auth pill (when logged in) and
+   the toggle sit together at the right. */
+.mute-btn {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: none;
+    border-radius: 50%;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.mute-btn svg {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mute-btn .wave {
+    fill: none;
+}
+
+.mute-btn .icon-muted,
+.mute-btn.muted .icon-sound {
+    display: none;
+}
+
+.mute-btn.muted .icon-muted {
+    display: block;
+}
+
+.mute-btn.muted {
+    color: var(--color-muted);
+}
+
+.mute-btn:active {
+    transform: scale(0.95);
 }
 
 /* --- Screens: one centered column --- */

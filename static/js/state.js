@@ -20,6 +20,7 @@ export const state = {
         status: 'playing',
     },
     lives: 3,                   // attempts left for the current word
+    muted: false,               // sound off; persisted by audio.js to localStorage 'flip.muted'
 };
 
 const subscribers = [];
