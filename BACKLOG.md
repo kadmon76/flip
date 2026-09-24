@@ -93,7 +93,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - `state.muted` exists, persisted to localStorage key `flip.muted`. A mute toggle in the header top-right, at least 48x48px, switches icon between speaker and muted speaker. Muted means no sound plays at all.
   - First user gesture unlocks audio; no console errors from autoplay policy on load.
   - Screenshots: `header-sound-on.png`, `header-muted.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/16
 
 ### B-109 Wrong feedback: wiggle and heart fade
 - why: a mistake should feel gentle and clear, not punishing.
