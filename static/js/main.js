@@ -4,6 +4,7 @@ import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
 import { starsFor } from './score.js';
+import * as audio from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -227,6 +228,19 @@ function onThemes() {
     });
 }
 
+// --- Header: mute toggle ---
+
+function renderMute(state) {
+    const btn = $('mute-btn');
+    btn.classList.toggle('muted', state.muted);
+    btn.setAttribute('aria-pressed', String(state.muted));
+    btn.setAttribute('aria-label', state.muted ? 'Sound off' : 'Sound on');
+}
+
+function onMute() {
+    setState({ muted: !state.muted });
+}
+
 // --- Wiring ---
 
 subscribe(renderScreens);
@@ -234,13 +248,19 @@ subscribe(renderThemeButtons);
 subscribe(renderCard);
 subscribe(renderActions);
 subscribe(renderRoundEnd);
+subscribe(renderMute);
+subscribe(audio.onState);
 
 $('check-btn').addEventListener('click', onCheck);
 $('next-btn').addEventListener('click', onNext);
 $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
+$('mute-btn').addEventListener('click', onMute);
 
 renderScreens(state);
+audio.init();
+// Remembered mute flag; this first setState also seeds audio.onState.
+setState({ muted: audio.readMuted(localStorage) });
 loadThemes();
 
 // Box sizing depends on the row width (layout.js); re-render on rotate.

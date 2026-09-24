@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=6">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=7">
 </head>
 <body>
     <!-- Header: title + auth in one compact line -->
@@ -30,6 +30,20 @@
             <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
         </span>
         {% endif %}
+        <!-- Mute toggle (BACKLOG B-108): main.js flips state.muted and sets
+             class "muted" / aria-pressed. Inline SVG like the hearts so the
+             icon takes the palette colour on every phone. -->
+        <button id="mute-btn" class="mute-btn" type="button" aria-label="Sound" aria-pressed="false">
+            <svg class="icon-sound" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 9.5h3.5L13 5v14l-5.5-4.5H4z"/>
+                <path class="wave" d="M16 9.5a3.5 3.5 0 0 1 0 5"/>
+                <path class="wave" d="M18.5 7a7 7 0 0 1 0 10"/>
+            </svg>
+            <svg class="icon-muted" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 9.5h3.5L13 5v14l-5.5-4.5H4z"/>
+                <path class="wave" d="M16.5 9.5l5 5M21.5 9.5l-5 5"/>
+            </svg>
+        </button>
     </header>
 
     <!-- Theme screen -->

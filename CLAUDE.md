@@ -32,7 +32,7 @@ a phone.
     snap, `main.js` wires it.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
   - `score.js` is pure round scoring (`starsFor`), no DOM; a Django test runs it through `node`.
-  - `audio.js` (to be created) is the only place sounds play.
+  - `audio.js` is the only place sounds play and the only module that constructs `Audio`; its DOM-free part (`cuesFor`, `clipUrl`, `pickIndex`, `readMuted`/`writeMuted`) is run through `node` by a Django test.
   - `script.js` and `ui.js` are old code for reference only. Do not import
     them. Delete each once nothing it does is still needed.
 
@@ -82,7 +82,7 @@ a phone.
 
 ## Project-specific rules (grow this from review feedback)
 - Do not rename the existing DOM ids in `templates/spelling_game/index.html`
-  (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `result-line`, `check-btn`, `next-btn`,
+  (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `result-line`, `check-btn`, `next-btn`, `mute-btn`,
   `play-again-btn`, `themes-btn`, `round-stars`, `round-words`) without a DECISIONS entry; card.js and main.js key on
   them.
 - Sound files under `static/sounds/` are the character's voice. Play the

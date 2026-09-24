@@ -21,7 +21,7 @@ No other colours without a DECISIONS entry. Tints of the above (lighter or
 darker by up to 15%) are allowed for hover/pressed states.
 
 ## Type
-- Font: Fredoka One for headings, tiles and buttons (already loaded from
+- Font: Fredoka One for headings, tiles, buttons and the English word wherever it is shown (tray, boxes, round-end list, sticker book) (already loaded from
   Google Fonts in the template); fallback "Comic Sans MS", sans-serif.
   Body text: system sans-serif. Min body size on phone 16px; letter tiles
   and boxes 28px+.
@@ -33,6 +33,7 @@ No visual mascot in M1. The character exists as the voice clips under
 `static/sounds/` (correct, error, celebration). Reserve the bottom-left
 corner of the play and round-end screens (roughly 96x96px on a 360px
 screen) for the mascot; nothing interactive goes there.
+Unearned stars are drawn as accent-colour outlines (not muted), so the three-star target is always visible.
 Personality: cheeky, warm, a little dramatic; laughs with the kid, never
 at them. Text and voice should read as one character.
 
