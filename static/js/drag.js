@@ -201,7 +201,7 @@ function placeTile(tileId, index) {
 
     placed[index] = { letter: tile.letter, tileId };
     tile.used = true;
-    setState({ current: { ...current, placed, tray } });
+    setState({ current: { ...current, placed, tray, status: afterMove(current.status) } });
     return true;
 }
 
@@ -213,6 +213,13 @@ function returnToTray(tileId) {
     const placed = [...current.placed];
     placed[from] = null;
     const tray = current.tray.map((t) => (t.id === tileId ? { ...t, used: false } : { ...t }));
-    setState({ current: { ...current, placed, tray } });
+    setState({ current: { ...current, placed, tray, status: afterMove(current.status) } });
     return true;
+}
+
+// Moving a tile after a wrong check reopens the word: the "try again"
+// line and the error-coloured heart belong to the arrangement that was
+// checked, not to the one the kid is now building.
+function afterMove(status) {
+    return status === 'wrong' ? 'playing' : status;
 }

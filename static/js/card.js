@@ -22,7 +22,7 @@ export function renderCard(state) {
     const { current, lives, round } = state;
 
     renderImage(current);
-    renderHearts(lives);
+    renderHearts(lives, current.status);
     renderCounter(round);
     renderBoxes(current.placed.length);
 
@@ -31,10 +31,13 @@ export function renderCard(state) {
         if (!tiles.has(t.id)) tiles.set(t.id, createTile(t));
     });
 
-    // Placed tiles live inside their box…
+    // Placed tiles live inside their box… While a wrong check stands, a
+    // box whose letter is not the word's letter is `wrong` (error tint);
+    // the next tile move sets status back to 'playing' and clears it.
     const boxes = $('letter-boxes').children;
     current.placed.forEach((slot, i) => {
         boxes[i].classList.toggle('filled', !!slot);
+        boxes[i].classList.toggle('wrong', isWrongBox(current, i));
         if (slot) mount(tiles.get(slot.tileId), boxes[i], 0);
     });
 
@@ -48,15 +51,27 @@ export function renderCard(state) {
     setDragEnabled(current.status === 'playing' || current.status === 'wrong');
 }
 
+// True when box `i` holds a tile whose letter differs from the word's,
+// and the arrangement has just been checked wrong.
+export function isWrongBox(current, i) {
+    const slot = current.placed[i];
+    return current.status === 'wrong' && !!slot && slot.letter !== current.word[i];
+}
+
 function renderImage(current) {
     const img = $('play-image');
     if (img.getAttribute('src') !== current.image) img.src = current.image;
     img.alt = 'Guess the word image';
 }
 
-function renderHearts(lives) {
+// Hearts beyond `lives` are lost (muted). Right after a miss the heart
+// that was just lost is `losing` (error colour) until the kid moves a
+// tile or checks again; the CSS transition then fades it to muted.
+function renderHearts(lives, status) {
+    const justLost = status === 'wrong' || status === 'revealed';
     document.querySelectorAll('.hearts span').forEach((heart, i) => {
         heart.classList.toggle('lost', i >= lives);
+        heart.classList.toggle('losing', justLost && i === lives);
     });
 }
 

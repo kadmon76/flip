@@ -89,7 +89,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
 - why: the character's voice is the reason the kid keeps playing; it must be the only place sound is played.
 - acceptance:
   - `static/js/audio.js` preloads pools from the existing files: `correct/*`, `error/*`, `celebration/tada.mp3`, `swipe/*`. `play(kind)` picks a random clip from the pool; a new voice clip stops the one playing. File names with spaces are URL-encoded.
-  - Sounds fire on: correct check (correct), wrong check and reveal (error), round-end shown (tada), tile placed in a box (swipe). Nothing else in `static/js` constructs `Audio` (grep).
+  - Sounds fire on: correct check (correct), wrong check and reveal (error), round-end shown (tada), tile placed in a box (swipe). Round-end shown (tada) fires once per round-end render, not on every setState while the screen is showing. Nothing else in `static/js` constructs `Audio` (grep).
   - `state.muted` exists, persisted to localStorage key `flip.muted`. A mute toggle in the header top-right, at least 48x48px, switches icon between speaker and muted speaker. Muted means no sound plays at all.
   - First user gesture unlocks audio; no console errors from autoplay policy on load.
   - Screenshots: `header-sound-on.png`, `header-muted.png`. Checklist passes.
@@ -151,3 +151,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
 - Play screen: words of 7+ letters wrap their letter boxes into two rows at 360px (B-104); revisit once the mockup says how long words should look.
+- Check stays enabled after a wrong check while nothing has moved, so a second tap on the same arrangement costs another heart (and wiggles again, B-109); consider disabling Check until a tile moves.
