@@ -102,7 +102,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - The lost heart (already error-coloured from B-106) fades to muted over 200ms when the kid next moves a tile, alongside the wrong tint clearing. Input is never blocked.
   - `prefers-reduced-motion`: no wiggle, tint only.
   - Screenshots via `--eval`: `play-wrong-boxes.png` showing the tinted wrong boxes and a lost heart. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/18
 
 ### B-110 Correct feedback: confetti, box pulse, star pop
 - why: the moment of success is the game's main reward beat.
