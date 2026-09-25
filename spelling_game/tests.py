@@ -149,7 +149,9 @@ class BoxLayoutTests(TestCase):
 class MotionSpecTests(TestCase):
     """static/js/motion.js motionFor(): DESIGN.md "Motion" numbers for tile
     pick-up, drop into a box and return; instant, no scale and no
-    overshoot under prefers-reduced-motion (BACKLOG B-105)."""
+    overshoot under prefers-reduced-motion (BACKLOG B-105). The wrong-check
+    wiggle (BACKLOG B-109): ±6px over 300ms, no distance under reduced
+    motion."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
 
@@ -185,10 +187,20 @@ class MotionSpecTests(TestCase):
         for kind in ('pickup', 'snap', 'return'):
             self.assertEqual(self.motion(kind, True), {'duration': 0, 'ease': 'none', 'scale': 1}, kind)
 
+    def test_wiggle_is_6px_over_300ms_without_scale_or_overshoot(self):
+        m = self.motion('wiggle', False)
+        self.assertEqual(m['distance'], 6)
+        self.assertEqual(m['duration'], 0.3)
+        self.assertEqual(m['scale'], 1)
+        self.assertNotIn('back', m['ease'])
+
+    def test_wiggle_reduced_motion_has_no_distance_and_no_duration(self):
+        self.assertEqual(self.motion('wiggle', True), {'duration': 0, 'ease': 'none', 'scale': 1, 'distance': 0})
+
     def test_unknown_kind_fails(self):
         script = (
             f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
-            "motionFor('wiggle', false);"
+            "motionFor('teleport', false);"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
