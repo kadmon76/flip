@@ -15,7 +15,7 @@ motion rules below and keep layouts simple; the mockup will refine them.
 - Surface (card, tiles, boxes): #FFFFFF with shadow rgba(74,60,40,0.12)
 - Primary (buttons, theme tiles, filled boxes): #7FB7BE (dusty teal)
 - Accent / success: #F2B84B (soft mustard; stars, confetti, correct)
-- Error: #E8836F (soft coral; wiggle flash, lost heart)
+- Error: #E8836F (soft coral; wrong boxes and their tiles after a wrong check, lost heart)
 - Text: #4A3C28 (warm dark brown); muted text #8C7B66
 No other colours without a DECISIONS entry. Tints of the above (lighter or
 darker by up to 15%) are allowed for hover/pressed states.
