@@ -3,6 +3,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
+import { renderFeedback } from './feedback.js';
 import { starsFor } from './score.js';
 
 const $ = (id) => document.getElementById(id);
@@ -232,6 +233,7 @@ function onThemes() {
 subscribe(renderScreens);
 subscribe(renderThemeButtons);
 subscribe(renderCard);
+subscribe(renderFeedback);
 subscribe(renderActions);
 subscribe(renderRoundEnd);
 

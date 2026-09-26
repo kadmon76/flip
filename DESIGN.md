@@ -15,14 +15,15 @@ motion rules below and keep layouts simple; the mockup will refine them.
 - Surface (card, tiles, boxes): #FFFFFF with shadow rgba(74,60,40,0.12)
 - Primary (buttons, theme tiles, filled boxes): #7FB7BE (dusty teal)
 - Accent / success: #F2B84B (soft mustard; stars, confetti, correct)
-- Error: #E8836F (soft coral; wiggle flash, lost heart)
+- Error: #E8836F (soft coral; wrong boxes and their tiles after a wrong check, lost heart)
 - Text: #4A3C28 (warm dark brown); muted text #8C7B66
 No other colours without a DECISIONS entry. Tints of the above (lighter or
 darker by up to 15%) are allowed for hover/pressed states.
 
 ## Type
-- Font: Fredoka One for headings, tiles and buttons (already loaded from
-  Google Fonts in the template); fallback "Comic Sans MS", sans-serif.
+- Font: Fredoka One for headings, tiles, buttons and the English word
+  wherever it is shown (tray, boxes, round-end list, sticker book)
+  (already loaded from Google Fonts in the template); fallback "Comic Sans MS", sans-serif.
   Body text: system sans-serif. Min body size on phone 16px; letter tiles
   and boxes 28px+.
 - Tap targets: min 48px on every side. Letter tiles and boxes are at
@@ -35,6 +36,8 @@ corner of the play and round-end screens (roughly 96x96px on a 360px
 screen) for the mascot; nothing interactive goes there.
 Personality: cheeky, warm, a little dramatic; laughs with the kid, never
 at them. Text and voice should read as one character.
+Unearned stars are drawn as accent-colour outlines (not muted), so the
+three-star target is always visible.
 
 ## Motion
 Feel: calm-tactile. Durations 120–300ms, easing ease-out for moves and

@@ -216,8 +216,17 @@ h3 {
     height: 26px;
 }
 
+/* a miss: the heart just lost turns to the error colour at once (card.js
+   adds `losing` while the wrong check stands) and fades to muted over
+   200ms once the kid moves a tile or checks again */
 .hearts .lost {
     color: var(--color-muted);
+    transition: color 200ms ease-out;
+}
+
+.hearts .lost.losing {
+    color: var(--color-error);
+    transition: none;
 }
 
 .word-counter {
@@ -276,6 +285,15 @@ h3 {
     justify-content: center;
     gap: var(--tile-gap);
     min-height: var(--tile-size);
+}
+
+/* checked wrong: a box holding the wrong letter, and the tile in it,
+   take the error colour (card.js sets `wrong` from state while the
+   check stands; the next tile move clears it). The tile covers the box,
+   so the tile must be tinted for the tint to show at all. */
+.letter-box.wrong,
+.letter-box.wrong > .draggable-letter {
+    background: var(--color-error);
 }
 
 .draggable-letter {
