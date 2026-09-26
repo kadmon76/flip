@@ -111,7 +111,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - On the round-end screen the earned stars pop in one after another with `back.out(1.4)`, 200ms each.
   - `prefers-reduced-motion`: fades only, no confetti.
   - Screenshots: `play-correct-confetti.png` captured with `--wait 200` after the check, `round-end-3.png` after the stars settle. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/20
 
 ### B-111 Sticker storage and "new stickers" on round-end
 - why: the sticker book needs persisted mastery before it can be shown.
@@ -151,3 +151,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
 - Play screen: words of 7+ letters wrap their letter boxes into two rows at 360px (B-104); revisit once the mockup says how long words should look.
+- Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.

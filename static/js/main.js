@@ -4,6 +4,7 @@ import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
 import { starsFor } from './score.js';
+import { renderCelebrate } from './celebrate.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -234,6 +235,7 @@ subscribe(renderThemeButtons);
 subscribe(renderCard);
 subscribe(renderActions);
 subscribe(renderRoundEnd);
+subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 
 $('check-btn').addEventListener('click', onCheck);
 $('next-btn').addEventListener('click', onNext);

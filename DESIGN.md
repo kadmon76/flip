@@ -44,6 +44,7 @@ snaps, a small overshoot (back.out(1.4)) only for tile drop and star pop.
 - Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; the lost heart turns to the error colour at once and fades to muted over 200ms when the kid next moves a tile (or on Next).
 - Correct: boxes pulse once, confetti burst from the card, 600ms total,
   does not block input.
+- Star pop (round end): each earned star's fill scales 0 -> 1 with back.out(1.4), 200ms, the next star starting 200ms after the previous; the accent outline stays visible underneath.
 - Screen change: crossfade 200ms.
 Never block input with animation longer than 300ms. Respect
 `prefers-reduced-motion`: reduce to opacity fades.
