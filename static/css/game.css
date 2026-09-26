@@ -419,6 +419,16 @@ body.dragging-active {
     line-height: 1;
 }
 
+/* "New stickers: N" (B-111): body text under the score, muted like the
+   word counter; always shown, 0 included. Adds 22px + gap to the budget
+   above (48+8+64+12+40+12+22+12+272+12+56+96 = 654 < 740). */
+.round-new {
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.25;
+    color: var(--color-muted);
+}
+
 /* One row per word: image thumbnail, the word, a tick (accent) or a
    cross (error) at the end. Rows are white paper strips. */
 .round-words {
@@ -472,6 +482,26 @@ body.dragging-active {
     stroke-width: 3;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+/* sticker badge (B-111): a small accent-coloured round sticker with a
+   white star, between the word and the tick, on words new in the book */
+.round-words .sticker {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: var(--color-surface);
+}
+
+.round-words .sticker svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
 }
 
 .round-words .correct .mark {
