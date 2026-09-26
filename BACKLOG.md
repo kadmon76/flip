@@ -121,7 +121,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - A word is added when it is checked correct with at least one heart left.
   - The round-end screen shows "New stickers: N" (N counts only words not already in the book) and puts a sticker badge next to those words in the list.
   - Screenshots via `--eval` seeding localStorage: `round-end-new-stickers.png` (some new), `round-end-no-new.png`. Checklist passes. `manage.py test` passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/22
 
 ### B-112 Sticker book screen
 - why: the collection the kid walks away with; the M1 finish line.
