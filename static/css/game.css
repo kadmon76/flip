@@ -512,6 +512,132 @@ body.dragging-active {
     color: var(--color-error);
 }
 
+/* --- Gallery (sticker book) screen --- */
+
+/* Back + heading on top, then one section per theme. Content starts at
+   the top and the page scrolls when the grids are taller than the
+   viewport; no mascot strip on this screen (BACKLOG B-112). */
+#screen-gallery {
+    justify-content: flex-start;
+    gap: 16px;
+    padding-top: 8px;
+}
+
+/* Back on the left, the heading centred in the column (equal side
+   tracks so the button does not push it off centre). */
+.gallery-top {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+}
+
+.gallery-top h2 {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+/* a pill in the primary colour, 48px tall (DESIGN tap target) */
+.back-btn {
+    justify-self: start;
+    min-height: 48px;
+    padding: 0 20px;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--color-text);
+    background: var(--color-primary);
+    border: none;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.back-btn:active {
+    transform: scale(0.98);
+}
+
+/* one short line from the character when the book is empty */
+.gallery-empty {
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.3;
+    text-align: center;
+    color: var(--color-muted);
+}
+
+.gallery-themes {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* theme name on the left, "3 / 14" on the right of the same heading */
+.gallery-theme h3 {
+    margin: 0 0 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 1.3rem;
+    line-height: 1.2;
+}
+
+.gallery-theme .count {
+    color: var(--color-muted);
+    font-size: 1.1rem;
+}
+
+/* three equal columns; minmax(0, ...) so a long word can never widen a
+   column past its third of the row */
+.gallery-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+/* one sticker: square image on a white paper tile, the word under it */
+.gallery-grid li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 4px 6px;
+    background: var(--color-surface);
+    border-radius: var(--radius-small);
+    box-shadow: var(--shadow);
+}
+
+.gallery-grid img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: var(--radius-small);
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.gallery-grid .word {
+    max-width: 100%;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+/* not yet mastered: the picture greyed out behind a "?" */
+.gallery-grid .locked img {
+    filter: grayscale(1) opacity(0.45);
+}
+
+.gallery-grid .locked .word {
+    color: var(--color-muted);
+}
+
 /* --- Confetti (celebrate.js, correct check) --- */
 
 /* A fixed, click-through layer over the page; celebrate.js positions

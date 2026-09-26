@@ -6,6 +6,7 @@ import { renderCard } from './card.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker } from './stickers.js';
+import { renderGallery } from './gallery.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -50,13 +51,14 @@ function revealed(current) {
 
 // themes.json shape: { "animals": "/static/data/animals.json", ... }.
 // Each data file: { "duck": { image, audio, difficulty }, ... }; the
-// theme card shows the image of the first word.
+// theme card shows the image of the first word, and the gallery
+// (gallery.js) lists every word, so each theme keeps its word list.
 async function loadThemes() {
     const index = await fetch('/static/config/themes.json').then((r) => r.json());
     const themes = await Promise.all(Object.entries(index).map(async ([name, dataUrl]) => {
         const data = await fetch(dataUrl).then((r) => r.json());
-        const first = Object.keys(data)[0];
-        return { name, dataUrl, image: first ? data[first].image : null };
+        const words = Object.keys(data).map((word) => ({ word, image: data[word].image }));
+        return { name, dataUrl, image: words.length ? words[0].image : null, words };
     }));
     setState({ themes });
 }
@@ -244,6 +246,18 @@ function onThemes() {
     });
 }
 
+// --- Gallery (sticker book) screen ---
+
+// Opened from the theme screen only; Back returns there. Nothing else in
+// state changes: the book is read by gallery.js through stickers.js.
+function onStickers() {
+    setState({ screen: 'gallery' });
+}
+
+function onGalleryBack() {
+    setState({ screen: 'theme' });
+}
+
 // --- Wiring ---
 
 subscribe(renderScreens);
@@ -251,12 +265,15 @@ subscribe(renderThemeButtons);
 subscribe(renderCard);
 subscribe(renderActions);
 subscribe(renderRoundEnd);
+subscribe(renderGallery);
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 
 $('check-btn').addEventListener('click', onCheck);
 $('next-btn').addEventListener('click', onNext);
 $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
+$('stickers-btn').addEventListener('click', onStickers);
+$('gallery-back-btn').addEventListener('click', onGalleryBack);
 
 renderScreens(state);
 loadThemes();
