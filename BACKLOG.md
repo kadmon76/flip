@@ -111,7 +111,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - On the round-end screen the earned stars pop in one after another with `back.out(1.4)`, 200ms each.
   - `prefers-reduced-motion`: fades only, no confetti.
   - Screenshots: `play-correct-confetti.png` captured with `--wait 200` after the check, `round-end-3.png` after the stars settle. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/20
 
 ### B-111 Sticker storage and "new stickers" on round-end
 - why: the sticker book needs persisted mastery before it can be shown.
