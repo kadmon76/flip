@@ -27,12 +27,13 @@ darker by up to 15%) are allowed for hover/pressed states.
   and boxes 28px+.
 - Tap targets: min 48px on every side. Letter tiles and boxes are at
   least 48x48px; boxes may shrink to 40px only for words of 8+ letters.
+  When even the minimum size does not fit one row, boxes keep 48px and wrap into rows as even as possible; a tile placed in a shrunk box takes the box size.
 
 ## Mascot / character
 No visual mascot in M1. The character exists as the voice clips under
-`static/sounds/` (correct, error, celebration). Reserve the bottom-left
-corner of the play and round-end screens (roughly 96x96px on a 360px
-screen) for the mascot; nothing interactive goes there.
+`static/sounds/` (correct, error, celebration). Reserve the bottom 96px strip of the play and round-end screens for the
+mascot (it will sit bottom-left); nothing interactive goes there and the
+action buttons sit directly above it.
 Personality: cheeky, warm, a little dramatic; laughs with the kid, never
 at them. Text and voice should read as one character.
 
@@ -41,7 +42,7 @@ Feel: calm-tactile. Durations 120–300ms, easing ease-out for moves and
 snaps, a small overshoot (back.out(1.4)) only for tile drop and star pop.
 - Tile pick-up: scale to 1.08 and lift shadow, 120ms.
 - Tile drop into box: snap with overshoot, 200ms.
-- Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; the lost heart turns to the error colour at once and fades to muted over 200ms when the kid next moves a tile (or on Next).
+- Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; the lost heart turns to the error colour at once and fades to muted over 200ms when the kid next moves a tile (or on Next); the wiggle uses a symmetric in-out ease, not ease-out.
 - Correct: boxes pulse once, confetti burst from the card, 600ms total,
   does not block input.
 - Star pop (round end): each earned star's fill scales 0 -> 1 with back.out(1.4), 200ms, the next star starting 200ms after the previous; the accent outline stays visible underneath.
@@ -56,7 +57,10 @@ Style: the existing character voice clips. Correct → one random clip
 from `static/sounds/correct/`; wrong → one random clip from
 `static/sounds/error/`; round end → `celebration/tada.mp3`; tile drop →
 `swipe/` clip. Never play two voice clips at once; a new voice clip cuts
-the previous one. Sounds are preloaded in pools in `audio.js`; nothing
+the previous one. Voice clips (correct, error, tada) share one channel;
+effects (swipe) are a second channel and may overlap a voice clip. tada is
+a voice clip, so tapping Next while a correct line is still playing cuts
+it. Sounds are preloaded in pools in `audio.js`; nothing
 else calls `Audio`.
 
 ## Tone of text
@@ -69,6 +73,7 @@ lines are short and funny, never sarcastic toward the kid.
 - Viewport 360x740, device scale 2, headless Chromium from
   `~/.cache/ms-playwright/` (no library needed), saved as PNG under
   `.agent/screenshots/<backlog-id>/<screen-or-state>.png`.
+- Desktop shots an item names (`*-desktop.png`) use `tools/shot.mjs --viewport 1024x740` (same device scale, 2048x1480 PNG); apply the checklist except the 360px-width line and check the column is centred at max 480px.
 - One screenshot per affected screen and per visible state named in the
   acceptance criteria (e.g. play-empty, play-wrong, play-correct,
   round-end-3-stars).

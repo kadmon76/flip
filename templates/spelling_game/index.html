@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=7">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=8">
 </head>
 <body>
     <!-- Header: title + auth in one compact line -->
@@ -62,7 +62,8 @@
 
     <!-- Round-end screen: stars, score, the five words with a tick or
          cross, Play again / Themes (BACKLOG B-107). main.js fills the
-         stars (class "earned"), #round-score and #round-words. Each star
+         stars (class "earned"), #round-score, #round-new (B-111) and
+         #round-words. Each star
          is an outline plus a "fill" layer that celebrate.js pops in. -->
     <div id="screen-round-end" class="screen" style="display: none;">
         <div id="round-stars" class="stars" aria-label="Stars">
@@ -80,6 +81,7 @@
             </span>
         </div>
         <h2 id="round-score"></h2>
+        <p id="round-new" class="round-new"></p>
         <ul id="round-words" class="round-words"></ul>
         <div class="actions">
             <button id="play-again-btn" class="action-btn">Play again</button>

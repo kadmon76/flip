@@ -5,6 +5,7 @@ import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
+import { add as addSticker } from './stickers.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -137,6 +138,9 @@ function onCheck() {
     results[round.index] = { word: current.word, correct };
 
     if (correct) {
+        // Mastered (correct with a heart left): into the sticker book.
+        // newSticker is true only if the book did not have the word yet.
+        results[round.index].newSticker = addSticker(state.theme, current.word);
         setState({ round: { ...round, results }, current: { ...current, status: 'correct' } });
     } else if (lives - 1 <= 0) {
         setState({ lives: 0, round: { ...round, results }, current: revealed(current) });
@@ -167,8 +171,10 @@ function onNext() {
 
 const TICK = 'M5 12.5l4.5 4.5L19 7';
 const CROSS = 'M6 6l12 12M18 6L6 18';
+const STAR = 'M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z';
 
-// Stars, score and one row per word (thumbnail, word, tick or cross).
+// Stars, score, "New stickers: N" and one row per word (thumbnail, word,
+// a sticker badge if the word is new in the book, tick or cross).
 // The rows are rebuilt from state.round.results on every render; the
 // list is small and nothing on this screen is interactive per row.
 function renderRoundEnd(state) {
@@ -181,6 +187,8 @@ function renderRoundEnd(state) {
         star.classList.toggle('earned', i < stars);
     });
     $('round-score').textContent = `${correct} / ${size}`;
+    const fresh = results.filter((r) => r.correct && r.newSticker).length;
+    $('round-new').textContent = `New stickers: ${fresh}`;
 
     const list = $('round-words');
     list.innerHTML = '';
@@ -198,6 +206,14 @@ function renderRoundEnd(state) {
         word.className = 'word';
         word.textContent = entry.word;
         li.appendChild(word);
+
+        if (ok && results[i].newSticker) {
+            const badge = document.createElement('span');
+            badge.className = 'sticker';
+            badge.setAttribute('aria-label', 'new sticker');
+            badge.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>`;
+            li.appendChild(badge);
+        }
 
         const mark = document.createElement('span');
         mark.className = 'mark';

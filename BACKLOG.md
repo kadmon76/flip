@@ -121,7 +121,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - A word is added when it is checked correct with at least one heart left.
   - The round-end screen shows "New stickers: N" (N counts only words not already in the book) and puts a sticker badge next to those words in the list.
   - Screenshots via `--eval` seeding localStorage: `round-end-new-stickers.png` (some new), `round-end-no-new.png`. Checklist passes. `manage.py test` passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/22
 
 ### B-112 Sticker book screen
 - why: the collection the kid walks away with; the M1 finish line.
@@ -150,5 +150,6 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Adaptive word selection (unmastered words return more often).
 - Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
-- Play screen: words of 7+ letters wrap their letter boxes into two rows at 360px (B-104); revisit once the mockup says how long words should look.
+- Play screen: words of 7+ letters wrap their letter boxes into even rows at 360px but the tray still flex-wraps (6+1, 6+3, 6+4), so the two grids misalign (B-104); revisit once the mockup says how long words should look.
+- Fold `feedback.js` (B-109, wiggle) and `celebrate.js` (B-110, pulse/confetti/star pop) into one transition-keyed module once both PRs land; the CLAUDE.md lines added from issues #19 and #21 each claim the correct-check effects until then.
 - Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.

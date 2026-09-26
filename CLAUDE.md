@@ -25,14 +25,17 @@ a phone.
   code on the server; `fix*.js` or patch files (fix the source); Python
   outside `venv/`.
 - Frontend architecture (static/js/):
-  - `state.js` is the only place state is mutated (`setState`). No state on
-    DOM elements, in classes or in module globals.
+  - `state.js` is the only place state is mutated (`setState`). No game state on DOM elements, in classes or in module globals. A module may keep a render cache (what it last rendered, e.g. `tiles` in card.js, `last` in celebrate.js) so it can tell a transition from a re-render; nothing reads such a cache as truth.
+    Subscribers may keep a memo of the last state they rendered or heard (`builtThemes` in main.js, `last` in audio.js); a memo is overwritten on every setState, is never read by another module, and is never a source of truth.
+  - A render module may hold a DOM cache (an element map or the last-rendered reference) that is rebuilt from state on every render and never read to decide game logic; mark it with a "DOM cache" comment. Anything else in a module global is state and belongs in state.js.
   - Every screen is a render of state. `screens.js` shows/hides screens,
     `card.js` renders the card, boxes and tray, `drag.js` handles drag and
     snap, `main.js` wires it.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
   - `score.js` is pure round scoring (`starsFor`), no DOM; a Django test runs it through `node`.
+  - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle now; correct pulse, confetti and star pop in B-110). It is a subscriber after `renderCard`, keeps only a render cache of the last status/lives, and never mutates state.
   - `audio.js` (to be created) is the only place sounds play.
+  - `celebrate.js` is the only place the correct-check and round-end celebrations run (box pulse, confetti, star pop). It is a state subscriber that fires only on a transition it detects against what it last rendered (status became 'correct', screen became 'round-end'); a re-render in the same state must not replay a celebration.
   - `script.js` and `ui.js` are old code for reference only. Do not import
     them. Delete each once nothing it does is still needed.
 

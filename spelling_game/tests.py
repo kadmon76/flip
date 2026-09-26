@@ -291,3 +291,98 @@ class CelebrateMotionSpecTests(TestCase):
         self.assertEqual((star['duration'], star['scale'], star['ease']), (0, 1, 'none'))
         self.assertGreater(star['fade'], 0)
         self.assertGreater(star['stagger'], 0)
+
+
+class StickerBookTests(TestCase):
+    """static/js/stickers.js: load/add/has/all over localStorage key
+    flip.stickers.v1, shape { "<theme>": ["duck", ...] }; corrupt or missing
+    data is an empty book (BACKLOG B-111). Run through node with a fake
+    localStorage."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'stickers.js'
+
+    # In-memory localStorage; `seed` is the initial value of the key or null.
+    FAKE_STORAGE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.stickers.v1', SEED);
+        globalThis.localStorage = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const raw = () => store.get('flip.stickers.v1') ?? null;
+    """
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, seed=None):
+        script = (
+            f"const SEED = {json.dumps(seed)};"
+            f"{self.FAKE_STORAGE}"
+            f"const s = await import('{self.MODULE.as_uri()}');"
+            f"const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_missing_key_is_an_empty_book(self):
+        self.assertEqual(self.run_node("out([s.load(), s.all(), s.has('animals', 'duck')]);"), [{}, [], False])
+
+    def test_add_writes_the_key_in_the_documented_shape(self):
+        book, stored = self.run_node("s.add('animals', 'duck'); out([s.load(), JSON.parse(raw())]);")
+        self.assertEqual(book, {'animals': ['duck']})
+        self.assertEqual(stored, {'animals': ['duck']})
+
+    def test_has_after_add_and_not_for_other_theme_or_word(self):
+        self.assertEqual(
+            self.run_node("s.add('animals', 'duck'); out([s.has('animals', 'duck'), s.has('animals', 'cat'), s.has('transportation', 'duck')]);"),
+            [True, False, False],
+        )
+
+    def test_add_returns_true_only_the_first_time_and_does_not_duplicate(self):
+        first, second, book, everything = self.run_node(
+            "const a = s.add('animals', 'duck'); const b = s.add('animals', 'duck');"
+            "s.add('animals', 'horse'); s.add('transportation', 'bus');"
+            "out([a, b, s.load(), s.all()]);"
+        )
+        self.assertTrue(first)
+        self.assertFalse(second)
+        self.assertEqual(book, {'animals': ['duck', 'horse'], 'transportation': ['bus']})
+        self.assertEqual(everything, [
+            {'theme': 'animals', 'word': 'duck'},
+            {'theme': 'animals', 'word': 'horse'},
+            {'theme': 'transportation', 'word': 'bus'},
+        ])
+
+    def test_seeded_book_is_read_and_extended(self):
+        self.assertEqual(
+            self.run_node("out([s.has('animals', 'cat'), s.add('animals', 'cat'), s.add('animals', 'dog'), s.load()]);",
+                          seed='{"animals": ["cat"]}'),
+            [True, False, True, {'animals': ['cat', 'dog']}],
+        )
+
+    def test_corrupt_json_is_an_empty_book_and_add_recovers(self):
+        for seed in ('{not json', '"a string"', '[1, 2]', 'null', '42'):
+            self.assertEqual(
+                self.run_node("out([s.load(), s.all(), s.add('animals', 'duck'), s.load()]);", seed=seed),
+                [{}, [], True, {'animals': ['duck']}], seed,
+            )
+
+    def test_bad_entries_inside_a_book_are_dropped(self):
+        self.assertEqual(
+            self.run_node("out(s.load());", seed='{"animals": ["duck", "duck", 3, null, ""], "transportation": "bus", "x": null}'),
+            {'animals': ['duck']},
+        )
+
+    def test_no_localstorage_is_an_empty_book(self):
+        self.assertEqual(
+            self.run_node("delete globalThis.localStorage; out([s.load(), s.add('animals', 'duck'), s.has('animals', 'duck')]);"),
+            [{}, True, False],
+        )
