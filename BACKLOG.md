@@ -131,7 +131,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - Empty state text when no stickers at all, in the character's tone (one short line).
   - The screen scrolls vertically; nothing is clipped horizontally. Mascot corner rule does not apply here.
   - Screenshots via `--eval` seeding localStorage: `gallery-empty.png`, `gallery-some.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/24
 
 ## M2 — Modes, difficulty, word audio
 Rough items; itemise with acceptance criteria after M1 is merged.
