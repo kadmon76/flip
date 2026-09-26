@@ -110,3 +110,8 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: DESIGN "Tone of text" wants very little, plain English; a count is the shortest honest line. The star on a round sticker echoes the round's stars (accent = reward) without a new colour or glyph font, and a small icon reads faster than a "NEW" label for a beginner reader.
 - considered: hiding the line at 0 (see above); a "NEW" text label (more text, English-only readers); a badge on the thumbnail corner (overlaps the image and is harder to see at 40px).
 - reversible: yes.
+
+## 2026-09-27 — Rule suggestions from the B-111 review applied (issue #23; consumed at the start of the B-112 run)
+- chose: the human answered issue #23 "A apply, B apply". Applied verbatim: (A) CLAUDE.md "Frontend architecture" gets the `stickers.js` line after `score.js` (only place the `flip.stickers.v1` key is read or written; no DOM, no module state; others call `load()`/`has()`/`add()`/`all()`); (B) the protected DOM-id list in CLAUDE.md "Project-specific rules" now includes `round-score` and `round-new`.
+- because: question protocol; answers are consumed at the start of the next run and logged here. No backlog item was blocked on #23.
+- reversible: yes (doc lines).
