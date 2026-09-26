@@ -236,3 +236,58 @@ class StarsTests(TestCase):
     def test_bad_score_fails(self):
         for body in ("starsFor(6, 5);", "starsFor(-1, 5);", "starsFor(2.5, 5);", "starsFor(1, 0);"):
             self.assertNotEqual(self.run_node(body).returncode, 0, body)
+
+
+class CelebrateMotionSpecTests(TestCase):
+    """static/js/motion.js motionFor() for the reward beats (BACKLOG B-110,
+    DESIGN.md "Motion"): a correct check pulses the boxes once and bursts up
+    to 40 confetti pieces over 600ms in total; earned stars pop in with
+    back.out(1.4), 200ms each. Reduced motion: fades only, no confetti, no
+    overshoot."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def motion(self, kind, reduced):
+        script = (
+            f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify(motionFor({json.dumps(kind)}, {json.dumps(reduced)})));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_pulse_is_one_ease_out_beat_within_the_600ms_budget(self):
+        m = self.motion('pulse', False)
+        self.assertGreater(m['scale'], 1)
+        self.assertLessEqual(m['duration'], 0.6)
+        self.assertNotIn('back', m['ease'])
+
+    def test_confetti_is_up_to_40_pieces_over_600ms(self):
+        m = self.motion('confetti', False)
+        self.assertEqual(m['count'], 40)
+        self.assertEqual(m['duration'], 0.6)
+
+    def test_star_pop_overshoots_200ms_per_star_one_after_another(self):
+        m = self.motion('starPop', False)
+        self.assertEqual(m['duration'], 0.2)
+        self.assertEqual(m['ease'], 'back.out(1.4)')
+        self.assertEqual(m['stagger'], 0.2)
+
+    def test_reduced_motion_is_fades_only_without_confetti_or_overshoot(self):
+        pulse = self.motion('pulse', True)
+        self.assertEqual((pulse['duration'], pulse['scale'], pulse['ease']), (0, 1, 'none'))
+        self.assertGreater(pulse['fade'], 0)
+
+        self.assertEqual(self.motion('confetti', True)['count'], 0)
+
+        star = self.motion('starPop', True)
+        self.assertEqual((star['duration'], star['scale'], star['ease']), (0, 1, 'none'))
+        self.assertGreater(star['fade'], 0)
+        self.assertGreater(star['stagger'], 0)

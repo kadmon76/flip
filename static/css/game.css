@@ -387,6 +387,7 @@ body.dragging-active {
 
 .stars span {
     display: flex;
+    position: relative;
 }
 
 .stars svg {
@@ -398,8 +399,18 @@ body.dragging-active {
     stroke-linejoin: round;
 }
 
-.stars .earned svg {
+/* the fill is a second star laid over the outline (class `fill` in the
+   template), shown when the star is earned; celebrate.js pops it in on
+   entering the screen while the outline underneath stays put */
+.stars .fill {
+    position: absolute;
+    inset: 0;
     fill: currentColor;
+    opacity: 0;
+}
+
+.stars .earned .fill {
+    opacity: 1;
 }
 
 #round-score {
@@ -469,4 +480,40 @@ body.dragging-active {
 
 .round-words .wrong .mark {
     color: var(--color-error);
+}
+
+/* --- Confetti (celebrate.js, correct check) --- */
+
+/* A fixed, click-through layer over the page; celebrate.js positions
+   the pieces from the card's centre with GSAP and removes the layer when
+   the 600ms burst ends. overflow hidden so a piece flying past the edge
+   never widens the page. */
+.confetti {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* small paper rectangles in three palette colours */
+.confetti-piece {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.confetti-piece.accent {
+    background: var(--color-accent);
+}
+
+.confetti-piece.primary {
+    background: var(--color-primary);
+}
+
+.confetti-piece.error {
+    background: var(--color-error);
 }
