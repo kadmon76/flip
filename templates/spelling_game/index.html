@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=8">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=9">
 </head>
 <body>
     <!-- Header: title + auth in one compact line -->
@@ -36,6 +36,11 @@
     <div id="screen-theme" class="screen">
         <h2>Select a Theme</h2>
         <div id="theme-buttons"></div>
+        <!-- opens the sticker book (BACKLOG B-112); same look as the
+             action buttons, 56px tall -->
+        <div class="actions">
+            <button id="stickers-btn" class="action-btn">Stickers</button>
+        </div>
     </div>
 
     <!-- Play screen: card, hearts, counter, boxes, tray, result, actions
@@ -89,8 +94,18 @@
         </div>
     </div>
 
-    <!-- Gallery screen (placeholder) -->
-    <div id="screen-gallery" class="screen" style="display: none;"></div>
+    <!-- Gallery screen: the sticker book (BACKLOG B-112). gallery.js
+         fills #gallery-themes with one section per theme (heading with
+         the count, a 3-column grid of the theme's words) and shows
+         #gallery-empty when the book has no sticker at all. -->
+    <div id="screen-gallery" class="screen" style="display: none;">
+        <div class="gallery-top">
+            <button id="gallery-back-btn" class="back-btn">Back</button>
+            <h2>Stickers</h2>
+        </div>
+        <p id="gallery-empty" class="gallery-empty" style="display: none;">No stickers yet. Go spell some!</p>
+        <div id="gallery-themes" class="gallery-themes"></div>
+    </div>
 
 <!-- GSAP + Draggable (drag.js) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>

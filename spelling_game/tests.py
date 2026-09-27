@@ -27,6 +27,14 @@ class IndexTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="screen-theme"')
 
+    def test_index_has_the_sticker_book_screen_and_its_buttons(self):
+        # BACKLOG B-112: Stickers on the theme screen opens #screen-gallery,
+        # which has a Back button.
+        response = self.client.get('/')
+        self.assertContains(response, 'id="stickers-btn"')
+        self.assertContains(response, 'id="screen-gallery"')
+        self.assertContains(response, 'id="gallery-back-btn"')
+
 
 class ShotToolTests(TestCase):
     """tools/shot.mjs must reject bad arguments before launching a browser."""
@@ -386,3 +394,53 @@ class StickerBookTests(TestCase):
             self.run_node("delete globalThis.localStorage; out([s.load(), s.add('animals', 'duck'), s.has('animals', 'duck')]);"),
             [{}, True, False],
         )
+
+
+class GalleryProgressTests(TestCase):
+    """static/js/gallery.js themeProgress(): per-theme sticker count for
+    the sticker book screen (BACKLOG B-112). Only words in the theme's
+    list count; a missing or malformed theme entry is 0 / total."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'gallery.js'
+    WORDS = [{'word': 'duck', 'image': '/d.svg'}, {'word': 'cat', 'image': '/c.svg'}, {'word': 'frog', 'image': '/f.svg'}]
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def progress(self, book, theme='animals', words=None):
+        words = self.WORDS if words is None else words
+        script = (
+            f"const {{ themeProgress }} = await import('{self.MODULE.as_uri()}');"
+            f"console.log(JSON.stringify(themeProgress({json.dumps(book)}, {json.dumps(theme)}, {json.dumps(words)})));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_counts_mastered_words_in_list_order(self):
+        p = self.progress({'animals': ['frog', 'duck']})
+        self.assertEqual((p['count'], p['total']), (2, 3))
+        self.assertEqual([i['word'] for i in p['items']], ['duck', 'cat', 'frog'])
+        self.assertEqual([i['mastered'] for i in p['items']], [True, False, True])
+        self.assertEqual(p['items'][0]['image'], '/d.svg')
+
+    def test_empty_book_or_missing_theme_is_zero_of_total(self):
+        self.assertEqual(self.progress({})['count'], 0)
+        p = self.progress({'transportation': ['bus']})
+        self.assertEqual((p['count'], p['total']), (0, 3))
+        self.assertFalse(any(i['mastered'] for i in p['items']))
+
+    def test_sticker_for_a_word_not_in_the_theme_does_not_count(self):
+        p = self.progress({'animals': ['duck', 'unicorn']})
+        self.assertEqual((p['count'], p['total']), (1, 3))
+
+    def test_malformed_theme_entry_is_ignored(self):
+        self.assertEqual(self.progress({'animals': 'duck'})['count'], 0)
+        self.assertEqual(self.progress({'animals': None})['count'], 0)
+
+    def test_no_words_is_zero_of_zero(self):
+        self.assertEqual(self.progress({'animals': ['duck']}, words=[]), {'count': 0, 'total': 0, 'items': []})
