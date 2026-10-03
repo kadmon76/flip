@@ -228,7 +228,6 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Adaptive word selection (unmastered words return more often).
 - Untrack `staticfiles/` (STATIC_ROOT, gitignored but tracked; still holds copies of the legacy frontend files removed in B-102).
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
-- Play screen: words of 7+ letters wrap their letter boxes into even rows at 360px but the tray still flex-wraps (6+1, 6+3, 6+4), so the two grids misalign (B-104); revisit once the mockup says how long words should look.
 - Fold `feedback.js` (B-109, wiggle) and `celebrate.js` (B-110, pulse/confetti/star pop) into one transition-keyed module once both PRs land; the CLAUDE.md lines added from issues #19 and #21 each claim the correct-check effects until then.
 - Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
