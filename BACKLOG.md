@@ -158,7 +158,7 @@ Build order: scene → controls → robot → other screens. Reference:
     colour literals.
   - Screenshots: `play-4.png` (duck), `play-6.png` (rabbit),
     `play-10.png` (helicopter). Each compared to the v5 reference.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/28
 
 ### B-114 Console controls: check/next dome, reset lever, speaker
 - why: the controls are physical objects on one console (v5); the dome is
