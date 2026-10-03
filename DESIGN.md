@@ -45,7 +45,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   ```css
   border-style: solid;
   border-width: 29px 26px 38px 28px;          /* top right bottom left */
-  border-image: url(flip-frame.png) 180 165 235 175;   /* no fill */
+  border-image: url(../images/ui/frame.png) 180 165 235 175;   /* no fill */
   ```
   Content safe area inside it: padding `16px 14px 22px 14px`.
 - **TV screen** (in % of the background image): x 28%–70%, y 16.4%–30.5%.
