@@ -15,15 +15,19 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Spelling Game">
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <!-- DESIGN "Type": Andika Bold (letter blocks), Courier Prime Bold
+         (split-flap logo and counter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=9">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=10">
 </head>
 <body>
-    <!-- Header: title + auth in one compact line -->
+    <!-- Header: split-flap "flip" logo + auth in one compact line. On the
+         play screen it sits over the lab shelf and the auth is hidden
+         (no English on that screen). -->
     <header class="app-header">
-        <span class="app-title">Flip</span>
+        <span class="app-title" role="img" aria-label="flip"><span class="flap">f</span><span class="flap">l</span><span class="flap">i</span><span class="flap">p</span></span>
         {% if user.is_authenticated %}
         <span class="auth">
             <span class="user-info">Hi, {{ user.username }}!</span>
@@ -43,25 +47,34 @@
         </div>
     </div>
 
-    <!-- Play screen: card, hearts, counter, boxes, tray, result, actions
-         (top to bottom per BACKLOG B-104). Ids are keyed on by card.js
-         and main.js; do not rename. -->
+    <!-- Play screen: the lab scene (DESIGN.md "Layout", v5). The TV
+         picture (.card) and the brass plate (lives bulbs, split-flap
+         counter) are placed over the background image; the slot rail
+         (#letter-boxes) and the bench of letter blocks (#letter-tray)
+         follow below the machine. Ids are keyed on by card.js and main.js;
+         do not rename. #result-line stays for main.js but is never shown
+         (no result text, DESIGN "Words on screen"). Check / Next are
+         interim icon buttons until the console (BACKLOG B-114). -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
             <img id="play-image" src="" alt="" />
         </div>
-        <div class="hearts" aria-label="Lives">
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.7 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.7 0 5.6 3.9 4 7.4C19.5 16.4 12 21 12 21z"/></svg></span>
+        <div class="plate">
+            <div class="hearts" aria-label="Lives">
+                <span></span><span></span><span></span>
+            </div>
+            <p id="word-counter" class="word-counter"></p>
         </div>
-        <p id="word-counter" class="word-counter"></p>
         <div id="letter-boxes" class="letter-boxes"></div>
         <div id="letter-tray" class="letter-tray"></div>
-        <p id="result-line" class="result-line"></p>
+        <p id="result-line" class="result-line" hidden></p>
         <div class="actions">
-            <button id="check-btn" class="action-btn" disabled>Check</button>
-            <button id="next-btn" class="action-btn">Next</button>
+            <button id="next-btn" class="action-btn icon-btn" aria-label="Next">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </button>
+            <button id="check-btn" class="action-btn icon-btn" aria-label="Check" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+            </button>
         </div>
     </div>
 
@@ -106,6 +119,10 @@
         <p id="gallery-empty" class="gallery-empty" style="display: none;">No stickers yet. Go spell some!</p>
         <div id="gallery-themes" class="gallery-themes"></div>
     </div>
+
+    <!-- Bakelite frame over the play screen (DESIGN.md "Layout"):
+         border-image only, click-through, above everything. -->
+    <div class="frame" aria-hidden="true"></div>
 
 <!-- GSAP + Draggable (drag.js) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.3/gsap.min.js"></script>
