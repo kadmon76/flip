@@ -127,3 +127,13 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: DESIGN "Tone of text" wants very little plain English; a count and a "?" need no reading. Greying via `filter` is what the acceptance names and keeps the picture recognisable as a hint. `minmax(0, 1fr)` is what keeps a long word from widening a column (the "nothing clipped horizontally" line). Showing the greyed grids in the empty state follows the acceptance literally ("for each theme ... a grid") and makes the empty line read as an invitation, not an error.
 - considered: hiding the grids in the empty state (the screen would be a line of text); a two-column grid on phones (bigger images but a taller page for 26 words); a "NEW" tag or count on the Stickers button (not asked, more text on the theme screen); a desktop shot (DESIGN asks for one only when the item names it).
 - reversible: yes.
+
+## 2026-10-03 — Design v5: retro-tech inventor's lab (design-v5)
+- chose:
+  - Visual direction changed from pastel/bold cartoon to a retro-tech inventor's lab (approved mockup `design/reference/play-screen-v5.png`).
+  - Layer model: scene objects are image assets; code draws only interactive/data parts.
+  - The check dome is also "next"; the separate next button is dropped.
+  - Letter blocks use Andika Bold, lowercase by default (single-storey a/g for beginners); uppercase is a later display option.
+  - No English UI text; icons, lights, sound, motion and the robot instead.
+  - Mascot corner replaced by the robot behind the console.
+- reversible: yes (docs and assets; no code changed).
