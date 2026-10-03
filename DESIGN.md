@@ -1,90 +1,152 @@
 # Flip — visual and feel contract
 
 ## Direction
-Three words: soft, calm, paper.
-Reference: Toca Boca apps — pastel paper-cutout look, rounded shapes, soft
-shadows, nothing glossy or neon. The calm look carries a playful, quirky
-personality: the humour lives in the character's voice and in small
-motions, not in loud colours.
-Approved mockup: TODO — implement to this, do not reinterpret.
-Until the mockup line is filled, implement to the palette, type and
-motion rules below and keep layouts simple; the mockup will refine them.
+A homemade 1960s retro-tech word machine in an inventor's lab. The kid
+operates the machine; it should feel like playing with a gadget, never
+like filling in a worksheet. Handmade, claymation-like, warm lamp light,
+real depth. Humour comes from the machine being homemade and a bit
+unreliable, and from the robot. Not babyish, not flat, not neon.
 
-## Palette (proposed; human confirms with the mockup)
-- Background: #FBF6EC (warm paper)
-- Surface (card, tiles, boxes): #FFFFFF with shadow rgba(74,60,40,0.12)
-- Primary (buttons, theme tiles, filled boxes): #7FB7BE (dusty teal)
-- Accent / success: #F2B84B (soft mustard; stars, confetti, correct)
-- Error: #E8836F (soft coral; wiggle flash, lost heart)
-- Text: #4A3C28 (warm dark brown); muted text #8C7B66
-No other colours without a DECISIONS entry. Tints of the above (lighter or
-darker by up to 15%) are allowed for hover/pressed states.
+Approved mockup: `design/reference/play-screen-v5.png` (play screen).
+Implement to it; do not reinterpret. Theme, round-end and sticker-book
+screens are not designed yet: see "Other screens (interim)".
+
+## The layer model (most important rule)
+1. **Scene** = images from `static/images/ui/`. Background, frame,
+   console, check dome, reset lever, speaker button, robot.
+2. **Interactive and data parts** = code, drawn to match the scene's
+   light: picture on the TV screen, bulbs, flip counter, slot rail,
+   letter blocks, glows and motion.
+
+Never replace an image asset with a CSS-drawn version of the same object,
+and never draw a new scene object in CSS (buttons, boxes, panels). If an
+object is missing, open a question issue; new scene objects are made in
+an image model by the human.
+
+## Assets (`static/images/ui/`)
+| File | What | Shown at (CSS px, 360 wide) |
+|---|---|---|
+| bg-lab.jpg | lab + TV machine + bench, 1264x2739 | width 100%, anchored top |
+| frame.png | cream bakelite bezel, transparent window | border-image overlay |
+| console.png | control console (cream + brass plate) | full safe width, ~60px tall |
+| dome-off / -ready / -pressed.png | check button (also "next") | ~80px wide |
+| lever-up / -down.png | reset lever (same canvas, plate aligned) | ~40px wide |
+| speaker-off / -on / -cap.png | hear-the-word button; cap = blanked | ~38px wide |
+| robot-*.png | idle, thinking, confused, excited, happy, oops, hero | see CHARACTER.md |
+
+All scene sprites are lit from the upper left. Every sprite gets a soft
+contact shadow (dark, blurred, offset down-right, ~40% opacity).
+
+## Layout (play screen, 360x740 reference; scale with width)
+- **Background:** `bg-lab.jpg`, `width:100%`, anchored top. At 360 wide it
+  is 780px tall. On taller screens fill below with `--bench-deep`; the
+  console hides the join.
+- **Frame:** fixed overlay, `pointer-events:none`, above everything:
+  ```css
+  border-style: solid;
+  border-width: 29px 26px 38px 28px;          /* top right bottom left */
+  border-image: url(flip-frame.png) 180 165 235 175;   /* no fill */
+  ```
+  Content safe area inside it: padding `16px 14px 22px 14px`.
+- **TV screen** (in % of the background image): x 28%–70%, y 16.4%–30.5%.
+  The word picture sits inside, masked to the screen's rounded corners,
+  with faint scanlines and a soft teal glow.
+- **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
+  lives bulbs. Right: split-flap counter "2 / 5".
+- **Slot rail:** brass, full safe width, directly below the machine
+  (~y 347–413). Slots 46x46px, gap 6px, rail padding 8px. Six slots fit
+  one row; 7+ letters wrap into two even rows.
+- **Letter blocks:** cream clay blocks lying on the bench below the rail,
+  52px min, slightly rotated (±4°), in loose staggered rows (max 4 per
+  row). Lowercase by default.
+- **Console:** pinned to the bottom of the safe area. On its brass plate,
+  left to right: reset lever (far left), speaker (centre-left), check
+  dome (right). Reset and check stay far apart.
+- **Robot:** behind the console's left third, head and shoulders visible
+  (~75px); console drawn above him.
+- **Header:** split-flap logo "flip" top-left, mute toggle top-right,
+  inside the safe area over the shelf.
+
+## Palette (sampled from v5; use as CSS variables)
+```
+--bench:#582703  --bench-deep:#2a1405  --cream:#efe0be  --ink:#2a1c10
+--brass:#b98c36  --brass-dark:#6b4a1c  --teal:#27665e   --teal-glow:#3fe0d0
+--amber:#ffd87a  --amber-deep:#e8a23a  --charcoal:#2c241c --bulb-off:#84582c
+--error:#d9583b
+```
+No other colours without a DECISIONS entry. Tints within ±15% allowed.
 
 ## Type
-- Font: Fredoka One for headings, tiles and buttons (already loaded from
-  Google Fonts in the template); fallback "Comic Sans MS", sans-serif.
-  Body text: system sans-serif. Min body size on phone 16px; letter tiles
-  and boxes 28px+.
-- Tap targets: min 48px on every side. Letter tiles and boxes are at
-  least 48x48px; boxes may shrink to 40px only for words of 8+ letters.
-  When even the minimum size does not fit one row, boxes keep 48px and wrap into rows as even as possible; a tile placed in a shrunk box takes the box size.
+- Letter blocks: **Andika Bold** (Google Fonts), single-storey a and g,
+  the shapes beginners write. 30px+ on 52px blocks. Lowercase default;
+  an uppercase option is a display setting only (data unchanged).
+- Flip counter and logo: **Courier Prime Bold**, cream on charcoal flaps.
+- No other text on screen (see "Words on screen").
 
-## Mascot / character
-No visual mascot in M1. The character exists as the voice clips under
-`static/sounds/` (correct, error, celebration). Reserve the bottom 96px strip of the play and round-end screens for the
-mascot (it will sit bottom-left); nothing interactive goes there and the
-action buttons sit directly above it.
-Personality: cheeky, warm, a little dramatic; laughs with the kid, never
-at them. Text and voice should read as one character.
+## Words on screen
+The players cannot read English yet. The only words allowed on screen
+are the target word (on the blocks, and revealed in the slots) and the
+"flip" logo. Numbers are allowed. Every other label, message and button
+is an icon, a light, a sound, motion or the robot. No result-line text.
+
+## Controls and states
+- **Check dome** (`#check-btn`): `off` while slots are empty or partly
+  filled. When all slots are filled: `ready`, glow pulsing slowly
+  (opacity 0.45↔1, 1.2s ease-in-out, infinite) until pressed or a block is
+  taken out. Press: `pressed` for 120ms, then the result. After a correct
+  answer or a reveal, it returns to `ready` pulse and pressing it goes to
+  the next word (the dome is both check and next).
+- **Reset lever** (`#reset-btn`): tap → `lever-down` for 250ms, rail shakes
+  ±4px for 200ms, placed blocks hop back to their starting spots (300ms,
+  30ms stagger), lever springs back. Tap area 48x48.
+- **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
+  playing. Where a mode hides it, show `speaker-cap` and ignore taps.
+- **Mute toggle:** top-right, remembered in localStorage.
+
+## Feedback (no words)
+- Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb
+  flickers three times and goes dark (`--bulb-off`); the TV picture gets a
+  150ms static flicker; robot `confused`.
+- Third wrong: correct blocks fly into the slots in order (120ms stagger);
+  robot `oops` then `happy`.
+- Correct: slots pulse once; TV screen flashes warm white (200ms); up to
+  40 sparks (amber, teal, cream) burst from the TV, 600ms, removed after;
+  robot `excited`.
+- Never block input for more than 300ms. `prefers-reduced-motion`:
+  replace motion with opacity fades; the dome glows steadily instead of
+  pulsing.
 
 ## Motion
-Feel: calm-tactile. Durations 120–300ms, easing ease-out for moves and
-snaps, a small overshoot (back.out(1.4)) only for tile drop and star pop.
-- Tile pick-up: scale to 1.08 and lift shadow, 120ms.
-- Tile drop into box: snap with overshoot, 200ms.
-- Wrong: tiles in wrong boxes wiggle ±6px horizontally, 300ms; the lost heart turns to the error colour at once and fades to muted over 200ms when the kid next moves a tile (or on Next); the wiggle uses a symmetric in-out ease, not ease-out.
-- Correct: boxes pulse once, confetti burst from the card, 600ms total,
-  does not block input.
-- Star pop (round end): each earned star's fill scales 0 -> 1 with back.out(1.4), 200ms, the next star starting 200ms after the previous; the accent outline stays visible underneath.
-- Screen change: crossfade 200ms.
-Never block input with animation longer than 300ms. Respect
-`prefers-reduced-motion`: reduce to opacity fades.
+Calm-tactile, 120–300ms, ease-out; small overshoot `back.out(1.4)` only for
+a block snapping into a slot and for star pops. Block pick-up: scale 1.08,
+shadow lifts, 120ms.
 
 ## Sound
-ON by default; a mute toggle in the header (top-right), remembered in
-localStorage. No background music in M1.
-Style: the existing character voice clips. Correct → one random clip
-from `static/sounds/correct/`; wrong → one random clip from
-`static/sounds/error/`; round end → `celebration/tada.mp3`; tile drop →
-`swipe/` clip. Never play two voice clips at once; a new voice clip cuts
-the previous one. Voice clips (correct, error, tada) share one channel;
-effects (swipe) are a second channel and may overlap a voice clip. tada is
-a voice clip, so tapping Next while a correct line is still playing cuts
-it. Sounds are preloaded in pools in `audio.js`; nothing
-else calls `Audio`.
+On by default, mute toggle remembered. Existing clips in `static/sounds/`:
+correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`,
+block into slot → `swipe/`. One voice clip at a time; a new one cuts the
+previous, except the target word. All playback goes through `audio.js`.
 
-## Tone of text
-Very little text. English words only; UI labels in short English a
-9-year-old beginner reads without help ("Check", "Next", "Play again").
-Warm, playful, one exclamation mark per screen at most. The character's
-lines are short and funny, never sarcastic toward the kid.
+## Other screens (interim, until designed)
+Theme, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
+darkened 40% as backdrop, the same frame, cream panels with a brass
+border in CSS, the palette and fonts above, and icons instead of English
+labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
+theme's picture, not its name. These are placeholders; a design pass
+will replace them.
 
 ## Screenshots (implementer produces, reviewer checks)
-- Viewport 360x740, device scale 2, headless Chromium from
-  `~/.cache/ms-playwright/` (no library needed), saved as PNG under
-  `.agent/screenshots/<backlog-id>/<screen-or-state>.png`.
-- Desktop shots an item names (`*-desktop.png`) use `tools/shot.mjs --viewport 1024x740` (same device scale, 2048x1480 PNG); apply the checklist except the 360px-width line and check the column is centred at max 480px.
-- One screenshot per affected screen and per visible state named in the
-  acceptance criteria (e.g. play-empty, play-wrong, play-correct,
-  round-end-3-stars).
-- Non-UI items (backend, tests, tooling): screenshot the JSON or page that
-  proves the change in the same viewport; the visual checklist below does
-  not apply to it, the reviewer notes "non-UI" and skips it.
+- `tools/shot.mjs`, viewport 360x740, device scale 2, saved under
+  `.agent/screenshots/<backlog-id>/<state>.png`.
+- One screenshot per affected screen and per state in the acceptance
+  criteria. Desktop shots, when an item names them: `--viewport 1024x740`,
+  content centred at max width 480px.
 
-## Screen checklist (reviewer uses this on every screenshot)
-- Readable at 360px wide, nothing clipped or overlapping, no horizontal
-  scroll
-- Only palette colours; font per above
-- Tap targets meet 48px minimum
-- Mascot corner is free on play and round-end screens
-- Matches the approved mockup for that screen (skip while mockup is TODO)
+## Screen checklist (reviewer, every screenshot)
+- Play screen matches `design/reference/play-screen-v5.png` in layout,
+  materials and light.
+- Scene objects are the image assets; nothing in their place is CSS-drawn.
+- No English on screen except the target word and the logo; numbers ok.
+- Only palette colours; fonts as above.
+- Tap targets ≥48px (slots may be 46px).
+- Nothing clipped, overlapping, or scrolling sideways at 360px.

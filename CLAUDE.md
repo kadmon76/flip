@@ -37,13 +37,12 @@ a phone.
   - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle now; correct pulse, confetti and star pop in B-110). It is a subscriber after `renderCard`, keeps only a render cache of the last status/lives, and never mutates state.
   - `audio.js` (to be created) is the only place sounds play.
   - `celebrate.js` is the only place the correct-check and round-end celebrations run (box pulse, confetti, star pop). It is a state subscriber that fires only on a transition it detects against what it last rendered (status became 'correct', screen became 'round-end'); a re-render in the same state must not replay a celebration.
-  - `script.js` and `ui.js` are old code for reference only. Do not import
-    them. Delete each once nothing it does is still needed.
 
 ## How to work
 - Read BACKLOG.md, pick the first unblocked item, do only that item.
 - Follow DESIGN.md for anything visual. Follow ~/agent-platform/docs/ask-rule.md
   and question-protocol.md for decisions and questions.
+- Follow CHARACTER.md for anything the robot does.
 - Branch: `agent/<backlog-id>-<slug>`. Never commit to main.
 - Every change must be seen: run the app
   (`venv/bin/python manage.py runserver 0.0.0.0:8000`), take phone-size
@@ -83,13 +82,17 @@ a phone.
   correct with at least one heart left.
 - Rewards are cosmetic only: stars per round, stickers in the book. All
   themes are always open. Nothing is gated.
+- No English on screen except the target word and the logo; numbers
+  allowed. Everything else is an icon, light, sound, motion or the robot
+  (DESIGN.md 'Words on screen').
 
 ## Project-specific rules (grow this from review feedback)
 - Do not rename the existing DOM ids in `templates/spelling_game/index.html`
   (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `result-line`, `check-btn`, `next-btn`,
-  `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`) without a DECISIONS entry; card.js and main.js key on
-  them.
+  `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`,
+  `reset-btn`, `speak-btn`) without a DECISIONS entry; card.js and main.js key on
+  them. `next-btn` is removed by B-114 (the check dome is also next).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.
-- Keep the mascot corner free (see DESIGN.md "Mascot"). Do not put
-  controls there.
+- The robot lives behind the console's left third; never place UI over
+  him, the rail, the blocks or the console controls.

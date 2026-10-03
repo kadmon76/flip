@@ -133,6 +133,84 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - Screenshots via `--eval` seeding localStorage: `gallery-empty.png`, `gallery-some.png`. Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/24
 
+## M1b — Restyle to the approved play screen (v5)
+Build order: scene → controls → robot → other screens. Reference:
+`design/reference/play-screen-v5.png`, rules in DESIGN.md and CHARACTER.md.
+
+### B-113 Play screen scene and layout to v5
+- why: the play screen still uses the old pastel look; v5 is approved.
+- acceptance:
+  - Background `bg-lab.jpg` full width, anchored top; frame overlay via
+    border-image exactly as in DESIGN.md "Layout"; content inside the
+    safe area.
+  - The word picture is shown inside the TV screen area (x 28–70%,
+    y 16.4–30.5% of the background), masked to rounded corners, with
+    scanlines and teal glow.
+  - Brass plate shows three lives bulbs (lit = `--amber`, lost =
+    `--bulb-off`) and a split-flap counter "n / 5" in Courier Prime Bold.
+  - Brass slot rail with 46px slots, 6px gap; 6 letters in one row at
+    360px; 7–10 letters wrap into two even rows.
+  - Clay letter blocks in Andika Bold, lowercase, 52px min, ±4° rotation,
+    loose staggered rows of max 4. Fonts loaded from Google Fonts.
+  - No English text on the play screen except the target word and the
+    "flip" logo; the result line is removed (feedback comes in B-114).
+  - Palette variables from DESIGN.md replace the old ones; no other
+    colour literals.
+  - Screenshots: `play-4.png` (duck), `play-6.png` (rabbit),
+    `play-10.png` (helicopter). Each compared to the v5 reference.
+- status:
+
+### B-114 Console controls: check/next dome, reset lever, speaker
+- why: the controls are physical objects on one console (v5); the dome is
+  both check and next; the kid asked for a hear-the-word button.
+- acceptance:
+  - `console.png` pinned to the bottom of the safe area; on its plate,
+    left to right: reset lever, speaker, check dome, positioned as v5.
+  - Dome states per DESIGN.md "Controls and states", including the slow
+    ready pulse when all slots are filled, and next-word behaviour after
+    a correct answer or a reveal. `#next-btn` is removed (DECISIONS entry).
+  - Reset lever returns all placed blocks to their start spots with the
+    lever, rail-shake and hop animation. Tapping a single placed block
+    still returns only that block.
+  - Speaker plays the word's audio file from the content JSON through
+    `audio.js`; `speaker-on` while playing; if a word has no audio file,
+    show `speaker-cap`. (Easy/normal gating comes with the modes item.)
+  - Wrong / reveal / correct feedback per DESIGN.md "Feedback", with no
+    text. Existing wiggle/confetti code is reused and restyled, not
+    duplicated.
+  - `prefers-reduced-motion` behaviour as in DESIGN.md.
+  - Screenshots: `console-empty.png`, `console-ready.png` (all slots
+    filled), `wrong.png`, `correct.png`, `revealed.png`.
+- status:
+
+### B-115 Robot behind the console
+- why: the character is the reason kids come back; he must react.
+- acceptance:
+  - Robot sprite behind the console's left third, z-order below the
+    console, head and shoulders visible.
+  - Pose and pop/sink/peek movement driven from state per CHARACTER.md
+    "Moment map", from a single data table in `static/js/character.js`
+    (moment → pose, movement, sound). No pose logic elsewhere.
+  - Idle timer: 10s without input → thinking then sink; any input pops
+    him back.
+  - Screenshots: `robot-idle.png`, `robot-confused.png`,
+    `robot-excited.png`, `robot-sunk.png`.
+- status:
+
+### B-116 Interim restyle of theme, round-end and sticker book
+- why: these screens still use the old look and English labels.
+- acceptance:
+  - All three per DESIGN.md "Other screens (interim)": blurred darkened
+    lab backdrop, same frame, cream panels with brass border, palette,
+    fonts.
+  - No English labels: theme cards show the theme picture; buttons are
+    icons (▶ play again, ▦ themes, ★ stickers, ← back). Numbers allowed.
+  - Round-end shows stars, the five words (picture + the word, which is
+    allowed) with a lit or dark bulb each, and the new-sticker badges.
+  - Screenshots: `theme.png`, `round-end-3.png`, `round-end-0.png`,
+    `stickers-some.png`.
+- status:
+
 ## M2 — Modes, difficulty, word audio
 Rough items; itemise with acceptance criteria after M1 is merged.
 - Mode picker on the theme screen. Mode 1: 3 hearts, reveal on the third miss (M1 behaviour). Mode 2: hint on the third miss (place the first wrong letter), reveal after two more misses.
