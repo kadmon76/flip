@@ -8,9 +8,12 @@
 // tap on the speaker starts it again from the beginning. Playback starts
 // inside the tap's handler, so the browser's autoplay policy allows it.
 
-// DOM cache: the word clip now playing (an HTMLAudioElement), kept only so
-// a new tap or a word change can stop it. Whether the speaker shows `on`
-// is `state.speaking`, set by main.js; nothing reads this as truth.
+// Handle to the word clip now playing (an HTMLAudioElement), or null. It
+// is not game state and not a DOM cache: audio.js keeps it so a new tap or
+// a word change can stop the clip, and reads it only to tell whether an
+// ended clip is still the current one (a stopped or replaced clip must not
+// call its `onEnd`). No other module reads it; whether the word is playing
+// is `state.speaking`, set by main.js, and that is the truth.
 let wordClip = null;
 
 // Play the word clip at `url`; `onEnd` runs once when it ends or fails to

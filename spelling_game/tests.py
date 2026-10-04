@@ -646,7 +646,7 @@ class TenLetterFitTests(TestCase):
             'console': (self.SIDE, top, self.W - self.SIDE, self.H - self.BOTTOM),
             'dome': (dome_cx - dome_w / 2, dome_cy - dome_h / 2, dome_cx + dome_w / 2, dome_cy + dome_h / 2),
             'robot cap': (robot_left + 18, robot_top, robot_left + 72, robot_top + 10),
-            'robot head': (robot_left, robot_top + 10, robot_left + 94, top),
+            'robot head': (robot_left, robot_top + 10, robot_left + 92, top),
         }, top
 
     @staticmethod

@@ -233,3 +233,8 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - noted for B-115: there is no room for the robot's 20px pop-up above the second block row on 7-10 letter words; he must sit under the bench blocks in z-order (CHARACTER: he never covers the blocks).
 - considered: 8px row gap (adjacent rows then come within 2px, below B-113's 4px spacing test); smaller blocks or five per row for long words (excluded by the acceptance without asking).
 - reversible: yes.
+
+## 2026-10-05 — Corrections from the B-114 review, round 1 (B-114)
+- chose: in `static/js/audio.js`, `wordClip` is now described as a handle to the playing word clip: not game state and not a DOM cache. audio.js reads it only to tell whether an ended clip is still the current one; no other module reads it; `state.speaking` is the truth. This replaces the "DOM cache" wording in the earlier audio.js entry above. The robot keep-out in `TenLetterFitTests` is now 92px wide, matching the fit entry above (it was 94px in the test; the fit still passes).
+- noted: the console position (the "Console layout" entry above) is open as question issue #30 (A keep as built, B v5 height plus long-word changes, C 324px console at the same height). The mockups `question-b-v5-height-bicycle.png` and `question-c-324-helicopter.png` in `.agent/screenshots/B-114/` were made with screenshot-only style overrides; the code is unchanged. If unanswered, A stands.
+- reversible: yes.
