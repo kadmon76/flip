@@ -1,38 +1,83 @@
 /* game.css — mobile-first layout for the rewritten screens; the only
-   stylesheet index.html loads. Colours come from DESIGN.md "Palette" and
-   live only in :root; every rule below uses the variables. */
+   stylesheet index.html loads. Colours come from DESIGN.md "Palette" (v5)
+   and live only in :root; every rule below uses the variables. The play
+   screen is the v5 lab scene (DESIGN.md "Layout"); theme, round-end and
+   sticker book keep their old layout with the palette mapped onto it
+   until their interim restyle (BACKLOG B-116). */
 
 :root {
-    /* sizing (DESIGN.md "Type"): tiles and boxes are 48px squares. The
-       tray wraps; letter boxes are laid out by layout.js (one row, or
-       shrink to 40px for 8+ letters, or wrap into even rows). */
+    /* sizing */
     --page-pad: 16px;
     --column-max: 480px;
-    --tile-gap: 6px;
-    --tile-size: 48px;
-    --tile-font: 28px;
-    --mascot-corner: 96px;    /* DESIGN "Mascot": bottom-left stays free */
+    --mascot-corner: 96px;    /* round-end bottom strip (B-107) */
     --radius: 16px;
     --radius-small: 8px;
 
-    /* palette (DESIGN.md) */
-    --color-bg: #FBF6EC;          /* warm paper */
-    --color-surface: #FFFFFF;     /* card, tiles, boxes */
-    --color-primary: #7FB7BE;     /* dusty teal: buttons, theme tiles, filled boxes */
-    --color-accent: #F2B84B;      /* soft mustard: stars, confetti, correct */
-    --color-error: #E8836F;       /* soft coral: wiggle flash, lost heart */
-    --color-text: #4A3C28;        /* warm dark brown */
-    --color-muted: #8C7B66;       /* muted text, empty box frames */
+    /* palette (DESIGN.md "Palette", sampled from v5) */
+    --bench: #582703;
+    --bench-deep: #2a1405;
+    --cream: #efe0be;
+    --ink: #2a1c10;
+    --brass: #b98c36;
+    --brass-dark: #6b4a1c;
+    --teal: #27665e;
+    --teal-glow: #3fe0d0;
+    --amber: #ffd87a;
+    --amber-deep: #e8a23a;
+    --charcoal: #2c241c;
+    --bulb-off: #84582c;
+    --error: #d9583b;
 
-    /* shadows: the DESIGN surface shadow, and a lifted variant for a
-       tile being dragged (same colour, stronger) */
-    --shadow: 0 6px 20px rgba(74, 60, 40, 0.12);
-    --shadow-lift: 0 8px 18px rgba(74, 60, 40, 0.24);
+    /* tints and shades (DESIGN: within ±15%): a palette colour mixed
+       with at most 15% white or black, for highlights and shaded edges */
+    --cream-hi: color-mix(in srgb, var(--cream) 85%, #fff);
+    --cream-lo: color-mix(in srgb, var(--cream) 85%, #000);
+    --brass-hi: color-mix(in srgb, var(--brass) 85%, #fff);
+    --brass-dark-lo: color-mix(in srgb, var(--brass-dark) 85%, #000);
+    --teal-lo: color-mix(in srgb, var(--teal) 85%, #000);
+    --amber-hi: color-mix(in srgb, var(--amber) 85%, #fff);
+    --amber-deep-lo: color-mix(in srgb, var(--amber-deep) 85%, #000);
+    --bulb-off-hi: color-mix(in srgb, var(--bulb-off) 85%, #fff);
+    --bulb-off-lo: color-mix(in srgb, var(--bulb-off) 85%, #000);
+    --charcoal-hi: color-mix(in srgb, var(--charcoal) 85%, #fff);
 
-    /* type: Fredoka One for headings, tiles and buttons; system sans
-       for body text */
-    --font-display: 'Fredoka One', 'Comic Sans MS', sans-serif;
+    /* palette colours made translucent: contact shadows (DESIGN: dark,
+       blurred, down-right, ~40%), glows and the TV scanlines */
+    --shadow-contact: color-mix(in srgb, var(--bench-deep) 40%, transparent);
+    --shadow-lift: color-mix(in srgb, var(--bench-deep) 32%, transparent);
+    --shadow-deep: color-mix(in srgb, var(--bench-deep) 75%, transparent);
+    --shadow-soft: color-mix(in srgb, var(--ink) 14%, transparent);
+    --glow-teal: color-mix(in srgb, var(--teal-glow) 35%, transparent);
+    --glow-amber: color-mix(in srgb, var(--amber) 60%, transparent);
+    --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
+
+    /* surface shadow of the interim screens (theme, round-end, gallery) */
+    --shadow: 0 6px 20px var(--shadow-soft);
+
+    /* type (DESIGN.md "Type"): Andika Bold for the letter blocks,
+       Courier Prime Bold for the split-flap logo and counter. The interim
+       screens use Andika for headings and buttons too. */
+    --font-block: 'Andika', 'Comic Sans MS', sans-serif;
+    --font-flap: 'Courier Prime', 'Courier New', monospace;
+    --font-display: var(--font-block);
     --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    /* play scene geometry: the scene is one column, full width on a phone
+       (centred, at most 480px). The background image is the column's
+       width and anchored top, so everything drawn onto it (TV picture,
+       brass plate) is placed in % of the column width and of the image
+       height (--bg-h), and sized in --u (1px at 360 wide). */
+    --scene-w: min(100vw, var(--column-max));
+    --bg-h: calc(var(--scene-w) * 2739 / 1264);   /* bg-lab.jpg is 1264x2739 */
+    --u: calc(var(--scene-w) / 360);
+}
+
+/* Desktop (not optimised, CLAUDE.md): keep the phone's 360:740 shape so
+   the whole scene fits the window height instead of scrolling. */
+@media (min-width: 481px) {
+    :root {
+        --scene-w: min(var(--column-max), 100vh * 360 / 740);
+    }
 }
 
 * {
@@ -49,18 +94,57 @@ body {
 body {
     font-family: var(--font-body);
     font-size: 16px;
-    color: var(--color-text);
-    background: var(--color-bg);
+    color: var(--ink);
+    background: var(--cream);
     display: flex;
     flex-direction: column;
     touch-action: manipulation;
+}
+
+/* screens.js mirrors state.screen onto <body data-screen>; the play
+   screen is a dark bench around and below the lab picture */
+body[data-screen="play"] {
+    background: var(--bench-deep);
 }
 
 h1,
 h2,
 h3 {
     font-family: var(--font-display);
-    font-weight: 400;
+    font-weight: 700;
+}
+
+/* --- Split-flap characters (logo and counter) --- */
+
+/* Cream on a charcoal flap with the hinge line across the middle
+   (DESIGN "Type"). Size comes from --flap-w / --flap-h / --flap-font set
+   by the logo and the counter. */
+.flap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--flap-w);
+    height: var(--flap-h);
+    font-family: var(--font-flap);
+    font-weight: 700;
+    font-size: var(--flap-font);
+    line-height: 1;
+    color: var(--cream);
+    background: linear-gradient(to bottom, var(--charcoal-hi), var(--charcoal) 48%, var(--charcoal) 100%);
+    border-radius: calc(var(--flap-w) * 0.18);
+    box-shadow: 1px 2px 3px var(--shadow-contact);
+}
+
+/* the hinge: a dark line with a faint highlight under it */
+.flap::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(50% - 1px);
+    height: 2px;
+    background: linear-gradient(to bottom, var(--bench-deep) 50%, var(--charcoal-hi) 50%);
 }
 
 /* --- Header: one compact line --- */
@@ -78,10 +162,35 @@ h3 {
     min-height: 48px;
 }
 
+/* the "flip" logo: four flaps, the last letter in amber as in v5 */
 .app-title {
-    font-family: var(--font-display);
-    font-size: 1.75rem;
-    line-height: 1;
+    display: flex;
+    gap: 2px;
+    --flap-w: 20px;
+    --flap-h: 26px;
+    --flap-font: 20px;
+}
+
+.app-title .flap:last-child {
+    color: var(--amber-deep);
+}
+
+/* On the play screen the header lies over the lab shelf, inside the
+   frame's safe area, logo top-left at (36, 36) as in v5. The auth line is
+   English, so it is not shown there (it stays on the theme screen). */
+body[data-screen="play"] .app-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    max-width: var(--scene-w);
+    padding: 36px 36px 0;
+    align-items: flex-start;
+}
+
+body[data-screen="play"] .auth {
+    display: none;
 }
 
 .auth {
@@ -93,8 +202,9 @@ h3 {
 
 .logout-btn {
     font-family: var(--font-display);
-    background: var(--color-primary);
-    color: var(--color-text);
+    font-weight: 700;
+    background: var(--brass);
+    color: var(--ink);
     text-decoration: none;
     padding: 6px 14px;
     border-radius: 999px;
@@ -116,7 +226,7 @@ h3 {
     gap: 20px;
 }
 
-/* --- Theme screen --- */
+/* --- Theme screen (interim until B-116) --- */
 
 #screen-theme h2 {
     margin: 0;
@@ -130,8 +240,8 @@ h3 {
     width: 100%;
 }
 
-/* One card per theme: first-word image on a white paper square, name
-   beside it. Full width of the column (16px gutters from .screen). */
+/* One card per theme: first-word image on a light square, name beside
+   it. Full width of the column (16px gutters from .screen). */
 .theme-btn {
     width: 100%;
     min-height: 120px;
@@ -140,10 +250,11 @@ h3 {
     gap: 16px;
     padding: 12px 16px;
     font-family: var(--font-display);
+    font-weight: 700;
     font-size: 1.6rem;
     text-align: left;
-    color: var(--color-text);
-    background: var(--color-primary);
+    color: var(--ink);
+    background: var(--brass);
     border: none;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
@@ -156,7 +267,7 @@ h3 {
     height: 96px;
     object-fit: cover;
     border-radius: var(--radius-small);
-    background: var(--color-surface);
+    background: var(--cream-hi);
     user-select: none;
     -webkit-user-drag: none;
 }
@@ -165,147 +276,227 @@ h3 {
     transform: scale(0.97);
 }
 
-/* --- Play screen --- */
+/* --- Play screen: the lab scene (DESIGN.md "Layout") --- */
 
-/* Top to bottom: card, hearts, counter, boxes, tray, result, actions.
-   Content starts at the top; the action row is pushed down to sit just
-   above the mascot strip so it lands in the same place for every word
-   length and never enters the bottom-left corner. */
+/* One column the width of the scene. The lab picture is its background,
+   full width and anchored top; below it the bench colour continues. The
+   TV picture and the brass plate are positioned over the picture; the
+   rail starts right under the machine (y 347 at 360 wide, 44.5% of the
+   picture) and the bench of blocks follows. The sides and bottom keep
+   the frame's safe area (14px, 22px). `isolation` keeps a dragged
+   block's z-index boost inside the scene, under the frame. A window
+   shorter than 740px can make a long word's screen taller than the
+   window: the bench then pans vertically (blocks stay touch-action:
+   none, so a drag never scrolls). */
 #screen-play {
-    touch-action: none;
+    position: relative;
+    isolation: isolate;
+    max-width: var(--scene-w);
+    touch-action: pan-y;
     justify-content: flex-start;
-    gap: 8px;
-    padding-top: 8px;
-    padding-bottom: var(--mascot-corner);
+    align-items: stretch;
+    gap: 10px;
+    padding: calc(var(--bg-h) * 0.445) 14px 22px;
+    background: var(--bench-deep) url(../images/ui/bg-lab.jpg) center top / 100% auto no-repeat;
 }
 
-.card {
-    flex: 0 0 auto;
-    width: min(48vw, 192px);
-    aspect-ratio: 1 / 1;
-    background: var(--color-surface);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+/* TV screen (x 28-70%, y 16.4-30.5% of the picture): the word picture
+   inside, masked to the screen's rounded corners, on the teal tube with a
+   soft teal glow. Content pictures are square with their own backdrop, so
+   the picture is shown whole (contained) rather than cropped. */
+#screen-play .card {
+    position: absolute;
+    left: 28%;
+    width: 42%;
+    top: calc(var(--bg-h) * 0.164);
+    height: calc(var(--bg-h) * 0.141);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: calc(14 * var(--u)) / calc(16 * var(--u));
+    background: radial-gradient(ellipse at 50% 45%, var(--teal) 55%, var(--teal-lo) 100%);
+    box-shadow: 0 0 calc(10 * var(--u)) var(--glow-teal);
 }
 
-.card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: inherit;
+#screen-play .card img {
     display: block;
+    height: calc(100% - 12 * var(--u));
+    width: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    border-radius: calc(8 * var(--u));
     user-select: none;
     -webkit-user-drag: none;
 }
 
-/* Hearts are inline SVG, not the ♥ glyph: on Android the glyph falls
-   back to the colour-emoji font, which ignores CSS colour, so a lost
-   heart never looked any different. */
+/* faint scanlines over the whole tube and the teal glow at its edges */
+#screen-play .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(2 * var(--u)),
+        var(--scanline) calc(2 * var(--u)),
+        var(--scanline) calc(3 * var(--u))
+    );
+    box-shadow: inset 0 0 calc(14 * var(--u)) var(--glow-teal);
+}
+
+/* Brass plate under the TV (x 24.5-72.5%, y 33.3-38.5% of the picture):
+   lives bulbs on the left, the split-flap counter on the right. */
+#screen-play .plate {
+    position: absolute;
+    left: 24.5%;
+    width: 48%;
+    top: calc(var(--bg-h) * 0.333);
+    height: calc(var(--bg-h) * 0.052);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 calc(15 * var(--u)) 0 calc(16 * var(--u));
+}
+
+/* Three lives bulbs (class kept from the hearts; card.js marks the lost
+   ones): lit is amber with a warm glow, lost is the dark bulb colour. */
 .hearts {
     display: flex;
-    gap: 4px;
-    color: var(--color-accent);
+    gap: calc(8 * var(--u));
 }
 
 .hearts span {
-    display: flex;
-}
-
-.hearts svg {
-    width: 26px;
-    height: 26px;
+    width: calc(15 * var(--u));
+    height: calc(15 * var(--u));
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, var(--amber-hi) 0, var(--amber) 18%, var(--amber-deep) 52%, var(--amber-deep-lo) 78%);
+    box-shadow: 0 0 calc(6 * var(--u)) var(--glow-amber), 1px 2px 2px var(--shadow-contact);
 }
 
 .hearts .lost {
-    color: var(--color-muted);
+    background: radial-gradient(circle at 38% 32%, var(--bulb-off-hi) 0, var(--bulb-off) 22%, var(--bulb-off-lo) 72%);
+    box-shadow: 1px 2px 2px var(--shadow-contact);
 }
 
+/* split-flap counter "2 / 5": card.js renders one .flap per character */
 .word-counter {
     margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    line-height: 1.2;
-    color: var(--color-muted);
+    display: flex;
+    gap: calc(3 * var(--u));
+    --flap-w: calc(22 * var(--u));
+    --flap-h: calc(29 * var(--u));
+    --flap-font: calc(22 * var(--u));
 }
 
-/* --- Letter boxes and tray --- */
+.word-counter .flap-slash {
+    --flap-w: calc(16 * var(--u));
+}
 
-/* card.js sets --box-size and --cols from layout.js so a long word
-   either shrinks its boxes (8+ letters, never below 40px) or wraps into
-   even rows; boxes are otherwise the tile size. */
+/* --- Slot rail and letter blocks --- */
+
+/* Brass rail, full safe width. card.js sets --slot-size, --slot-gap,
+   --rail-pad and --cols from layout.js (46px slots, 6px gap, 8px
+   padding; six to a row, 7+ letters in two even rows). */
 .letter-boxes {
-    --box-size: var(--tile-size);
+    --slot-size: 46px;
+    --slot-gap: 6px;
+    --rail-pad: 8px;
     --cols: 1;
+    flex: 0 0 auto;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(var(--cols), var(--box-size));
+    grid-template-columns: repeat(var(--cols), var(--slot-size));
     justify-content: center;
-    gap: var(--tile-gap);
+    gap: var(--slot-gap);
+    padding: var(--rail-pad);
+    border-radius: 12px;
+    background: linear-gradient(to bottom, var(--brass-hi) 0, var(--brass) 12%, var(--brass) 80%, var(--brass-dark) 100%);
+    box-shadow:
+        inset 0 1px 0 var(--amber),
+        inset 0 -2px 0 var(--brass-dark),
+        2px 5px 9px var(--shadow-contact);
 }
 
+/* a slot: a dark hole sunk into the brass, shadowed from the top */
 .letter-box {
-    width: var(--box-size);
-    height: var(--box-size);
-    border: 2px dashed var(--color-muted);
-    border-radius: var(--radius-small);
-    background: var(--color-surface);
-    box-shadow: var(--shadow);
+    width: var(--slot-size);
+    height: var(--slot-size);
+    border-radius: 7px;
+    background: linear-gradient(to bottom, var(--bench-deep), var(--brass-dark-lo));
+    box-shadow: inset 0 3px 5px var(--shadow-deep), 0 1px 0 var(--brass-hi);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* a box holding a tile: box and tile both take the primary colour; the
-   frame goes so the tile fills the full 48px (border-box) */
-.letter-box.filled {
-    border: 0;
-    background: var(--color-primary);
+/* The bench under the rail: card.js gives it its height and puts one
+   absolutely placed spot per block there (layout.js: rows of at most
+   four, staggered, each block tilted up to 4 degrees). */
+.letter-tray {
+    --block-size: 52px;
+    position: relative;
+    flex: 0 0 auto;
+    width: 100%;
 }
 
-.letter-box > .draggable-letter {
+.block-spot {
+    position: absolute;
+    width: var(--block-size);
+    height: var(--block-size);
+}
+
+/* A clay letter block: light cream face lit from the upper left, a
+   shaded lower-right edge, a soft contact shadow down-right. Andika Bold,
+   lowercase as the data has it. GSAP owns its transform (tilt, drag). */
+.draggable-letter {
     width: 100%;
     height: 100%;
-    background: var(--color-primary);
-    box-shadow: none;
-}
-
-.letter-tray {
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--tile-gap);
-    min-height: var(--tile-size);
-}
-
-.draggable-letter {
-    width: var(--tile-size);
-    height: var(--tile-size);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
-    font-size: var(--tile-font);
+    font-family: var(--font-block);
+    font-weight: 700;
+    font-size: 32px;
     line-height: 1;
-    color: var(--color-text);
-    background: var(--color-surface);
+    color: var(--ink);
+    background: linear-gradient(150deg, var(--cream-hi) 0%, var(--cream-hi) 35%, var(--cream) 100%);
     border: none;
-    border-radius: var(--radius-small);
-    box-shadow: var(--shadow);
+    border-radius: 10px;
+    box-shadow:
+        inset -2px -3px 0 var(--cream-lo),
+        inset 1px 1px 0 var(--cream-hi),
+        3px 5px 7px var(--shadow-contact);
     cursor: pointer;
     user-select: none;
     touch-action: none;
 }
 
+/* a block sitting in a slot fills it (46px), upright, slightly smaller
+   letter, shadow kept inside the hole */
+.letter-box > .draggable-letter {
+    font-size: 28px;
+    border-radius: 7px;
+    box-shadow:
+        inset -2px -3px 0 var(--cream-lo),
+        inset 1px 1px 0 var(--cream-hi),
+        1px 2px 3px var(--shadow-deep);
+}
+
 /* pick-up (DESIGN "Motion"): the shadow lifts over 120ms while drag.js
-   scales the tile to 1.08; both are skipped under reduced motion */
+   scales the block to 1.08; both are skipped under reduced motion */
 .draggable-letter {
     transition: box-shadow 120ms ease-out;
 }
 
 .draggable-letter.gsap-dragging,
 .letter-box > .draggable-letter.gsap-dragging {
-    box-shadow: var(--shadow-lift);
+    box-shadow:
+        inset -2px -3px 0 var(--cream-lo),
+        inset 1px 1px 0 var(--cream-hi),
+        8px 14px 16px var(--shadow-lift);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -317,13 +508,6 @@ h3 {
 body.dragging-active {
     user-select: none;
     -webkit-user-select: none;
-}
-
-.result-line {
-    margin: 0;
-    min-height: 1.4em;
-    font-size: 1.1rem;
-    text-align: center;
 }
 
 /* --- Action row --- */
@@ -343,9 +527,10 @@ body.dragging-active {
     flex: 1 1 0;
     height: 56px;
     font-family: var(--font-display);
+    font-weight: 700;
     font-size: 1.3rem;
-    color: var(--color-text);
-    background: var(--color-primary);
+    color: var(--ink);
+    background: var(--brass);
     border: none;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
@@ -356,14 +541,46 @@ body.dragging-active {
     transform: scale(0.98);
 }
 
-/* muted: faded onto the paper, no shadow, no lift on press */
+/* muted: faded, no shadow, no lift on press */
 .action-btn:disabled {
     opacity: 0.4;
     box-shadow: none;
     cursor: default;
 }
 
-/* --- Round-end screen --- */
+/* Play screen, interim until the console (BACKLOG B-114): Check (tick)
+   and Next (arrow) as icon-only buttons at the bottom right of the safe
+   area, where the check dome will be. No text (DESIGN "Words on screen"). */
+#screen-play .actions {
+    justify-content: flex-end;
+}
+
+.icon-btn {
+    flex: 0 0 auto;
+    width: 64px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--ink);
+    background: var(--cream);
+    border: 2px solid var(--brass);
+    border-radius: 12px;
+    box-shadow: 2px 4px 6px var(--shadow-contact);
+}
+
+.icon-btn svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* --- Round-end screen (interim until B-116) --- */
 
 /* Top to bottom: stars, score, the five words, Play again / Themes.
    Same shape as the play screen: content from the top, the action row
@@ -377,12 +594,12 @@ body.dragging-active {
     padding-bottom: var(--mascot-corner);
 }
 
-/* Three star outlines in the accent colour; an earned star is filled.
-   Inline SVG (like the hearts) so CSS colour applies on every phone. */
+/* Three star outlines in amber; an earned star is filled. Inline SVG
+   (like the old hearts) so CSS colour applies on every phone. */
 .stars {
     display: flex;
     gap: 8px;
-    color: var(--color-accent);
+    color: var(--amber-deep);
 }
 
 .stars span {
@@ -419,18 +636,18 @@ body.dragging-active {
     line-height: 1;
 }
 
-/* "New stickers: N" (B-111): body text under the score, muted like the
-   word counter; always shown, 0 included. Adds 22px + gap to the budget
-   above (48+8+64+12+40+12+22+12+272+12+56+96 = 654 < 740). */
+/* "New stickers: N" (B-111): body text under the score, muted; always
+   shown, 0 included. Adds 22px + gap to the budget above
+   (48+8+64+12+40+12+22+12+272+12+56+96 = 654 < 740). */
 .round-new {
     margin: 0;
     font-size: 1.1rem;
     line-height: 1.25;
-    color: var(--color-muted);
+    color: var(--brass-dark);
 }
 
-/* One row per word: image thumbnail, the word, a tick (accent) or a
-   cross (error) at the end. Rows are white paper strips. */
+/* One row per word: image thumbnail, the word, a tick (amber) or a
+   cross (error) at the end. Rows are light cream strips. */
 .round-words {
     list-style: none;
     margin: 0;
@@ -447,7 +664,7 @@ body.dragging-active {
     gap: 12px;
     height: 48px;
     padding: 4px 12px 4px 4px;
-    background: var(--color-surface);
+    background: var(--cream-hi);
     border-radius: var(--radius-small);
     box-shadow: var(--shadow);
 }
@@ -465,6 +682,7 @@ body.dragging-active {
 .round-words .word {
     flex: 1 1 auto;
     font-family: var(--font-display);
+    font-weight: 700;
     font-size: 1.3rem;
     line-height: 1;
 }
@@ -484,8 +702,8 @@ body.dragging-active {
     stroke-linejoin: round;
 }
 
-/* sticker badge (B-111): a small accent-coloured round sticker with a
-   white star, between the word and the tick, on words new in the book */
+/* sticker badge (B-111): a small amber round sticker with a light star,
+   between the word and the tick, on words new in the book */
 .round-words .sticker {
     flex: 0 0 auto;
     display: flex;
@@ -494,8 +712,8 @@ body.dragging-active {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--color-accent);
-    color: var(--color-surface);
+    background: var(--amber-deep);
+    color: var(--cream-hi);
 }
 
 .round-words .sticker svg {
@@ -505,14 +723,14 @@ body.dragging-active {
 }
 
 .round-words .correct .mark {
-    color: var(--color-accent);
+    color: var(--amber-deep);
 }
 
 .round-words .wrong .mark {
-    color: var(--color-error);
+    color: var(--error);
 }
 
-/* --- Gallery (sticker book) screen --- */
+/* --- Gallery (sticker book) screen (interim until B-116) --- */
 
 /* Back + heading on top, then one section per theme. Content starts at
    the top and the page scrolls when the grids are taller than the
@@ -537,15 +755,16 @@ body.dragging-active {
     font-size: 1.6rem;
 }
 
-/* a pill in the primary colour, 48px tall (DESIGN tap target) */
+/* a brass pill, 48px tall (tap target) */
 .back-btn {
     justify-self: start;
     min-height: 48px;
     padding: 0 20px;
     font-family: var(--font-display);
+    font-weight: 700;
     font-size: 1.1rem;
-    color: var(--color-text);
-    background: var(--color-primary);
+    color: var(--ink);
+    background: var(--brass);
     border: none;
     border-radius: 999px;
     box-shadow: var(--shadow);
@@ -562,7 +781,7 @@ body.dragging-active {
     font-size: 1.1rem;
     line-height: 1.3;
     text-align: center;
-    color: var(--color-muted);
+    color: var(--brass-dark);
 }
 
 .gallery-themes {
@@ -583,7 +802,7 @@ body.dragging-active {
 }
 
 .gallery-theme .count {
-    color: var(--color-muted);
+    color: var(--brass-dark);
     font-size: 1.1rem;
 }
 
@@ -598,14 +817,14 @@ body.dragging-active {
     gap: 8px;
 }
 
-/* one sticker: square image on a white paper tile, the word under it */
+/* one sticker: square image on a light cream tile, the word under it */
 .gallery-grid li {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
     padding: 4px 4px 6px;
-    background: var(--color-surface);
+    background: var(--cream-hi);
     border-radius: var(--radius-small);
     box-shadow: var(--shadow);
 }
@@ -623,6 +842,7 @@ body.dragging-active {
 .gallery-grid .word {
     max-width: 100%;
     font-family: var(--font-display);
+    font-weight: 700;
     font-size: 1rem;
     line-height: 1.2;
     text-align: center;
@@ -635,15 +855,15 @@ body.dragging-active {
 }
 
 .gallery-grid .locked .word {
-    color: var(--color-muted);
+    color: var(--brass-dark);
 }
 
 /* --- Confetti (celebrate.js, correct check) --- */
 
 /* A fixed, click-through layer over the page; celebrate.js positions
-   the pieces from the card's centre with GSAP and removes the layer when
-   the 600ms burst ends. overflow hidden so a piece flying past the edge
-   never widens the page. */
+   the pieces from the TV picture's centre with GSAP and removes the layer
+   when the 600ms burst ends. overflow hidden so a piece flying past the
+   edge never widens the page. Below the frame. */
 .confetti {
     position: fixed;
     inset: 0;
@@ -652,7 +872,8 @@ body.dragging-active {
     z-index: 10;
 }
 
-/* small paper rectangles in three palette colours */
+/* small pieces in three palette colours (class names are celebrate.js's
+   colour roles; restyled as sparks in B-114) */
 .confetti-piece {
     position: absolute;
     top: 0;
@@ -663,13 +884,39 @@ body.dragging-active {
 }
 
 .confetti-piece.accent {
-    background: var(--color-accent);
+    background: var(--amber);
 }
 
 .confetti-piece.primary {
-    background: var(--color-primary);
+    background: var(--teal-glow);
 }
 
 .confetti-piece.error {
-    background: var(--color-error);
+    background: var(--cream);
+}
+
+/* --- Frame (play screen) --- */
+
+/* The cream bakelite bezel, exactly as DESIGN.md "Layout": a fixed,
+   click-through border-image (no fill) over the scene column, above
+   everything. Shown on the play screen only until the other screens get
+   their interim restyle (B-116). */
+.frame {
+    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: var(--scene-w);
+    margin: 0 auto;
+    z-index: 20;
+    pointer-events: none;
+    border-style: solid;
+    border-width: 29px 26px 38px 28px;          /* top right bottom left */
+    border-image: url(../images/ui/frame.png) 180 165 235 175;   /* no fill */
+}
+
+body[data-screen="play"] .frame {
+    display: block;
 }

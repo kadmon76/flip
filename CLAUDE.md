@@ -34,6 +34,7 @@ a phone.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
   - `score.js` is pure round scoring (`starsFor`), no DOM; a Django test runs it through `node`.
   - `stickers.js` is the only place the sticker book (localStorage key `flip.stickers.v1`) is read or written; no DOM, no module state. Other modules call `load()`/`has()`/`add()`/`all()`; nothing else touches that key.
+  - `gallery.js` renders the sticker book screen (`#screen-gallery`) from `state.themes[].words` and `stickers.load()` on every render while `state.screen === 'gallery'`; it never mutates state and keeps no cache. `themeProgress(book, theme, words)` is the pure part (no DOM); a Django test runs it through `node`.
   - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle now; correct pulse, confetti and star pop in B-110). It is a subscriber after `renderCard`, keeps only a render cache of the last status/lives, and never mutates state.
   - `audio.js` (to be created) is the only place sounds play.
   - `celebrate.js` is the only place the correct-check and round-end celebrations run (box pulse, confetti, star pop). It is a state subscriber that fires only on a transition it detects against what it last rendered (status became 'correct', screen became 'round-end'); a re-render in the same state must not replay a celebration.
@@ -90,7 +91,8 @@ a phone.
 - Do not rename the existing DOM ids in `templates/spelling_game/index.html`
   (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `result-line`, `check-btn`, `next-btn`,
   `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`,
-  `reset-btn`, `speak-btn`) without a DECISIONS entry; card.js and main.js key on
+  `stickers-btn`, `gallery-back-btn`, `gallery-empty`, `gallery-themes`,
+  `reset-btn`, `speak-btn`) without a DECISIONS entry; card.js, main.js and gallery.js key on
   them. `next-btn` is removed by B-114 (the check dome is also next).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.

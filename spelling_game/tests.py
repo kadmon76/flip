@@ -35,6 +35,20 @@ class IndexTests(TestCase):
         self.assertContains(response, 'id="screen-gallery"')
         self.assertContains(response, 'id="gallery-back-btn"')
 
+    def test_play_screen_keeps_its_ids_hides_the_result_line_and_loads_v5_fonts(self):
+        # BACKLOG B-113: no result text on the play screen; the protected
+        # ids stay; Andika Bold and Courier Prime Bold from Google Fonts.
+        response = self.client.get('/')
+        for id_ in ('screen-play', 'letter-boxes', 'letter-tray', 'word-counter',
+                    'check-btn', 'next-btn', 'play-image'):
+            self.assertContains(response, f'id="{id_}"')
+        self.assertContains(response, '<p id="result-line" class="result-line" hidden></p>', html=False)
+        self.assertContains(response, 'family=Andika:wght@700')
+        self.assertContains(response, 'family=Courier+Prime:wght@700')
+        self.assertNotContains(response, 'Fredoka')
+        self.assertNotContains(response, '>Check<')
+        self.assertNotContains(response, '>Next<')
+
 
 class ShotToolTests(TestCase):
     """tools/shot.mjs must reject bad arguments before launching a browser."""
@@ -83,10 +97,17 @@ class ShotToolTests(TestCase):
 
 
 class GameCssPaletteTests(TestCase):
-    """DESIGN.md palette: colour literals live only in :root of game.css."""
+    """DESIGN.md "Palette" (v5): colour literals live only in :root of
+    game.css; derived tones there are a palette colour mixed with at most
+    15% white or black (the allowed tints), or made translucent."""
 
     CSS = Path(__file__).resolve().parent.parent / 'static' / 'css' / 'game.css'
-    PALETTE = ['#FBF6EC', '#FFFFFF', '#7FB7BE', '#F2B84B', '#E8836F', '#4A3C28', '#8C7B66']
+    PALETTE = {
+        'bench': '#582703', 'bench-deep': '#2a1405', 'cream': '#efe0be', 'ink': '#2a1c10',
+        'brass': '#b98c36', 'brass-dark': '#6b4a1c', 'teal': '#27665e', 'teal-glow': '#3fe0d0',
+        'amber': '#ffd87a', 'amber-deep': '#e8a23a', 'charcoal': '#2c241c', 'bulb-off': '#84582c',
+        'error': '#d9583b',
+    }
 
     def _root_and_rest(self):
         text = re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
@@ -96,30 +117,53 @@ class GameCssPaletteTests(TestCase):
 
     def test_root_defines_the_design_palette(self):
         root, _ = self._root_and_rest()
-        for colour in self.PALETTE:
-            self.assertIn(colour, root.upper())
+        for name, colour in self.PALETTE.items():
+            self.assertRegex(root, rf'--{name}:\s*{colour}\s*;', name)
+
+    def test_no_old_palette_variables_remain(self):
+        self.assertNotIn('--color-', self.CSS.read_text())
 
     def test_no_colour_literals_outside_root(self):
         _, rest = self._root_and_rest()
-        literals = re.findall(r'#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(', rest)
+        literals = re.findall(r'#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bcolor-mix\(', rest)
         self.assertEqual(literals, [])
+        named = re.findall(r':[^;{}]*\b(white|black|red|green|blue|gray|grey|orange|yellow)\b', rest)
+        self.assertEqual(named, [])
+
+    def test_derived_tones_are_palette_tints_within_15_percent_or_translucent(self):
+        root, _ = self._root_and_rest()
+        mixes = re.findall(
+            r'color-mix\(\s*in srgb,\s*var\(--([a-z-]+)\)\s*(\d+)%,\s*(#fff|#000|transparent)\s*\)', root)
+        # every color-mix in :root has that shape
+        self.assertEqual(len(mixes), root.count('color-mix('))
+        self.assertTrue(mixes)
+        for name, share, other in mixes:
+            self.assertIn(name, self.PALETTE, name)
+            if other != 'transparent':
+                self.assertGreaterEqual(int(share), 85, name)
+
+    def test_frame_border_image_is_exactly_as_design(self):
+        css = self.CSS.read_text()
+        self.assertIn('border-width: 29px 26px 38px 28px;', css)
+        self.assertIn('border-image: url(../images/ui/frame.png) 180 165 235 175;', css)
 
 
-class BoxLayoutTests(TestCase):
-    """static/js/layout.js boxLayout(): 48px boxes on one row when they fit;
-    8+ letter words shrink toward 40px to stay on one row; otherwise 48px
-    boxes wrap into even rows (DESIGN.md "Type", BACKLOG B-104)."""
+class SlotLayoutTests(TestCase):
+    """static/js/layout.js slotLayout(): 46px slots, 6px apart, 8px rail
+    padding; six slots fit one row, 7+ letters wrap into two even rows
+    (DESIGN.md "Layout", BACKLOG B-113)."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
+    RAIL = 332   # 360px phone minus the frame's 14px safe area on each side
 
     def setUp(self):
         if shutil.which('node') is None:
             self.skipTest('node not installed')
 
-    def layout(self, count, width, gap=6):
+    def layout(self, count, width=RAIL):
         script = (
-            f"import {{ boxLayout }} from '{self.MODULE.as_uri()}';"
-            f"console.log(JSON.stringify(boxLayout({count}, {width}, {gap})));"
+            f"import {{ slotLayout }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify(slotLayout({count}, {width})));"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
@@ -128,30 +172,116 @@ class BoxLayoutTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
-    def test_short_word_one_row_at_phone_width(self):
-        # 360px viewport minus 16px gutters = 328px row.
-        self.assertEqual(self.layout(4, 328), {'size': 48, 'cols': 4})
-        self.assertEqual(self.layout(6, 328), {'size': 48, 'cols': 6})
+    def test_slot_size_gap_and_padding(self):
+        self.assertEqual(self.layout(4), {'size': 46, 'gap': 6, 'pad': 8, 'cols': 4, 'rows': 1})
 
-    def test_seven_letters_never_shrink_below_48_so_they_wrap(self):
-        self.assertEqual(self.layout(7, 328), {'size': 48, 'cols': 4})   # 4 + 3
+    def test_up_to_six_letters_fit_one_row_at_phone_width(self):
+        for n in range(1, 7):
+            self.assertEqual((self.layout(n)['cols'], self.layout(n)['rows']), (n, 1), n)
 
-    def test_long_words_wrap_into_even_rows_at_phone_width(self):
-        self.assertEqual(self.layout(8, 328), {'size': 48, 'cols': 4})   # 4 + 4
-        self.assertEqual(self.layout(9, 328), {'size': 48, 'cols': 5})   # 5 + 4
-        self.assertEqual(self.layout(10, 328), {'size': 48, 'cols': 5})  # 5 + 5
+    def test_seven_to_ten_letters_wrap_into_two_even_rows(self):
+        self.assertEqual((self.layout(7)['cols'], self.layout(7)['rows']), (4, 2))    # 4 + 3
+        self.assertEqual((self.layout(8)['cols'], self.layout(8)['rows']), (4, 2))    # 4 + 4
+        self.assertEqual((self.layout(9)['cols'], self.layout(9)['rows']), (5, 2))    # 5 + 4
+        self.assertEqual((self.layout(10)['cols'], self.layout(10)['rows']), (5, 2))  # 5 + 5
 
-    def test_eight_plus_letters_shrink_to_fit_one_row_on_a_wide_column(self):
-        # 480px column minus gutters = 448px row.
-        self.assertEqual(self.layout(8, 448), {'size': 48, 'cols': 8})
-        nine = self.layout(9, 448)
-        self.assertEqual(nine['cols'], 9)
-        self.assertGreaterEqual(nine['size'], 40)
-        self.assertLess(nine['size'], 48)
-        self.assertEqual(self.layout(10, 448), {'size': 48, 'cols': 5})  # 40px would not fit
+    def test_seven_letters_wrap_on_a_wide_rail_too(self):
+        # 480px column: seven would fit, but the rail holds six to a row.
+        self.assertEqual(self.layout(6, 452)['rows'], 1)
+        self.assertEqual((self.layout(7, 452)['cols'], self.layout(7, 452)['rows']), (4, 2))
+
+    def test_every_row_fits_the_rail(self):
+        for n in range(1, 11):
+            l = self.layout(n)
+            self.assertLessEqual(l['cols'] * 46 + (l['cols'] - 1) * 6 + 2 * 8, self.RAIL, n)
+
+    def test_narrow_rail_holds_what_fits(self):
+        # 280px rail: 264px inside, five 46px slots with 6px gaps.
+        self.assertEqual((self.layout(6, 280)['cols'], self.layout(6, 280)['rows']), (3, 2))
 
     def test_zero_letters_is_safe(self):
-        self.assertEqual(self.layout(0, 328), {'size': 48, 'cols': 1})
+        self.assertEqual(self.layout(0), {'size': 46, 'gap': 6, 'pad': 8, 'cols': 1, 'rows': 0})
+
+
+class BlockLayoutTests(TestCase):
+    """static/js/layout.js blockLayout(): 52px letter blocks in loose
+    staggered rows of at most four, each tilted at most 4 degrees, inside
+    the bench width (DESIGN.md "Layout", BACKLOG B-113)."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
+    BENCH = 332
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def layout(self, count, width=BENCH):
+        script = (
+            f"import {{ blockLayout }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify(blockLayout({count}, {width})));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def rows(self, layout):
+        ys = []
+        for s in layout['spots']:
+            if not ys or abs(s['y'] - ys[-1][0]) > layout['size'] / 2:
+                ys.append([s['y'], 0])
+            ys[-1][1] += 1
+        return [n for _, n in ys]
+
+    def test_blocks_are_52px(self):
+        self.assertEqual(self.layout(4)['size'], 52)
+
+    def test_rows_hold_at_most_four_and_fill_four_first(self):
+        self.assertEqual(self.rows(self.layout(4)), [4])
+        self.assertEqual(self.rows(self.layout(6)), [4, 2])       # as in the v5 reference
+        self.assertEqual(self.rows(self.layout(7)), [4, 3])
+        self.assertEqual(self.rows(self.layout(10)), [4, 4, 2])
+
+    def test_tilt_is_at_most_four_degrees_and_not_all_equal(self):
+        spots = self.layout(10)['spots']
+        self.assertTrue(all(abs(s['rot']) <= 4 for s in spots))
+        self.assertGreater(len({s['rot'] for s in spots}), 1)
+
+    def test_blocks_stay_on_the_bench_and_do_not_overlap(self):
+        for n in range(1, 11):
+            l = self.layout(n)
+            size = l['size']
+            for s in l['spots']:
+                self.assertGreaterEqual(s['x'], 2, n)
+                self.assertLessEqual(s['x'] + size, self.BENCH - 2, n)
+                self.assertGreaterEqual(s['y'], 0, n)
+                self.assertLessEqual(s['y'] + size, l['height'], n)
+            for i, a in enumerate(l['spots']):
+                for b in l['spots'][i + 1:]:
+                    apart = abs(a['x'] - b['x']) >= size + 4 or abs(a['y'] - b['y']) >= size + 4
+                    self.assertTrue(apart, (n, a, b))
+
+    def test_rows_are_staggered_when_there_are_two_or_more(self):
+        spots = self.layout(8)['spots']   # 4 + 4: same width, so only the stagger differs
+        first = sum(s['x'] for s in spots[:4]) / 4
+        second = sum(s['x'] for s in spots[4:]) / 4
+        self.assertGreaterEqual(abs(first - second), 8)
+
+    def test_same_input_same_spots(self):
+        self.assertEqual(self.layout(6), self.layout(6))
+
+    def test_height_fits_ten_letters_above_the_console(self):
+        # 360x740: rail top 347 + two slot rows (114) + 10px gap + bench
+        # + 10px gap + 48px controls + 22px safe area must fit in 740.
+        self.assertLessEqual(347 + 114 + 10 + self.layout(10)['height'] + 10 + 48 + 22, 740)
+
+    def test_narrow_bench_puts_fewer_on_a_row(self):
+        self.assertEqual(self.rows(self.layout(6, 250)), [3, 3])
+
+    def test_zero_blocks_is_safe(self):
+        self.assertEqual(self.layout(0), {'size': 52, 'spots': [], 'height': 0})
 
 
 class MotionSpecTests(TestCase):

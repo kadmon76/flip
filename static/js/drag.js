@@ -95,11 +95,14 @@ function centre(el) {
 
 // Apply a state change that moves `el` between tray and boxes, then
 // animate it from where it was to where the render put it (FLIP). The
-// centre is used so the pick-up scale does not skew the offset.
+// centre is used so the pick-up scale does not skew the offset. The tilt
+// the render set (a bench spot's, or upright in a slot) is eased in too.
 function moveTile(el, change) {
     const before = centre(el);
+    const tiltBefore = gsap.getProperty(el, 'rotation');
     if (!change()) return false;
     const after = centre(el);
+    const tiltAfter = gsap.getProperty(el, 'rotation');
     const m = motionFor('snap', reducedMotion());
     gsap.killTweensOf(el);
     if (m.duration === 0) {
@@ -108,8 +111,8 @@ function moveTile(el, change) {
     }
     gsap.fromTo(
         el,
-        { x: before.x - after.x, y: before.y - after.y },
-        { x: 0, y: 0, scale: m.scale, duration: m.duration, ease: m.ease },
+        { x: before.x - after.x, y: before.y - after.y, rotation: tiltBefore },
+        { x: 0, y: 0, rotation: tiltAfter, scale: m.scale, duration: m.duration, ease: m.ease },
     );
     return true;
 }

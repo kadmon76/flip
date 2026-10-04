@@ -1,4 +1,7 @@
-// screens.js — shows the container matching state.screen, hides the rest.
+// screens.js — shows the container matching state.screen, hides the rest,
+// and mirrors state.screen onto <body data-screen> as a CSS hook (the lab
+// scene, frame and header placement of the play screen). The attribute is
+// render output, written on every render and never read by any script.
 
 const SCREENS = {
     'theme': 'screen-theme',
@@ -12,4 +15,5 @@ export function renderScreens(state) {
         const el = document.getElementById(id);
         if (el) el.style.display = name === state.screen ? '' : 'none';
     }
+    document.body.dataset.screen = state.screen;
 }
