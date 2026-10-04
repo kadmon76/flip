@@ -88,7 +88,9 @@ function putDown(el) {
     tween(el, { scale: 1 }, m);
 }
 
-function centre(el) {
+// Centre of an element on screen; feedback.js uses it for the reveal
+// fly-in and the reset hop too.
+export function centre(el) {
     const r = el.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
@@ -204,7 +206,7 @@ function placeTile(tileId, index) {
 
     placed[index] = { letter: tile.letter, tileId };
     tile.used = true;
-    setState({ current: { ...current, placed, tray } });
+    setState({ current: { ...current, placed, tray, status: afterMove(current.status) } });
     return true;
 }
 
@@ -216,6 +218,26 @@ function returnToTray(tileId) {
     const placed = [...current.placed];
     placed[from] = null;
     const tray = current.tray.map((t) => (t.id === tileId ? { ...t, used: false } : { ...t }));
-    setState({ current: { ...current, placed, tray } });
+    setState({ current: { ...current, placed, tray, status: afterMove(current.status) } });
     return true;
+}
+
+// Moving a tile after a wrong check reopens the word: the wrong check
+// belongs to the arrangement that was checked, not to the one the kid is
+// now building, so the check dome lights up again once every slot is
+// filled (DESIGN "Controls and states").
+export function afterMove(status) {
+    return status === 'wrong' ? 'playing' : status;
+}
+
+// The reset lever: every placed tile goes back to its start spot on the
+// bench. Pure (main.js applies it through setState, feedback.js animates
+// the hop); a wrong check is reopened as by any other move.
+export function returnAll(current) {
+    return {
+        ...current,
+        placed: current.placed.map(() => null),
+        tray: current.tray.map((t) => ({ ...t, used: false })),
+        status: afterMove(current.status),
+    };
 }

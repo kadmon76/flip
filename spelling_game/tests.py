@@ -35,19 +35,33 @@ class IndexTests(TestCase):
         self.assertContains(response, 'id="screen-gallery"')
         self.assertContains(response, 'id="gallery-back-btn"')
 
-    def test_play_screen_keeps_its_ids_hides_the_result_line_and_loads_v5_fonts(self):
-        # BACKLOG B-113: no result text on the play screen; the protected
-        # ids stay; Andika Bold and Courier Prime Bold from Google Fonts.
+    def test_play_screen_keeps_its_ids_has_no_text_and_loads_v5_fonts(self):
+        # BACKLOG B-113 / B-114: no result text on the play screen (the
+        # result line and #next-btn are gone, the dome is also "next");
+        # the other protected ids stay; Andika Bold and Courier Prime Bold
+        # from Google Fonts.
         response = self.client.get('/')
         for id_ in ('screen-play', 'letter-boxes', 'letter-tray', 'word-counter',
-                    'check-btn', 'next-btn', 'play-image'):
+                    'check-btn', 'reset-btn', 'speak-btn', 'play-image'):
             self.assertContains(response, f'id="{id_}"')
-        self.assertContains(response, '<p id="result-line" class="result-line" hidden></p>', html=False)
+        self.assertNotContains(response, 'id="next-btn"')
+        self.assertNotContains(response, 'id="result-line"')
         self.assertContains(response, 'family=Andika:wght@700')
         self.assertContains(response, 'family=Courier+Prime:wght@700')
         self.assertNotContains(response, 'Fredoka')
         self.assertNotContains(response, '>Check<')
         self.assertNotContains(response, '>Next<')
+
+    def test_console_controls_are_the_image_assets(self):
+        # BACKLOG B-114, DESIGN "The layer model": the console and its
+        # controls are the scene images, left to right lever, speaker, dome.
+        html = self.client.get('/').content.decode()
+        for asset in ('console', 'lever-up', 'lever-down', 'speaker-off', 'speaker-on',
+                      'speaker-cap', 'dome-off', 'dome-ready', 'dome-pressed'):
+            self.assertIn(f'/static/images/ui/{asset}.png', html, asset)
+        self.assertLess(html.index('id="reset-btn"'), html.index('id="speak-btn"'))
+        self.assertLess(html.index('id="speak-btn"'), html.index('id="check-btn"'))
+        self.assertNotIn('icon-btn', html)
 
 
 class ShotToolTests(TestCase):
@@ -273,9 +287,21 @@ class BlockLayoutTests(TestCase):
         self.assertEqual(self.layout(6), self.layout(6))
 
     def test_height_fits_ten_letters_above_the_console(self):
-        # 360x740: rail top 347 + two slot rows (114) + 10px gap + bench
-        # + 10px gap + 48px controls + 22px safe area must fit in 740.
-        self.assertLessEqual(347 + 114 + 10 + self.layout(10)['height'] + 10 + 48 + 22, 740)
+        # 360x740: rail top 347 + two slot rows (114) + 4px gap + bench
+        # + 4px gap + the console (332px wide, 972x175) + 22px safe area
+        # must fit in 740 (BACKLOG B-114).
+        console = 332 * 175 / 972
+        self.assertLessEqual(347 + 114 + 4 + self.layout(10)['height'] + 4 + console + 22, 740)
+
+    def test_third_row_sits_right_of_the_robot(self):
+        # Rows from the third on are centred right of 40% of the bench
+        # (the robot's head and shoulders end at about 36%).
+        for n in (9, 10):
+            spots = self.layout(n)['spots'][8:]
+            self.assertTrue(all(s['x'] >= 0.4 * self.BENCH for s in spots), (n, spots))
+        # rows one and two keep the stagger
+        first, second = self.layout(10)['spots'][:4], self.layout(10)['spots'][4:8]
+        self.assertGreaterEqual(abs(sum(s['x'] for s in first) - sum(s['x'] for s in second)) / 4, 8)
 
     def test_narrow_bench_puts_fewer_on_a_row(self):
         self.assertEqual(self.rows(self.layout(6, 250)), [3, 3])
@@ -326,7 +352,7 @@ class MotionSpecTests(TestCase):
     def test_unknown_kind_fails(self):
         script = (
             f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
-            "motionFor('wiggle', false);"
+            "motionFor('twirl', false);"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
@@ -574,3 +600,271 @@ class GalleryProgressTests(TestCase):
 
     def test_no_words_is_zero_of_zero(self):
         self.assertEqual(self.progress({'animals': ['duck']}, words=[]), {'count': 0, 'total': 0, 'items': []})
+
+
+class TenLetterFitTests(TestCase):
+    """BACKLOG B-114: at 360x740 every word up to 10 letters (two slot
+    rows, three block rows) fits with the console (and its check dome)
+    and the robot's head and shoulders without overlap. Positions are the
+    CSS layout's: rail top at 44.5% of the 780px lab picture, 4px gaps,
+    14px / 22px safe area, the console 332px wide (972x175) at the bottom,
+    the dome as placed in game.css, the robot as in the v5 reference (92px
+    wide, left edge at 7.4% of the console, 75px above it; the brass cap
+    is the top 10px)."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
+    W, H, SIDE, BOTTOM, GAP = 360, 740, 14, 22, 4
+    TILT = 2   # a block tilted up to 4 degrees reaches ~2px past its box
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def layouts(self, count):
+        bench = self.W - 2 * self.SIDE
+        script = (
+            f"import {{ slotLayout, blockLayout }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify([slotLayout({count}, {bench}), blockLayout({count}, {bench})]));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def keep_out(self):
+        cw = self.W - 2 * self.SIDE
+        ch = cw * 175 / 972
+        top = self.H - self.BOTTOM - ch
+        dome_w = cw * 0.254
+        dome_cx, dome_cy = self.SIDE + 0.815 * cw, top + 0.41 * ch
+        dome_h = dome_w * 169 / 240
+        robot_left = self.SIDE + 0.074 * cw
+        robot_top = top - 75
+        return {
+            'console': (self.SIDE, top, self.W - self.SIDE, self.H - self.BOTTOM),
+            'dome': (dome_cx - dome_w / 2, dome_cy - dome_h / 2, dome_cx + dome_w / 2, dome_cy + dome_h / 2),
+            'robot cap': (robot_left + 18, robot_top, robot_left + 72, robot_top + 10),
+            'robot head': (robot_left, robot_top + 10, robot_left + 94, top),
+        }, top
+
+    @staticmethod
+    def overlap(a, b):
+        return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+    def test_words_up_to_ten_letters_clear_the_console_dome_and_robot(self):
+        zones, console_top = self.keep_out()
+        rail_top = 0.445 * self.W * 2739 / 1264
+        for n in range(1, 11):
+            slots, blocks = self.layouts(n)
+            rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
+            bench_top = rail_top + rail_h + self.GAP
+            # the column fits the screen: the console is not pushed down
+            self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, n)
+            for s in blocks['spots']:
+                x, y = self.SIDE + s['x'], bench_top + s['y']
+                box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
+                for name, zone in zones.items():
+                    self.assertFalse(self.overlap(box, zone), (n, name, box, zone))
+
+
+class ConsoleMotionSpecTests(TestCase):
+    """static/js/motion.js motionFor() for the console and the feedback
+    (BACKLOG B-114, DESIGN "Controls and states", "Feedback"): wrong blocks
+    wiggle ±6px in 300ms; the rail shakes ±4px in 200ms; the lost bulb
+    flickers three times; the TV static lasts 150ms and the warm-white
+    flash 200ms; revealed blocks fly in 120ms apart; reset blocks hop back
+    in 300ms, 30ms apart. Reduced motion: opacity fades only."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def motion(self, kind, reduced):
+        script = (
+            f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify(motionFor({json.dumps(kind)}, {json.dumps(reduced)})));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_wrong_wiggle_and_rail_shake(self):
+        w = self.motion('wiggle', False)
+        self.assertEqual((w['distance'], w['duration']), (6, 0.3))
+        r = self.motion('shake', False)
+        self.assertEqual((r['distance'], r['duration']), (4, 0.2))
+        for m in (w, r):
+            self.assertNotIn('back', m['ease'])
+
+    def test_bulb_flicker_tv_static_and_flash(self):
+        self.assertEqual(self.motion('flicker', False)['flashes'], 3)
+        self.assertLessEqual(self.motion('flicker', False)['duration'], 0.3)
+        self.assertEqual(self.motion('tvStatic', False)['duration'], 0.15)
+        self.assertEqual(self.motion('flash', False)['duration'], 0.2)
+
+    def test_reveal_fly_in_and_reset_hop(self):
+        f = self.motion('flyIn', False)
+        self.assertEqual(f['stagger'], 0.12)
+        self.assertLessEqual(f['duration'], 0.3)
+        self.assertEqual(f['ease'], 'back.out(1.4)')   # lands like a snap into a slot
+        h = self.motion('hop', False)
+        self.assertEqual((h['duration'], h['stagger']), (0.3, 0.03))
+        self.assertGreater(h['height'], 0)
+        self.assertNotIn('back', h['ease'])
+
+    def test_reduced_motion_is_fades_only(self):
+        for kind in ('wiggle', 'shake', 'flicker', 'tvStatic', 'flash', 'flyIn', 'hop'):
+            m = self.motion(kind, True)
+            self.assertEqual((m['duration'], m['scale'], m['ease']), (0, 1, 'none'), kind)
+            for key in ('distance', 'flashes', 'height'):
+                self.assertEqual(m.get(key, 0), 0, (kind, key))
+        for kind in ('wiggle', 'flicker', 'tvStatic', 'flash', 'flyIn', 'hop'):
+            self.assertGreater(self.motion(kind, True)['fade'], 0, kind)
+        self.assertEqual(self.motion('flyIn', True)['stagger'], 0.12)
+
+
+class ControlsTests(TestCase):
+    """static/js/controls.js: the console's states from state (BACKLOG
+    B-114, DESIGN "Controls and states"). The dome is off until every slot
+    is filled, ready then, pressed while held, and ready again after a
+    correct answer or a reveal, when it means "next"; after a wrong check
+    it stays off until a block moves. The lever works while blocks can
+    move; the speaker is capped without word audio."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'controls.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        script = (
+            f"const c = await import('{self.MODULE.as_uri()}');"
+            "const cur = (status, placed, audio = '/a.mp3') => ({ word: 'cat', audio, status,"
+            " placed: placed.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i })) });"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_press_times(self):
+        self.assertEqual(self.run_node("out(c.PRESS_MS);"), {'dome': 120, 'lever': 250})
+
+    def test_dome_off_until_every_slot_is_filled_then_ready_to_check(self):
+        self.assertEqual(
+            self.run_node("out(['---', 'c--', 'ca-', 'cat', 'tac'].map((p) => [c.domeAction(cur('playing', p)), c.domeState(cur('playing', p), null)]));"),
+            [[None, 'off'], [None, 'off'], [None, 'off'], ['check', 'ready'], ['check', 'ready']],
+        )
+
+    def test_dome_pressed_while_held(self):
+        self.assertEqual(self.run_node("out([c.domeState(cur('playing', 'cat'), 'dome'), c.domeState(cur('playing', 'cat'), 'lever')]);"),
+                         ['pressed', 'ready'])
+
+    def test_after_wrong_the_dome_is_off_until_a_block_moves(self):
+        self.assertEqual(self.run_node("out([c.domeAction(cur('wrong', 'tac')), c.domeState(cur('wrong', 'tac'), null)]);"),
+                         [None, 'off'])
+
+    def test_after_correct_or_reveal_the_dome_is_next(self):
+        self.assertEqual(
+            self.run_node("out(['correct', 'revealed'].map((s) => [c.domeAction(cur(s, 'cat')), c.domeState(cur(s, 'cat'), null)]));"),
+            [['next', 'ready'], ['next', 'ready']],
+        )
+
+    def test_no_word_no_action(self):
+        self.assertEqual(self.run_node("out([c.domeAction({ word: null, placed: [], status: 'playing' }), c.canReset({ word: null, status: 'playing' })]);"),
+                         [None, False])
+
+    def test_lever(self):
+        self.assertEqual(
+            self.run_node("out([c.leverState(null), c.leverState('lever'), c.leverState('dome'),"
+                          " ...['playing', 'wrong', 'correct', 'revealed'].map((s) => c.canReset(cur(s, 'ca-')))]);"),
+            ['up', 'down', 'up', True, True, False, False],
+        )
+
+    def test_speaker(self):
+        self.assertEqual(
+            self.run_node("out([c.speakerState(cur('playing', '---'), false), c.speakerState(cur('playing', '---'), true),"
+                          " c.speakerState(cur('playing', '---', null), false), c.speakerState(cur('playing', '---', ''), true)]);"),
+            ['off', 'on', 'cap', 'cap'],
+        )
+
+
+class ResetTransitionTests(TestCase):
+    """static/js/drag.js returnAll() and afterMove(): the reset lever puts
+    every placed block back on the bench; any block move after a wrong
+    check reopens the word (BACKLOG B-114)."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'drag.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        script = (
+            f"const d = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_return_all_empties_the_slots_and_frees_every_block(self):
+        current = {
+            'word': 'cat', 'status': 'wrong',
+            'tray': [{'id': 'a', 'letter': 't', 'used': True}, {'id': 'b', 'letter': 'a', 'used': True},
+                     {'id': 'c', 'letter': 'c', 'used': False}],
+            'placed': [{'letter': 't', 'tileId': 'a'}, {'letter': 'a', 'tileId': 'b'}, None],
+        }
+        after, before = self.run_node(f"const cur = {json.dumps(current)}; const before = JSON.stringify(cur);"
+                                      "out([d.returnAll(cur), JSON.parse(before)]);")
+        self.assertEqual(after['placed'], [None, None, None])
+        self.assertEqual([t['used'] for t in after['tray']], [False, False, False])
+        self.assertEqual([t['id'] for t in after['tray']], ['a', 'b', 'c'])   # start spots keep their order
+        self.assertEqual(after['status'], 'playing')
+        self.assertEqual(before, current)   # pure: the old state is untouched
+
+    def test_after_move_reopens_only_a_wrong_check(self):
+        self.assertEqual(self.run_node("out(['playing', 'wrong', 'correct', 'revealed'].map(d.afterMove));"),
+                         ['playing', 'playing', 'correct', 'revealed'])
+
+
+class ConsoleCssTests(TestCase):
+    """game.css: the ready dome's glow pulses opacity 0.45 <-> 1, 1.2s
+    ease-in-out, infinite, and glows steadily under reduced motion; the
+    interim icon buttons are gone (BACKLOG B-114)."""
+
+    CSS = Path(__file__).resolve().parent.parent / 'static' / 'css' / 'game.css'
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def test_ready_pulse(self):
+        css = self.css()
+        self.assertIn('animation: dome-ready 1.2s ease-in-out infinite alternate;', css)
+        frames = re.search(r'@keyframes dome-ready\s*{(.*?)}\s*}', css, flags=re.S).group(1)
+        self.assertRegex(frames, r'from\s*{\s*opacity:\s*0\.45;')
+        self.assertRegex(frames, r'to\s*{\s*opacity:\s*1;')
+
+    def test_reduced_motion_glows_steadily(self):
+        blocks = re.findall(r'@media \(prefers-reduced-motion: reduce\)\s*{(.*?)}\s*}', self.css(), flags=re.S)
+        self.assertTrue(any('.is-ready .dome-ready' in b and 'animation: none' in b for b in blocks))
+
+    def test_interim_buttons_are_gone(self):
+        self.assertNotIn('icon-btn', self.css())

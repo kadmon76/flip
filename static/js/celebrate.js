@@ -1,10 +1,12 @@
 // celebrate.js — one-shot motion for the two reward beats (DESIGN
-// "Motion"): a correct check pulses the boxes once and bursts confetti
-// from the card; the round-end screen pops the earned stars in one after
-// another. It runs as a state subscriber after card.js and the round-end
-// render, compares the new state with the last one it saw and starts a
-// tween only on the transition (status became 'correct', screen became
-// 'round-end'); a re-render in the same state does nothing. Nothing here
+// "Feedback", "Motion"): a correct check pulses the slots once, flashes
+// the TV screen warm white and bursts sparks (the confetti pieces, styled
+// as sparks in game.css) from the TV; the round-end screen pops the
+// earned stars in one after another. It runs as a state subscriber after
+// card.js and the round-end render, compares the new state with the last
+// one it saw and starts a tween only on the transition (status became
+// 'correct', screen became 'round-end'); a re-render in the same state
+// does nothing. Nothing here
 // is game state: the confetti pieces exist only for the burst and are
 // removed from the DOM when it ends; every tween clears what it set.
 
@@ -29,9 +31,10 @@ export function renderCelebrate(state) {
 
     if (status === 'correct' && prev.status !== 'correct') {
         pulseBoxes();
+        flashTv();
         burstConfetti();
     } else if (status !== 'correct' && prev.status === 'correct') {
-        settle(document.querySelectorAll('#letter-boxes .letter-box'));
+        settle(document.querySelectorAll('#letter-boxes .letter-box, #screen-play .tv-flash'));
     }
 
     if (screen === 'round-end' && prev.screen !== 'round-end') {
@@ -75,14 +78,33 @@ function pulseBoxes() {
     }
 }
 
-// --- Correct: confetti ---
+// --- Correct: TV flash ---
+
+// The TV screen lights up warm white (the .tv-flash layer over the
+// picture) and fades back within m.duration (200ms). It is an opacity
+// fade either way, so reduced motion keeps it (at the `fade` length).
+function flashTv() {
+    const layer = document.querySelector('#screen-play .tv-flash');
+    if (!layer) return;
+    const m = motionFor('flash', reducedMotion());
+    gsap.killTweensOf(layer);
+    gsap.fromTo(layer, { opacity: 0.9 }, {
+        opacity: 0,
+        duration: m.duration || m.fade,
+        ease: 'power2.out',
+        onComplete: () => gsap.set(layer, { clearProps: 'opacity' }),
+    });
+}
+
+// --- Correct: confetti (sparks from the TV) ---
 
 function rand(min, max) {
     return min + Math.random() * (max - min);
 }
 
-// `m.count` small paper pieces in palette colours start inside the card
-// and fly outward past its edge, spinning and fading, over `m.duration`.
+// `m.count` small sparks in palette colours (amber, teal glow, cream)
+// start inside the TV picture (.card) and fly outward past its edge,
+// fading, over `m.duration`.
 // They live in a fixed, click-through layer appended to <body> that is
 // removed when the timeline ends, so input is never blocked and nothing
 // stays in the DOM. Reduced motion: count 0, no confetti.
