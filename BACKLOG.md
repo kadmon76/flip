@@ -179,6 +179,7 @@ Build order: scene → controls → robot → other screens. Reference:
     text. Existing wiggle/confetti code is reused and restyled, not
     duplicated.
   - `prefers-reduced-motion` behaviour as in DESIGN.md.
+  - At 360x740 a 10-letter word (two slot rows, three block rows) fits with the console and the robot's head and shoulders without overlap; if the DESIGN numbers cannot all fit, open a question issue before changing block size, blocks per row or the console.
   - Screenshots: `console-empty.png`, `console-ready.png` (all slots
     filled), `wrong.png`, `correct.png`, `revealed.png`.
 - status:
@@ -231,3 +232,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Fold `feedback.js` (B-109, wiggle) and `celebrate.js` (B-110, pulse/confetti/star pop) into one transition-keyed module once both PRs land; the CLAUDE.md lines added from issues #19 and #21 each claim the correct-check effects until then.
 - Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
+- TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.

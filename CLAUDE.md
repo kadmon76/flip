@@ -17,6 +17,7 @@ a phone.
   Drag-and-drop is GSAP Draggable loaded from cdnjs (already in the template).
 - Runs on: phone browser, portrait, 360px wide and up (primary). Desktop
   must work but is not optimised.
+- Browser floor: iOS Safari 16.2+ / Chrome 111+. CSS or JS newer than the floor needs a fallback or a DECISIONS entry naming the browsers it drops.
 - Content for M1: `static/config/themes.json` (theme index) and `static/data/*.json` (words) plus the existing images and sounds
   under `static/images/` and `static/sounds/`. Read-only: do not add, edit,
   regenerate or rename content or assets in M1.
@@ -28,7 +29,7 @@ a phone.
   - `state.js` is the only place state is mutated (`setState`). No game state on DOM elements, in classes or in module globals. A module may keep a render cache (what it last rendered, e.g. `tiles` in card.js, `last` in celebrate.js) so it can tell a transition from a re-render; nothing reads such a cache as truth.
     Subscribers may keep a memo of the last state they rendered or heard (`builtThemes` in main.js, `last` in audio.js); a memo is overwritten on every setState, is never read by another module, and is never a source of truth.
   - A render module may hold a DOM cache (an element map or the last-rendered reference) that is rebuilt from state on every render and never read to decide game logic; mark it with a "DOM cache" comment. Anything else in a module global is state and belongs in state.js.
-  - Every screen is a render of state. `screens.js` shows/hides screens,
+  - Every screen is a render of state. `screens.js` shows/hides screens and mirrors `state.screen` onto `<body data-screen>` as a CSS-only hook (written on every render, never read by a script),
     `card.js` renders the card, boxes and tray, `drag.js` handles drag and
     snap, `main.js` wires it.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
