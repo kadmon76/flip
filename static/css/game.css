@@ -595,15 +595,18 @@ body.dragging-active {
 
 /* --- Console (DESIGN "Controls and states") --- */
 
-/* console.png at the full safe width (332px at 360 wide, so ~60px tall),
-   pinned to the bottom of the safe area as the last item of the play
-   column. Above the bench in z-order; the robot (B-115) goes behind it. */
+/* console.png pinned to the bottom of the safe area as the last item of
+   the play column, inset 4px from each side of the safe area (324px at
+   360 wide, so ~58px tall) and centred, so its lower corners clear the
+   frame's rounded inner corners (DESIGN "Layout", issue #30). Above the
+   bench in z-order; the robot (B-115) goes behind it. */
 #screen-play .console {
-    --console-w: calc(var(--scene-w) - 28px);
+    --console-w: calc(var(--scene-w) - 36px);
     position: relative;
     z-index: 2;
     flex: 0 0 auto;
-    width: 100%;
+    align-self: center;
+    width: var(--console-w);
     margin-top: auto;
     aspect-ratio: 972 / 175;
 }
