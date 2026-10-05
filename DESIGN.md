@@ -28,7 +28,7 @@ an image model by the human.
 |---|---|---|
 | bg-lab.jpg | lab + TV machine + bench, 1264x2739 | width 100%, anchored top |
 | frame.png | cream bakelite bezel, transparent window | border-image overlay |
-| console.png | control console (cream + brass plate) | full safe width, ~60px tall |
+| console.png | control console (cream + brass plate) | safe width less 4px each side (324px), ~58px tall |
 | dome-off / -ready / -pressed.png | check button (also "next") | ~80px wide |
 | lever-up / -down.png | reset lever (same canvas, plate aligned) | ~40px wide |
 | speaker-off / -on / -cap.png | hear-the-word button; cap = blanked | ~38px wide |
@@ -59,7 +59,9 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
 - **Letter blocks:** cream clay blocks lying on the bench below the rail,
   52px min, slightly rotated (±4°), in loose staggered rows (max 4 per
   row). Lowercase by default.
-- **Console:** pinned to the bottom of the safe area. On its brass plate,
+- **Console:** pinned to the bottom of the safe area, inset 4px from each
+  side of it (324px wide at 360) so its lower corners clear the frame's
+  rounded inner corners. On its brass plate,
   left to right: reset lever (far left), speaker (centre-left), check
   dome (right). Reset and check stay far apart.
 - **Robot:** behind the console's left third, head and shoulders visible
