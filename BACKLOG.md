@@ -182,7 +182,7 @@ Build order: scene → controls → robot → other screens. Reference:
   - At 360x740 a 10-letter word (two slot rows, three block rows) fits with the console and the robot's head and shoulders without overlap; if the DESIGN numbers cannot all fit, open a question issue before changing block size, blocks per row or the console.
   - Screenshots: `console-empty.png`, `console-ready.png` (all slots
     filled), `wrong.png`, `correct.png`, `revealed.png`.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/31
 
 ### B-115 Robot behind the console
 - why: the character is the reason kids come back; he must react.
