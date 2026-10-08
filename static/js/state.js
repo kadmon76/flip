@@ -10,16 +10,22 @@ export const state = {
     current: {
         word: null,
         image: null,
-        audio: null,
+        audio: null,            // the word's audio file from the content JSON, or none
         // placed[i] is null or { letter, tileId }; one slot per letter of word
         placed: [],
         // tray is [{ id, letter, used }] in tray display order; id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
-        // 'playing' | 'wrong' (checked, lives left) | 'correct' | 'revealed'
+        // 'playing' | 'wrong' (checked, lives left; the next block move
+        // makes it 'playing' again) | 'correct' | 'revealed'
         status: 'playing',
     },
     lives: 3,                   // attempts left for the current word
+    // Console control held down (DESIGN "Controls and states"): 'dome' for
+    // 120ms after a press on the check dome, 'lever' for 250ms after a pull
+    // on the reset lever; null otherwise.
+    pressed: null,
+    speaking: false,            // the word's audio is playing (speaker-on)
 };
 
 const subscribers = [];

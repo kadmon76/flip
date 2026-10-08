@@ -50,6 +50,9 @@
     --glow-teal: color-mix(in srgb, var(--teal-glow) 35%, transparent);
     --glow-amber: color-mix(in srgb, var(--amber) 60%, transparent);
     --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
+    /* TV static on a wrong check: light and dark noise lines */
+    --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
+    --static-dark: color-mix(in srgb, var(--ink) 55%, transparent);
 
     /* surface shadow of the interim screens (theme, round-end, gallery) */
     --shadow: 0 6px 20px var(--shadow-soft);
@@ -283,7 +286,10 @@ body[data-screen="play"] .auth {
    TV picture and the brass plate are positioned over the picture; the
    rail starts right under the machine (y 347 at 360 wide, 44.5% of the
    picture) and the bench of blocks follows. The sides and bottom keep
-   the frame's safe area (14px, 22px). `isolation` keeps a dragged
+   the frame's safe area (14px, 22px); the console is the last item,
+   pushed to the bottom. 4px between rail, bench and console keeps a
+   10-letter word clear of the console and the robot's head at 360x740
+   (BACKLOG B-114). `isolation` keeps a dragged
    block's z-index boost inside the scene, under the frame. A window
    shorter than 740px can make a long word's screen taller than the
    window: the bench then pans vertically (blocks stay touch-action:
@@ -295,7 +301,7 @@ body[data-screen="play"] .auth {
     touch-action: pan-y;
     justify-content: flex-start;
     align-items: stretch;
-    gap: 10px;
+    gap: 4px;
     padding: calc(var(--bg-h) * 0.445) 14px 22px;
     background: var(--bench-deep) url(../images/ui/bg-lab.jpg) center top / 100% auto no-repeat;
 }
@@ -347,6 +353,32 @@ body[data-screen="play"] .auth {
     box-shadow: inset 0 0 calc(14 * var(--u)) var(--glow-teal);
 }
 
+/* Wrong check: static over the picture, fine light and dark noise lines
+   on the tube; feedback.js flickers it for 150ms. Correct check: the
+   screen flashes warm white; celebrate.js fades it out over 200ms. Both
+   are invisible at rest and sit under the scanlines. */
+#screen-play .tv-static,
+#screen-play .tv-flash {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+}
+
+/* interference: uneven light and dark horizontal bands from two layers
+   with unrelated periods (feedback.js jumps their position per frame) */
+#screen-play .tv-static {
+    background:
+        repeating-linear-gradient(to bottom, var(--static-light) 0 1px, transparent 1px 3px, var(--static-dark) 3px 5px, transparent 5px 7px),
+        repeating-linear-gradient(to bottom, transparent 0 4px, var(--static-light) 4px 6px, var(--static-dark) 6px 7px, transparent 7px 13px),
+        var(--teal-lo);
+}
+
+#screen-play .tv-flash {
+    background: radial-gradient(ellipse at 50% 45%, var(--cream-hi) 0, var(--cream-hi) 40%, var(--amber-hi) 100%);
+}
+
 /* Brass plate under the TV (x 24.5-72.5%, y 33.3-38.5% of the picture):
    lives bulbs on the left, the split-flap counter on the right. */
 #screen-play .plate {
@@ -362,23 +394,37 @@ body[data-screen="play"] .auth {
 }
 
 /* Three lives bulbs (class kept from the hearts; card.js marks the lost
-   ones): lit is amber with a warm glow, lost is the dark bulb colour. */
+   ones): lit is amber with a warm glow, lost is the dark bulb colour.
+   The span is the dark bulb; the lit glow is a layer over it whose
+   opacity is --lit (1 lit, 0 lost by default). When a bulb goes out,
+   feedback.js sets --lit inline for 300ms to flicker it three times,
+   then removes it so the `lost` class decides again. */
 .hearts {
     display: flex;
     gap: calc(8 * var(--u));
 }
 
 .hearts span {
+    position: relative;
     width: calc(15 * var(--u));
     height: calc(15 * var(--u));
     border-radius: 50%;
-    background: radial-gradient(circle at 38% 32%, var(--amber-hi) 0, var(--amber) 18%, var(--amber-deep) 52%, var(--amber-deep-lo) 78%);
-    box-shadow: 0 0 calc(6 * var(--u)) var(--glow-amber), 1px 2px 2px var(--shadow-contact);
-}
-
-.hearts .lost {
     background: radial-gradient(circle at 38% 32%, var(--bulb-off-hi) 0, var(--bulb-off) 22%, var(--bulb-off-lo) 72%);
     box-shadow: 1px 2px 2px var(--shadow-contact);
+}
+
+.hearts span::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, var(--amber-hi) 0, var(--amber) 18%, var(--amber-deep) 52%, var(--amber-deep-lo) 78%);
+    box-shadow: 0 0 calc(6 * var(--u)) var(--glow-amber);
+    opacity: var(--lit, 1);
+}
+
+.hearts .lost::before {
+    opacity: var(--lit, 0);
 }
 
 /* split-flap counter "2 / 5": card.js renders one .flap per character */
@@ -518,7 +564,6 @@ body.dragging-active {
     gap: 12px;
 }
 
-#screen-play .actions,
 #screen-round-end .actions {
     margin-top: auto;
 }
@@ -548,36 +593,160 @@ body.dragging-active {
     cursor: default;
 }
 
-/* Play screen, interim until the console (BACKLOG B-114): Check (tick)
-   and Next (arrow) as icon-only buttons at the bottom right of the safe
-   area, where the check dome will be. No text (DESIGN "Words on screen"). */
-#screen-play .actions {
-    justify-content: flex-end;
-}
+/* --- Console (DESIGN "Controls and states") --- */
 
-.icon-btn {
+/* console.png pinned to the bottom of the safe area as the last item of
+   the play column, inset 4px from each side of the safe area (324px at
+   360 wide, so ~58px tall) and centred, so its lower corners clear the
+   frame's rounded inner corners (DESIGN "Layout", issue #30). Above the
+   bench in z-order; the robot (B-115) goes behind it. */
+#screen-play .console {
+    --console-w: calc(var(--scene-w) - 36px);
+    position: relative;
+    z-index: 2;
     flex: 0 0 auto;
-    width: 64px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    color: var(--ink);
-    background: var(--cream);
-    border: 2px solid var(--brass);
-    border-radius: 12px;
-    box-shadow: 2px 4px 6px var(--shadow-contact);
+    align-self: center;
+    width: var(--console-w);
+    margin-top: auto;
+    aspect-ratio: 972 / 175;
 }
 
-.icon-btn svg {
-    width: 28px;
-    height: 28px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.console-body {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(2px 4px 5px var(--shadow-contact));
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* A control on the console's brass plate: a button at least 48x48
+   (tap target) centred on its sprite. Centre (--cx, --cy, in % of the
+   console) and sprite width (--w) are measured from the v5 reference;
+   --ar is the asset's height / width. The sprite stacks the control's
+   images; controls.js puts class is-<state> on the button and the rules
+   below show the matching one. One contact shadow for the whole stack. */
+.ctl {
+    position: absolute;
+    left: var(--cx);
+    top: var(--cy);
+    width: max(48px, var(--w));
+    height: max(48px, calc(var(--w) * var(--ar)));
+    transform: translate(-50%, -50%);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.ctl:disabled {
+    cursor: default;
+}
+
+.ctl .sprite {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--w);
+    height: calc(var(--w) * var(--ar));
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(2px 3px 3px var(--shadow-contact));
+}
+
+.ctl .sprite img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* left to right: reset lever (far left), speaker, check dome (right) */
+#reset-btn {
+    --cx: 13.4%;
+    --cy: 51%;
+    --w: calc(var(--console-w) * 0.116);
+    --ar: calc(137 / 120);
+}
+
+#speak-btn {
+    --cx: 36.1%;
+    --cy: 55.4%;
+    --w: calc(var(--console-w) * 0.1145);
+    --ar: calc(123 / 120);
+}
+
+#check-btn {
+    --cx: 81.5%;
+    --cy: 41%;
+    --w: calc(var(--console-w) * 0.254);
+    --ar: calc(169 / 240);
+}
+
+/* reset lever: up at rest, down for 250ms when pulled */
+#reset-btn .lever-up,
+#reset-btn.is-down .lever-down {
+    opacity: 1;
+}
+
+#reset-btn.is-down .lever-up {
+    opacity: 0;
+}
+
+/* speaker: off; on while the word plays; cap when there is no word audio */
+#speak-btn .speaker-off,
+#speak-btn.is-on .speaker-on,
+#speak-btn.is-cap .speaker-cap {
+    opacity: 1;
+}
+
+#speak-btn.is-on .speaker-off,
+#speak-btn.is-cap .speaker-off {
+    opacity: 0;
+}
+
+/* check dome: `off` underneath; `ready` is the lit dome over it, its glow
+   pulsing slowly (opacity 0.45 <-> 1, 1.2s ease-in-out, infinite) until
+   pressed or a block is taken out; `pressed` for 120ms after a press.
+   Reduced motion: the ready dome glows steadily. */
+#check-btn .dome-off {
+    opacity: 1;
+}
+
+#check-btn.is-ready .dome-ready {
+    opacity: 1;
+    animation: dome-ready 1.2s ease-in-out infinite alternate;
+}
+
+#check-btn.is-pressed .dome-off {
+    opacity: 0;
+}
+
+#check-btn.is-pressed .dome-pressed {
+    opacity: 1;
+}
+
+@keyframes dome-ready {
+    from {
+        opacity: 0.45;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #check-btn.is-ready .dome-ready {
+        animation: none;
+    }
 }
 
 /* --- Round-end screen (interim until B-116) --- */
@@ -858,7 +1027,7 @@ body.dragging-active {
     color: var(--brass-dark);
 }
 
-/* --- Confetti (celebrate.js, correct check) --- */
+/* --- Sparks (celebrate.js's confetti, correct check) --- */
 
 /* A fixed, click-through layer over the page; celebrate.js positions
    the pieces from the TV picture's centre with GSAP and removes the layer
@@ -872,27 +1041,29 @@ body.dragging-active {
     z-index: 10;
 }
 
-/* small pieces in three palette colours (class names are celebrate.js's
-   colour roles; restyled as sparks in B-114) */
+/* sparks (DESIGN "Feedback"): small glowing dots in amber, teal glow and
+   cream (the class names are celebrate.js's colour roles) */
 .confetti-piece {
     position: absolute;
     top: 0;
     left: 0;
-    width: 8px;
-    height: 12px;
-    border-radius: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 6px 1px currentColor;
 }
 
 .confetti-piece.accent {
-    background: var(--amber);
+    color: var(--amber);
 }
 
 .confetti-piece.primary {
-    background: var(--teal-glow);
+    color: var(--teal-glow);
 }
 
 .confetti-piece.error {
-    background: var(--cream);
+    color: var(--cream);
 }
 
 /* --- Frame (play screen) --- */

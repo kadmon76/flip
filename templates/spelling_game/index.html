@@ -20,7 +20,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=10">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=11">
 </head>
 <body>
     <!-- Header: split-flap "flip" logo + auth in one compact line. On the
@@ -51,13 +51,17 @@
          picture (.card) and the brass plate (lives bulbs, split-flap
          counter) are placed over the background image; the slot rail
          (#letter-boxes) and the bench of letter blocks (#letter-tray)
-         follow below the machine. Ids are keyed on by card.js and main.js;
-         do not rename. #result-line stays for main.js but is never shown
-         (no result text, DESIGN "Words on screen"). Check / Next are
-         interim icon buttons until the console (BACKLOG B-114). -->
+         follow below the machine, and the console sits at the bottom of
+         the safe area. Ids are keyed on by card.js, controls.js and
+         main.js; do not rename. No text anywhere on this screen (DESIGN
+         "Words on screen"): feedback is light and motion (feedback.js,
+         celebrate.js). .tv-static and .tv-flash are the TV's wrong-check
+         static and correct-check flash, invisible at rest. -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
             <img id="play-image" src="" alt="" />
+            <div class="tv-static" aria-hidden="true"></div>
+            <div class="tv-flash" aria-hidden="true"></div>
         </div>
         <div class="plate">
             <div class="hearts" aria-label="Lives">
@@ -67,13 +71,33 @@
         </div>
         <div id="letter-boxes" class="letter-boxes"></div>
         <div id="letter-tray" class="letter-tray"></div>
-        <p id="result-line" class="result-line" hidden></p>
-        <div class="actions">
-            <button id="next-btn" class="action-btn icon-btn" aria-label="Next">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        <!-- Console (DESIGN "Controls and states", BACKLOG B-114): on its
+             brass plate, left to right, the reset lever, the speaker and
+             the check dome (also "next"). Each control stacks its image
+             assets; controls.js shows one of them from state (class
+             is-<state> on the button). aria-labels are for screen readers
+             only, never shown. -->
+        <div class="console">
+            <img class="console-body" src="{% static 'images/ui/console.png' %}" alt="" />
+            <button id="reset-btn" class="ctl" type="button" aria-label="Reset">
+                <span class="sprite">
+                    <img class="lever-up" src="{% static 'images/ui/lever-up.png' %}" alt="" />
+                    <img class="lever-down" src="{% static 'images/ui/lever-down.png' %}" alt="" />
+                </span>
             </button>
-            <button id="check-btn" class="action-btn icon-btn" aria-label="Check" disabled>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+            <button id="speak-btn" class="ctl" type="button" aria-label="Hear the word">
+                <span class="sprite">
+                    <img class="speaker-off" src="{% static 'images/ui/speaker-off.png' %}" alt="" />
+                    <img class="speaker-on" src="{% static 'images/ui/speaker-on.png' %}" alt="" />
+                    <img class="speaker-cap" src="{% static 'images/ui/speaker-cap.png' %}" alt="" />
+                </span>
+            </button>
+            <button id="check-btn" class="ctl" type="button" aria-label="Check" disabled>
+                <span class="sprite">
+                    <img class="dome-off" src="{% static 'images/ui/dome-off.png' %}" alt="" />
+                    <img class="dome-ready" src="{% static 'images/ui/dome-ready.png' %}" alt="" />
+                    <img class="dome-pressed" src="{% static 'images/ui/dome-pressed.png' %}" alt="" />
+                </span>
             </button>
         </div>
     </div>

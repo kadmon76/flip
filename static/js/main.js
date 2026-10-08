@@ -1,8 +1,13 @@
-// main.js — wiring: theme selection, round flow, check/next, screen renders.
+// main.js — wiring: theme selection, round flow, the console controls
+// (check dome, reset lever, speaker), screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
+import { returnAll } from './drag.js';
+import { renderFeedback } from './feedback.js';
+import { renderControls, domeAction, canReset, speakerState, PRESS_MS } from './controls.js';
+import { speakWord, stopWord } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker } from './stickers.js';
@@ -35,14 +40,22 @@ function makeCurrent(entry) {
     };
 }
 
-// Fill every box with the right letter using the word's own tiles.
+// Fill every box with the right letter using the word's own tiles. A
+// block already in its right slot stays there, so on the reveal only the
+// others fly in (feedback.js).
 function revealed(current) {
     const tray = current.tray.map((t) => ({ ...t, used: true }));
-    const taken = new Set();
-    const placed = current.word.split('').map((ch) => {
+    const letters = current.word.split('');
+    const placed = letters.map((ch, i) => {
+        const p = current.placed[i];
+        return p && p.letter === ch ? { letter: ch, tileId: p.tileId } : null;
+    });
+    const taken = new Set(placed.filter(Boolean).map((p) => p.tileId));
+    letters.forEach((ch, i) => {
+        if (placed[i]) return;
         const tile = tray.find((t) => t.letter === ch && !taken.has(t.id));
         taken.add(tile.id);
-        return { letter: tile.letter, tileId: tile.id };
+        placed[i] = { letter: tile.letter, tileId: tile.id };
     });
     return { ...current, tray, placed, status: 'revealed' };
 }
@@ -100,6 +113,7 @@ async function startRound({ name, dataUrl }) {
     const words = shuffle(Object.keys(data))
         .slice(0, ROUND_SIZE)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
+    stopWord();
     setState({
         theme: name,
         words,
@@ -107,32 +121,56 @@ async function startRound({ name, dataUrl }) {
         round: { index: 0, size: ROUND_SIZE, results: [] },
         current: makeCurrent(words[0]),
         lives: LIVES,
+        pressed: null,
+        speaking: false,
     });
 }
 
-// --- Play screen: check / next ---
+// --- Play screen: the console (DESIGN "Controls and states") ---
 
-const RESULT_TEXT = {
-    playing: '',
-    correct: 'Correct!',
-    wrong: 'Not quite, try again',
-    revealed: (word) => `The word is "${word}"`,
-};
-
-function renderActions(state) {
-    if (state.screen !== 'play' || !state.current.word) return;
-    const { current } = state;
-    const allFilled = current.placed.every(Boolean);
-    const canCheck = current.status === 'playing' || current.status === 'wrong';
-    $('check-btn').disabled = !(allFilled && canCheck);
-    const text = RESULT_TEXT[current.status];
-    $('result-line').textContent = typeof text === 'function' ? text(current.word) : text;
+// Check dome, also "next": it shows `dome-pressed` for 120ms, then the
+// result. What the press does is decided again when the 120ms are up (a
+// block may have been taken out meanwhile). `pressed` is cleared in the
+// same setState as the result.
+function onDome() {
+    if (state.screen !== 'play' || state.pressed || !domeAction(state.current)) return;
+    setState({ pressed: 'dome' });
+    setTimeout(() => {
+        const action = state.screen === 'play' ? domeAction(state.current) : null;
+        if (action === 'check') onCheck({ pressed: null });
+        else if (action === 'next') onNext({ pressed: null });
+        if (state.pressed === 'dome') setState({ pressed: null });
+    }, PRESS_MS.dome);
 }
 
-function onCheck() {
+// Reset lever: down for 250ms, and every placed block goes back to its
+// start spot at once (feedback.js shakes the rail and hops the blocks).
+// Input is not blocked; tapping a single placed block still returns only
+// that block (drag.js).
+function onLever() {
+    if (state.screen !== 'play' || state.pressed || !canReset(state.current)) return;
+    setState({ pressed: 'lever', current: returnAll(state.current) });
+    setTimeout(() => {
+        if (state.pressed === 'lever') setState({ pressed: null });
+    }, PRESS_MS.lever);
+}
+
+// Speaker: plays the word's audio file through audio.js; `speaking` shows
+// `speaker-on` until it ends. A word without an audio file shows
+// `speaker-cap` and the tap is ignored.
+function onSpeak() {
+    const { current } = state;
+    if (state.screen !== 'play' || speakerState(current, state.speaking) === 'cap') return;
+    setState({ speaking: true });
+    speakWord(current.audio, () => setState({ speaking: false }));
+}
+
+// `extra` is merged into the result's setState (the dome passes
+// `pressed: null`).
+function onCheck(extra = {}) {
     const { current, round, lives } = state;
     if (!current.placed.every(Boolean)) return;
-    if (current.status === 'correct' || current.status === 'revealed') return;
+    if (current.status !== 'playing') return;
 
     const answer = current.placed.map((p) => p.letter).join('');
     const correct = answer === current.word;
@@ -143,28 +181,34 @@ function onCheck() {
         // Mastered (correct with a heart left): into the sticker book.
         // newSticker is true only if the book did not have the word yet.
         results[round.index].newSticker = addSticker(state.theme, current.word);
-        setState({ round: { ...round, results }, current: { ...current, status: 'correct' } });
+        setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, ...extra });
     } else if (lives - 1 <= 0) {
-        setState({ lives: 0, round: { ...round, results }, current: revealed(current) });
+        setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
     } else {
-        setState({ lives: lives - 1, round: { ...round, results }, current: { ...current, status: 'wrong' } });
+        setState({ lives: lives - 1, round: { ...round, results }, current: { ...current, status: 'wrong' }, ...extra });
     }
 }
 
-function onNext() {
+// Next word, or the round-end screen after the fifth. The dome offers it
+// only after a correct answer or a reveal, so every word has a result by
+// then; one without would count as wrong. The word clip stops with its
+// word.
+function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
-    // Skipping a word without checking counts as wrong.
     if (!results[round.index]) results[round.index] = { word: current.word, correct: false };
 
+    stopWord();
     const nextIndex = round.index + 1;
     if (nextIndex >= round.size) {
-        setState({ round: { ...round, results }, screen: 'round-end' });
+        setState({ round: { ...round, results }, screen: 'round-end', speaking: false, ...extra });
     } else {
         setState({
             round: { ...round, index: nextIndex, results },
             current: makeCurrent(state.words[nextIndex]),
             lives: LIVES,
+            speaking: false,
+            ...extra,
         });
     }
 }
@@ -237,12 +281,15 @@ function onPlayAgain() {
 }
 
 function onThemes() {
+    stopWord();
     setState({
         screen: 'theme',
         theme: null,
         words: [],
         round: { index: 0, size: ROUND_SIZE, results: [] },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
+        pressed: null,
+        speaking: false,
     });
 }
 
@@ -263,13 +310,15 @@ function onGalleryBack() {
 subscribe(renderScreens);
 subscribe(renderThemeButtons);
 subscribe(renderCard);
-subscribe(renderActions);
+subscribe(renderFeedback);    // after the card render: keys off its DOM
+subscribe(renderControls);
 subscribe(renderRoundEnd);
 subscribe(renderGallery);
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 
-$('check-btn').addEventListener('click', onCheck);
-$('next-btn').addEventListener('click', onNext);
+$('check-btn').addEventListener('click', onDome);
+$('reset-btn').addEventListener('click', onLever);
+$('speak-btn').addEventListener('click', onSpeak);
 $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);

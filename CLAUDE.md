@@ -17,6 +17,7 @@ a phone.
   Drag-and-drop is GSAP Draggable loaded from cdnjs (already in the template).
 - Runs on: phone browser, portrait, 360px wide and up (primary). Desktop
   must work but is not optimised.
+- Browser floor: iOS Safari 16.2+ / Chrome 111+. CSS or JS newer than the floor needs a fallback or a DECISIONS entry naming the browsers it drops.
 - Content for M1: `static/config/themes.json` (theme index) and `static/data/*.json` (words) plus the existing images and sounds
   under `static/images/` and `static/sounds/`. Read-only: do not add, edit,
   regenerate or rename content or assets in M1.
@@ -28,15 +29,16 @@ a phone.
   - `state.js` is the only place state is mutated (`setState`). No game state on DOM elements, in classes or in module globals. A module may keep a render cache (what it last rendered, e.g. `tiles` in card.js, `last` in celebrate.js) so it can tell a transition from a re-render; nothing reads such a cache as truth.
     Subscribers may keep a memo of the last state they rendered or heard (`builtThemes` in main.js, `last` in audio.js); a memo is overwritten on every setState, is never read by another module, and is never a source of truth.
   - A render module may hold a DOM cache (an element map or the last-rendered reference) that is rebuilt from state on every render and never read to decide game logic; mark it with a "DOM cache" comment. Anything else in a module global is state and belongs in state.js.
-  - Every screen is a render of state. `screens.js` shows/hides screens,
+  - Every screen is a render of state. `screens.js` shows/hides screens and mirrors `state.screen` onto `<body data-screen>` as a CSS-only hook (written on every render, never read by a script),
     `card.js` renders the card, boxes and tray, `drag.js` handles drag and
     snap, `main.js` wires it.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
   - `score.js` is pure round scoring (`starsFor`), no DOM; a Django test runs it through `node`.
+  - `controls.js` renders the console controls (`#check-btn` dome, `#reset-btn` lever, `#speak-btn` speaker) from `current`, `pressed` and `speaking` in state; its rules (`domeAction`, `domeState`, `canReset`, `leverState`, `speakerState`, `PRESS_MS`) are pure, no DOM, and a Django test runs them through `node`.
   - `stickers.js` is the only place the sticker book (localStorage key `flip.stickers.v1`) is read or written; no DOM, no module state. Other modules call `load()`/`has()`/`add()`/`all()`; nothing else touches that key.
   - `gallery.js` renders the sticker book screen (`#screen-gallery`) from `state.themes[].words` and `stickers.load()` on every render while `state.screen === 'gallery'`; it never mutates state and keeps no cache. `themeProgress(book, theme, words)` is the pure part (no DOM); a Django test runs it through `node`.
-  - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle now; correct pulse, confetti and star pop in B-110). It is a subscriber after `renderCard`, keeps only a render cache of the last status/lives, and never mutates state.
-  - `audio.js` (to be created) is the only place sounds play.
+  - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle, bulb flicker, TV static, reveal fly-in, reset-lever rail shake and hop now; correct pulse, confetti and star pop in B-110). It is a subscriber after `renderCard`, keeps only a render cache of the current word's key and the last status, lives, `pressed` and placement, and never mutates state.
+  - `audio.js` is the only place sounds play.
   - `celebrate.js` is the only place the correct-check and round-end celebrations run (box pulse, confetti, star pop). It is a state subscriber that fires only on a transition it detects against what it last rendered (status became 'correct', screen became 'round-end'); a re-render in the same state must not replay a celebration.
 
 ## How to work
@@ -89,11 +91,11 @@ a phone.
 
 ## Project-specific rules (grow this from review feedback)
 - Do not rename the existing DOM ids in `templates/spelling_game/index.html`
-  (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `result-line`, `check-btn`, `next-btn`,
+  (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `check-btn`,
   `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`,
   `stickers-btn`, `gallery-back-btn`, `gallery-empty`, `gallery-themes`,
-  `reset-btn`, `speak-btn`) without a DECISIONS entry; card.js, main.js and gallery.js key on
-  them. `next-btn` is removed by B-114 (the check dome is also next).
+  `reset-btn`, `speak-btn`) without a DECISIONS entry; card.js, controls.js, main.js and gallery.js key on
+  them. `next-btn` and `result-line` were removed by B-114 (the check dome is also next).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.
 - The robot lives behind the console's left third; never place UI over

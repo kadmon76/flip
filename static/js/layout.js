@@ -17,10 +17,17 @@ export const SLOTS_PER_ROW = 6;
 // lays six blocks out as 4 + 2).
 export const BLOCK = 52;
 export const BLOCK_GAP = 16;        // between blocks on a row
-export const BLOCK_ROW_GAP = 12;    // between rows
+export const BLOCK_ROW_GAP = 10;    // between rows
 export const BLOCKS_PER_ROW = 4;
 export const STAGGER = 8;           // rows shift alternately left / right of centre
 export const TRAY_PAD = 4;          // room above and below for nudges and tilt
+
+// The robot (CHARACTER.md) stands behind the console's left third with
+// his head and shoulders showing above it. At 360x740 only a word with a
+// third row of blocks (9-10 letters) reaches down beside him, so rows from
+// the third on are centred in the part of the bench right of ROBOT_ZONE
+// (a fraction of the bench width; his head ends at about 36%).
+export const ROBOT_ZONE = 0.4;
 
 // Fixed per-position tilt (degrees, within DESIGN's ±4) and nudge (px),
 // so a block's spot is the same on every render and a block always goes
@@ -47,7 +54,9 @@ export function slotLayout(count, railWidth) {
 // x / y in px and a tilt in degrees for each block in tray order, plus the
 // height the bench area needs. Rows hold four (fewer if the bench is too
 // narrow), are centred, and shift alternately left and right when there
-// is more than one row.
+// is more than one row. A third row is centred right of the robot's zone
+// when it fits there (it does for one or two blocks), so it stays clear
+// of his head.
 export function blockLayout(count, width) {
     const size = BLOCK;
     if (count <= 0) return { size, spots: [], height: 0 };
@@ -60,7 +69,11 @@ export function blockLayout(count, width) {
         const n = Math.min(perRow, count - r * perRow);
         const rowWidth = n * size + (n - 1) * BLOCK_GAP;
         const shift = rows > 1 ? (r % 2 === 0 ? -STAGGER : STAGGER) : 0;
-        const x0 = (width - rowWidth) / 2 + shift;
+        const zoneLeft = width * ROBOT_ZONE;
+        const besideRobot = r >= 2 && rowWidth <= width - margin - zoneLeft;
+        const x0 = besideRobot
+            ? (zoneLeft + width - margin - rowWidth) / 2
+            : (width - rowWidth) / 2 + shift;
         const y0 = TRAY_PAD + r * (size + BLOCK_ROW_GAP);
         for (let c = 0; c < n; c++) {
             const i = r * perRow + c;
