@@ -197,7 +197,7 @@ Build order: scene → controls → robot → other screens. Reference:
     him back.
   - Screenshots: `robot-idle.png`, `robot-confused.png`,
     `robot-excited.png`, `robot-sunk.png`.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/33
 
 ### B-116 Interim restyle of theme, round-end and sticker book
 - why: these screens still use the old look and English labels.
