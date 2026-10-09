@@ -236,3 +236,5 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
 - Open PRs #12 (B-106), #16 (B-108) and #18 (B-109) now overlap main after B-114: check/next flow and result line (#12), an add/add `static/js/audio.js` (#16; its mute must also gate the word clip), an add/add `static/js/feedback.js` with the wiggle and error tint (#18); rebase onto main or close.
 - Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
+- Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
+- CSS cache-buster: PR #33 (B-115) and B-116 both set `game.css?v=12`; whichever merges second bumps it to `?v=13`.
