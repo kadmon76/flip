@@ -13,6 +13,7 @@ import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
+import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
 
 const $ = (id) => document.getElementById(id);
@@ -66,8 +67,9 @@ function revealed(current) {
 
 // themes.json shape: { "animals": "/static/data/animals.json", ... }.
 // Each data file: { "duck": { image, audio, difficulty }, ... }; the
-// theme card shows the image of the first word, and the gallery
-// (gallery.js) lists every word, so each theme keeps its word list.
+// theme card shows the image of the first word (the theme's picture),
+// and the gallery (gallery.js) lists every word, so each theme keeps its
+// word list.
 async function loadThemes() {
     const index = await fetch('/static/config/themes.json').then((r) => r.json());
     const themes = await Promise.all(Object.entries(index).map(async ([name, dataUrl]) => {
@@ -78,14 +80,12 @@ async function loadThemes() {
     setState({ themes });
 }
 
-function capitalise(s) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 // DOM cache: the themes array the buttons were last built from. Not game
 // state; the buttons are rebuilt whenever state.themes is replaced.
 let builtThemes = null;
 
+// One cream card per theme showing the theme's picture, not its name
+// (DESIGN "Other screens (interim)"); the name is only the aria-label.
 function renderThemeButtons(state) {
     if (state.themes === builtThemes) return;
     builtThemes = state.themes;
@@ -94,16 +94,14 @@ function renderThemeButtons(state) {
     for (const theme of state.themes) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'theme-btn';
+        btn.className = 'theme-btn panel';
+        btn.setAttribute('aria-label', theme.name);
         if (theme.image) {
             const img = document.createElement('img');
             img.src = theme.image;
             img.alt = '';
             btn.appendChild(img);
         }
-        const label = document.createElement('span');
-        label.textContent = capitalise(theme.name);
-        btn.appendChild(label);
         btn.addEventListener('click', () => startRound(theme));
         container.appendChild(btn);
     }
@@ -253,12 +251,21 @@ function armIdle() {
 
 // --- Round-end screen ---
 
-const TICK = 'M5 12.5l4.5 4.5L19 7';
-const CROSS = 'M6 6l12 12M18 6L6 18';
 const STAR = 'M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z';
 
-// Stars, score, "New stickers: N" and one row per word (thumbnail, word,
-// a sticker badge if the word is new in the book, tick or cross).
+// A sticker (amber disc with a light star; class `off`: dark), the icon
+// for "sticker" on every screen.
+function sticker(off = false) {
+    const el = document.createElement('span');
+    el.className = off ? 'sticker off' : 'sticker';
+    el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>`;
+    return el;
+}
+
+// Stars, the score as split-flaps, the new-sticker count (a sticker and
+// "+N", the sticker dark at +0) and one row per word (thumbnail, word, a
+// sticker if the word is new in the book, a lit or dark bulb). No English
+// (DESIGN "Words on screen"): only the words and numbers.
 // The rows are rebuilt from state.round.results on every render; the
 // list is small and nothing on this screen is interactive per row.
 function renderRoundEnd(state) {
@@ -270,9 +277,16 @@ function renderRoundEnd(state) {
     document.querySelectorAll('#round-stars span').forEach((star, i) => {
         star.classList.toggle('earned', i < stars);
     });
-    $('round-score').textContent = `${correct} / ${size}`;
+    renderFlaps($('round-score'), `${correct} / ${size}`);
     const fresh = results.filter((r) => r.correct && r.newSticker).length;
-    $('round-new').textContent = `New stickers: ${fresh}`;
+    const news = $('round-new');
+    news.innerHTML = '';
+    news.setAttribute('aria-label', `new stickers: ${fresh}`);
+    news.appendChild(sticker(fresh === 0));
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = `+${fresh}`;
+    news.appendChild(count);
 
     const list = $('round-words');
     list.innerHTML = '';
@@ -292,18 +306,16 @@ function renderRoundEnd(state) {
         li.appendChild(word);
 
         if (ok && results[i].newSticker) {
-            const badge = document.createElement('span');
-            badge.className = 'sticker';
+            const badge = sticker();
             badge.setAttribute('aria-label', 'new sticker');
-            badge.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>`;
             li.appendChild(badge);
         }
 
-        const mark = document.createElement('span');
-        mark.className = 'mark';
-        mark.setAttribute('aria-label', ok ? 'correct' : 'wrong');
-        mark.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ok ? TICK : CROSS}"/></svg>`;
-        li.appendChild(mark);
+        // lit bulb: mastered; dark bulb: missed (the lives bulbs' look)
+        const bulb = document.createElement('span');
+        bulb.className = ok ? 'bulb' : 'bulb off';
+        bulb.setAttribute('aria-label', ok ? 'correct' : 'wrong');
+        li.appendChild(bulb);
 
         list.appendChild(li);
     });
