@@ -90,6 +90,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
 - acceptance:
   - `static/js/audio.js` preloads pools from the existing files: `correct/*`, `error/*`, `celebration/tada.mp3`, `swipe/*`. `play(kind)` picks a random clip from the pool; a new voice clip stops the one playing. File names with spaces are URL-encoded.
   - Sounds fire on: correct check (correct), wrong check and reveal (error), round-end shown (tada), tile placed in a box (swipe). Nothing else in `static/js` constructs `Audio` (grep).
+  - The robot's clips come from `MOMENTS[moment].sound` in `static/js/character.js`, not from a second trigger list. The swipe plays whenever a block goes into a slot, including the block that fills the last slot (`filledEarly`/`filled`), and not when a block returns to the bench or the reset lever fires.
   - `state.muted` exists, persisted to localStorage key `flip.muted`. A mute toggle in the header top-right, at least 48x48px, switches icon between speaker and muted speaker. Muted means no sound plays at all.
   - First user gesture unlocks audio; no console errors from autoplay policy on load.
   - Screenshots: `header-sound-on.png`, `header-muted.png`. Checklist passes.
@@ -234,3 +235,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
 - Open PRs #12 (B-106), #16 (B-108) and #18 (B-109) now overlap main after B-114: check/next flow and result line (#12), an add/add `static/js/audio.js` (#16; its mute must also gate the word clip), an add/add `static/js/feedback.js` with the wiggle and error tint (#18); rebase onto main or close.
+- Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
