@@ -2,16 +2,21 @@
    stylesheet index.html loads. Colours come from DESIGN.md "Palette" (v5)
    and live only in :root; every rule below uses the variables. The play
    screen is the v5 lab scene (DESIGN.md "Layout"); theme, round-end and
-   sticker book keep their old layout with the palette mapped onto it
-   until their interim restyle (BACKLOG B-116). */
+   sticker book are the interim screens (DESIGN.md "Other screens
+   (interim)", BACKLOG B-116): blurred, darkened lab behind, the same
+   frame, cream panels with a brass border, icons instead of words. */
 
 :root {
     /* sizing */
-    --page-pad: 16px;
     --column-max: 480px;
-    --mascot-corner: 96px;    /* round-end bottom strip (B-107) */
-    --radius: 16px;
     --radius-small: 8px;
+    /* Interim screens: the frame's content safe area (DESIGN "Layout":
+       16px 14px 22px 14px), with the sides inset 4px more as the console
+       is so a panel's brass edge never meets the bezel, and the first
+       line under the "flip" logo (logo top 36 + 26 tall + 8). */
+    --safe-side: 18px;
+    --safe-bottom: 22px;
+    --below-logo: 70px;
 
     /* palette (DESIGN.md "Palette", sampled from v5) */
     --bench: #582703;
@@ -46,7 +51,6 @@
     --shadow-contact: color-mix(in srgb, var(--bench-deep) 40%, transparent);
     --shadow-lift: color-mix(in srgb, var(--bench-deep) 32%, transparent);
     --shadow-deep: color-mix(in srgb, var(--bench-deep) 75%, transparent);
-    --shadow-soft: color-mix(in srgb, var(--ink) 14%, transparent);
     --glow-teal: color-mix(in srgb, var(--teal-glow) 35%, transparent);
     --glow-amber: color-mix(in srgb, var(--amber) 60%, transparent);
     --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
@@ -54,12 +58,10 @@
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
     --static-dark: color-mix(in srgb, var(--ink) 55%, transparent);
 
-    /* surface shadow of the interim screens (theme, round-end, gallery) */
-    --shadow: 0 6px 20px var(--shadow-soft);
-
     /* type (DESIGN.md "Type"): Andika Bold for the letter blocks,
        Courier Prime Bold for the split-flap logo and counter. The interim
-       screens use Andika for headings and buttons too. */
+       screens use Andika for the words and Courier Prime flaps for their
+       numbers. */
     --font-block: 'Andika', 'Comic Sans MS', sans-serif;
     --font-flap: 'Courier Prime', 'Courier New', monospace;
     --font-display: var(--font-block);
@@ -94,20 +96,40 @@ body {
     overscroll-behavior: none;
 }
 
+/* the dark bench around and below the scene column on every screen */
 body {
     font-family: var(--font-body);
     font-size: 16px;
     color: var(--ink);
-    background: var(--cream);
+    background: var(--bench-deep);
     display: flex;
     flex-direction: column;
     touch-action: manipulation;
 }
 
-/* screens.js mirrors state.screen onto <body data-screen>; the play
-   screen is a dark bench around and below the lab picture */
-body[data-screen="play"] {
-    background: var(--bench-deep);
+/* Backdrop of the interim screens (DESIGN "Other screens (interim)"):
+   bg-lab.jpg blurred 6px and darkened 40%, laid out like the play
+   screen's picture (column width, anchored top, the bench colour below)
+   and fixed, so the sticker book scrolls over it. Its soft blurred edges
+   lie under the frame. screens.js mirrors state.screen onto
+   <body data-screen>; the play screen draws the sharp picture itself. */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: -1;
+    width: var(--scene-w);
+    margin: 0 auto;
+    background: var(--bench-deep) url(../images/ui/bg-lab.jpg) center top / 100% auto no-repeat;
+    filter: blur(6px) brightness(60%);
+    pointer-events: none;
+}
+
+body[data-screen="play"]::before {
+    display: none;
 }
 
 h1,
@@ -150,19 +172,24 @@ h3 {
     background: linear-gradient(to bottom, var(--bench-deep) 50%, var(--charcoal-hi) 50%);
 }
 
-/* --- Header: one compact line --- */
+/* --- Header: the "flip" logo --- */
 
+/* On every screen the header lies inside the frame's safe area, logo
+   top-left at (36, 36) as in v5 (over the lab shelf on the play screen).
+   The mute toggle (B-108) will sit top-right. */
 .app-header {
-    flex: 0 0 auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
     width: 100%;
-    max-width: var(--column-max);
+    max-width: var(--scene-w);
     margin: 0 auto;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
-    padding: 8px var(--page-pad);
-    min-height: 48px;
+    padding: 36px 36px 0;
 }
 
 /* the "flip" logo: four flaps, the last letter in amber as in v5 */
@@ -178,99 +205,164 @@ h3 {
     color: var(--amber-deep);
 }
 
-/* On the play screen the header lies over the lab shelf, inside the
-   frame's safe area, logo top-left at (36, 36) as in v5. The auth line is
-   English, so it is not shown there (it stays on the theme screen). */
-body[data-screen="play"] .app-header {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1;
-    max-width: var(--scene-w);
-    padding: 36px 36px 0;
-    align-items: flex-start;
-}
-
-body[data-screen="play"] .auth {
-    display: none;
-}
-
-.auth {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 1rem;
-}
-
-.logout-btn {
-    font-family: var(--font-display);
-    font-weight: 700;
-    background: var(--brass);
-    color: var(--ink);
-    text-decoration: none;
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 1rem;
-}
-
 /* --- Screens: one centered column --- */
 
+/* The column is the scene's width (the frame's width on desktop too).
+   The interim screens start under the logo and keep the frame's safe
+   area on the sides and at the bottom; the play screen sets its own. */
 .screen {
     flex: 1 1 auto;
     width: 100%;
-    max-width: var(--column-max);
+    max-width: var(--scene-w);
     margin: 0 auto;
-    padding: var(--page-pad);
+    padding: var(--below-logo) var(--safe-side) var(--safe-bottom);
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+}
+
+/* --- Interim screens: cream panels with a brass border --- */
+
+/* A cream bakelite panel lit from the upper left, a brass border with a
+   thin dark edge inside and out, and the DESIGN contact shadow (dark,
+   blurred, down-right, ~40%). Theme cards, the round-end panel, the
+   sticker book's theme panels and the icon buttons. */
+.panel,
+.panel-btn {
+    background: linear-gradient(160deg, var(--cream-hi) 0%, var(--cream) 70%);
+    border: 3px solid var(--brass);
+    border-radius: 14px;
+    box-shadow:
+        inset 0 0 0 1px var(--brass-dark),
+        0 0 0 1px var(--brass-dark),
+        3px 6px 10px var(--shadow-contact);
+}
+
+/* An icon button (DESIGN: play, themes, stickers, back): 72x56, the
+   icon in ink. The words are only in aria-label. */
+.panel-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 20px;
+    width: 72px;
+    height: 56px;
+    padding: 0;
+    color: var(--ink);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
-/* --- Theme screen (interim until B-116) --- */
+.panel-btn:active {
+    transform: translate(1px, 2px);
+    box-shadow:
+        inset 0 0 0 1px var(--brass-dark),
+        0 0 0 1px var(--brass-dark),
+        1px 2px 4px var(--shadow-contact);
+}
 
-#screen-theme h2 {
+.panel-btn svg {
+    width: 30px;
+    height: 30px;
+    fill: currentColor;
+}
+
+/* line icons (back arrow) */
+.panel-btn svg .stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* the icon buttons' row at the bottom of the screen */
+.actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+}
+
+/* A sticker, the icon for "sticker" everywhere (stickers button, sticker
+   book heading, new stickers on round-end): an amber disc lit from the
+   upper left with a light star. `off`: dark, like an unlit bulb. */
+.sticker {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--sticker-size, 28px);
+    height: var(--sticker-size, 28px);
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, var(--amber-hi) 0, var(--amber) 30%, var(--amber-deep) 100%);
+    color: var(--cream-hi);
+    box-shadow: inset 0 0 0 1px var(--amber-deep-lo), 1px 2px 3px var(--shadow-contact);
+}
+
+.sticker svg {
+    width: 64%;
+    height: 64%;
+    fill: currentColor;
+}
+
+.sticker.off {
+    background: radial-gradient(circle at 38% 32%, var(--bulb-off-hi) 0, var(--bulb-off) 30%, var(--bulb-off-lo) 100%);
+    color: var(--bulb-off-lo);
+    box-shadow: inset 0 0 0 1px var(--brass-dark), 1px 2px 3px var(--shadow-contact);
+}
+
+.panel-btn .sticker {
+    --sticker-size: 38px;
+}
+
+/* split-flap numbers on the interim screens (round-end score, sticker
+   book counts): .flap characters from flaps.js, the slash narrower */
+.flaps {
     margin: 0;
-    font-size: 1.6rem;
+    display: flex;
+    gap: 3px;
 }
 
+.flaps .flap-slash {
+    width: calc(var(--flap-w) * 0.72);
+}
+
+/* --- Theme screen --- */
+
+/* The theme cards centred between the logo and the stickers button,
+   which sits at the bottom of the safe area. */
 #theme-buttons {
+    margin: auto 0;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 16px;
     width: 100%;
 }
 
-/* One card per theme: first-word image on a light square, name beside
-   it. Full width of the column (16px gutters from .screen). */
+/* One cream card per theme showing the theme's picture (the first
+   word's), not its name. Square, up to 240px, smaller on a short screen
+   so both cards and the button fit (two cards, three gaps, the button,
+   the logo line and the bottom safe area). */
 .theme-btn {
-    width: 100%;
-    min-height: 120px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1.6rem;
-    text-align: left;
-    color: var(--ink);
-    background: var(--brass);
-    border: none;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+    display: block;
+    width: min(240px, 100%, (100vh - 200px) / 2);
+    aspect-ratio: 1 / 1;
+    padding: 8px;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .theme-btn img {
-    flex: 0 0 auto;
-    width: 96px;
-    height: 96px;
+    display: block;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     border-radius: var(--radius-small);
-    background: var(--cream-hi);
     user-select: none;
     -webkit-user-drag: none;
 }
@@ -398,14 +490,17 @@ body[data-screen="play"] .auth {
    The span is the dark bulb; the lit glow is a layer over it whose
    opacity is --lit (1 lit, 0 lost by default). When a bulb goes out,
    feedback.js sets --lit inline for 300ms to flicker it three times,
-   then removes it so the `lost` class decides again. */
+   then removes it so the `lost` class decides again. The round-end
+   rows use the same bulb (.bulb, `off` when the word was missed). */
 .hearts {
     display: flex;
     gap: calc(8 * var(--u));
 }
 
-.hearts span {
+.hearts span,
+.bulb {
     position: relative;
+    flex: 0 0 auto;
     width: calc(15 * var(--u));
     height: calc(15 * var(--u));
     border-radius: 50%;
@@ -413,7 +508,8 @@ body[data-screen="play"] .auth {
     box-shadow: 1px 2px 2px var(--shadow-contact);
 }
 
-.hearts span::before {
+.hearts span::before,
+.bulb::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -423,7 +519,8 @@ body[data-screen="play"] .auth {
     opacity: var(--lit, 1);
 }
 
-.hearts .lost::before {
+.hearts .lost::before,
+.bulb.off::before {
     opacity: var(--lit, 0);
 }
 
@@ -554,43 +651,6 @@ body[data-screen="play"] .auth {
 body.dragging-active {
     user-select: none;
     -webkit-user-select: none;
-}
-
-/* --- Action row --- */
-
-.actions {
-    width: 100%;
-    display: flex;
-    gap: 12px;
-}
-
-#screen-round-end .actions {
-    margin-top: auto;
-}
-
-.action-btn {
-    flex: 1 1 0;
-    height: 56px;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1.3rem;
-    color: var(--ink);
-    background: var(--brass);
-    border: none;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    cursor: pointer;
-}
-
-.action-btn:active:not(:disabled) {
-    transform: scale(0.98);
-}
-
-/* muted: faded, no shadow, no lift on press */
-.action-btn:disabled {
-    opacity: 0.4;
-    box-shadow: none;
-    cursor: default;
 }
 
 /* --- Console (DESIGN "Controls and states") --- */
@@ -749,26 +809,30 @@ body.dragging-active {
     }
 }
 
-/* --- Round-end screen (interim until B-116) --- */
+/* --- Round-end screen (interim, DESIGN "Other screens (interim)") --- */
 
-/* Top to bottom: stars, score, the five words, Play again / Themes.
-   Same shape as the play screen: content from the top, the action row
-   pushed down to sit just above the mascot strip (bottom-left stays
-   free). Budget at 360x740: header 48 + stars 64 + score 56 + five
-   48px rows + buttons 56 + strip 96 fits without scrolling. */
+/* Under the logo, top to bottom: the three stars on the dark backdrop,
+   one cream panel (the score and the new stickers, then the five words)
+   and the themes / play again buttons at the bottom of the safe area.
+   Stars and panel are centred in the space between the logo and the
+   buttons. At 360x740 (~420px of content above 56px of buttons) nothing
+   scrolls. */
 #screen-round-end {
-    justify-content: flex-start;
-    gap: 12px;
-    padding-top: 8px;
-    padding-bottom: var(--mascot-corner);
+    gap: 14px;
 }
 
-/* Three star outlines in amber; an earned star is filled. Inline SVG
-   (like the old hearts) so CSS colour applies on every phone. */
+#round-stars,
+#screen-round-end .actions {
+    margin-top: auto;
+}
+
+/* Three stars: a dark star (the unlit bulb's colours) with a lit amber
+   star over it (the `fill` layer) when earned; celebrate.js pops the lit
+   layer in while the dark one stays put. Inline SVG so the palette
+   applies on every phone. */
 .stars {
     display: flex;
-    gap: 8px;
-    color: var(--amber-deep);
+    gap: 10px;
 }
 
 .stars span {
@@ -779,19 +843,19 @@ body.dragging-active {
 .stars svg {
     width: 64px;
     height: 64px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
+    fill: var(--bulb-off);
+    stroke: var(--brass-dark);
+    stroke-width: 1.2;
     stroke-linejoin: round;
+    filter: drop-shadow(2px 3px 2px var(--shadow-contact));
 }
 
-/* the fill is a second star laid over the outline (class `fill` in the
-   template), shown when the star is earned; celebrate.js pops it in on
-   entering the screen while the outline underneath stays put */
 .stars .fill {
     position: absolute;
     inset: 0;
-    fill: currentColor;
+    fill: var(--amber);
+    stroke: var(--amber-deep);
+    filter: drop-shadow(0 0 6px var(--glow-amber));
     opacity: 0;
 }
 
@@ -799,49 +863,63 @@ body.dragging-active {
     opacity: 1;
 }
 
-#round-score {
-    margin: 0;
-    font-size: 2.5rem;
-    line-height: 1;
+.round-panel {
+    width: 100%;
+    padding: 10px 12px 4px;
 }
 
-/* "New stickers: N" (B-111): body text under the score, muted; always
-   shown, 0 included. Adds 22px + gap to the budget above
-   (48+8+64+12+40+12+22+12+272+12+56+96 = 654 < 740). */
+/* the score in flaps and the new-sticker count side by side */
+.round-totals {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding-bottom: 10px;
+}
+
+#round-score {
+    --flap-w: 28px;
+    --flap-h: 38px;
+    --flap-font: 28px;
+}
+
+/* B-111's new-sticker count without words: a sticker and "+N" (a dark
+   sticker at +0) */
 .round-new {
     margin: 0;
-    font-size: 1.1rem;
-    line-height: 1.25;
-    color: var(--brass-dark);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.6rem;
+    line-height: 1;
+    --sticker-size: 34px;
 }
 
-/* One row per word: image thumbnail, the word, a tick (amber) or a
-   cross (error) at the end. Rows are light cream strips. */
+/* One row per word: the picture, the word (the only English allowed), a
+   sticker if it is new in the book, and a bulb: lit when the word was
+   mastered, dark when it was missed. Rows are divided by a shaded line. */
 .round-words {
     list-style: none;
     margin: 0;
     padding: 0;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
 }
 
 .round-words li {
     display: flex;
     align-items: center;
     gap: 12px;
-    height: 48px;
-    padding: 4px 12px 4px 4px;
-    background: var(--cream-hi);
-    border-radius: var(--radius-small);
-    box-shadow: var(--shadow);
+    height: 56px;
+    padding: 0 6px 0 2px;
+    border-top: 1px solid var(--cream-lo);
 }
 
 .round-words img {
     flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     object-fit: cover;
     border-radius: var(--radius-small);
     user-select: none;
@@ -850,68 +928,30 @@ body.dragging-active {
 
 .round-words .word {
     flex: 1 1 auto;
+    min-width: 0;
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 1.3rem;
+    font-size: 1.4rem;
     line-height: 1;
 }
 
-.round-words .mark {
-    flex: 0 0 auto;
-    display: flex;
+.round-words .bulb {
+    width: 22px;
+    height: 22px;
 }
 
-.round-words .mark svg {
-    width: 28px;
-    height: 28px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
+/* --- Sticker book screen (interim, DESIGN "Other screens (interim)") --- */
 
-/* sticker badge (B-111): a small amber round sticker with a light star,
-   between the word and the tick, on words new in the book */
-.round-words .sticker {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--amber-deep);
-    color: var(--cream-hi);
-}
-
-.round-words .sticker svg {
-    width: 18px;
-    height: 18px;
-    fill: currentColor;
-}
-
-.round-words .correct .mark {
-    color: var(--amber-deep);
-}
-
-.round-words .wrong .mark {
-    color: var(--error);
-}
-
-/* --- Gallery (sticker book) screen (interim until B-116) --- */
-
-/* Back + heading on top, then one section per theme. Content starts at
-   the top and the page scrolls when the grids are taller than the
-   viewport; no mascot strip on this screen (BACKLOG B-112). */
+/* Back and the heading sticker on top, then one cream panel per theme.
+   The page scrolls over the fixed backdrop when the panels are taller
+   than the screen (BACKLOG B-112); the frame stays put above it. */
 #screen-gallery {
-    justify-content: flex-start;
-    gap: 16px;
-    padding-top: 8px;
+    gap: 14px;
+    padding-bottom: 40px;
 }
 
-/* Back on the left, the heading centred in the column (equal side
-   tracks so the button does not push it off centre). */
+/* Back on the left, the heading sticker centred in the column (equal
+   side tracks so the button does not push it off centre). */
 .gallery-top {
     width: 100%;
     display: grid;
@@ -919,60 +959,58 @@ body.dragging-active {
     align-items: center;
 }
 
+.gallery-top .panel-btn {
+    justify-self: start;
+}
+
 .gallery-top h2 {
     margin: 0;
-    font-size: 1.6rem;
+    display: flex;
+    --sticker-size: 48px;
 }
 
-/* a brass pill, 48px tall (tap target) */
-.back-btn {
-    justify-self: start;
-    min-height: 48px;
-    padding: 0 20px;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--ink);
-    background: var(--brass);
-    border: none;
-    border-radius: 999px;
-    box-shadow: var(--shadow);
-    cursor: pointer;
-}
-
-.back-btn:active {
-    transform: scale(0.98);
-}
-
-/* one short line from the character when the book is empty */
+/* the empty book: one dark sticker (no words, DESIGN "Words on screen") */
 .gallery-empty {
-    margin: 0;
-    font-size: 1.1rem;
-    line-height: 1.3;
-    text-align: center;
-    color: var(--brass-dark);
+    display: flex;
+    justify-content: center;
+    --sticker-size: 40px;
 }
 
 .gallery-themes {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
-/* theme name on the left, "3 / 14" on the right of the same heading */
+.gallery-theme {
+    padding: 10px;
+}
+
+/* the theme's picture (not its name) on the left, the count in flaps on
+   the right */
 .gallery-theme h3 {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    font-size: 1.3rem;
-    line-height: 1.2;
+    align-items: center;
+}
+
+.gallery-theme .theme-pic {
+    display: block;
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: var(--radius-small);
+    box-shadow: 0 0 0 2px var(--brass), 1px 2px 4px var(--shadow-contact);
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 .gallery-theme .count {
-    color: var(--brass-dark);
-    font-size: 1.1rem;
+    --flap-w: 22px;
+    --flap-h: 30px;
+    --flap-font: 22px;
 }
 
 /* three equal columns; minmax(0, ...) so a long word can never widen a
@@ -994,8 +1032,9 @@ body.dragging-active {
     gap: 4px;
     padding: 4px 4px 6px;
     background: var(--cream-hi);
+    border: 1px solid var(--cream-lo);
     border-radius: var(--radius-small);
-    box-shadow: var(--shadow);
+    box-shadow: 1px 2px 4px var(--shadow-contact);
 }
 
 .gallery-grid img {
@@ -1066,14 +1105,13 @@ body.dragging-active {
     color: var(--cream);
 }
 
-/* --- Frame (play screen) --- */
+/* --- Frame (every screen) --- */
 
 /* The cream bakelite bezel, exactly as DESIGN.md "Layout": a fixed,
    click-through border-image (no fill) over the scene column, above
-   everything. Shown on the play screen only until the other screens get
-   their interim restyle (B-116). */
+   everything, on the play screen and the interim screens alike (DESIGN
+   "Other screens (interim)": the same frame). */
 .frame {
-    display: none;
     position: fixed;
     top: 0;
     bottom: 0;
@@ -1086,8 +1124,4 @@ body.dragging-active {
     border-style: solid;
     border-width: 29px 26px 38px 28px;          /* top right bottom left */
     border-image: url(../images/ui/frame.png) 180 165 235 175;   /* no fill */
-}
-
-body[data-screen="play"] .frame {
-    display: block;
 }

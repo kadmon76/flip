@@ -42,7 +42,7 @@ slide, nothing else:
 - **Pop up** (react): rises ~20px over 180ms, ease-out, then settles.
 - **Sink** (bored, idle 10s+): slides down until only the top of the head
   shows, 400ms; pops back up on the kid's next action.
-- **Peek** (after a wrong check, sometimes): only eyes above the edge for
+- **Peek** (after the wrong check that leaves one lives bulb lit, and rarely, at random, after the first wrong check too): only eyes above the edge for
   600ms, then normal.
 Pose and movement change together; never more than one change per 300ms.
 `prefers-reduced-motion`: pose swaps only, no sliding.
@@ -53,7 +53,7 @@ Pose and movement change together; never more than one change per 300ms.
 | Round start | idle, pop up | — | always |
 | Picture shown | thinking | — | always |
 | Block placed | idle (eyes follow) | swipe | always |
-| All slots filled | idle; points at dome via robot-excited for 2 rounds | — | first 2 rounds |
+| All slots filled | idle; points at dome via robot-excited for 2 rounds | — | first 2 rounds since the page was loaded (not stored) |
 | Kid idle 10s | thinking, then sink | — | once per word |
 | Wrong check | confused, peek | error clip | always |
 | Third miss | oops → happy as blocks fly in | error clip | always |
