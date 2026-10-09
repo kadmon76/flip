@@ -211,7 +211,7 @@ Build order: scene → controls → robot → other screens. Reference:
     allowed) with a lit or dark bulb each, and the new-sticker badges.
   - Screenshots: `theme.png`, `round-end-3.png`, `round-end-0.png`,
     `stickers-some.png`.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/35
 
 ## M2 — Modes, difficulty, word audio
 Rough items; itemise with acceptance criteria after M1 is merged.
