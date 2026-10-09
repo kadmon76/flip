@@ -26,6 +26,16 @@ export const state = {
     // on the reset lever; null otherwise.
     pressed: null,
     speaking: false,            // the word's audio is playing (speaker-on)
+    // The robot (character.js, CHARACTER.md "Moment map"):
+    roundsStarted: 0,           // rounds started this session (he points at the dome in the first two)
+    // performance.now() of the kid's last input on the current word, or of
+    // its start; monotonic, so a wall-clock change cannot fire or delay
+    // the idle beat.
+    lastInput: 0,
+    // The kid-idle beat of the current word, once per word: null until
+    // IDLE_MS pass without input, 'sunk' from then (he has sunk) until the
+    // kid's next input, 'over' after it (he popped back up).
+    idleBeat: null,
 };
 
 const subscribers = [];

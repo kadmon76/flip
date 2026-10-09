@@ -1,5 +1,6 @@
 // main.js — wiring: theme selection, round flow, the console controls
-// (check dome, reset lever, speaker), screen renders.
+// (check dome, reset lever, speaker), the kid-idle timer for the robot,
+// screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -12,6 +13,7 @@ import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
+import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -123,7 +125,11 @@ async function startRound({ name, dataUrl }) {
         lives: LIVES,
         pressed: null,
         speaking: false,
+        roundsStarted: state.roundsStarted + 1,
+        lastInput: performance.now(),
+        idleBeat: null,
     });
+    armIdle();
 }
 
 // --- Play screen: the console (DESIGN "Controls and states") ---
@@ -201,16 +207,48 @@ function onNext(extra = {}) {
     stopWord();
     const nextIndex = round.index + 1;
     if (nextIndex >= round.size) {
-        setState({ round: { ...round, results }, screen: 'round-end', speaking: false, ...extra });
+        setState({ round: { ...round, results }, screen: 'round-end', speaking: false, idleBeat: null, ...extra });
     } else {
         setState({
             round: { ...round, index: nextIndex, results },
             current: makeCurrent(state.words[nextIndex]),
             lives: LIVES,
             speaking: false,
+            lastInput: performance.now(),
+            idleBeat: null,
             ...extra,
         });
+        armIdle();
     }
+}
+
+// --- The kid-idle beat (CHARACTER "Kid idle 10s", character.js) ---
+
+// Any input on the play screen: while the beat has not come yet, note
+// when (the idle timer counts from it); if the robot has sunk out of
+// boredom, the beat is over and he pops back up. After that, inputs on
+// this word are not recorded.
+function onInput() {
+    if (state.screen !== 'play' || !state.current.word) return;
+    if (state.idleBeat === 'sunk') setState({ idleBeat: 'over' });
+    else if (state.idleBeat === null) setState({ lastInput: performance.now() });
+}
+
+// The idle timer of the word now showing: it checks when the kid could
+// first have been idle IDLE_MS, and again for what is left if there was
+// input since; it ends when the beat comes or when the word or the
+// screen changes. Nothing is kept outside state: the word it belongs to
+// lives in the timer's own closure.
+function armIdle() {
+    const word = wordKey(state);
+    const tick = () => {
+        if (wordKey(state) !== word) return;
+        const wait = idleWait(state, performance.now());
+        if (wait === null) return;
+        if (wait > 0) setTimeout(tick, wait);
+        else setState({ idleBeat: 'sunk' });
+    };
+    setTimeout(tick, IDLE_MS);
 }
 
 // --- Round-end screen ---
@@ -290,6 +328,7 @@ function onThemes() {
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,
+        idleBeat: null,
     });
 }
 
@@ -312,6 +351,7 @@ subscribe(renderThemeButtons);
 subscribe(renderCard);
 subscribe(renderFeedback);    // after the card render: keys off its DOM
 subscribe(renderControls);
+subscribe(renderRobot);
 subscribe(renderRoundEnd);
 subscribe(renderGallery);
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
@@ -323,6 +363,10 @@ $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
+// Any touch, click or key counts as input for the idle timer (capture:
+// seen before a block or a control handles it).
+document.addEventListener('pointerdown', onInput, true);
+document.addEventListener('keydown', onInput, true);
 
 renderScreens(state);
 loadThemes();

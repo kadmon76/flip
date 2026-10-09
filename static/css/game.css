@@ -599,11 +599,12 @@ body.dragging-active {
    the play column, inset 4px from each side of the safe area (324px at
    360 wide, so ~58px tall) and centred, so its lower corners clear the
    frame's rounded inner corners (DESIGN "Layout", issue #30). Above the
-   bench in z-order; the robot (B-115) goes behind it. */
+   bench and the rail in z-order by coming after them; no z-index on
+   purpose: one would make the console a stacking context and lift the
+   robot inside it (.robot, z-index -1) above the bench blocks. */
 #screen-play .console {
     --console-w: calc(var(--scene-w) - 36px);
     position: relative;
-    z-index: 2;
     flex: 0 0 auto;
     align-self: center;
     width: var(--console-w);
@@ -747,6 +748,73 @@ body.dragging-active {
     #check-btn.is-ready .dome-ready {
         animation: none;
     }
+}
+
+/* --- Robot (CHARACTER.md, BACKLOG B-115) --- */
+
+/* He stands behind the console's left third with his head and shoulders
+   (75px) above it. .robot is a window inside .console, from 130px above
+   the console down to its opaque bottom edge (95%), that clips him when
+   he sinks. z-index -1 puts it in #screen-play's stacking context
+   (isolation) right above the lab picture and below everything else:
+   the rail, the bench blocks (on 7-10 letter words his pop-up reaches
+   under the second row, BACKLOG B-115) and the console with its
+   controls. Sizes are in --rpx, 1px at the 324px console of a 360 wide
+   screen, so he scales with the console. */
+#screen-play .robot {
+    --rpx: calc(var(--console-w) / 324);
+    --s: calc(var(--rpx) * 120 / 330);   /* one sprite px: 330px sprites drawn 120px tall */
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    top: calc(-130 * var(--rpx));
+    bottom: 5%;
+    width: calc(160 * var(--rpx));
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* The layer character.js slides up and down (yPercent of its height); at
+   rest the sprite's top is 75px above the console. One contact shadow. */
+.robot-body {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc((130 - 75) * var(--rpx));
+    height: calc(120 * var(--rpx));
+    filter: drop-shadow(2px 3px 3px var(--shadow-contact));
+}
+
+/* One image per pose, all 330px tall at the same scale; each is placed
+   so its visor centre (--vx, in sprite px) is 72.6px from the console's
+   left edge, where v5 has it, so his head stays put when the pose
+   changes. --sw is the sprite's width in px. character.js puts class
+   is-<pose> on .robot and the rules below show that image. */
+.robot-body img {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: calc(var(--sw) * var(--s));
+    left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));
+    opacity: 0;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.robot-body .robot-idle { --sw: 276; --vx: 150; }
+.robot-body .robot-thinking { --sw: 252; --vx: 149; }
+.robot-body .robot-confused { --sw: 269; --vx: 132; }
+.robot-body .robot-excited { --sw: 334; --vx: 164; }
+.robot-body .robot-happy { --sw: 282; --vx: 148; }
+.robot-body .robot-oops { --sw: 282; --vx: 144; }
+
+.robot.is-idle .robot-idle,
+.robot.is-thinking .robot-thinking,
+.robot.is-confused .robot-confused,
+.robot.is-excited .robot-excited,
+.robot.is-happy .robot-happy,
+.robot.is-oops .robot-oops {
+    opacity: 1;
 }
 
 /* --- Round-end screen (interim until B-116) --- */
