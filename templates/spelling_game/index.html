@@ -20,30 +20,31 @@
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=11">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=12">
 </head>
 <body>
-    <!-- Header: split-flap "flip" logo + auth in one compact line. On the
-         play screen it sits over the lab shelf and the auth is hidden
-         (no English on that screen). -->
+    <!-- Header: the split-flap "flip" logo, top-left inside the frame's
+         safe area on every screen (DESIGN "Layout"). No other text: the
+         English auth line is gone (DESIGN "Words on screen", B-116). -->
     <header class="app-header">
         <span class="app-title" role="img" aria-label="flip"><span class="flap">f</span><span class="flap">l</span><span class="flap">i</span><span class="flap">p</span></span>
-        {% if user.is_authenticated %}
-        <span class="auth">
-            <span class="user-info">Hi, {{ user.username }}!</span>
-            <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
-        </span>
-        {% endif %}
     </header>
 
-    <!-- Theme screen -->
+    <!-- Theme, round-end and sticker book are the interim screens (DESIGN
+         "Other screens (interim)", BACKLOG B-116): the blurred, darkened
+         lab behind them (body::before), the same frame, cream panels with
+         a brass border, and icons instead of English labels (play,
+         themes, stickers, back as inline SVG). aria-labels are for screen
+         readers only, never shown. -->
+
+    <!-- Theme screen: one card per theme showing the theme's picture
+         (main.js), and the sticker book button (star sticker). -->
     <div id="screen-theme" class="screen">
-        <h2>Select a Theme</h2>
         <div id="theme-buttons"></div>
-        <!-- opens the sticker book (BACKLOG B-112); same look as the
-             action buttons, 56px tall -->
         <div class="actions">
-            <button id="stickers-btn" class="action-btn">Stickers</button>
+            <button id="stickers-btn" class="panel-btn" type="button" aria-label="Stickers">
+                <span class="sticker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
+            </button>
         </div>
     </div>
 
@@ -102,11 +103,13 @@
         </div>
     </div>
 
-    <!-- Round-end screen: stars, score, the five words with a tick or
-         cross, Play again / Themes (BACKLOG B-107). main.js fills the
-         stars (class "earned"), #round-score, #round-new (B-111) and
-         #round-words. Each star
-         is an outline plus a "fill" layer that celebrate.js pops in. -->
+    <!-- Round-end screen: the stars, then a cream panel with the score
+         (split-flap), the new-sticker count (a sticker and "+N") and the
+         five words, each with its picture, a sticker if it is new in the
+         book and a lit or dark bulb; then themes and play again (BACKLOG
+         B-107, B-111, B-116). main.js fills the stars (class "earned"),
+         #round-score, #round-new and #round-words. Each star is a dark
+         star plus a lit "fill" layer that celebrate.js pops in. -->
     <div id="screen-round-end" class="screen" style="display: none;">
         <div id="round-stars" class="stars" aria-label="Stars">
             <span>
@@ -122,30 +125,45 @@
                 <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
             </span>
         </div>
-        <h2 id="round-score"></h2>
-        <p id="round-new" class="round-new"></p>
-        <ul id="round-words" class="round-words"></ul>
+        <div class="panel round-panel">
+            <div class="round-totals">
+                <h2 id="round-score" class="flaps"></h2>
+                <p id="round-new" class="round-new"></p>
+            </div>
+            <ul id="round-words" class="round-words"></ul>
+        </div>
         <div class="actions">
-            <button id="play-again-btn" class="action-btn">Play again</button>
-            <button id="themes-btn" class="action-btn">Themes</button>
+            <button id="themes-btn" class="panel-btn" type="button" aria-label="Themes">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.5"/></svg>
+            </button>
+            <button id="play-again-btn" class="panel-btn" type="button" aria-label="Play again">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4.8v14.4a1 1 0 0 0 1.5.86l11.3-7.2a1 1 0 0 0 0-1.72L9.5 3.94A1 1 0 0 0 8 4.8z"/></svg>
+            </button>
         </div>
     </div>
 
-    <!-- Gallery screen: the sticker book (BACKLOG B-112). gallery.js
-         fills #gallery-themes with one section per theme (heading with
-         the count, a 3-column grid of the theme's words) and shows
-         #gallery-empty when the book has no sticker at all. -->
+    <!-- Gallery screen: the sticker book (BACKLOG B-112, B-116). Back on
+         the left, a star sticker as the heading. gallery.js fills
+         #gallery-themes with one cream panel per theme (the theme's
+         picture and the split-flap count "3/14", then a 3-column grid of
+         the theme's words) and shows #gallery-empty, a dark sticker, when
+         the book has no sticker at all. -->
     <div id="screen-gallery" class="screen" style="display: none;">
         <div class="gallery-top">
-            <button id="gallery-back-btn" class="back-btn">Back</button>
-            <h2>Stickers</h2>
+            <button id="gallery-back-btn" class="panel-btn" type="button" aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19.5 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>
+            </button>
+            <h2 aria-label="Stickers"><span class="sticker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span></h2>
         </div>
-        <p id="gallery-empty" class="gallery-empty" style="display: none;">No stickers yet. Go spell some!</p>
+        <div id="gallery-empty" class="gallery-empty" role="img" aria-label="No stickers yet" style="display: none;">
+            <span class="sticker off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
+        </div>
         <div id="gallery-themes" class="gallery-themes"></div>
     </div>
 
-    <!-- Bakelite frame over the play screen (DESIGN.md "Layout"):
-         border-image only, click-through, above everything. -->
+    <!-- Bakelite frame over every screen (DESIGN.md "Layout", "Other
+         screens (interim)"): border-image only, click-through, above
+         everything. -->
     <div class="frame" aria-hidden="true"></div>
 
 <!-- GSAP + Draggable (drag.js) -->

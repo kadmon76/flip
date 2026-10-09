@@ -63,6 +63,31 @@ class IndexTests(TestCase):
         self.assertLess(html.index('id="speak-btn"'), html.index('id="check-btn"'))
         self.assertNotIn('icon-btn', html)
 
+    def test_interim_screens_have_no_english_and_icon_buttons(self):
+        # BACKLOG B-116, DESIGN "Words on screen": no text in the markup of
+        # the theme, round-end and sticker book screens (main.js and
+        # gallery.js add only the words and numbers); the header shows only
+        # the logo; every button there is an icon with its word only in
+        # aria-label. The protected ids stay.
+        html = self.client.get('/').content.decode()
+
+        def visible_text(chunk):
+            chunk = re.sub(r'<!--.*?-->', '', chunk, flags=re.S)
+            return re.sub(r'<[^>]+>', ' ', chunk)
+
+        header = html[html.index('<header'):html.index('</header>')]
+        self.assertEqual(''.join(visible_text(header).split()), 'flip')
+        screens = (html[html.index('<div id="screen-theme"'):html.index('<div id="screen-play"')]
+                   + html[html.index('<div id="screen-round-end"'):html.index('<div class="frame"')])
+        self.assertNotRegex(visible_text(screens), r'[A-Za-z]')
+        for id_ in ('stickers-btn', 'play-again-btn', 'themes-btn', 'gallery-back-btn'):
+            m = re.search(rf'<button id="{id_}"[^>]*aria-label="[^"]+"[^>]*>(.*?)</button>', html, flags=re.S)
+            self.assertIsNotNone(m, id_)
+            self.assertIn('<svg', m.group(1), id_)
+        for id_ in ('round-stars', 'round-score', 'round-new', 'round-words',
+                    'gallery-empty', 'gallery-themes', 'theme-buttons'):
+            self.assertIn(f'id="{id_}"', html, id_)
+
 
 class ShotToolTests(TestCase):
     """tools/shot.mjs must reject bad arguments before launching a browser."""
@@ -600,6 +625,97 @@ class GalleryProgressTests(TestCase):
 
     def test_no_words_is_zero_of_zero(self):
         self.assertEqual(self.progress({'animals': ['duck']}, words=[]), {'count': 0, 'total': 0, 'items': []})
+
+
+class FlapsTests(TestCase):
+    """static/js/flaps.js renderFlaps(): a number like "4 / 5" as one
+    split-flap per character, spaces dropped, the slash on a narrower
+    flap, the full text on aria-label (round-end score and sticker book
+    counts, BACKLOG B-116). Run in node against a minimal fake DOM."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'flaps.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def flaps(self, text):
+        script = (
+            "globalThis.document = { createElement: () => ({ className: '', textContent: '' }) };"
+            "const el = { attrs: {}, children: [],"
+            " set innerHTML(v) { this.children = []; },"
+            " setAttribute(k, v) { this.attrs[k] = v; },"
+            " appendChild(c) { this.children.push(c); } };"
+            f"const {{ renderFlaps }} = await import('{self.MODULE.as_uri()}');"
+            # twice: a re-render replaces the flaps instead of adding more
+            f"renderFlaps(el, {json.dumps(text)}); renderFlaps(el, {json.dumps(text)});"
+            "console.log(JSON.stringify({ label: el.attrs['aria-label'],"
+            " flaps: el.children.map((c) => [c.className, c.textContent]) }));"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_one_flap_per_character_with_a_narrow_slash(self):
+        r = self.flaps('4 / 5')
+        self.assertEqual(r['label'], '4 / 5')
+        self.assertEqual(r['flaps'], [['flap', '4'], ['flap flap-slash', '/'], ['flap', '5']])
+
+    def test_two_digit_total(self):
+        r = self.flaps('3 / 14')
+        self.assertEqual([t for _, t in r['flaps']], ['3', '/', '1', '4'])
+
+
+class InterimScreensCssTests(TestCase):
+    """game.css for the interim screens (DESIGN "Other screens
+    (interim)", BACKLOG B-116): the lab blurred 6px and darkened 40% as
+    backdrop, the same frame on every screen, cream panels with a brass
+    border, icon buttons at least 48px; the round-end and sticker book
+    renders add no English."""
+
+    STATIC = Path(__file__).resolve().parent.parent / 'static'
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.STATIC / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rules(self, selector):
+        # bodies of every rule whose selector list has `selector` on a line
+        # of its own (alone or as the last of a list)
+        pattern = rf'(?:^|\n){re.escape(selector)}\s*{{([^}}]*)}}'
+        return ''.join(re.findall(pattern, self.css()))
+
+    def test_backdrop_is_the_lab_blurred_and_darkened(self):
+        backdrop = self.rules('body::before')
+        self.assertIn('url(../images/ui/bg-lab.jpg)', backdrop)
+        self.assertIn('filter: blur(6px) brightness(60%);', backdrop)
+        self.assertIn('position: fixed;', backdrop)
+        self.assertIn('display: none;', self.rules('body[data-screen="play"]::before'))
+
+    def test_frame_shows_on_every_screen(self):
+        self.assertIn('border-image: url(../images/ui/frame.png) 180 165 235 175;', self.rules('.frame'))
+        self.assertNotIn('display: none', self.rules('.frame'))
+        self.assertNotRegex(self.css(), r'\]\s*\.frame\s*{')
+
+    def test_panels_are_cream_with_a_brass_border(self):
+        panel = self.rules('.panel-btn')
+        self.assertIn('border: 3px solid var(--brass);', panel)
+        self.assertRegex(panel, r'background: linear-gradient\([^;]*var\(--cream-hi\)[^;]*var\(--cream\)')
+        self.assertIn('.panel,\n.panel-btn {', self.css())
+
+    def test_icon_buttons_are_at_least_48px(self):
+        btn = self.rules('.panel-btn')
+        width = int(re.search(r'\bwidth: (\d+)px;', btn).group(1))
+        height = int(re.search(r'\bheight: (\d+)px;', btn).group(1))
+        self.assertGreaterEqual(min(width, height), 48)
+
+    def test_renders_write_no_english_labels(self):
+        for name in ('main.js', 'gallery.js'):
+            src = (self.STATIC / 'js' / name).read_text()
+            self.assertNotIn('New stickers', src, name)
+            self.assertNotIn('capitalise(theme.name)', src, name)
 
 
 class TenLetterFitTests(TestCase):

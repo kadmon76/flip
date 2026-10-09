@@ -1,5 +1,6 @@
-// gallery.js — the sticker book screen (BACKLOG B-112): one section per
-// theme with a "have / total" count and a 3-column grid of the theme's
+// gallery.js — the sticker book screen (BACKLOG B-112, B-116): one cream
+// panel per theme, headed by the theme's picture (not its name) and a
+// split-flap "have / total" count, then a 3-column grid of the theme's
 // words. A mastered word shows its image and the word; an unmastered one
 // shows the image greyed out (CSS filter) and a "?". Renders from
 // state.themes (each theme carries its word list, loaded by main.js) and
@@ -7,6 +8,7 @@
 // control, Back, is wired in main.js.
 
 import { load } from './stickers.js';
+import { renderFlaps } from './flaps.js';
 
 // Pure (node-tested): which of `words` ([{ word, image }]) are stickers in
 // `theme` according to `book` ({ "<theme>": [word, ...] }, the shape
@@ -19,21 +21,23 @@ export function themeProgress(book, theme, words) {
     return { count: items.filter((i) => i.mastered).length, total: items.length, items };
 }
 
-function capitalise(s) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 function section(theme, progress) {
     const el = document.createElement('section');
-    el.className = 'gallery-theme';
+    el.className = 'gallery-theme panel';
 
+    // the theme's picture (its name only as the aria-label) and the count
     const heading = document.createElement('h3');
-    const name = document.createElement('span');
-    name.textContent = capitalise(theme.name);
-    heading.appendChild(name);
+    heading.setAttribute('aria-label', theme.name);
+    if (theme.image) {
+        const pic = document.createElement('img');
+        pic.className = 'theme-pic';
+        pic.src = theme.image;
+        pic.alt = '';
+        heading.appendChild(pic);
+    }
     const count = document.createElement('span');
-    count.className = 'count';
-    count.textContent = `${progress.count} / ${progress.total}`;
+    count.className = 'count flaps';
+    renderFlaps(count, `${progress.count} / ${progress.total}`);
     heading.appendChild(count);
     el.appendChild(heading);
 
