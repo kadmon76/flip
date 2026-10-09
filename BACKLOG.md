@@ -189,6 +189,7 @@ Build order: scene → controls → robot → other screens. Reference:
 - acceptance:
   - Robot sprite behind the console's left third, z-order below the
     console, head and shoulders visible.
+  - At 360x740, 7–10 letter words leave no room for the ~20px pop-up above the second block row: the robot is drawn below the bench blocks in z-order and never covers them (DECISIONS, B-114 10-letter fit entry).
   - Pose and pop/sink/peek movement driven from state per CHARACTER.md
     "Moment map", from a single data table in `static/js/character.js`
     (moment → pose, movement, sound). No pose logic elsewhere.
@@ -234,3 +235,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
 - Open PRs #12 (B-106), #16 (B-108) and #18 (B-109) now overlap main after B-114: check/next flow and result line (#12), an add/add `static/js/audio.js` (#16; its mute must also gate the word clip), an add/add `static/js/feedback.js` with the wiggle and error tint (#18); rebase onto main or close.
+- `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).

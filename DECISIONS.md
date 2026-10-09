@@ -252,3 +252,8 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - noted: `console.png` has a few stray dark opaque pixels at its top-left and top-right corners, outside the console body; they show as small dark patches at the ends of the brass rail (visible in the corner zoom shots). Assets are read-only in M1, so they are left as they are.
 - considered: a console-relative inset in % (the frame does not scale); a bounding-box test (fails at every width down to 316px because of the bezel's curve); placing the robot keep-out from the safe area instead of the console (the robot sits behind the console's left third, CHARACTER / DESIGN).
 - reversible: yes (CSS and tests only).
+
+## 2026-10-09 — Rule suggestions from the B-114 review applied (issue #32; consumed at the start of the B-115 run)
+- chose: the human answered issue #32 "A apply, B apply, C apply, D apply, E apply" on 2026-10-08. Applied verbatim: (A) CLAUDE.md "Frontend architecture" gets the `audio.js` clip-handle bullet (`wordClip`) after the "DOM cache" bullet. (B) DESIGN.md "Controls and states": after a wrong check the dome stays `off` until a block moves (drag, tap or the reset lever). (C) DESIGN.md "Controls and states": the ready pulse is 1.2s each way (2.4s per cycle). (D) BACKLOG.md B-115 acceptance gets the bullet that at 360x740 the robot is drawn below the bench blocks in z-order on 7–10 letter words and never covers them. (E) BACKLOG.md "Later / not now" gets the `console.png` stray-pixels line.
+- because: question protocol; answers are consumed at the start of the next run and logged here. B and C record what B-114 shipped; D is needed before B-115 is built.
+- reversible: yes (doc changes only).

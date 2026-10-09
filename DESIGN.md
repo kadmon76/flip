@@ -94,10 +94,11 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 ## Controls and states
 - **Check dome** (`#check-btn`): `off` while slots are empty or partly
   filled. When all slots are filled: `ready`, glow pulsing slowly
-  (opacity 0.45↔1, 1.2s ease-in-out, infinite) until pressed or a block is
+  (opacity 0.45↔1, 1.2s each way, ease-in-out, infinite) until pressed or a block is
   taken out. Press: `pressed` for 120ms, then the result. After a correct
   answer or a reveal, it returns to `ready` pulse and pressing it goes to
-  the next word (the dome is both check and next).
+  the next word (the dome is both check and next). After a wrong check it
+  stays `off` until a block moves (drag, tap or the reset lever).
 - **Reset lever** (`#reset-btn`): tap → `lever-down` for 250ms, rail shakes
   ±4px for 200ms, placed blocks hop back to their starting spots (300ms,
   30ms stagger), lever springs back. Tap area 48x48.
