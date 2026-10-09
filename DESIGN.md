@@ -65,7 +65,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   left to right: reset lever (far left), speaker (centre-left), check
   dome (right). Reset and check stay far apart.
 - **Robot:** behind the console's left third, head and shoulders visible
-  (~75px); console drawn above him.
+  (~75px); the console, the rail and the bench blocks are drawn above him (on 7–10 letter words his pop-up passes under the second block row; BACKLOG B-115).
 - **Header:** split-flap logo "flip" top-left, mute toggle top-right,
   inside the safe area over the shelf.
 

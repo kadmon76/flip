@@ -38,7 +38,7 @@ a phone.
   - `controls.js` renders the console controls (`#check-btn` dome, `#reset-btn` lever, `#speak-btn` speaker) from `current`, `pressed` and `speaking` in state; its rules (`domeAction`, `domeState`, `canReset`, `leverState`, `speakerState`, `PRESS_MS`) are pure, no DOM, and a Django test runs them through `node`.
   - `stickers.js` is the only place the sticker book (localStorage key `flip.stickers.v1`) is read or written; no DOM, no module state. Other modules call `load()`/`has()`/`add()`/`all()`; nothing else touches that key.
   - `gallery.js` renders the sticker book screen (`#screen-gallery`) from `state.themes[].words` and `stickers.load()` on every render while `state.screen === 'gallery'`; it never mutates state and keeps no cache. `themeProgress(book, theme, words)` is the pure part (no DOM); a Django test runs it through `node`.
-  - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle, bulb flicker, TV static, reveal fly-in, reset-lever rail shake and hop now; correct pulse, confetti and star pop in B-110). It is a subscriber after `renderCard`, keeps only a render cache of the current word's key and the last status, lives, `pressed` and placement, and never mutates state.
+  - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle, bulb flicker, TV static, reveal fly-in, reset-lever rail shake and hop now; correct pulse, confetti and star pop in B-110), except the robot's poses and slides, which start in `character.js` (B-115). It is a subscriber after `renderCard`, keeps only a render cache of the current word's key and the last status, lives, `pressed` and placement, and never mutates state.
   - `audio.js` is the only place sounds play.
   - `celebrate.js` is the only place the correct-check and round-end celebrations run (box pulse, confetti, star pop). It is a state subscriber that fires only on a transition it detects against what it last rendered (status became 'correct', screen became 'round-end'); a re-render in the same state must not replay a celebration.
 
@@ -99,5 +99,4 @@ a phone.
   them. `next-btn` and `result-line` were removed by B-114 (the check dome is also next).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.
-- The robot lives behind the console's left third; never place UI over
-  him, the rail, the blocks or the console controls.
+- The robot lives behind the console's left third and is drawn under the console, the rail and the bench blocks (`.robot` has z-index -1 inside `.console`, which has no z-index; B-115). He never covers them. At rest no block overlaps him; only the top of his pop-up on 7–10 letter words passes under the second block row.
