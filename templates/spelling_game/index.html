@@ -20,7 +20,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=12">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=13">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo, top-left inside the frame's
@@ -77,8 +77,23 @@
              the check dome (also "next"). Each control stacks its image
              assets; controls.js shows one of them from state (class
              is-<state> on the button). aria-labels are for screen readers
-             only, never shown. -->
+             only, never shown.
+             The robot (CHARACTER.md, BACKLOG B-115) stands behind the
+             console's left third: .robot is drawn under the console, the
+             rail and the bench blocks (game.css), one image per pose;
+             character.js shows one (class is-<pose>) and slides
+             .robot-body up and down. -->
         <div class="console">
+            <div class="robot is-idle" aria-hidden="true">
+                <div class="robot-body">
+                    <img class="robot-idle" src="{% static 'images/ui/robot-idle.png' %}" alt="" />
+                    <img class="robot-thinking" src="{% static 'images/ui/robot-thinking.png' %}" alt="" />
+                    <img class="robot-confused" src="{% static 'images/ui/robot-confused.png' %}" alt="" />
+                    <img class="robot-excited" src="{% static 'images/ui/robot-excited.png' %}" alt="" />
+                    <img class="robot-happy" src="{% static 'images/ui/robot-happy.png' %}" alt="" />
+                    <img class="robot-oops" src="{% static 'images/ui/robot-oops.png' %}" alt="" />
+                </div>
+            </div>
             <img class="console-body" src="{% static 'images/ui/console.png' %}" alt="" />
             <button id="reset-btn" class="ctl" type="button" aria-label="Reset">
                 <span class="sprite">

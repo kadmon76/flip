@@ -190,6 +190,7 @@ Build order: scene → controls → robot → other screens. Reference:
 - acceptance:
   - Robot sprite behind the console's left third, z-order below the
     console, head and shoulders visible.
+  - At 360x740, 7–10 letter words leave no room for the ~20px pop-up above the second block row: the robot is drawn below the bench blocks in z-order and never covers them (DECISIONS, B-114 10-letter fit entry).
   - Pose and pop/sink/peek movement driven from state per CHARACTER.md
     "Moment map", from a single data table in `static/js/character.js`
     (moment → pose, movement, sound). No pose logic elsewhere.
@@ -197,7 +198,7 @@ Build order: scene → controls → robot → other screens. Reference:
     him back.
   - Screenshots: `robot-idle.png`, `robot-confused.png`,
     `robot-excited.png`, `robot-sunk.png`.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/33
 
 ### B-116 Interim restyle of theme, round-end and sticker book
 - why: these screens still use the old look and English labels.
@@ -237,4 +238,6 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Open PRs #12 (B-106), #16 (B-108) and #18 (B-109) now overlap main after B-114: check/next flow and result line (#12), an add/add `static/js/audio.js` (#16; its mute must also gate the word clip), an add/add `static/js/feedback.js` with the wiggle and error tint (#18); rebase onto main or close.
 - Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
 - Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
-- CSS cache-buster: PR #33 (B-115) and B-116 both set `game.css?v=12`; whichever merges second bumps it to `?v=13`.
+- `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
+- The robot's eyes don't follow a moving block (CHARACTER "Block placed: idle (eyes follow)"): the eyes are drawn into the pose sprites, so this needs separate eye layers from the human (B-115).
+- The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).

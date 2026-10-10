@@ -1079,3 +1079,305 @@ class ConsoleCssTests(TestCase):
 
     def test_interim_buttons_are_gone(self):
         self.assertNotIn('icon-btn', self.css())
+
+
+class CharacterTests(TestCase):
+    """static/js/character.js: the robot's moment table and how a moment
+    is picked from state (BACKLOG B-115, CHARACTER.md "Moment map" and
+    "Presence"). One table maps each moment to pose, movement and sound;
+    pose and movement change together, never more than once per 300ms;
+    10s without input -> thinking, then sink, once per word; reduced
+    motion swaps poses only."""
+
+    MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'character.js'
+    UI = Path(__file__).resolve().parent.parent / 'static' / 'images' / 'ui'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        # st(...) builds a play-screen state on the word "cat" (round 1,
+        # three lives, nothing placed) with overrides; snap(...) is its
+        # snapshot; moments(a, b) the moments from state a to state b.
+        script = (
+            f"const c = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status: 'playing', placed: put('---') }, ...o });"
+            "const cur = (status, placed) => ({ word: 'cat', status, placed: put(placed) });"
+            "const moments = (a, b) => c.momentsFor(c.snapshot(a), c.snapshot(b));"
+            "const theme = { screen: 'theme', roundsStarted: 0, idleBeat: null, lives: 3,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: null, placed: [] } };"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_the_table_is_the_moment_map(self):
+        steps = lambda *s: [{'pose': p, 'move': m} for p, m in s]
+        self.assertEqual(self.run_node("out(c.MOMENTS);"), {
+            'roundStart': {'steps': steps(('idle', 'pop')), 'sound': None},
+            'picture': {'steps': steps(('thinking', 'none')), 'sound': None},
+            'blockPlaced': {'steps': steps(('idle', 'none')), 'sound': 'swipe'},
+            'filledEarly': {'steps': steps(('excited', 'none')), 'sound': None},
+            'filled': {'steps': steps(('idle', 'none')), 'sound': None},
+            'kidIdle': {'steps': steps(('thinking', 'none'), ('thinking', 'sink')), 'sound': None},
+            'wake': {'steps': steps(('idle', 'pop')), 'sound': None},
+            'wrong': {'steps': steps(('confused', 'none')), 'sound': 'error'},
+            'wrongPeek': {'steps': steps(('confused', 'peek')), 'sound': 'error'},
+            'thirdMiss': {'steps': steps(('oops', 'none'), ('happy', 'none')), 'sound': 'error'},
+            'correct': {'steps': steps(('excited', 'pop')), 'sound': 'correct'},
+            'streak': {'steps': steps(('excited', 'doublePop')), 'sound': 'correct'},
+            'roundEndGood': {'steps': steps(('happy', 'none')), 'sound': 'tada'},
+            'roundEnd': {'steps': steps(('idle', 'none')), 'sound': 'tada'},
+        })
+
+    def test_every_pose_is_an_image_and_every_move_exists(self):
+        poses, moves, used = self.run_node(
+            "out([c.POSES, Object.keys(c.MOVES), Object.values(c.MOMENTS).flatMap((m) => m.steps)]);")
+        for p in poses:
+            self.assertTrue((self.UI / f'robot-{p}.png').exists(), p)
+        for step in used:
+            self.assertIn(step['pose'], poses)
+            self.assertIn(step['move'], moves)
+
+    def test_round_start_pops_him_up_then_the_picture_makes_him_think(self):
+        self.assertEqual(self.run_node(
+            "out([moments(theme, st()), moments({ ...st(), screen: 'round-end' }, st({ roundsStarted: 2 })),"
+            " moments(st(), st({ roundsStarted: 2 })), c.stepsFor(['roundStart', 'picture'])]);"), [
+            ['roundStart', 'picture'], ['roundStart', 'picture'], ['roundStart', 'picture'],
+            [{'pose': 'idle', 'move': 'pop'}, {'pose': 'thinking', 'move': 'none'}],
+        ])
+
+    def test_next_word_is_a_new_picture(self):
+        self.assertEqual(self.run_node(
+            "out(moments(st({ current: cur('correct', 'cat') }),"
+            " st({ round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })));"),
+            ['picture'])
+
+    def test_blocks_moving_and_the_slots_filling(self):
+        # any block move -> idle; all slots filled -> excited (pointing at
+        # the dome) in the first two rounds, idle from the third
+        self.assertEqual(self.run_node(
+            "out([moments(st(), st({ current: cur('playing', 'c--') })),"
+            " moments(st({ current: cur('playing', 'ca-') }), st({ current: cur('playing', 'c--') })),"
+            " moments(st({ current: cur('wrong', 'tac') }), st({ current: cur('playing', 'ta-') })),"
+            " moments(st({ current: cur('playing', 'ca-') }), st({ current: cur('playing', 'cat') })),"
+            " moments(st({ roundsStarted: 2, current: cur('playing', 'ca-') }), st({ roundsStarted: 2, current: cur('playing', 'cat') })),"
+            " moments(st({ roundsStarted: 3, current: cur('playing', 'ca-') }), st({ roundsStarted: 3, current: cur('playing', 'cat') }))]);"),
+            [['blockPlaced'], ['blockPlaced'], ['blockPlaced'], ['filledEarly'], ['filledEarly'], ['filled']])
+
+    def test_wrong_check_confused_and_a_peek_on_the_last_bulb(self):
+        self.assertEqual(self.run_node(
+            "out([moments(st({ current: cur('playing', 'tac') }), st({ lives: 2, current: cur('wrong', 'tac') })),"
+            " moments(st({ lives: 2, current: cur('playing', 'act') }), st({ lives: 1, current: cur('wrong', 'act') }))]);"),
+            [['wrong'], ['wrongPeek']])
+
+    def test_third_miss_oops_then_happy(self):
+        self.assertEqual(self.run_node(
+            "out(moments(st({ lives: 1, current: cur('playing', 'tca') }), st({ lives: 0, current: cur('revealed', 'cat') })));"),
+            ['thirdMiss'])
+
+    def test_correct_and_three_in_a_row(self):
+        self.assertEqual(self.run_node(
+            "out([moments(st({ current: cur('playing', 'cat') }), st({ current: cur('correct', 'cat'), round: { index: 0, size: 5, results: [{ correct: true }] } })),"
+            " moments(st({ round: { index: 2, size: 5, results: [{ correct: false }, { correct: true }] }, current: cur('playing', 'cat') }),"
+            "         st({ round: { index: 2, size: 5, results: [{ correct: false }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') })),"
+            " moments(st({ round: { index: 2, size: 5, results: [{ correct: true }, { correct: true }] }, current: cur('playing', 'cat') }),"
+            "         st({ round: { index: 2, size: 5, results: [{ correct: true }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') })),"
+            " moments(st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: true }, { correct: true }, { correct: true }] }, current: cur('playing', 'cat') }),"
+            "         st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: true }, { correct: true }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') }))]);"),
+            [['correct'], ['correct'], ['streak'], ['streak']])
+
+    def test_idle_sinks_him_once_and_input_pops_him_back(self):
+        self.assertEqual(self.run_node(
+            "out([moments(st(), st({ idleBeat: 'sunk' })), moments(st({ idleBeat: 'sunk' }), st({ idleBeat: 'over' })),"
+            " c.stepsFor(['kidIdle']).map((s) => s.pose + '/' + s.move), c.stepsFor(['wake'])]);"),
+            [['kidIdle'], ['wake'], ['thinking/none', 'thinking/sink'], [{'pose': 'idle', 'move': 'pop'}]])
+
+    def test_round_end_happy_or_idle_never_sad(self):
+        self.assertEqual(self.run_node(
+            "const end = (n) => ({ ...st(), screen: 'round-end', round: { index: 4, size: 5,"
+            " results: [0, 1, 2, 3, 4].map((i) => ({ correct: i < n })) } });"
+            "out([5, 4, 3, 1, 0].map((n) => moments(st(), end(n))).concat([moments(end(5), end(5))]));"),
+            [['roundEndGood'], ['roundEndGood'], ['roundEnd'], ['roundEnd'], ['roundEnd'], []])
+
+    def test_a_re_render_in_the_same_state_is_no_moment(self):
+        self.assertEqual(self.run_node(
+            "out([moments(st(), st()), moments(st({ current: cur('wrong', 'tac'), lives: 2 }), st({ current: cur('wrong', 'tac'), lives: 2 })),"
+            " moments(theme, theme), moments(st({ idleBeat: 'over' }), st({ idleBeat: 'over' })),"
+            " moments(st({ pressed: null }), st({ pressed: 'dome', speaking: true }))]);"),
+            [[], [], [], [], []])
+
+    def test_changes_are_at_least_300ms_apart(self):
+        self.assertEqual(self.run_node(
+            "out([c.CHANGE_MS, c.stepDelays(1, Infinity), c.stepDelays(2, 1000), c.stepDelays(2, 100), c.stepDelays(1, 0)]);"),
+            [300, [0], [0, 300], [200, 500], [300]])
+
+    def test_moves(self):
+        moves = self.run_node("out(c.MOVES);")
+        total = lambda m: sum(s['duration'] for s in m)
+        # pop: rises ~20px in 180ms, ease-out, then settles back
+        self.assertEqual(moves['pop'][0], {'y': -20, 'duration': 0.18, 'ease': 'power2.out'})
+        self.assertEqual(moves['pop'][-1]['y'], 0)
+        self.assertLessEqual(total(moves['pop']), 0.3)
+        self.assertEqual(moves['doublePop'], moves['pop'] * 2)
+        # sink: 400ms, down until only the top of his head shows (14 of 75px)
+        self.assertEqual([(s['y'], s['duration']) for s in moves['sink']], [(61, 0.4)])
+        # peek: only the eyes above the edge for 600ms, then normal
+        self.assertEqual([s['y'] for s in moves['peek']], [18, 18, 0])
+        self.assertEqual(moves['peek'][1]['duration'], 0.6)
+        # a vertical slide only; everything but the sink ends at rest
+        for name, segs in moves.items():
+            self.assertEqual(set(k for s in segs for k in s), {'y', 'duration', 'ease'}, name)
+            self.assertNotIn('back', ' '.join(s['ease'] for s in segs), name)
+            if name != 'sink':
+                self.assertEqual(segs[-1]['y'], 0, name)
+
+    def test_reduced_motion_swaps_poses_only(self):
+        self.assertEqual(self.run_node("out(Object.keys(c.MOVES).map((k) => c.moveFor(k, true)));"),
+                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 5)
+        self.assertEqual(self.run_node("out(c.moveFor('pop', false));"), self.run_node("out(c.MOVES.pop);"))
+
+    def test_idle_wait_is_10s_from_the_last_input_once_per_word(self):
+        self.assertEqual(self.run_node(
+            "out([c.IDLE_MS, c.idleWait(st({ lastInput: 1000 }), 1000), c.idleWait(st({ lastInput: 1000 }), 8000),"
+            " c.idleWait(st({ lastInput: 1000 }), 11000), c.idleWait(st({ lastInput: 1000 }), 50000),"
+            " c.idleWait(st({ idleBeat: 'sunk' }), 50000), c.idleWait(st({ idleBeat: 'over' }), 50000),"
+            " c.idleWait({ ...st(), screen: 'round-end' }, 50000), c.idleWait(theme, 50000)]);"),
+            [10000, 10000, 3000, 0, 0, None, None, None, None])
+
+
+class RobotLayoutTests(TestCase):
+    """The robot behind the console (BACKLOG B-115, DESIGN "Layout",
+    CHARACTER "Presence"): inside .console, drawn below the console, the
+    rail and the bench blocks; head and shoulders (75px) above the
+    console's left third; words of up to six letters leave room for his
+    20px pop-up, longer ones put blocks over him (z-order)."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    UI = ROOT / 'static' / 'images' / 'ui'
+    LAYOUT = ROOT / 'static' / 'js' / 'layout.js'
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    def test_robot_is_inside_the_console_with_every_pose(self):
+        html = self.client.get('/').content.decode()
+        console = html.index('<div class="console">')
+        robot = html.index('<div class="robot')
+        self.assertLess(console, robot)
+        self.assertLess(robot, html.index('class="console-body"'))
+        for pose in ('idle', 'thinking', 'confused', 'excited', 'happy', 'oops'):
+            self.assertIn(f'/static/images/ui/robot-{pose}.png', html[robot:html.index('class="console-body"')], pose)
+
+    def test_robot_is_drawn_below_the_console_rail_and_blocks(self):
+        # z-index -1 inside #screen-play's stacking context: above the lab
+        # picture, below every block, the rail and the console. The console
+        # must not be a stacking context of its own, or he would be lifted
+        # above the bench with it.
+        self.assertIn('isolation: isolate;', self.rule('#screen-play'))
+        robot = self.rule('#screen-play .robot')
+        self.assertIn('z-index: -1;', robot)
+        self.assertIn('pointer-events: none;', robot)
+        self.assertIn('overflow: hidden;', robot)
+        console = self.rule('#screen-play .console')
+        for prop in ('z-index', 'transform', 'filter', 'opacity', 'isolation', 'will-change', 'contain'):
+            self.assertNotIn(prop, console, prop)
+        for sel in ('.letter-boxes', '.letter-tray', '.block-spot', '.draggable-letter'):
+            self.assertNotRegex(self.rule(sel), r'z-index:\s*-', sel)
+
+    def geometry(self):
+        """Per pose (sprite width, visor centre x) from game.css, and the
+        numbers the CSS places him with (checked to be there)."""
+        css = self.css()
+        for decl in ('--s: calc(var(--rpx) * 120 / 330);', 'top: calc((130 - 75) * var(--rpx));',
+                     'height: calc(120 * var(--rpx));', 'left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));',
+                     '--rpx: calc(var(--console-w) / 324);', 'bottom: 5%;'):
+            self.assertIn(decl, css)
+        poses = dict((p, (int(w), int(v))) for p, w, v in re.findall(
+            r'\.robot-body \.robot-(\w+)\s*{\s*--sw:\s*(\d+);\s*--vx:\s*(\d+);\s*}', css))
+        self.assertEqual(set(poses), {'idle', 'thinking', 'confused', 'excited', 'happy', 'oops'})
+        return poses
+
+    def test_head_and_shoulders_show_and_short_words_leave_room_for_the_pop(self):
+        # At 360x740: the console is 324px wide at x 18 (TenLetterFitTests),
+        # top 659.7. Each pose is 120px tall, its top 75px above the
+        # console, its visor centre 72.6px right of the console's left
+        # edge. Checked on the sprites' pixels (alpha >= 50%), above the
+        # console only (below it he is hidden):
+        # - he shows down to the console edge (no gap: head and shoulders)
+        #   and stays inside his clip window (x 18-178) and the console's
+        #   left half;
+        # - at rest he is clear of every block of every word (1-10
+        #   letters) and of the rail;
+        # - at the top of a pop (20px up) he is clear of every block of a
+        #   1-6 letter word and of the rail of any word; 7-10 letter words
+        #   do reach him, which is why he is drawn under the blocks.
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        poses = self.geometry()
+        fit = TenLetterFitTests()
+        left, top, cw, ch = fit.console_box()
+        bench = fit.W - 2 * fit.SIDE
+        rail_top = 0.445 * fit.W * 2739 / 1264
+        script = TenLetterFitTests.PNG_ALPHA_JS + f"""
+            import {{ slotLayout, blockLayout }} from '{self.LAYOUT.as_uri()}';
+            const poses = {json.dumps(poses)}, UI = {json.dumps(str(self.UI))};
+            const L = {left}, TOP = {top}, BENCH = {bench}, RAIL = {rail_top}, SIDE = {fit.SIDE}, GAP = {fit.GAP}, TILT = {fit.TILT};
+            const s = 120 / 330, out = {{}};
+            const words = [];
+            for (let n = 1; n <= 10; n++) {{
+                const sl = slotLayout(n, BENCH), bl = blockLayout(n, BENCH);
+                const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap;
+                const benchTop = railBottom + GAP;
+                words.push({{ n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
+                    SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT]) }});
+            }}
+            for (const [pose, [sw, vx]] of Object.entries(poses)) {{
+                const img = alphaOf(UI + '/robot-' + pose + '.png');
+                const x0 = L + 72.6 - vx * s;
+                const r = {{ minX: Infinity, maxX: -Infinity, lowest: -Infinity, rest: {{}}, pop: {{}}, rail: 0 }};
+                for (let sy = 0; sy < img.h; sy++) {{
+                    for (let sx = 0; sx < img.w; sx++) {{
+                        if (img.at(sx, sy) < 128) continue;
+                        const x = x0 + (sx + 0.5) * s, yRest = TOP - 75 + (sy + 0.5) * s;
+                        if (yRest >= TOP) continue;
+                        r.minX = Math.min(r.minX, x); r.maxX = Math.max(r.maxX, x); r.lowest = Math.max(r.lowest, yRest);
+                        for (const [at, y] of [['rest', yRest], ['pop', yRest - 20]]) {{
+                            for (const w of words) {{
+                                if (y < w.railBottom) r.rail++;
+                                if (w.blocks.some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d)) r[at][w.n] = (r[at][w.n] || 0) + 1;
+                            }}
+                        }}
+                    }}
+                }}
+                out[pose] = r;
+            }}
+            console.log(JSON.stringify(out));
+        """
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for pose, r in json.loads(result.stdout).items():
+            self.assertGreater(r['lowest'], top - 1, pose)                  # shows down to the console edge
+            self.assertGreaterEqual(r['minX'], left, pose)                   # inside the clip window
+            self.assertLessEqual(r['maxX'], left + 160, pose)
+            self.assertLessEqual(r['maxX'], left + cw / 2, pose)              # the console's left half
+            self.assertEqual(r['rail'], 0, pose)                              # never reaches the rail
+            self.assertEqual(r['rest'], {}, pose)                             # at rest, clear of all blocks
+            for n in range(1, 7):
+                self.assertNotIn(str(n), r['pop'], (pose, n))                # room for the pop-up
+        # the reason for the z-order: the second row of a 7-10 letter word
+        # is in the way of the pop-up
+        self.assertEqual(sorted(json.loads(result.stdout)['idle']['pop'], key=int), ['7', '8', '9', '10'])
