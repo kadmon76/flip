@@ -1125,8 +1125,9 @@ class CharacterTests(TestCase):
             'roundStart': {'steps': steps(('idle', 'pop')), 'sound': None},
             'picture': {'steps': steps(('thinking', 'none')), 'sound': None},
             'blockPlaced': {'steps': steps(('idle', 'none')), 'sound': 'swipe'},
-            'filledEarly': {'steps': steps(('excited', 'none')), 'sound': None},
-            'filled': {'steps': steps(('idle', 'none')), 'sound': None},
+            'blockReturned': {'steps': steps(('idle', 'none')), 'sound': None},
+            'filledEarly': {'steps': steps(('excited', 'none')), 'sound': 'swipe'},
+            'filled': {'steps': steps(('idle', 'none')), 'sound': 'swipe'},
             'kidIdle': {'steps': steps(('thinking', 'none'), ('thinking', 'sink')), 'sound': None},
             'wake': {'steps': steps(('idle', 'pop')), 'sound': None},
             'wrong': {'steps': steps(('confused', 'none')), 'sound': 'error'},
@@ -1162,8 +1163,9 @@ class CharacterTests(TestCase):
             ['picture'])
 
     def test_blocks_moving_and_the_slots_filling(self):
-        # any block move -> idle; all slots filled -> excited (pointing at
-        # the dome) in the first two rounds, idle from the third
+        # a block into a slot -> blockPlaced, back to the bench ->
+        # blockReturned (idle both); all slots filled -> excited (pointing
+        # at the dome) in the first two rounds, idle from the third
         self.assertEqual(self.run_node(
             "out([moments(st(), st({ current: cur('playing', 'c--') })),"
             " moments(st({ current: cur('playing', 'ca-') }), st({ current: cur('playing', 'c--') })),"
@@ -1171,7 +1173,48 @@ class CharacterTests(TestCase):
             " moments(st({ current: cur('playing', 'ca-') }), st({ current: cur('playing', 'cat') })),"
             " moments(st({ roundsStarted: 2, current: cur('playing', 'ca-') }), st({ roundsStarted: 2, current: cur('playing', 'cat') })),"
             " moments(st({ roundsStarted: 3, current: cur('playing', 'ca-') }), st({ roundsStarted: 3, current: cur('playing', 'cat') }))]);"),
-            [['blockPlaced'], ['blockPlaced'], ['blockPlaced'], ['filledEarly'], ['filledEarly'], ['filled']])
+            [['blockPlaced'], ['blockReturned'], ['blockReturned'], ['filledEarly'], ['filledEarly'], ['filled']])
+        self.assertEqual(self.run_node("out([c.stepsFor(['blockPlaced']), c.stepsFor(['blockReturned'])]);"),
+                         [[{'pose': 'idle', 'move': 'none'}]] * 2)
+
+    def test_a_block_into_a_slot_is_placed_one_leaving_only_is_returned(self):
+        # BACKLOG B-108: the swipe moment is a block going into a slot (a
+        # slot now holds a block it did not hold before), also when it
+        # swaps out the one there or comes from another slot; a block
+        # back to the bench (tap, drag) or every block sent back by the
+        # reset lever is blockReturned. Tile ids are given per slot.
+        self.assertEqual(self.run_node(
+            "const at = (ids) => ids.map((id) => (id ? { letter: 'x', tileId: id } : null));"
+            "const s = (ids, o = {}) => st({ current: { word: 'cat', status: 'playing', placed: at(ids) }, ...o });"
+            "out([moments(s([null, null, null]), s([null, 't2', null])),"     # bench -> slot 2
+            " moments(s(['t1', null, null]), s([null, null, 't1'])),"          # slot 1 -> slot 3
+            " moments(s(['t1', 't2', null]), s(['t3', 't2', null])),"          # t3 swaps t1 out
+            " moments(s(['t1', 't2', null]), s(['t1', null, null])),"          # t2 back to the bench
+            " moments(s(['t1', 't2', null], { pressed: null }), s([null, null, null], { pressed: 'lever' })),"   # the lever
+            " moments(s(['t1', 't2', 't3']), s(['t1', null, 't3'])),"          # out of a full rail
+            " moments(s(['t1', 't2', null]), s(['t1', 't2', 't3'])),"          # the last slot
+            " c.blockEntered('t1,-,-', 't1,t2,-'), c.blockEntered('t1,t2,-', 't1,-,-'), c.blockEntered('t1,t2,t3', '-,-,-'),"
+            " c.blockEntered('t1,t2,-', 't2,t1,-'), c.blockEntered('', '')]);"),
+            [['blockPlaced'], ['blockPlaced'], ['blockPlaced'], ['blockReturned'], ['blockReturned'],
+             ['blockReturned'], ['filledEarly'], True, False, False, True, False])
+
+    def test_which_moments_sound_which_clip(self):
+        # BACKLOG B-108: the robot's clips are MOMENTS[moment].sound, read
+        # through soundsFor (audio.js plays them): swipe when a block goes
+        # into a slot, the last one too; error on a wrong check and on the
+        # reveal; correct on a correct check (and a streak); tada when the
+        # round-end screen is shown; nothing else.
+        sounds = self.run_node("out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.soundsFor([m])])));")
+        self.assertEqual(sounds, {
+            'roundStart': [], 'picture': [], 'blockPlaced': ['swipe'], 'blockReturned': [],
+            'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
+            'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
+            'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
+        })
+        self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
+        self.assertEqual(self.run_node(
+            "const used = new Set(Object.values(c.MOMENTS).map((m) => m.sound).filter(Boolean)); out([...used].sort());"),
+            ['correct', 'error', 'swipe', 'tada'])
 
     def test_wrong_check_confused_and_a_peek_on_the_last_bulb(self):
         self.assertEqual(self.run_node(
@@ -1253,6 +1296,260 @@ class CharacterTests(TestCase):
             " c.idleWait({ ...st(), screen: 'round-end' }, 50000), c.idleWait(theme, 50000)]);"),
             [10000, 10000, 3000, 0, 0, None, None, None, None])
 
+
+
+class AudioTests(TestCase):
+    """static/js/audio.js, the only place sounds play (BACKLOG B-108,
+    DESIGN "Sound"): pools of the existing clips, URL-encoded; a random
+    clip per play; one voice clip at a time, never over the target word;
+    the robot's clips come from character.js's moment table; the first
+    gesture unlocks playback and nothing plays on load; `state.muted` in
+    localStorage `flip.muted` means no sound at all."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+    STATE = ROOT / 'static' / 'js' / 'state.js'
+    SOUNDS = ROOT / 'static' / 'sounds'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        # A fake Audio (records play / pause on `log`, play() resolves) and
+        # a fake document (keeps its listeners in `listeners`). `a` is
+        # audio.js, `S` state.js. `names(kind)` are the file names played
+        # so far, `clear()` empties the log. `st(...)` builds a play-screen
+        # state on "cat" (round 1, three lives) with overrides; `put(ids)`
+        # its placed slots from tile ids.
+        script = (
+            "const log = []; const listeners = {}; const made = [];"
+            "globalThis.Audio = class { constructor(src) { this.src = src; this.preload = ''; this.muted = false;"
+            " this.paused = true; this.currentTime = 0; this.on = {}; made.push(this); }"
+            " addEventListener(t, fn) { this.on[t] = fn; }"
+            " play() { this.paused = false; log.push({ op: 'play', src: this.src, muted: this.muted }); return Promise.resolve(); }"
+            " pause() { this.paused = true; log.push({ op: 'pause', src: this.src }); } };"
+            "globalThis.document = { addEventListener(t, fn, c) { listeners[t] = fn; }, removeEventListener(t, fn, c) { delete listeners[t]; } };"
+            f"const a = await import('{self.MODULE.as_uri()}');"
+            f"const S = await import('{self.STATE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const tick = () => new Promise((r) => setTimeout(r, 0));"
+            "const short = (src) => decodeURIComponent(src.replace('/static/sounds/', ''));"
+            "const played = () => log.filter((e) => e.op === 'play' && !e.muted).map((e) => short(e.src));"
+            "const kinds = () => played().map((f) => f.split('/')[0].replace('celebration', 'tada'));"
+            "const clear = () => { log.length = 0; };"
+            "const put = (ids) => ids.map((id) => (id ? { letter: 'x', tileId: id } : null));"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, speaking: false,"
+            " muted: false, pressed: null, round: { index: 0, size: 5, results: [] },"
+            " current: { word: 'cat', status: 'playing', placed: put([null, null, null]) }, ...o });"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_pools_are_exactly_the_existing_clips(self):
+        # correct/*, error/*, celebration/tada.mp3, swipe/*: every file on
+        # disk and nothing else (a renamed clip fails here, not on a phone)
+        files = self.run_node("out(a.FILES);")
+        self.assertEqual(set(files), {'correct', 'error', 'tada', 'swipe'})
+        for kind, dir_ in (('correct', 'correct'), ('error', 'error'), ('swipe', 'swipe')):
+            self.assertEqual(files[kind]['dir'], dir_)
+            on_disk = sorted(f.name for f in (self.SOUNDS / dir_).iterdir() if f.is_file())
+            self.assertEqual(sorted(files[kind]['names']), on_disk, kind)
+        self.assertEqual(files['tada'], {'dir': 'celebration', 'names': ['tada.mp3']})
+        self.assertTrue((self.SOUNDS / 'celebration' / 'tada.mp3').exists())
+
+    def test_urls_are_encoded(self):
+        urls = self.run_node(
+            "out([a.clipUrl('error', 'hmm no.mp3'), a.clipUrl('tada', 'tada.mp3'), a.poolUrls('swipe'),"
+            " a.poolUrls('correct').filter((u) => / /.test(u)).length, a.clipUrl('correct', 'a b.mp3', '/x/')]);")
+        self.assertEqual(urls, [
+            '/static/sounds/error/hmm%20no.mp3', '/static/sounds/celebration/tada.mp3',
+            [f'/static/sounds/swipe/swipe{i}.mp3' for i in range(1, 5)], 0, '/x/correct/a%20b.mp3'])
+        self.assertIn('unknown kind', self.run_node(
+            "try { a.clipUrl('music', 'x.mp3'); out('no error'); } catch (e) { out(e.message); }"))
+
+    def test_pick_is_random_within_the_pool(self):
+        self.assertEqual(self.run_node(
+            "out([a.pickIndex(10, () => 0), a.pickIndex(10, () => 0.55), a.pickIndex(10, () => 0.9999),"
+            " a.pickIndex(10, () => 1), a.pickIndex(1, () => 0.7), a.pickIndex(0)]);"),
+            [0, 5, 9, 9, 0, -1])
+
+    def test_channels(self):
+        self.assertEqual(self.run_node("out(a.CHANNEL);"),
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx'})
+
+    def test_mute_flag_is_remembered_in_flip_muted(self):
+        self.assertEqual(self.run_node(
+            "const store = (init = {}) => { const d = { ...init }; return { d, getItem: (k) => (k in d ? d[k] : null),"
+            " setItem: (k, v) => { d[k] = String(v); } }; };"
+            "const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('full'); } };"
+            "const s1 = store(); a.saveMuted(true, s1); const on = s1.d['flip.muted']; const r1 = a.loadMuted(s1);"
+            "a.saveMuted(false, s1);"
+            "out([a.MUTED_KEY, a.loadMuted(store()), on, r1, s1.d['flip.muted'], a.loadMuted(s1),"
+            " a.loadMuted(store({ 'flip.muted': 'yes' })), a.loadMuted(store({ 'flip.muted': '1' })),"
+            " a.loadMuted(broken), (() => { a.saveMuted(true, broken); return 'no throw'; })(), a.loadMuted(undefined)]);"),
+            ['flip.muted', False, 'true', True, 'false', False, False, False, False, 'no throw', False])
+
+    def test_nothing_plays_on_load_and_the_first_gesture_unlocks(self):
+        # init() preloads one Audio per clip and plays nothing; the first
+        # pointerup / touchend / click / keydown starts every clip muted
+        # and stops it again once it runs, and removes the listeners.
+        self.assertEqual(self.run_node(
+            "a.init(); const before = [made.length, made.every((e) => e.preload === 'auto'), log.length, Object.keys(listeners).sort()];"
+            "listeners.touchend(); const primed = log.filter((e) => e.op === 'play').map((e) => e.muted);"
+            "await tick(); await tick();"
+            "out([before, primed.length, primed.every(Boolean), made.every((e) => e.paused && !e.muted && e.currentTime === 0),"
+            " Object.keys(listeners)]);"),
+            [[25, True, 0, ['click', 'keydown', 'pointerup', 'touchend']], 25, True, True, []])
+
+    def test_a_clip_played_during_the_unlock_keeps_playing(self):
+        self.assertEqual(self.run_node(
+            "a.init(); S.setState({ muted: false, speaking: false }); listeners.pointerup(); a.play('tada'); await tick(); await tick();"
+            "const tada = made.find((e) => e.src.endsWith('tada.mp3'));"
+            "out([tada.paused, tada.muted]);"),
+            [False, False])
+
+    def test_play_picks_from_the_pool_and_voice_clips_take_turns(self):
+        self.assertEqual(self.run_node(
+            "a.init(); S.setState({ muted: false, speaking: false });"
+            "a.play('error'); const first = played(); const errEl = made.find((e) => !e.paused);"
+            "a.play('swipe'); const errStill = !errEl.paused;"          # the swipe does not cut the voice
+            "a.play('correct'); const errCut = errEl.paused;"          # a voice clip cuts the voice clip
+            "out([first.length, first[0].split('/')[0], kinds(), errStill, errCut,"
+            " made.filter((e) => !e.paused).map((e) => short(e.src).split('/')[0]).sort()]);"),
+            [1, 'error', ['error', 'swipe', 'correct'], True, True, ['correct', 'swipe']])
+
+    def test_no_voice_clip_over_the_target_word_and_the_word_cuts_the_voice(self):
+        self.assertEqual(self.run_node(
+            "a.init(); S.setState({ muted: false, speaking: false });"
+            "a.play('error'); const errEl = made.find((e) => !e.paused);"
+            "S.setState({ speaking: true }); let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
+            "const word = made[made.length - 1]; const voiceCut = errEl.paused;"
+            "clear(); a.play('correct'); a.play('tada'); a.play('swipe');"
+            "out([voiceCut, kinds(), word.paused, ended]);"),
+            [True, ['swipe'], False, 0])
+
+    def test_muted_means_no_sound_at_all(self):
+        self.assertEqual(self.run_node(
+            "a.init(); S.setState({ muted: true, speaking: false }); const n = made.length;"
+            "['correct', 'error', 'tada', 'swipe'].forEach(a.play);"
+            "let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
+            "out([played(), made.length - n, ended]);"),
+            [[], 0, 1])
+
+    def test_sounds_follow_the_moment_table(self):
+        # renderSound (a state subscriber) plays MOMENTS[moment].sound for
+        # each state change: swipe for a block into a slot (the last one
+        # too), nothing for a block back to the bench or the lever, error
+        # on a wrong check and the reveal, correct on a correct check,
+        # tada once when the round-end screen shows; and nothing at all
+        # while muted.
+        steps = self.run_node(
+            "a.init(); S.subscribe(a.renderSound);"
+            "const go = (o) => { clear(); S.setState(st(o)); return kinds(); };"
+            "const cur = (ids, status = 'playing') => ({ current: { word: 'cat', status, placed: put(ids) } });"
+            "const res = (n) => ({ round: { index: 4, size: 5, results: [0, 1, 2, 3, 4].map((i) => ({ correct: i < n })) } });"
+            "out([go({ screen: 'theme', current: { word: null, placed: [] } }), go({}),"
+            " go(cur(['t1', null, null])), go(cur([null, null, null])), go(cur(['t2', 't1', null])),"
+            " go({ ...cur([null, null, null]), pressed: 'lever' }), go({ ...cur(['t2', 't1', null]), pressed: null }),"
+            " go(cur(['t2', 't1', 't3'])), go({ ...cur(['t2', 't1', 't3'], 'wrong'), lives: 2 }),"
+            " go({ ...cur(['t2', null, 't3']), lives: 2 }), go({ ...cur(['t2', 't1', 't3']), lives: 2 }),"
+            " go({ ...cur(['t1', 't2', 't3'], 'revealed'), lives: 0 }),"
+            " go({ ...cur([null, null, null]), lives: 3, round: { index: 1, size: 5, results: [{ correct: false }] } }),"
+            " go({ ...cur(['t3', 't1', 't2'], 'correct'), lives: 3, round: { index: 1, size: 5, results: [{ correct: false }, { correct: true }] } }),"
+            " go({ ...cur(['t1', 't2', 't3'], 'correct'), screen: 'round-end', ...res(4) }),"
+            " go({ ...cur(['t1', 't2', 't3'], 'correct'), screen: 'round-end', ...res(4) })]);")
+        self.assertEqual(steps, [
+            [], [],                         # theme screen, then a round starts: silent
+            ['swipe'], [], ['swipe'],       # into a slot / back to the bench / two in again (one new)
+            [], ['swipe'],                  # the lever / a block in again
+            ['swipe'],                      # the block that fills the last slot
+            ['error'],                      # wrong check
+            [], ['swipe'],                  # a block out, then in again (fills the rail)
+            ['error'],                      # the third miss reveals
+            [],                             # the next word
+            ['correct'],                    # correct check
+            ['tada'], [],                   # round-end shown, once
+        ])
+
+    def test_mute_stops_everything_and_keeps_it_silent(self):
+        self.assertEqual(self.run_node(
+            "a.init(); S.subscribe(a.renderSound); S.setState(st());"
+            "S.setState(st({ current: { word: 'cat', status: 'playing', placed: put(['t1', null, null]) } }));"
+            "a.speakWord('/static/sounds/themes/animals/cat.mp3', () => {}); const word = made[made.length - 1];"
+            "const swipeOn = made.some((e) => !e.paused && e.src.includes('/swipe/'));"
+            "S.setState({ muted: true, speaking: false }); const allStopped = made.every((e) => e.paused);"
+            "clear(); S.setState(st({ muted: true, current: { word: 'cat', status: 'playing', placed: put(['t1', 't2', null]) } }));"
+            "S.setState(st({ muted: true, screen: 'round-end' }));"
+            "out([swipeOn, word.paused, allStopped, played()]);"),
+            [True, True, True, []])
+
+    def test_nothing_else_constructs_audio(self):
+        # BACKLOG B-108: audio.js is the only place sounds play; no other
+        # module in static/js makes an Audio element, an AudioContext or an
+        # <audio>, and the page has no <audio> tag.
+        pattern = re.compile(r"\bnew\s+Audio\b|\bAudio\s*\(|AudioContext|createElement\(\s*['\"]audio|<audio")
+        js_dir = self.ROOT / 'static' / 'js'
+        offenders = [f.name for f in sorted(js_dir.rglob('*.js'))
+                     if f.name != 'audio.js' and pattern.search(f.read_text())]
+        self.assertEqual(offenders, [])
+        self.assertRegex(self.MODULE.read_text(), r'new Audio\(')
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertNotIn('<audio', html)
+
+
+class MuteToggleTests(TestCase):
+    """The header's mute toggle (BACKLOG B-108, DESIGN "Layout" header,
+    "Words on screen"): top-right after the logo, an icon button at least
+    48x48, speaker / muted speaker, no text; wired to state.muted."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def test_toggle_is_an_icon_button_in_the_header_after_the_logo(self):
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<header'):html.index('</header>')]
+        m = re.search(r'<button id="mute-btn"([^>]*)>(.*?)</button>', header, flags=re.S)
+        self.assertIsNotNone(m)
+        attrs, inner = m.groups()
+        self.assertIn('aria-label="Mute"', attrs)
+        self.assertIn('aria-pressed="false"', attrs)
+        self.assertIn('<svg class="icon-sound"', inner)
+        self.assertIn('<svg class="icon-muted"', inner)
+        self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '')
+        self.assertLess(header.index('class="app-title"'), header.index('id="mute-btn"'))
+
+    def test_toggle_is_at_least_48px_and_shows_one_icon(self):
+        css = self.css()
+        rule = re.search(r'\n\.mute-btn\s*{([^}]*)}', css).group(1)
+        self.assertIn('width: 48px;', rule)
+        self.assertIn('height: 48px;', rule)
+        self.assertRegex(css, r'\.mute-btn \.icon-muted,\s*\.mute-btn\.is-muted \.icon-sound\s*{\s*display: none;')
+        self.assertRegex(css, r'\.mute-btn\.is-muted \.icon-muted\s*{\s*display: block;')
+
+    def test_state_and_wiring(self):
+        js = self.ROOT / 'static' / 'js'
+        self.assertRegex((js / 'state.js').read_text(), r'\n    muted: false,')
+        main = (js / 'main.js').read_text()
+        self.assertIn("$('mute-btn').addEventListener('click', onMute);", main)
+        self.assertIn('subscribe(renderSound);', main)
+        self.assertIn('setState({ muted: loadMuted() });', main)
+        # only audio.js reads or writes the flip.muted key (comments aside);
+        # main.js goes through loadMuted / saveMuted
+        def code(f):
+            return re.sub(r'/\*.*?\*/|//[^\n]*', '', f.read_text(), flags=re.S)
+        for f in sorted(js.glob('*.js')):
+            if f.name != 'audio.js':
+                self.assertNotIn('flip.muted', code(f), f.name)
+        self.assertNotIn('localStorage', code(js / 'main.js'))
+        self.assertIn('saveMuted(muted);', main)
 
 class RobotLayoutTests(TestCase):
     """The robot behind the console (BACKLOG B-115, DESIGN "Layout",

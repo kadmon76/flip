@@ -26,6 +26,10 @@ export const state = {
     // on the reset lever; null otherwise.
     pressed: null,
     speaking: false,            // the word's audio is playing (speaker-on)
+    // Sound off (the header's mute toggle, B-108): no sound plays at all.
+    // Remembered in localStorage `flip.muted` (audio.js loadMuted /
+    // saveMuted); main.js sets it from there at start-up.
+    muted: false,
     // The robot (character.js, CHARACTER.md "Moment map"):
     roundsStarted: 0,           // rounds started this session (he points at the dome in the first two)
     // performance.now() of the kid's last input on the current word, or of

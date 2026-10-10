@@ -330,3 +330,5 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 - The robot's eyes don't follow a moving block (CHARACTER "Block placed: idle (eyes follow)"): the eyes are drawn into the pose sprites, so this needs separate eye layers from the human (B-115).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
 - Replace the placeholder voice lines and game sounds (prototype clips) with new ones that fit the lab look; the human will provide them.
+- v5's brass mute switch (a pill with a cream knob beside the speaker glyph) has no image asset; B-108 ships the cream glyph alone as the toggle. Needs switch on/off images from the human if the switch is wanted.
+- A speaker tap while muted does nothing and shows nothing (B-108); a hint toward the mute toggle (a glow, or the robot) could help a kid who forgot they muted.

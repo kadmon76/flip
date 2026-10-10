@@ -172,11 +172,11 @@ h3 {
     background: linear-gradient(to bottom, var(--bench-deep) 50%, var(--charcoal-hi) 50%);
 }
 
-/* --- Header: the "flip" logo --- */
+/* --- Header: the "flip" logo and the mute toggle --- */
 
 /* On every screen the header lies inside the frame's safe area, logo
-   top-left at (36, 36) as in v5 (over the lab shelf on the play screen).
-   The mute toggle (B-108) will sit top-right. */
+   top-left at (36, 36) as in v5 (over the lab shelf on the play screen),
+   the mute toggle top-right (B-108). */
 .app-header {
     position: absolute;
     top: 0;
@@ -203,6 +203,62 @@ h3 {
 
 .app-title .flap:last-child {
     color: var(--amber-deep);
+}
+
+/* The mute toggle (BACKLOG B-108): v5's cream speaker glyph, 28px, with
+   the contact shadow, in a 48x48 tap area (no face or border: the glyph
+   is the whole control). The box's top is the frame's inner edge (29),
+   its right edge the window's (334 at 360 wide); 8px of bottom padding
+   puts the glyph's centre on the logo's (y 49) and its right edge 36px
+   from the scene's edge, mirroring the logo's left. Muted: the speaker
+   with a cross instead of the wave (class is-muted, main.js). */
+.mute-btn {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    margin: -7px -10px 0 0;
+    padding: 0 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cream);
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mute-btn svg {
+    width: 28px;
+    height: 28px;
+    filter: drop-shadow(1px 2px 1.5px var(--shadow-contact));
+}
+
+.mute-btn .body {
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+}
+
+.mute-btn .line {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+}
+
+.mute-btn .icon-muted,
+.mute-btn.is-muted .icon-sound {
+    display: none;
+}
+
+.mute-btn.is-muted .icon-muted {
+    display: block;
+}
+
+.mute-btn:active svg {
+    transform: scale(0.92);
 }
 
 /* --- Screens: one centered column --- */
