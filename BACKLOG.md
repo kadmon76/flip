@@ -311,7 +311,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 
 ## Later / not now
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
-- Visual mascot in the reserved corner; character text lines on screens.
+- Visual mascot on the theme, round-end and sticker book screens (no corner is reserved since B-116; CHARACTER.md "Poses": robot-hero on the theme screen); character text lines on screens.
 - Content in DB and generation pipeline (words, images in one cartoon style, TTS audio).
 - PWA: `manifest.json` references icons that do not exist; icons and offline.
 - Background music loop with its own toggle.

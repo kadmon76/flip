@@ -23,6 +23,8 @@ and never draw a new scene object in CSS (buttons, boxes, panels). If an
 object is missing, open a question issue; new scene objects are made in
 an image model by the human.
 
+Exception: on the interim screens (see "Other screens (interim)") the cream panels with a brass border and the icon buttons (small cream panels with an ink icon) are CSS by design until their design pass.
+
 ## Assets (`static/images/ui/`)
 | File | What | Shown at (CSS px, 360 wide) |
 |---|---|---|
@@ -137,6 +139,7 @@ border in CSS, the palette and fonts above, and icons instead of English
 labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
 theme's picture, not its name. These are placeholders; a design pass
 will replace them.
+Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned and mastered / missed are lit / dark (stars, bulbs), never ticks, crosses or outlines.
 
 ## Screenshots (implementer produces, reviewer checks)
 - `tools/shot.mjs`, viewport 360x740, device scale 2, saved under

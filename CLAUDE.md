@@ -35,6 +35,7 @@ a phone.
     snap, `main.js` wires it.
   - `layout.js` is pure sizing helpers (no DOM); `card.js` applies its result, a Django test runs it through `node`.
   - `score.js` is pure round scoring (`starsFor`), no DOM; a Django test runs it through `node`.
+  - `flaps.js` `renderFlaps(el, text)` is the only helper that writes a number as split-flap `.flap` characters on the interim screens (round-end score, sticker book counts); no state, no module globals, rebuilt on every call; a Django test runs it through `node` with a fake DOM. `card.js`'s counter keeps its own `renderCounter` until folded.
   - `controls.js` renders the console controls (`#check-btn` dome, `#reset-btn` lever, `#speak-btn` speaker) from `current`, `pressed` and `speaking` in state; its rules (`domeAction`, `domeState`, `canReset`, `leverState`, `speakerState`, `PRESS_MS`) are pure, no DOM, and a Django test runs them through `node`.
   - `stickers.js` is the only place the sticker book (localStorage key `flip.stickers.v1`) is read or written; no DOM, no module state. Other modules call `load()`/`has()`/`add()`/`all()`; nothing else touches that key.
   - `gallery.js` renders the sticker book screen (`#screen-gallery`) from `state.themes[].words` and `stickers.load()` on every render while `state.screen === 'gallery'`; it never mutates state and keeps no cache. `themeProgress(book, theme, words)` is the pure part (no DOM); a Django test runs it through `node`.

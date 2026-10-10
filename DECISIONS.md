@@ -337,3 +337,7 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: the human answered the levels-and-hints proposal: (1) hear the word after answering on every level, (2) keep correct letters only when the kid pulls the lever, with a way to start over, (3) a given letter on the 2nd miss is fine on hard, (4) extra letters on hard are good; without word audio before answering on hard, the speaker should play something else.
 - reversible: yes.
 
+
+## 2026-10-11 — Rule suggestions from the B-116 review applied (issue #36; consumed at the start of the B-108 run)
+- chose: the human answered issue #36 "A apply, B apply, C apply, D apply" on 2026-10-09. Applied verbatim: (A) BACKLOG.md "Later / not now": the mascot line now says the visual mascot goes on the theme, round-end and sticker book screens (no corner is reserved since B-116; robot-hero on the theme screen). (B) CLAUDE.md "Frontend architecture" gets the `flaps.js` bullet after the `score.js` bullet. (C) DESIGN.md "The layer model" gets the exception that the interim screens' cream panels and icon buttons are CSS by design until their design pass. (D) DESIGN.md "Other screens (interim)" gets the conventions line (Courier Prime split-flaps for numbers, the amber sticker disc, lit / dark for earned and mastered).
+- because: question protocol; answers are consumed at the start of the next run and logged here. No backlog item was blocked on #36.
