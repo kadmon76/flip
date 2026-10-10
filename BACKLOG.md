@@ -214,12 +214,100 @@ Build order: scene → controls → robot → other screens. Reference:
     `stickers-some.png`.
 - status: done: https://github.com/kadmon76/flip/pull/35
 
-## M2 — Modes, difficulty, word audio
-Rough items; itemise with acceptance criteria after M1 is merged.
-- Mode picker on the theme screen. Mode 1: 3 hearts, reveal on the third miss (M1 behaviour). Mode 2: hint on the third miss (place the first wrong letter), reveal after two more misses.
-- Difficulty picker: easy (first letter given), normal, hard (distractor letters in the tray). Use the `difficulty` tags in the JSON.
-- Tap the card to hear the word (the per-word `audio` in the JSON).
-- Header shows the current theme and a way back mid-round.
+## M2 — Levels and hints
+Decided by the human on 2026-10-10 (DECISIONS.md, "M2 levels and hints").
+Three levels, picked with icons (1, 2 or 3 lit bulbs, no text), default easy.
+Each miss gives more help: 1st miss shows which letters are wrong (exists),
+2nd miss the robot gives one letter, 3rd miss reveals the word (exists).
+Build order: way out → level picker → speaker per level → easy start →
+lever → 2nd-miss hint → hard distractors → missed words return → level-up nudge.
+
+### B-201 Back to themes from the play screen
+- why: there is no way out of a round.
+- acceptance:
+  - A back icon button (line arrow, the same SVG as the sticker book's back, at least 48x48px) on the play screen, in the header to the left of the mute toggle (B-108), clear of the logo and of the robot. No text.
+  - Tapping it goes to the theme screen at once, no confirmation. The unfinished round is dropped: no stars, no stickers, no results kept.
+  - Any word clip playing stops.
+  - Screenshots: `play-back.png` (play screen with the button), `theme-after-back.png`. Checklist passes.
+- status:
+
+### B-202 Level picker and level in state
+- why: the kid chooses how hard a round is.
+- acceptance:
+  - `state.level` is `'easy' | 'normal' | 'hard'`, default `'easy'`, persisted in localStorage key `flip.level` (read/write wrapped in try/catch; a missing or bad value is `'easy'`).
+  - Theme screen: a row of three panel buttons above the stickers button showing 1, 2 and 3 bulbs (the lives bulb look); the chosen one is lit and pressed (`aria-pressed`), the others dark. `aria-label`s "easy", "normal", "hard". No text on screen.
+  - The level is fixed for the round once a theme is tapped; changing it affects the next round.
+  - Pure helper `levelRules(level)` (no DOM) returns the per-level rules used by B-203…B-207 (`hearBefore`, `firstLetterGiven`, `leverDropsWrongFirst`, `distractors`, `shortWordsFirst`); a Django test runs it through `node`.
+  - Screenshots: `theme-level-easy.png`, `theme-level-hard.png`. Checklist passes.
+- status:
+
+### B-203 Speaker per level
+- why: hearing the word is the main help on easy and a reward on every level.
+- acceptance:
+  - Easy: the speaker plays the word at any time (today's behaviour).
+  - Normal and hard, before the word is answered: the speaker does not play the word. Instead it plays the "hmm no" voice clip (`static/sounds/error/hmm no.mp3`, a placeholder until new lines exist) and the robot does a short confused "no" (moment `speakerLocked` in `character.js`: confused pose, a small head-shake). The speaker looks the same as normal; no lock icon.
+  - On every level, once the word is answered (correct or revealed), the speaker plays the word.
+  - Mute (B-108) silences all of it.
+  - Screenshots: `speaker-locked-robot.png` (normal, after tapping the speaker). Checklist passes.
+- status:
+
+### B-204 Easy: first letter given, short words first
+- why: an easy start for beginners.
+- acceptance:
+  - On easy the word's first letter starts in the first slot, locked: it cannot be dragged, the lever never removes it, and it is drawn as placed with a small lit-edge "locked" look (DESIGN tokens). Its tile is not on the bench.
+  - On easy a round prefers words tagged `"difficulty": "easy"` in the theme JSON, then fills up with the shortest remaining words. Normal and hard pick as today.
+  - A word whose only missing letters are the given one still needs a check (the dome lights when all slots are full, as now).
+  - Screenshots: `play-easy-start.png`. Checklist passes.
+- status:
+
+### B-205 Lever: wrong letters first, pull again to start over
+- why: the kid fixes only what was wrong, but can always start the word over.
+- acceptance:
+  - Easy, after a wrong check: the first pull sends back only the letters in wrong slots; the letters in right slots stay and lock with the same "locked" look as B-204. The next pull (any time later, while placed unlocked or locked letters remain besides the given first letter) sends back every letter except the given first letter and unlocks them.
+  - Normal and hard: one pull sends back every placed letter (today's behaviour). Letters are never locked.
+  - Before any wrong check, on every level, a pull sends back every placed letter (except the easy given letter).
+  - Pure helper `leverResult(level, current)` (no DOM) returns the letters that go back and the ones that lock; a Django test covers easy-after-wrong, easy-second-pull, normal and before-check.
+  - Screenshots: `lever-easy-after-wrong.png` (wrong letters gone, right ones locked), `lever-easy-second-pull.png`. Checklist passes.
+- status:
+
+### B-206 Second miss: the robot gives one letter
+- why: help grows with each mistake instead of jumping from "wrong" to "here is the word".
+- acceptance:
+  - On every level, the wrong check that leaves one bulb lit also places one letter: the first slot that is empty or wrong gets its correct letter, flown in from the bench like the reveal fly-in (a wrong letter in that slot goes back to the bench first). That letter locks.
+  - The robot plays a new moment `hintGiven` (happy pose, small pop) after his confused reaction to the miss, per CHARACTER.md "Presence" spacing.
+  - A word answered correctly after a hint still counts as mastered (bulbs left).
+  - Screenshots: `hint-second-miss.png`. Checklist passes.
+- status:
+
+### B-207 Hard: two extra letters on the bench
+- why: hard means choosing the right letters, not only ordering them.
+- acceptance:
+  - On hard the bench gets 2 extra letters that are not in the word, picked from a confusion table in a pure helper (pairs such as b/d, p/q, c/k, s/z, m/n, i/e, a/e, u/o: prefer the partner of a letter in the word, else a random letter not in the word). Never a letter already in the word.
+  - The check ignores the extras; they can be placed and are wrong where placed. Reveal and the second-miss hint never use them.
+  - The bench still fits 10-letter words plus 2 extras at 360x740 without overlap (new rows if needed; layout.js test extended).
+  - Screenshots: `play-hard-extras.png`, `play-hard-10-letters.png`. Checklist passes.
+- status:
+
+### B-208 Missed words come back
+- why: practice lands on the words that are hard for this kid.
+- acceptance:
+  - A word missed (revealed or skipped) is remembered per theme in localStorage (`flip.missed.v1`, only read/written in one module, like stickers.js).
+  - The next round of that theme includes up to 2 remembered missed words, in random positions; a word spelled correctly is removed from the list.
+  - Stickers only for correct words (unchanged).
+  - A Django test runs the round-picking helper through `node`.
+- status:
+
+### B-209 Level-up nudge
+- why: kids move up when ready, never forced.
+- acceptance:
+  - After two rounds in a row with 3 stars on the same level (not stored across page loads), on the round-end screen the robot (or, if the robot is not on that screen, a pulsing glow) points at a "next level" icon button (the next level's bulbs). Tapping it sets the level and starts a new round of the same theme. On hard there is no nudge.
+  - Screenshots: `round-end-level-up.png`. Checklist passes.
+- status:
+
+### B-210 Robot as a puppet
+- why: six still pictures feel stiff; a puppet of parts with code-drawn eyes feels alive (test page approved in principle by the human on 2026-10-10).
+- acceptance: to be written once clean parts exist (body with head, two eyebrows, two hands, an empty visor; eyes drawn in code; idle breathing, blinking, eyes following the dragged letter; moods from parts).
+- status: blocked: needs clean robot parts from the human (assets are read-only for agents)
 
 ## Later / not now
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
@@ -241,3 +329,4 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
 - The robot's eyes don't follow a moving block (CHARACTER "Block placed: idle (eyes follow)"): the eyes are drawn into the pose sprites, so this needs separate eye layers from the human (B-115).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
+- Replace the placeholder voice lines and game sounds (prototype clips) with new ones that fit the lab look; the human will provide them.
