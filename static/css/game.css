@@ -176,7 +176,10 @@ h3 {
 
 /* On every screen the header lies inside the frame's safe area, logo
    top-left at (36, 36) as in v5 (over the lab shelf on the play screen),
-   the mute toggle top-right (B-108). */
+   the mute toggle top-right (B-108). The header box spans the column
+   (y 0-77 with the toggle), over the top of the screens' content, so it
+   is click-through and only the toggle takes taps (the sticker book's
+   back button and scrolled content stay tappable under it). */
 .app-header {
     position: absolute;
     top: 0;
@@ -190,6 +193,7 @@ h3 {
     align-items: flex-start;
     justify-content: space-between;
     padding: 36px 36px 0;
+    pointer-events: none;
 }
 
 /* the "flip" logo: four flaps, the last letter in amber as in v5 */
@@ -226,6 +230,7 @@ h3 {
     border: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
 }
 
 .mute-btn svg {

@@ -1534,6 +1534,16 @@ class MuteToggleTests(TestCase):
         self.assertRegex(css, r'\.mute-btn \.icon-muted,\s*\.mute-btn\.is-muted \.icon-sound\s*{\s*display: none;')
         self.assertRegex(css, r'\.mute-btn\.is-muted \.icon-muted\s*{\s*display: block;')
 
+    def test_header_is_click_through_except_the_toggle(self):
+        # the header box spans the column down to y 77 at 360x740, over
+        # the top of the sticker book's back button (y 70) and scrolled
+        # content: only the toggle takes taps
+        css = self.css()
+        header = re.search(r'\n\.app-header\s*{([^}]*)}', css).group(1)
+        self.assertIn('pointer-events: none;', header)
+        toggle = re.search(r'\n\.mute-btn\s*{([^}]*)}', css).group(1)
+        self.assertIn('pointer-events: auto;', toggle)
+
     def test_state_and_wiring(self):
         js = self.ROOT / 'static' / 'js'
         self.assertRegex((js / 'state.js').read_text(), r'\n    muted: false,')
