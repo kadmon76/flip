@@ -73,7 +73,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - Next always advances; an unchecked word counts as wrong. Word counter increments. After the fifth word Next shows the round-end screen.
   - A word is recorded as `correct: true` only when checked correct with at least one heart left.
   - Screenshots via `--eval`: `play-wrong.png`, `play-correct.png`, `play-revealed.png`. Checklist passes.
-- status:
+- status: done: superseded by B-114 (https://github.com/kadmon76/flip/pull/31); old PR closed
 
 ### B-107 Round-end screen with stars
 - why: the session ends here; stars are the reward the kickoff asked for.
@@ -103,7 +103,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - The lost heart (already error-coloured from B-106) fades to muted over 200ms when the kid next moves a tile, alongside the wrong tint clearing. Input is never blocked.
   - `prefers-reduced-motion`: no wiggle, tint only.
   - Screenshots via `--eval`: `play-wrong-boxes.png` showing the tinted wrong boxes and a lost heart. Checklist passes.
-- status:
+- status: done: superseded by B-114 (https://github.com/kadmon76/flip/pull/31); old PR closed
 
 ### B-110 Correct feedback: confetti, box pulse, star pop
 - why: the moment of success is the game's main reward beat.
@@ -235,7 +235,7 @@ Rough items; itemise with acceptance criteria after M1 is merged.
 - Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
-- Open PRs #12 (B-106), #16 (B-108) and #18 (B-109) now overlap main after B-114: check/next flow and result line (#12), an add/add `static/js/audio.js` (#16; its mute must also gate the word clip), an add/add `static/js/feedback.js` with the wiggle and error tint (#18); rebase onto main or close.
+- Wrong-box tint (from closed PR #18, B-109): boxes holding a wrong letter keep an error-colour tint until the kid next moves a block; main has the wiggle and the bulb flicker but no tint.
 - Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
 - Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
 - `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
