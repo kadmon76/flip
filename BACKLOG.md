@@ -98,12 +98,12 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
 - status:
 
 ### B-108b Mute switch from images
-- why: v5 shows the mute control as a brass pill switch with a cream knob (issue #39, answer B).
+- why: v5 shows the mute control as a brass switch with a cream knob (issue #39, answer B).
 - acceptance:
-  - `static/images/ui/mute-switch-on.png` (knob right) and `mute-switch-off.png` (knob left), same canvas, supplied by the human.
-  - The toggle becomes the small cream glyph (about 14px, code) plus the switch at v5's size and place (about 45x23px at 360 wide, x 282-327, y 37-60), one button with a tap area of about 84x48. The knob side follows `state.muted`. No game logic changes.
-  - Screenshots: `header-switch-on.png`, `header-switch-off.png`. Checklist passes.
-- status: blocked: #39 (needs the two switch images from the human)
+  - Uses `static/images/ui/mute-switch-on.png` (knob right, sound on) and `mute-switch-off.png` (knob left, muted): same 180x59 canvas, transparent, lit from the upper left, no baked-in cast shadow (add the DESIGN contact shadow in CSS). Assets are read-only.
+  - The toggle becomes the small cream speaker glyph (about 14px, code, wave or cross) followed by the switch, both on the logo's centre line at the top right as in v5. The switch keeps its 3:1 shape, about 60x20px at 360 wide. One button covers glyph and switch, tap area at least 84x48. The two images are stacked and swapped by class (as the lever and dome do), so there is no flash on the first toggle. No game logic changes.
+  - Screenshots: `header-switch-on.png`, `header-switch-off.png`, plus a 3x zoom of both. Checklist passes.
+- status:
 
 ### B-109 Wrong feedback: wiggle and heart fade
 - why: a mistake should feel gentle and clear, not punishing.
