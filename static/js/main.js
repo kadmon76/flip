@@ -1,6 +1,6 @@
 // main.js — wiring: theme selection, round flow, the console controls
-// (check dome, reset lever, speaker), the kid-idle timer for the robot,
-// screen renders.
+// (check dome, reset lever, speaker), the header's mute toggle, the
+// kid-idle timer for the robot, screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -8,7 +8,7 @@ import { renderCard } from './card.js';
 import { returnAll } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerState, PRESS_MS } from './controls.js';
-import { speakWord, stopWord } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker } from './stickers.js';
@@ -161,10 +161,11 @@ function onLever() {
 
 // Speaker: plays the word's audio file through audio.js; `speaking` shows
 // `speaker-on` until it ends. A word without an audio file shows
-// `speaker-cap` and the tap is ignored.
+// `speaker-cap` and the tap is ignored; so is a tap while muted (nothing
+// would play).
 function onSpeak() {
     const { current } = state;
-    if (state.screen !== 'play' || speakerState(current, state.speaking) === 'cap') return;
+    if (state.screen !== 'play' || state.muted || speakerState(current, state.speaking) === 'cap') return;
     setState({ speaking: true });
     speakWord(current.audio, () => setState({ speaking: false }));
 }
@@ -344,6 +345,24 @@ function onThemes() {
     });
 }
 
+// --- Header: the mute toggle (BACKLOG B-108) ---
+
+// The toggle shows the speaker glyph, or the muted speaker while muted
+// (class is-muted; CSS shows one of the two icons). On every screen.
+function renderMute(state) {
+    const btn = $('mute-btn');
+    btn.classList.toggle('is-muted', state.muted);
+    btn.setAttribute('aria-pressed', String(state.muted));
+}
+
+// Flip the flag and remember it. Muting while the word plays ends it
+// (audio.js stops every sound on mute), so the speaker goes back to off.
+function onMute() {
+    const muted = !state.muted;
+    saveMuted(muted);
+    setState(muted ? { muted, speaking: false } : { muted });
+}
+
 // --- Gallery (sticker book) screen ---
 
 // Opened from the theme screen only; Back returns there. Nothing else in
@@ -367,6 +386,8 @@ subscribe(renderRobot);
 subscribe(renderRoundEnd);
 subscribe(renderGallery);
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
+subscribe(renderMute);
+subscribe(renderSound);       // the robot's clips (character.js's table) and the mute
 
 $('check-btn').addEventListener('click', onDome);
 $('reset-btn').addEventListener('click', onLever);
@@ -375,12 +396,17 @@ $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
+$('mute-btn').addEventListener('click', onMute);
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
 document.addEventListener('pointerdown', onInput, true);
 document.addEventListener('keydown', onInput, true);
 
 renderScreens(state);
+// Preload the clips (nothing plays until the first gesture), then the
+// remembered mute flag.
+initAudio();
+setState({ muted: loadMuted() });
 loadThemes();
 
 // Box sizing depends on the row width (layout.js); re-render on rotate.
