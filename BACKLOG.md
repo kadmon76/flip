@@ -95,7 +95,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - First user gesture unlocks audio; no console errors from autoplay policy on load.
   - Screenshots: `header-sound-on.png`, `header-muted.png`. Checklist passes.
   - Mute look (issue #39, answer B): until switch images exist, ship the interim cream glyph (28px, in a 48x48 tap area, top-right, wave or cross), as already built on branch `agent/wip/B-108-20261011-020002`; start from that branch. The brass switch is B-108b.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/44
 
 ### B-108b Mute switch from images
 - why: v5 shows the mute control as a brass switch with a cream knob (issue #39, answer B).
