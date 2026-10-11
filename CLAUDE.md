@@ -15,6 +15,7 @@ a phone.
 - Stack: Django 4.2 (Python 3.12, `venv/`), SQLite, django.contrib.auth.
   Frontend is vanilla JS ES modules, no build step, no framework.
   Drag-and-drop is GSAP Draggable loaded from cdnjs (already in the template).
+- Server Python is 3.8 (the Linode serves the preview and the live site); local dev is 3.12. Python code must stay 3.8-compatible (no `match`, no `X | Y` type unions, no 3.9+ stdlib APIs) and requirements must install on 3.8. A branch that breaks this shows "preview failed" in the run ping.
 - Runs on: phone browser, portrait, 360px wide and up (primary). Desktop
   must work but is not optimised.
 - Browser floor: iOS Safari 16.2+ / Chrome 111+. CSS or JS newer than the floor needs a fallback or a DECISIONS entry naming the browsers it drops.

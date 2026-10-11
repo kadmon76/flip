@@ -339,3 +339,5 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 - The robot's eyes don't follow a moving block (CHARACTER "Block placed: idle (eyes follow)"): the eyes are drawn into the pose sprites, so this needs separate eye layers from the human (B-115).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
 - Replace the placeholder voice lines and game sounds (prototype clips) with new ones that fit the lab look; the human will provide them.
+- Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).
+- `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
