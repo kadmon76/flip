@@ -3,7 +3,8 @@
 //   - the target word: the per-word `audio` file from the content JSON,
 //     played when the kid taps the speaker on the console (speakWord);
 //   - the robot's voice and the block swipe: pools of the existing clips
-//     under static/sounds/, preloaded once (init) and played by
+//     under static/sounds/, downloaded once (init), decoded into Web
+//     Audio buffers on the first gesture and played by
 //     renderSound, a state subscriber, for the moments character.js's
 //     table (MOMENTS[moment].sound) gives a state change. There is no
 //     second trigger list here.
@@ -11,8 +12,8 @@
 // through loadMuted / saveMuted) means no sound plays at all.
 //
 // Everything above "Playback" is pure (no DOM, no Audio) and a Django
-// test runs it through node; Audio elements are only created inside
-// init() and speakWord().
+// test runs it through node; the AudioContext is only created on the
+// first gesture and Audio elements only inside speakWord().
 
 import { state } from './state.js';
 import { snapshot, momentsFor, soundsFor, NONE } from './character.js';
@@ -65,7 +66,7 @@ export const FILES = {
 // plays whenever a block goes into a slot and may overlap anything.
 export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx' };
 
-// The first user gesture unlocks playback (see unlock): events that count
+// A user gesture unlocks playback (see unlock): events that count
 // as a user activation in Chrome and as a user gesture in Safari.
 export const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown'];
 
@@ -110,10 +111,23 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 
 // --- Playback ---
 
-// The preloaded clips: kind -> [HTMLAudioElement], built once by init()
-// from FILES. Media elements, not game state: nothing reads them to
-// decide game logic, and which clip plays is never remembered.
-const pools = {};
+// The robot's clips and the swipe play through the Web Audio API, not
+// <audio> elements. On a phone (every iOS browser is Safari underneath)
+// an <audio> element takes a few hundred ms from play() to sound, iOS
+// ignores `preload` so a clip's first play waits for its download, and
+// iOS refuses some of the per-element unlocks, leaving those clips silent
+// until a reload. So: init() downloads every clip once; the first user
+// gesture creates one AudioContext, opens its output and decodes the
+// clips into memory; play() then starts a decoded buffer at once.
+// The target word stays an <audio> element (speakWord): one file per
+// word, started by the kid's own tap on the speaker.
+//
+// Audio engine handles, not game state (CLAUDE.md "audio.js"): no other
+// module reads them and nothing decides game logic from them.
+let ctx = null;             // the AudioContext, made on the first gesture
+const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
+const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
+const live = new Set();     // pooled sources now playing: { src, kind }
 
 // Handle to the word clip now playing (an HTMLAudioElement), or null. It
 // is not game state and not a DOM cache: audio.js keeps it so a new tap or
@@ -123,80 +137,116 @@ const pools = {};
 // is `state.speaking`, set by main.js, and that is the truth.
 let wordClip = null;
 
-// Build the pools and wait for the first gesture. Nothing plays here, so
-// loading the page raises no autoplay-policy error.
+// Start downloading every clip and wait for the first gesture. Nothing
+// plays and no AudioContext exists yet, so loading the page raises no
+// autoplay-policy warning. A clip that fails to download is left out of
+// its pool.
 export function init() {
     for (const kind of Object.keys(FILES)) {
-        pools[kind] = poolUrls(kind).map((url) => {
-            const el = new Audio(url);
-            el.preload = 'auto';
-            return el;
+        buffers[kind] = FILES[kind].names.map(() => null);
+        bytes[kind] = poolUrls(kind).map((url) => {
+            try {
+                return fetch(url)
+                    .then((r) => (r.ok ? r.arrayBuffer() : null))
+                    .catch(() => null);
+            } catch (e) {
+                return Promise.resolve(null);
+            }
         });
+    }
+    // iOS 17+: play like a media app (heard with the silent switch on, as
+    // the <audio> clips were). Older iOS and other browsers lack it.
+    try {
+        if (globalThis.navigator && navigator.audioSession) navigator.audioSession.type = 'playback';
+    } catch (e) {
+        // nothing to do
     }
     for (const type of UNLOCK_EVENTS) document.addEventListener(type, unlock, true);
 }
 
-function allClips() {
-    return Object.values(pools).flat();
-}
-
-// First user gesture: start every clip silently (element-muted) and stop
-// it again as soon as it runs. Browsers that grant playback per element
-// (iOS Safari) then allow the clips later, also from a timer (the dome's
-// 120ms press). A clip that play() claims meanwhile is unmuted by it and
-// left playing. A refused start is caught: no console error.
+// Every gesture (capture phase, so a drop's own pointerup comes first):
+// the first one makes the context and decodes the clips; any one finding
+// the context not running (not yet started, or suspended / interrupted
+// after the phone switched apps) resumes it and plays one silent sample,
+// which is what really opens the output on iOS.
 function unlock() {
-    for (const type of UNLOCK_EVENTS) document.removeEventListener(type, unlock, true);
-    for (const el of allClips()) {
-        el.muted = true;
-        const release = () => {
-            if (!el.muted) return;          // play() took it over
-            el.pause();
-            el.currentTime = 0;
-            el.muted = false;
-        };
-        let p;
+    if (!ctx) {
+        const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+        if (!AC) return;            // no Web Audio: the game stays silent, no error
         try {
-            p = el.play();
+            ctx = new AC();
         } catch (e) {
-            el.muted = false;
-            continue;
+            return;
         }
-        if (p && p.then) p.then(release, () => { el.muted = false; });
-        else release();
+        decodeAll();
+    }
+    if (ctx.state === 'running') return;
+    try {
+        const p = ctx.resume();
+        if (p && p.catch) p.catch(() => {});
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, 22050);
+        src.connect(ctx.destination);
+        src.start(0);
+    } catch (e) {
+        // the next gesture tries again
     }
 }
 
-function stop(el) {
-    if (el.paused) return;
-    el.pause();
-    el.currentTime = 0;
+function decodeAll() {
+    for (const kind of Object.keys(bytes)) {
+        bytes[kind].forEach((p, i) => {
+            p.then((data) => (data ? ctx.decodeAudioData(data) : null))
+                .then((buf) => { if (buf) buffers[kind][i] = buf; })
+                .catch(() => {});   // an undecodable clip is left out of its pool
+        });
+    }
 }
 
-// Cut the robot's voice (every clip of the voice pools).
+function stopSource(entry) {
+    live.delete(entry);
+    try {
+        entry.src.stop();
+    } catch (e) {
+        // already ended
+    }
+}
+
+// Cut the robot's voice (every playing clip of the voice pools).
 function stopVoice() {
-    for (const [kind, clips] of Object.entries(pools)) {
-        if (CHANNEL[kind] === 'voice') clips.forEach(stop);
+    for (const entry of [...live]) {
+        if (CHANNEL[entry.kind] === 'voice') stopSource(entry);
     }
 }
 
 // Play a random clip of pool `kind` ('correct', 'error', 'tada', 'swipe').
-// Muted: nothing. A voice clip cuts the voice clip playing, and does not
-// start while the target word plays (`state.speaking`): the word is
-// spoken clean and is never cut.
+// Muted, before the first gesture, or while the pool is still decoding:
+// nothing. A voice clip cuts the voice clip playing, and does not start
+// while the target word plays (`state.speaking`): the word is spoken
+// clean and is never cut. The swipe may overlap anything.
 export function play(kind) {
-    if (state.muted) return;
-    const clips = pools[kind];
-    if (!clips || clips.length === 0) return;
+    if (state.muted || !ctx || !buffers[kind]) return;
     if (CHANNEL[kind] === 'voice') {
         if (state.speaking) return;
         stopVoice();
     }
-    const el = clips[pickIndex(clips.length)];
-    el.muted = false;
-    el.currentTime = 0;
-    const p = el.play();
-    if (p && p.catch) p.catch(() => {});    // not unlocked yet: stay silent, no console error
+    const ready = buffers[kind].filter(Boolean);
+    if (ready.length === 0) return;
+    try {
+        if (ctx.state !== 'running') {
+            const p = ctx.resume();
+            if (p && p.catch) p.catch(() => {});
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = ready[pickIndex(ready.length)];
+        src.connect(ctx.destination);
+        const entry = { src, kind };
+        live.add(entry);
+        src.onended = () => live.delete(entry);
+        src.start(0);
+    } catch (e) {
+        // stay silent, no console error
+    }
 }
 
 // Play the word clip at `url`; `onEnd` runs once when it ends or fails to
@@ -243,7 +293,7 @@ export function stopWord() {
 // Everything stops: the word and every pooled clip.
 function silence() {
     stopWord();
-    allClips().forEach(stop);
+    [...live].forEach(stopSource);
 }
 
 // Memo of the last state heard (CLAUDE.md "Subscribers may keep a memo"):

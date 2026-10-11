@@ -1302,8 +1302,9 @@ class AudioTests(TestCase):
     """static/js/audio.js, the only place sounds play (BACKLOG B-108,
     DESIGN "Sound"): pools of the existing clips, URL-encoded; a random
     clip per play; one voice clip at a time, never over the target word;
-    the robot's clips come from character.js's moment table; the first
-    gesture unlocks playback and nothing plays on load; `state.muted` in
+    the robot's clips come from character.js's moment table; clips play
+    through Web Audio, a gesture unlocks playback and nothing plays on
+    load; `state.muted` in
     localStorage `flip.muted` means no sound at all."""
 
     ROOT = Path(__file__).resolve().parent.parent
@@ -1316,27 +1317,45 @@ class AudioTests(TestCase):
             self.skipTest('node not installed')
 
     def run_node(self, body):
-        # A fake Audio (records play / pause on `log`, play() resolves) and
-        # a fake document (keeps its listeners in `listeners`). `a` is
-        # audio.js, `S` state.js. `names(kind)` are the file names played
-        # so far, `clear()` empties the log. `st(...)` builds a play-screen
-        # state on "cat" (round 1, three lives) with overrides; `put(ids)`
-        # its placed slots from tile ids.
+        # Fakes: Audio (the word clip; records play / pause on `log`),
+        # fetch (records URLs in `fetched`; URLs in `missing` answer 404),
+        # AudioContext (starts 'suspended'; decodeAudioData resolves; its
+        # buffer sources log play / stop and are listed in `sources`), and
+        # a document keeping its listeners in `listeners`. `a` is audio.js,
+        # `S` state.js. `played()` are the files started so far (the silent
+        # unlock sample left out), `kinds()` their pools, `sounding()` the pooled
+        # files playing now, `clear()` empties the log, `settle()` lets the
+        # downloads and decodes finish, `ready()` is init + one gesture +
+        # settle. `st(...)` builds a play-screen state on "cat" (round 1,
+        # three lives) with overrides; `put(ids)` its placed slots.
         script = (
-            "const log = []; const listeners = {}; const made = [];"
-            "globalThis.Audio = class { constructor(src) { this.src = src; this.preload = ''; this.muted = false;"
-            " this.paused = true; this.currentTime = 0; this.on = {}; made.push(this); }"
+            "const log = []; const listeners = {}; const made = []; const fetched = []; const missing = new Set();"
+            "const ctxs = []; const sources = [];"
+            "globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.on = {}; made.push(this); }"
             " addEventListener(t, fn) { this.on[t] = fn; }"
-            " play() { this.paused = false; log.push({ op: 'play', src: this.src, muted: this.muted }); return Promise.resolve(); }"
+            " play() { this.paused = false; log.push({ op: 'play', src: this.src }); return Promise.resolve(); }"
             " pause() { this.paused = true; log.push({ op: 'pause', src: this.src }); } };"
+            "globalThis.fetch = (url) => { fetched.push(url);"
+            " return Promise.resolve({ ok: !missing.has(url), arrayBuffer: () => Promise.resolve({ url }) }); };"
+            "globalThis.AudioContext = class { constructor() { this.state = 'suspended'; this.destination = {}; this.resumes = 0; ctxs.push(this); }"
+            " resume() { this.resumes++; this.state = 'running'; return Promise.resolve(); }"
+            " createBuffer() { return { url: 'silence' }; }"
+            " decodeAudioData(data) { return Promise.resolve({ url: data.url }); }"
+            " createBufferSource() { const s = { buffer: null, on: false, connect() {},"
+            "   start() { s.on = true; log.push({ op: 'play', src: s.buffer.url }); },"
+            "   stop() { if (!s.on) return; s.on = false; log.push({ op: 'stop', src: s.buffer.url }); } };"
+            "   sources.push(s); return s; } };"
             "globalThis.document = { addEventListener(t, fn, c) { listeners[t] = fn; }, removeEventListener(t, fn, c) { delete listeners[t]; } };"
             f"const a = await import('{self.MODULE.as_uri()}');"
             f"const S = await import('{self.STATE.as_uri()}');"
             "const out = (v) => console.log(JSON.stringify(v));"
             "const tick = () => new Promise((r) => setTimeout(r, 0));"
+            "const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };"
+            "const ready = async () => { a.init(); listeners.pointerup(); await settle(); };"
             "const short = (src) => decodeURIComponent(src.replace('/static/sounds/', ''));"
-            "const played = () => log.filter((e) => e.op === 'play' && !e.muted).map((e) => short(e.src));"
+            "const played = () => log.filter((e) => e.op === 'play' && e.src !== 'silence').map((e) => short(e.src));"
             "const kinds = () => played().map((f) => f.split('/')[0].replace('celebration', 'tada'));"
+            "const sounding = () => sources.filter((s) => s.on && s.buffer.url !== 'silence').map((s) => short(s.buffer.url).split('/')[0]).sort();"
             "const clear = () => { log.length = 0; };"
             "const put = (ids) => ids.map((id) => (id ? { letter: 'x', tileId: id } : null));"
             "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, speaking: false,"
@@ -1395,48 +1414,60 @@ class AudioTests(TestCase):
             " a.loadMuted(broken), (() => { a.saveMuted(true, broken); return 'no throw'; })(), a.loadMuted(undefined)]);"),
             ['flip.muted', False, 'true', True, 'false', False, False, False, False, 'no throw', False])
 
-    def test_nothing_plays_on_load_and_the_first_gesture_unlocks(self):
-        # init() preloads one Audio per clip and plays nothing; the first
-        # pointerup / touchend / click / keydown starts every clip muted
-        # and stops it again once it runs, and removes the listeners.
+    def test_nothing_plays_on_load_and_a_gesture_unlocks(self):
+        # init() downloads every clip once and plays nothing, with no
+        # AudioContext yet; the first pointerup / touchend / click /
+        # keydown makes one context, resumes it and plays one silent
+        # sample (iOS opens the output on that), then the clips decode.
+        # The listeners stay: a later gesture finding the context
+        # suspended (the phone switched apps) resumes it again; one
+        # finding it running does nothing.
         self.assertEqual(self.run_node(
-            "a.init(); const before = [made.length, made.every((e) => e.preload === 'auto'), log.length, Object.keys(listeners).sort()];"
-            "listeners.touchend(); const primed = log.filter((e) => e.op === 'play').map((e) => e.muted);"
-            "await tick(); await tick();"
-            "out([before, primed.length, primed.every(Boolean), made.every((e) => e.paused && !e.muted && e.currentTime === 0),"
-            " Object.keys(listeners)]);"),
-            [[25, True, 0, ['click', 'keydown', 'pointerup', 'touchend']], 25, True, True, []])
+            "a.init(); const before = [fetched.length, new Set(fetched).size, ctxs.length, log.length, Object.keys(listeners).sort()];"
+            "a.play('swipe'); const early = log.length;"
+            "listeners.touchend(); const c = ctxs[0]; const first = [ctxs.length, c.state, c.resumes, log.map((e) => e.src)];"
+            "await settle(); clear(); a.play('swipe'); const after = kinds();"
+            "listeners.click(); const quiet = [ctxs.length, c.resumes];"
+            "c.state = 'interrupted'; listeners.pointerup();"
+            "out([before, early, first, after, quiet, [c.state, c.resumes], Object.keys(listeners).length]);"),
+            [[25, 25, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
+             [1, 'running', 1, ['silence']], ['swipe'], [1, 1], ['running', 2], 4])
 
-    def test_a_clip_played_during_the_unlock_keeps_playing(self):
+    def test_no_web_audio_means_silent_not_broken(self):
         self.assertEqual(self.run_node(
-            "a.init(); S.setState({ muted: false, speaking: false }); listeners.pointerup(); a.play('tada'); await tick(); await tick();"
-            "const tada = made.find((e) => e.src.endsWith('tada.mp3'));"
-            "out([tada.paused, tada.muted]);"),
-            [False, False])
+            "delete globalThis.AudioContext; a.init(); listeners.pointerup(); await settle();"
+            "['correct', 'error', 'tada', 'swipe'].forEach(a.play); out([ctxs.length, played()]);"),
+            [0, []])
+
+    def test_a_clip_that_fails_to_download_is_left_out(self):
+        self.assertEqual(self.run_node(
+            "['swipe1', 'swipe2', 'swipe3'].forEach((n) => missing.add(`/static/sounds/swipe/${n}.mp3`));"
+            "await ready(); for (let i = 0; i < 6; i++) a.play('swipe');"
+            "out([...new Set(played())]);"),
+            ['swipe/swipe4.mp3'])
 
     def test_play_picks_from_the_pool_and_voice_clips_take_turns(self):
         self.assertEqual(self.run_node(
-            "a.init(); S.setState({ muted: false, speaking: false });"
-            "a.play('error'); const first = played(); const errEl = made.find((e) => !e.paused);"
-            "a.play('swipe'); const errStill = !errEl.paused;"          # the swipe does not cut the voice
-            "a.play('correct'); const errCut = errEl.paused;"          # a voice clip cuts the voice clip
-            "out([first.length, first[0].split('/')[0], kinds(), errStill, errCut,"
-            " made.filter((e) => !e.paused).map((e) => short(e.src).split('/')[0]).sort()]);"),
-            [1, 'error', ['error', 'swipe', 'correct'], True, True, ['correct', 'swipe']])
+            "await ready(); S.setState({ muted: false, speaking: false });"
+            "a.play('error'); const first = played();"
+            "a.play('swipe'); const both = sounding();"            # the swipe does not cut the voice
+            "a.play('correct'); const after = sounding();"         # a voice clip cuts the voice clip
+            "out([first.length, first[0].split('/')[0], kinds(), both, after]);"),
+            [1, 'error', ['error', 'swipe', 'correct'], ['error', 'swipe'], ['correct', 'swipe']])
 
     def test_no_voice_clip_over_the_target_word_and_the_word_cuts_the_voice(self):
         self.assertEqual(self.run_node(
-            "a.init(); S.setState({ muted: false, speaking: false });"
-            "a.play('error'); const errEl = made.find((e) => !e.paused);"
-            "S.setState({ speaking: true }); let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
-            "const word = made[made.length - 1]; const voiceCut = errEl.paused;"
+            "await ready(); S.setState({ muted: false, speaking: false });"
+            "a.play('error'); S.setState({ speaking: true }); let ended = 0;"
+            "a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
+            "const word = made[made.length - 1]; const voiceCut = sounding();"
             "clear(); a.play('correct'); a.play('tada'); a.play('swipe');"
             "out([voiceCut, kinds(), word.paused, ended]);"),
-            [True, ['swipe'], False, 0])
+            [[], ['swipe'], False, 0])
 
     def test_muted_means_no_sound_at_all(self):
         self.assertEqual(self.run_node(
-            "a.init(); S.setState({ muted: true, speaking: false }); const n = made.length;"
+            "await ready(); S.setState({ muted: true, speaking: false }); const n = made.length;"
             "['correct', 'error', 'tada', 'swipe'].forEach(a.play);"
             "let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
             "out([played(), made.length - n, ended]);"),
@@ -1450,7 +1481,7 @@ class AudioTests(TestCase):
         # tada once when the round-end screen shows; and nothing at all
         # while muted.
         steps = self.run_node(
-            "a.init(); S.subscribe(a.renderSound);"
+            "await ready(); S.subscribe(a.renderSound);"
             "const go = (o) => { clear(); S.setState(st(o)); return kinds(); };"
             "const cur = (ids, status = 'playing') => ({ current: { word: 'cat', status, placed: put(ids) } });"
             "const res = (n) => ({ round: { index: 4, size: 5, results: [0, 1, 2, 3, 4].map((i) => ({ correct: i < n })) } });"
@@ -1479,11 +1510,11 @@ class AudioTests(TestCase):
 
     def test_mute_stops_everything_and_keeps_it_silent(self):
         self.assertEqual(self.run_node(
-            "a.init(); S.subscribe(a.renderSound); S.setState(st());"
+            "await ready(); S.subscribe(a.renderSound); S.setState(st());"
             "S.setState(st({ current: { word: 'cat', status: 'playing', placed: put(['t1', null, null]) } }));"
             "a.speakWord('/static/sounds/themes/animals/cat.mp3', () => {}); const word = made[made.length - 1];"
-            "const swipeOn = made.some((e) => !e.paused && e.src.includes('/swipe/'));"
-            "S.setState({ muted: true, speaking: false }); const allStopped = made.every((e) => e.paused);"
+            "const swipeOn = sounding().includes('swipe');"
+            "S.setState({ muted: true, speaking: false }); const allStopped = sounding().length === 0 && word.paused;"
             "clear(); S.setState(st({ muted: true, current: { word: 'cat', status: 'playing', placed: put(['t1', 't2', null]) } }));"
             "S.setState(st({ muted: true, screen: 'round-end' }));"
             "out([swipeOn, word.paused, allStopped, played()]);"),
