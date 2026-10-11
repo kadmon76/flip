@@ -337,3 +337,13 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - because: the human answered the levels-and-hints proposal: (1) hear the word after answering on every level, (2) keep correct letters only when the kid pulls the lever, with a way to start over, (3) a given letter on the 2nd miss is fine on hard, (4) extra letters on hard are good; without word audio before answering on hard, the speaker should play something else.
 - reversible: yes.
 
+
+## 2026-10-11 — Rule suggestions from the B-116 review applied (issue #36; consumed at the start of batch run 20261011-2247)
+- chose: the human answered issue #36 "A apply, B apply, C apply, D apply" on 2026-10-09. Applied verbatim: (A) BACKLOG.md "Later / not now": the mascot line now reads "Visual mascot on the theme, round-end and sticker book screens (no corner is reserved since B-116; CHARACTER.md "Poses": robot-hero on the theme screen); character text lines on screens." (B) CLAUDE.md "Frontend architecture" gets the `flaps.js` bullet after the `score.js` bullet. (C) DESIGN.md "The layer model" gets the exception that the interim screens' cream panels with a brass border and icon buttons are CSS by design until their design pass. (D) DESIGN.md "Other screens (interim)" records the conventions: split-flap numbers, the amber sticker disc (dark = none), lit / dark for earned / unearned and mastered / missed.
+- because: question protocol; answers are consumed at the start of the next run and logged here. No backlog item was blocked on #36.
+- reversible: yes (docs only).
+
+## 2026-10-11 — Mute look answered: brass switch from images (issue #39; consumed at the start of batch run 20261011-2247)
+- chose: the human answered issue #39 "B" on 2026-10-11: the header mute toggle becomes the cream glyph plus a brass switch drawn from images. The human already supplied `static/images/ui/mute-switch-on.png` and `mute-switch-off.png`, unblocked B-108 and added B-108b in BACKLOG.md (PR #40): B-108 ships the interim 28px cream glyph (option A's look) starting from `agent/wip/B-108-20261011-020002`, and B-108b swaps in the switch. Nothing else to apply here.
+- because: question protocol; the answer is logged here. B-108 is no longer blocked; B-108b follows it.
+- reversible: yes.
