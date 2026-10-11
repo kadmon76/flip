@@ -94,6 +94,15 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - `state.muted` exists, persisted to localStorage key `flip.muted`. A mute toggle in the header top-right, at least 48x48px, switches icon between speaker and muted speaker. Muted means no sound plays at all.
   - First user gesture unlocks audio; no console errors from autoplay policy on load.
   - Screenshots: `header-sound-on.png`, `header-muted.png`. Checklist passes.
+  - Mute look (issue #39, answer B): until switch images exist, ship the interim cream glyph (28px, in a 48x48 tap area, top-right, wave or cross), as already built on branch `agent/wip/B-108-20261011-020002`; start from that branch. The brass switch is B-108b.
+- status:
+
+### B-108b Mute switch from images
+- why: v5 shows the mute control as a brass switch with a cream knob (issue #39, answer B).
+- acceptance:
+  - Uses `static/images/ui/mute-switch-on.png` (knob right, sound on) and `mute-switch-off.png` (knob left, muted): same 180x59 canvas, transparent, lit from the upper left, no baked-in cast shadow (add the DESIGN contact shadow in CSS). Assets are read-only.
+  - The toggle becomes the small cream speaker glyph (about 14px, code, wave or cross) followed by the switch, both on the logo's centre line at the top right as in v5. The switch keeps its 3:1 shape, about 60x20px at 360 wide. One button covers glyph and switch, tap area at least 84x48. The two images are stacked and swapped by class (as the lever and dome do), so there is no flash on the first toggle. No game logic changes.
+  - Screenshots: `header-switch-on.png`, `header-switch-off.png`, plus a 3x zoom of both. Checklist passes.
 - status:
 
 ### B-109 Wrong feedback: wiggle and heart fade
