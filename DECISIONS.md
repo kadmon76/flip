@@ -392,3 +392,9 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - chose: `.app-header` gets `pointer-events: none` and `.mute-btn` `pointer-events: auto`. The header is absolute, spans the column and, with the toggle's negative top margin, reaches y 77 at 360x740, so without this it covers the top 7px of the sticker book's `#gallery-back-btn` (x 18-90, y 70-126) and anything under the header's empty middle. Checked on this branch with `elementFromPoint` on the sticker book at 360x740: (54, 72) and (30, 76) are `#gallery-back-btn`, (200, 50) is the screen, (310, 49) and (288, 31) are `#mute-btn`; a real tap on the back button returns to the theme screen. Test `MuteToggleTests.test_header_is_click_through_except_the_toggle`.
 - because: the wip branch's round-1 review (minor); a header must not take taps meant for the screen under it.
 - reversible: yes (CSS only).
+
+## 2026-10-11 — Robot becomes a puppet (human decisions, planning chat)
+- chose: replace the six still poses with a puppet of parts generated in Canva from the character sheet (body, head, two eyebrows, mitten hands in six shapes) plus code-drawn visor eyes. Talking is shown by four effects driven by the live audio, all on together: a "scope mouth" line in the visor, eyes pulsing, cap sparks, head bobs. Hands rest on the console edge so they stay visible. Moments were tuned one by one with the human on a test page (`design/reference/robot-puppet.html`), including random variants for a new picture and extra enthusiasm when all slots are filled, and peeking over the edge while the kid is idle.
+- because: the still poses felt stiff, and with no mouth a kid could miss that the voice is his; the human approved the test page ("much better") and liked all four talking effects together.
+- reversible: yes.
+

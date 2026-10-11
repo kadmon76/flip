@@ -314,9 +314,21 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 - status:
 
 ### B-210 Robot as a puppet
-- why: six still pictures feel stiff; a puppet of parts with code-drawn eyes feels alive (test page approved in principle by the human on 2026-10-10).
-- acceptance: to be written once clean parts exist (body with head, two eyebrows, two hands, an empty visor; eyes drawn in code; idle breathing, blinking, eyes following the dragged letter; moods from parts).
-- status: blocked: needs clean robot parts from the human (assets are read-only for agents)
+- why: six still pictures feel stiff. A puppet of separate parts with code-drawn eyes and a voice-driven "mouth" feels alive and lets the kid connect his voice to him. Approved by the human on 2026-10-11 after several rounds on a test page.
+- reference: `design/reference/robot-puppet.html` is the approved test page. Serve the repo root over http (e.g. `python3 -m http.server`) and open `/design/reference/robot-puppet.html`. Its numbers (positions in "puppet px" on a 505x505 canvas, rotations, timings, eye sizes, eyebrow offsets, hand poses per moment) are the spec; port them, don't reinvent them. It is a single-file prototype: split it to fit the frontend architecture in CLAUDE.md.
+- assets (read-only): `static/images/ui/robot/` has `body.png` and `head.png` (505x505 canvas, already aligned; the visor is empty), `browL.png`, `browR.png` (same canvas), and the hand shapes `hand-restL.png`, `hand-restR.png`, `hand-wave.png`, `hand-point.png`, `hand-ball.png`, `hand-palm.png` (2x density, placed by their centre; the left hand uses the right-hand shapes mirrored, except rest). The old `robot-*.png` poses stay in place until this item replaces their use.
+- acceptance:
+  - Layers: body, head (rotates around its neck pivot), eyebrows (inside the head), two hands. Eyes are drawn in code (SVG) inside a visor clip, as in the reference.
+  - Hands are drawn above the console's top edge (a separate layer over the console) so they stay visible; the body and head stay behind the console as today. Hands never cover a console control's tap area or a bench block; adjust the rest pose if the lever is in the way and note it in DECISIONS.
+  - Ambient life on every screen where he is shown: float, breathing, blinking (with an occasional double blink), eyes wandering, hands drifting, eyebrows bobbing out of step plus an occasional solo lift or wiggle.
+  - Eyes and a small head turn follow the block the kid is dragging.
+  - Moments as in the reference, driven by `character.js`'s `MOMENTS` table: round start, new picture (random of surprise / giggle / shock, looking up at the TV), letter placed, all slots filled (point at the dome; about 4 in 10 times the extra-excited version), kid idle 10s (think, sink, then every few seconds peek over the edge with no hands showing, until the kid's next input), wake up, wrong (head shake and shrug), wrong with peek (ducks to his eyes, looks left/right, small shiver, comes back), third miss (covers eyes, then relief), correct (fist pump), 3 in a row (two fists, double pop, cap sparks), round end (clap), speaker locked (head shake, shrug).
+  - Talking: whenever a voice clip plays through `audio.js`, an AnalyserNode drives all four effects together: the scope mouth (a glowing line at the bottom of the visor showing the live waveform, faint and flat when quiet), eyes pulsing with loudness, cap glow and sparks on loud syllables, head bobs on peaks; the eyebrows also rise with loudness. Mute (B-108) silences the sound and therefore the effects.
+  - `prefers-reduced-motion`: pose and shape changes only, no floating, bobbing or hops.
+  - CHARACTER.md "Poses" and "Moment map" are updated to the puppet (parts, hand shapes, the moments above); the robot rule in CLAUDE.md "Project-specific rules" is updated for the hands-over-the-edge layer.
+  - Pure parts (moment table, pose lookup, hand pose per moment, the loudness smoothing) get a Django test through `node`.
+  - Screenshots: one per moment at 360x740 (`robot-<moment>.png`), plus `robot-talking.png` mid-clip and `robot-peek.png`. Checklist passes.
+- status:
 
 ## Later / not now
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
@@ -341,3 +353,4 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 - Replace the placeholder voice lines and game sounds (prototype clips) with new ones that fit the lab look; the human will provide them.
 - Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
+- Robot voice lines for the puppet's moments (the ~60-line ElevenLabs pool): the reference page `design/reference/robot-puppet.html` shows the line each moment wants (e.g. surprised "Ooh! What is THAT?", smirky "Take your time… I'll just… wait here."); the human will generate them.
