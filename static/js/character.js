@@ -7,8 +7,9 @@
 // above "Render" are pure (no DOM) and a Django test runs them through
 // node.
 //
-// The sound column is data only for now: the voice pools and the mute
-// toggle are B-108, which plays these clips through audio.js.
+// The sound column is the robot's voice: audio.js (B-108), the only place
+// sounds play, asks momentsFor() and soundsFor() which clip a state change
+// calls for and plays it from its pools; nothing else triggers a clip.
 
 import { starsFor } from './score.js';
 
@@ -27,12 +28,18 @@ export const POSES = ['idle', 'thinking', 'confused', 'excited', 'happy', 'oops'
 //     lives bulb lit, on the first miss he is only confused;
 //   - "Round end": happy for 2-3 stars, idle for 0-1 (never sad).
 // "wake" is the kid's next action after the idle sink ("pops back up").
+// "Block placed" is split by where the block went (BACKLOG B-108): into a
+// slot (blockPlaced, with the swipe) or back to the bench, by a tap, a
+// drag or the reset lever (blockReturned, silent). A block that fills the
+// last slot is "All slots filled" (filledEarly / filled), and it went into
+// a slot too, so those swipe as well.
 export const MOMENTS = {
     roundStart: { steps: [{ pose: 'idle', move: 'pop' }], sound: null },
     picture: { steps: [{ pose: 'thinking', move: 'none' }], sound: null },
     blockPlaced: { steps: [{ pose: 'idle', move: 'none' }], sound: 'swipe' },
-    filledEarly: { steps: [{ pose: 'excited', move: 'none' }], sound: null },
-    filled: { steps: [{ pose: 'idle', move: 'none' }], sound: null },
+    blockReturned: { steps: [{ pose: 'idle', move: 'none' }], sound: null },
+    filledEarly: { steps: [{ pose: 'excited', move: 'none' }], sound: 'swipe' },
+    filled: { steps: [{ pose: 'idle', move: 'none' }], sound: 'swipe' },
     kidIdle: { steps: [{ pose: 'thinking', move: 'none' }, { pose: 'thinking', move: 'sink' }], sound: null },
     wake: { steps: [{ pose: 'idle', move: 'pop' }], sound: null },
     wrong: { steps: [{ pose: 'confused', move: 'none' }], sound: 'error' },
@@ -143,13 +150,28 @@ export function momentsFor(prev, now) {
     }
     if (now.placed !== prev.placed) {
         if (now.filled && now.status === 'playing') return [now.round <= EARLY_ROUNDS ? 'filledEarly' : 'filled'];
-        return ['blockPlaced'];
+        return [blockEntered(prev.placed, now.placed) ? 'blockPlaced' : 'blockReturned'];
     }
     return [];
 }
 
+// Whether a block went into a slot between two snapshots' `placed`
+// (tile ids per slot, '-' for an empty one): some slot now holds a block
+// it did not hold before. A block taken back to the bench, or every block
+// sent back by the reset lever, only empties slots.
+export function blockEntered(before, after) {
+    const was = before.split(',');
+    return after.split(',').some((id, i) => id !== '-' && id !== '' && id !== was[i]);
+}
+
 export function stepsFor(moments) {
     return moments.flatMap((m) => MOMENTS[m].steps);
+}
+
+// The clips `moments` call for, in order (MOMENTS' sound column; moments
+// without one add nothing). audio.js plays them.
+export function soundsFor(moments) {
+    return moments.map((m) => MOMENTS[m].sound).filter(Boolean);
 }
 
 // When each of `count` steps starts (ms from now) if the last change was
@@ -168,12 +190,15 @@ export function idleWait(state, now) {
     return Math.max(0, state.lastInput + IDLE_MS - now);
 }
 
+// The snapshot before any state was seen: where renderRobot and audio.js's
+// renderSound start comparing from.
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, streak: 0, stars: null };
+
 // --- Render ---
 
 // Render cache: the snapshot it last rendered (to tell a moment from a
 // re-render) and when it last changed his pose (performance.now() ms, to
 // keep changes CHANGE_MS apart). Not game state; nothing else reads it.
-const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, streak: 0, stars: null };
 let last = { snap: NONE, changedAt: -Infinity };
 
 function reducedMotion() {

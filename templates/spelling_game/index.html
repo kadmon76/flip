@@ -19,14 +19,23 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=13">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=14">
 </head>
 <body>
-    <!-- Header: the split-flap "flip" logo, top-left inside the frame's
-         safe area on every screen (DESIGN "Layout"). No other text: the
-         English auth line is gone (DESIGN "Words on screen", B-116). -->
+    <!-- Header: the split-flap "flip" logo top-left and the mute toggle
+         top-right, inside the frame on every screen (DESIGN "Layout"). No
+         other text: the English auth line is gone (DESIGN "Words on
+         screen", B-116). The mute toggle (BACKLOG B-108) is a cream
+         speaker glyph, v5's, in a 48x48 tap area: main.js sets class
+         is-muted and aria-pressed from state.muted and CSS shows the
+         speaker with a wave or the muted speaker with a cross. The
+         aria-label is for screen readers only, never shown. -->
     <header class="app-header">
         <span class="app-title" role="img" aria-label="flip"><span class="flap">f</span><span class="flap">l</span><span class="flap">i</span><span class="flap">p</span></span>
+        <button id="mute-btn" class="mute-btn" type="button" aria-label="Mute" aria-pressed="false">
+            <svg class="icon-sound" viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M3 9.2h3.6L12 4.8v14.4l-5.4-4.4H3z"/><path class="line" d="M15.6 8.4a5.2 5.2 0 0 1 0 7.2"/></svg>
+            <svg class="icon-muted" viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M3 9.2h3.6L12 4.8v14.4l-5.4-4.4H3z"/><path class="line" d="M15.8 9.4l5.2 5.2M21 9.4l-5.2 5.2"/></svg>
+        </button>
     </header>
 
     <!-- Theme, round-end and sticker book are the interim screens (DESIGN

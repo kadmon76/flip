@@ -95,7 +95,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - First user gesture unlocks audio; no console errors from autoplay policy on load.
   - Screenshots: `header-sound-on.png`, `header-muted.png`. Checklist passes.
   - Mute look (issue #39, answer B): until switch images exist, ship the interim cream glyph (28px, in a 48x48 tap area, top-right, wave or cross), as already built on branch `agent/wip/B-108-20261011-020002`; start from that branch. The brass switch is B-108b.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/44
 
 ### B-108b Mute switch from images
 - why: v5 shows the mute control as a brass switch with a cream knob (issue #39, answer B).
@@ -320,7 +320,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 
 ## Later / not now
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
-- Visual mascot in the reserved corner; character text lines on screens.
+- Visual mascot on the theme, round-end and sticker book screens (no corner is reserved since B-116; CHARACTER.md "Poses": robot-hero on the theme screen); character text lines on screens.
 - Content in DB and generation pipeline (words, images in one cartoon style, TTS audio).
 - PWA: `manifest.json` references icons that do not exist; icons and offline.
 - Background music loop with its own toggle.
