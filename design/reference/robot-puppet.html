@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Approved robot puppet test (2026-10-11). Reference for B-210: open via the dev server at /static/../design is not served; open this file from a local http server at the repo root. All positions are in "puppet px" on a 505x505 canvas. -->
+<style>img{max-width:100%}body{margin:0}</style>
+<title>Flip Robot Puppet Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap">
+<style>
+/* Layout: one lab stage with the puppet over a console edge, then the game's moments as brass keys, then voice keys. Single dark look, matching the game. */
+:root{
+  --bench:#2a1d14; --bench-deep:#1b120c;
+  --brass:#b98a3c; --brass-dark:#6e4f1f; --cream:#efe4cb; --muted:#b9a88a;
+  --cyan:#47f0ee; --amber:#f2a33a;
+  --display:"Andika",ui-rounded,"Segoe UI",system-ui,sans-serif;
+  --mono:"Courier Prime","Courier New",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--bench-deep);color:var(--cream)}
+body{font-family:var(--display);padding-inline:16px;padding-block:20px 32px}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.5rem;margin:0;text-wrap:balance}
+p.lede{margin:0;color:var(--muted);font-family:system-ui,sans-serif;font-size:.95rem;line-height:1.5;max-width:62ch}
+.stage{background:radial-gradient(120% 90% at 50% 25%,#4a3524 0%,var(--bench) 55%,var(--bench-deep) 100%);
+  border:3px solid var(--brass);outline:1px solid var(--brass-dark);border-radius:14px;
+  position:relative;overflow:hidden;touch-action:none;display:flex;flex-direction:column;align-items:center;padding:8px 8px 0}
+.rig{position:relative;width:100%;max-width:340px;aspect-ratio:1;margin-bottom:-26%}
+#pup,#hands{position:absolute;left:0;top:0;width:505px;height:505px;transform-origin:0 0}
+#pup{z-index:1}
+#hands{z-index:3;pointer-events:none}
+#pupIn,#handsIn,#pupF,#handsF{position:absolute;inset:0}
+.layer{position:absolute;inset:0;width:505px;height:505px}
+.layer img{width:100%;height:100%;display:block;pointer-events:none;user-select:none}
+#pup svg{position:absolute;inset:0;width:505px;height:505px;overflow:visible}
+.hand{position:absolute;width:0;height:0}
+.hand .float, .hand .flip{position:absolute;left:0;top:0;width:0;height:0}
+.hand img{max-width:none;height:auto;position:absolute;transform:translate(-50%,-50%);opacity:0;pointer-events:none;user-select:none}
+.hand img.on{opacity:1}
+.hand img.mir{transform:translate(-50%,-50%) scaleX(-1)}
+#handL{left:134px;top:338px}
+#handR{left:350px;top:346px}
+.console{position:relative;z-index:2;width:100%;height:96px;background:linear-gradient(#7a5a2c,#4c3418);border-top:4px solid var(--brass);
+  box-shadow:inset 0 2px 0 #d6a95a, 0 -6px 14px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:flex-end;padding-inline:18px;gap:16px}
+.dome{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffcf8a,#e0801f 60%,#8a4a10);box-shadow:0 3px 0 #3a2410}
+.tile{position:absolute;left:24px;bottom:22px;width:44px;height:48px;border-radius:8px;background:var(--cream);color:#2a1a0c;
+  display:grid;place-items:center;font-size:1.6rem;box-shadow:0 3px 0 #9a8460;cursor:grab;touch-action:none;user-select:none;z-index:3}
+.group{display:flex;flex-direction:column;gap:8px}
+.label{font-family:var(--mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brass)}
+.keys{display:flex;flex-wrap:wrap;gap:8px}
+.keys button{font:inherit;font-size:.95rem;color:#2a1a0c;background:linear-gradient(#f6ecd6,var(--cream));border:3px solid var(--brass);
+  border-radius:10px;padding:7px 12px;min-height:44px;cursor:pointer;box-shadow:0 3px 0 var(--brass-dark)}
+.keys button[aria-pressed="true"]{background:linear-gradient(#ffc56b,var(--amber))}
+.keys button.talk{background:linear-gradient(#7ff6f4,var(--cyan))}
+.keys button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--brass-dark)}
+.keys button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.now{font-family:var(--mono);font-size:.85rem;color:var(--cyan);min-height:1.2em}
+ul.list{margin:0;padding-left:1.1em;font-family:system-ui,sans-serif;font-size:.9rem;line-height:1.55;color:var(--muted)}
+ul.list b{color:var(--cream)}
+@media (prefers-reduced-motion:reduce){.keys button:active{transform:none}}
+</style>
+
+<main>
+  <h1>Robot puppet test</h1>
+  <p class="lede">Version 3. The buttons are now the robot's real moments in the game. His hands change shape per moment (rest, wave, point, fist, palm up), his eyebrows have a life of their own, and all four talking effects are on. His hands now rest on the console edge, so they stay in view. Drag the letter <b>a</b> to see his eyes and head follow it.</p>
+
+  <section class="stage" id="stage" aria-label="Puppet robot">
+    <div class="rig" id="rig"><div id="pup"><div id="pupIn"><div id="pupF">
+      <div class="layer" id="body"><img alt="robot" src="../../static/images/ui/robot/body.png"></div>
+      <div class="layer" id="head">
+        <div class="layer"><img alt="" src="../../static/images/ui/robot/head.png"></div>
+        <svg viewBox="0 0 1264 1264" aria-hidden="true">
+          <defs>
+            <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="9" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <clipPath id="visorClip"><ellipse cx="666" cy="464" rx="194" ry="116" transform="rotate(10 666 464)"/></clipPath>
+            <radialGradient id="capGlow"><stop offset="0" stop-color="#9ffcfb" stop-opacity="1"/><stop offset=".5" stop-color="#47f0ee" stop-opacity=".55"/><stop offset="1" stop-color="#47f0ee" stop-opacity="0"/></radialGradient>
+          </defs>
+          <g id="cap" opacity="0">
+            <ellipse cx="722" cy="186" rx="110" ry="60" fill="url(#capGlow)"/>
+            <g id="sparks" stroke="#bffdfc" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#glow)">
+              <path d="M700 170 l-14 -40 l16 -6 l-12 -36"/>
+              <path d="M735 168 l10 -44 l-16 -4 l12 -34"/>
+              <path d="M760 178 l30 -28 l-12 -10 l26 -24"/>
+            </g>
+          </g>
+          <g clip-path="url(#visorClip)">
+            <g filter="url(#glow)">
+              <g id="eyes">
+                <g class="eye" id="eyeL" transform="translate(590 452)">
+                  <ellipse class="ball" rx="34" ry="48" fill="#47f0ee"/>
+                  <path class="arc" d="M-30 10 Q0 -28 30 10" stroke="#47f0ee" stroke-width="13" fill="none" stroke-linecap="round" opacity="0"/>
+                </g>
+                <g class="eye" id="eyeR" transform="translate(748 480)">
+                  <ellipse class="ball" rx="30" ry="42" fill="#47f0ee"/>
+                  <path class="arc" d="M-26 10 Q0 -24 26 10" stroke="#47f0ee" stroke-width="13" fill="none" stroke-linecap="round" opacity="0"/>
+                </g>
+              </g>
+              <g transform="rotate(10 666 464)">
+                <path id="scope" d="M556 548 L776 548" stroke="#47f0ee" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".28"/>
+              </g>
+            </g>
+          </g>
+        </svg>
+        <div class="layer" id="browL"><div class="layer bf"><img alt="" src="../../static/images/ui/robot/browL.png"></div></div>
+        <div class="layer" id="browR"><div class="layer bf"><img alt="" src="../../static/images/ui/robot/browR.png"></div></div>
+      </div>
+    </div></div></div>
+      <div id="hands"><div id="handsIn"><div id="handsF">
+      <div class="hand" id="handL"><div class="float"><div class="flip">
+        <img data-s="rest" class="on" alt="" src="../../static/images/ui/robot/hand-restL.png" width="86">
+        <img data-s="wave" alt="" src="../../static/images/ui/robot/hand-wave.png" width="83" class="mir">
+        <img data-s="point" alt="" src="../../static/images/ui/robot/hand-point.png" width="101" class="mir">
+        <img data-s="ball" alt="" src="../../static/images/ui/robot/hand-ball.png" width="72" class="mir">
+        <img data-s="palm" alt="" src="../../static/images/ui/robot/hand-palm.png" width="103" class="mir">
+      </div></div></div>
+      <div class="hand" id="handR"><div class="float"><div class="flip">
+        <img data-s="rest" class="on" alt="" src="../../static/images/ui/robot/hand-restR.png" width="86">
+        <img data-s="wave" alt="" src="../../static/images/ui/robot/hand-wave.png" width="83">
+        <img data-s="point" alt="" src="../../static/images/ui/robot/hand-point.png" width="101">
+        <img data-s="ball" alt="" src="../../static/images/ui/robot/hand-ball.png" width="72">
+        <img data-s="palm" alt="" src="../../static/images/ui/robot/hand-palm.png" width="103">
+      </div></div></div>
+      </div></div></div>
+    </div>
+    <div class="console" aria-hidden="true"><div class="dome" id="dome"></div></div>
+    <div class="tile" id="tile" aria-label="draggable letter a">a</div>
+  </section>
+
+  <div class="group">
+    <span class="label">Game moments</span>
+    <div class="keys" role="group" aria-label="Moments" id="moments"></div>
+    <div class="now" id="now" aria-live="polite"></div>
+  </div>
+
+  <div class="group">
+    <span class="label">Voice</span>
+    <div class="keys" role="group" aria-label="Talking visuals">
+      <button class="talk" id="talkBtn">▶ Talk</button>
+      <button data-fx="scope" aria-pressed="true">scope mouth</button>
+      <button data-fx="eyes" aria-pressed="true">eyes pulse</button>
+      <button data-fx="cap" aria-pressed="true">cap sparks</button>
+      <button data-fx="nod" aria-pressed="true">head bob</button>
+    </div>
+  </div>
+
+  <ul class="list">
+    <li><b>Hands:</b> each moment picks a hand shape and a place for it. They float a little behind his body, so they trail his moves instead of sliding like stickers.</li>
+    <li><b>Eyebrows:</b> they bob out of step with each other, sometimes one lifts or wiggles on its own, and both jump on loud syllables when he talks.</li>
+    <li><b>Kid idle</b> sinks him behind the console; <b>Wake up</b> brings him back.</li>
+  </ul>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Draggable.min.js"></script>
+<script>
+(function(){
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s)=>document.querySelector(s);
+  const pup = $('#pup');
+  function fit(){ const k = $('#rig').clientWidth/505; ['#pup','#hands'].forEach(id=>{ document.querySelector(id).style.transform = 'scale(' + k + ')'; }); }
+  fit(); addEventListener('resize', fit);
+  if (!window.gsap) { $('.lede').textContent += ' (Animation library did not load.)'; return; }
+
+  const HEAD = '241px 262px';
+  const REST = { L:{x:134,y:338}, R:{x:350,y:346} };
+  // Hand poses, in puppet px: target centre, rotation, shape. The console edge is at y 374,
+  // so every pose keeps the hands above it; "rest" has the mittens resting on the edge.
+  const H = {
+    rest:   { L:{x:150,y:340,r:-8,s:'rest'},  R:{x:334,y:344,r:8,s:'rest'} },
+    chin:   { L:{x:150,y:342,r:-8,s:'rest'},  R:{x:290,y:270,r:-15,s:'ball'} },
+    point:  { L:{x:150,y:340,r:-8,s:'rest'},  R:{x:398,y:318,r:32,s:'point'} },
+    scratch:{ L:{x:150,y:342,r:-8,s:'rest'},  R:{x:368,y:122,r:-150,s:'ball'} },
+    cover:  { L:{x:228,y:194,r:8,s:'wave'},   R:{x:310,y:206,r:-8,s:'wave'} },
+    wave:   { L:{x:96,y:262,r:-18,s:'wave'},  R:{x:400,y:196,r:14,s:'wave'} },
+    cheer:  { L:{x:84,y:180,r:-12,s:'wave'},  R:{x:406,y:168,r:12,s:'wave'} },
+    clap:   { L:{x:212,y:310,r:20,s:'wave'},  R:{x:274,y:314,r:-20,s:'wave'} },
+    shrug:  { L:{x:104,y:292,r:-10,s:'palm'}, R:{x:382,y:296,r:10,s:'palm'} },
+    grip:   { L:{x:184,y:360,r:0,s:'ball'},   R:{x:302,y:362,r:0,s:'ball'} },
+    gasp:   { L:{x:196,y:262,r:10,s:'wave'},  R:{x:300,y:270,r:-10,s:'wave'} },
+    giggle: { L:{x:150,y:340,r:-8,s:'rest'},  R:{x:298,y:262,r:-10,s:'ball'} },
+    shock:  { L:{x:70,y:214,r:-24,s:'wave'},  R:{x:414,y:206,r:24,s:'wave'} },
+    pointUp:{ L:{x:150,y:340,r:-8,s:'rest'},  R:{x:356,y:300,r:-30,s:'point'} },
+    pump:   { L:{x:150,y:340,r:-8,s:'rest'},  R:{x:392,y:226,r:-6,s:'ball'} },
+    pump2:  { L:{x:92,y:226,r:6,s:'ball'},    R:{x:392,y:226,r:-6,s:'ball'} },
+  };
+  const EYES = { idle:[34,48,30,42], wide:[42,56,38,52], squint:[32,8,28,8], confused:[40,54,14,16], dots:[12,12,11,11], happy:'arc' };
+
+  let state = { head:0, eyes:'idle', brows:'calm', hands:'rest', sunk:false };
+  const T = { ease:'sine.inOut', yoyo:true, repeat:-1 };
+
+  // ---------- ambient life
+  if (!reduce){
+    gsap.to(['#pupF','#handsF'], { y:-6, duration:1.7, ...T });
+    gsap.to('#body', { scaleY:1.012, scaleX:.996, duration:1.3, ...T, transformOrigin:'241px 420px' });
+    gsap.to('#handL .float', { y:-8, x:3, duration:1.5, ...T, delay:.35 });
+    gsap.to('#handR .float', { y:-10, x:-3, duration:1.8, ...T, delay:.6 });
+    gsap.to('#browL .bf', { y:-3, duration:1.9, ...T });
+    gsap.to('#browR .bf', { y:-3, rotation:2, duration:2.3, ...T, delay:.5, transformOrigin:'308px 136px' });
+  }
+  // eyebrows: an occasional solo lift or wiggle
+  (function browSolo(){
+    if (!reduce && !state.sunk){
+      const which = Math.random()<.5 ? '#browL .bf' : '#browR .bf';
+      const kind = Math.random();
+      if (kind < .5) gsap.to(which, { y:'-=9', duration:.18, yoyo:true, repeat:1, repeatDelay:.5, ease:'power2.out' });
+      else gsap.to(which, { rotation:'+=7', duration:.09, yoyo:true, repeat:3, ease:'sine.inOut', transformOrigin:'50% 50%' });
+    }
+    gsap.delayedCall(2.5 + Math.random()*3.5, browSolo);
+  })();
+
+  // ---------- building blocks
+  function setShape(side, s){ document.querySelectorAll(`#hand${side} img`).forEach(i=>i.classList.toggle('on', i.dataset.s===s)); }
+  function hands(name, d=.35){
+    state.hands = name; const P = H[name];
+    ['L','R'].forEach(k=>{
+      const p = P[k]; setShape(k, p.s);
+      gsap.to('#hand'+k, { x:p.x-REST[k].x, y:p.y-REST[k].y, rotation:p.r, duration:reduce?0:d, ease:'back.out(1.5)', delay:k==='L'?0:.04, overwrite:'auto' });
+    });
+  }
+  function eyes(name, d=.25){
+    state.eyes = name; const E = EYES[name];
+    const arc = E==='arc'; const v = arc ? EYES.idle : E;
+    gsap.to('#eyeL .ball', { attr:{rx:v[0], ry:v[1]}, opacity:arc?0:1, duration:reduce?0:d, ease:'back.out(1.4)' });
+    gsap.to('#eyeR .ball', { attr:{rx:v[2], ry:v[3]}, opacity:arc?0:1, duration:reduce?0:d, ease:'back.out(1.4)' });
+    gsap.to('#eyes .arc', { opacity:arc?1:0, duration:reduce?0:d });
+  }
+  const BROWS = { calm:[0,0,0,0], up:[-14,0,-14,0], frown:[8,6,10,-5], puzzled:[-12,-8,6,8], worried:[-12,-10,-12,10], happy:[-6,-4,-6,4] };
+  function brows(name){
+    state.brows = name; const b = BROWS[name];
+    gsap.to('#browL', { y:b[0], rotation:b[1], duration:reduce?0:.3, ease:'back.out(2)', transformOrigin:'230px 126px' });
+    gsap.to('#browR', { y:b[2], rotation:b[3], duration:reduce?0:.3, ease:'back.out(2)', transformOrigin:'308px 136px' });
+  }
+  function head(r, d=.4){ state.head = r; gsap.to('#head', { rotation:r, duration:reduce?0:d, ease:'back.out(1.5)', transformOrigin:HEAD }); }
+  function look(x, y){ gsap.to('#eyes', { x, y, duration:.25, ease:'power2.out' }); }
+  function pop(n=1){
+    if (reduce) return;
+    const tl = gsap.timeline();
+    for (let i=0;i<n;i++) tl.to('#pupIn', { y:-26, duration:.18, ease:'power2.out' }).to('#pupIn', { y:0, duration:.14, ease:'power2.in' });
+    gsap.timeline({ delay:.04 }).to('#handsIn', { y:-30, duration:.2, ease:'power2.out' }).to('#handsIn', { y:0, duration:.18, ease:'power2.in' });
+    // hands trail the body a beat later and a bit further
+    gsap.timeline({ delay:.05 }).to('.hand .flip', { y:10, duration:.12 }).to('.hand .flip', { y:0, duration:.3, ease:'back.out(3)' });
+  }
+  function sink(px, keepHands){
+    state.sunk = px > 60;
+    gsap.to('#pupIn', { y:px, duration:reduce?0:.4, ease:'power2.out' });
+    gsap.to('#handsIn', { y:keepHands ? 0 : px, opacity: (px > 40 && !keepHands) ? 0 : 1, duration:reduce?0:.3, ease:'power2.out' });
+  }
+  // while the kid is idle he hides, then every few seconds peeks over the edge, gripping it
+  let peekLoop = null;
+  function stopPeek(){ if (peekLoop){ peekLoop.kill(); peekLoop = null; } }
+  function startPeek(){
+    stopPeek();
+    peekLoop = gsap.timeline({ repeat:-1, delay:1.6, repeatDelay:2.6 })
+      .call(()=>{ sink(104); look(-26,-8); brows('up'); voice('smirky mumble: "hmm-hmm… still there?"'); })
+      .call(()=>look(26,-8), null, .9)
+      .call(()=>look(0,-10), null, 1.6)
+      .call(()=>{ sink(150); brows('calm'); }, null, 2.2);
+  }
+  function shake(){ if (!reduce) gsap.to('#head', { rotation:state.head+9, duration:.09, yoyo:true, repeat:5, ease:'sine.inOut', transformOrigin:HEAD, onComplete:()=>head(state.head,.15) }); }
+
+  let seq = null;
+  function run(steps){
+    if (seq) seq.kill();
+    seq = gsap.timeline();
+    let t = 0;
+    steps.forEach(([wait, fn])=>{ t += wait; seq.call(fn, null, t); });
+  }
+  let voiceTxt = '';
+  const say = (txt)=>{ $('#now').textContent = txt + (voiceTxt ? '   🔊 ' + voiceTxt : ''); };
+  function voice(txt){ voiceTxt = txt; const n = $('#now'); n.textContent = n.textContent.split('   🔊')[0] + '   🔊 ' + txt; }
+  const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+
+  // ---------- the game's moments (CHARACTER.md moment map)
+  const MOMENTS = [
+    ['Round start', ()=>run([[0,()=>{ sink(0); head(0); eyes('idle'); brows('up'); hands('wave'); pop(); }], [.6,()=>{ brows('calm'); hands('rest'); }]])],
+    ['New picture', ()=>{ const v = pick(['surprise','giggle','shock']);
+      if (v==='surprise') run([[0,()=>{ sink(0); head(-10); look(0,-22); eyes('wide'); brows('up'); hands('gasp'); pop(); voice('surprised: "Ooh! What is THAT?"'); }], [1.4,()=>{ hands('rest'); eyes('idle'); brows('calm'); head(-4); }]]);
+      if (v==='giggle')   run([[0,()=>{ sink(0); head(-8); look(0,-22); eyes('happy'); brows('happy'); hands('giggle'); voice('giggle: "hee-hee, I know this one… I think"'); }],
+                              [.2,()=>gsap.to('#head',{ rotation:'+=4', duration:.08, yoyo:true, repeat:7, transformOrigin:HEAD })], [1.6,()=>{ hands('rest'); eyes('idle'); brows('calm'); head(-4); }]]);
+      if (v==='shock')    run([[0,()=>{ sink(0); head(-12); look(0,-24); eyes('dots'); brows('worried'); hands('shock'); pop(); voice('shocked: "WHOA!"'); }], [.5,()=>eyes('wide')], [1.4,()=>{ hands('rest'); eyes('idle'); brows('calm'); head(-4); }]]);
+      say('New picture (' + v + ')'); }],
+    ['Letter placed', ()=>run([[0,()=>{ sink(0); head(0); eyes('idle'); brows('calm'); hands('rest'); look(-26,22); }], [.6,()=>look(0,0)]])],
+    ['All slots filled', ()=>{ const big = Math.random() < .4;
+      if (!big) run([[0,()=>{ sink(0); head(6); eyes('wide'); brows('up'); hands('point'); look(26,22); voice('"Press it, press it!"'); }]]);
+      else run([[0,()=>{ sink(0); head(6); eyes('wide'); brows('up'); hands('point'); look(26,22); pop(2); voice('excited: "Ooh ooh! The button! Now!"'); }],
+               [.3,()=>gsap.to('#handR .flip',{ x:12, duration:.12, yoyo:true, repeat:7 })],
+               [.3,()=>gsap.to(['#browL .bf','#browR .bf'],{ y:'-=8', duration:.12, yoyo:true, repeat:5 })]]);
+      say('All slots filled' + (big ? ' (extra excited)' : '')); }],
+    ['Kid idle 10s', ()=>run([[0,()=>{ sink(0); head(-6); eyes('squint'); brows('frown'); hands('chin'); voice('smirky: "Take your time… I\'ll just… wait here."'); }], [.9,()=>{ hands('rest'); sink(150); }], [.5, startPeek]])],
+    ['Wake up', ()=>run([[0,()=>{ sink(0); head(0); eyes('wide'); brows('up'); hands('rest'); pop(); }], [.5,()=>{ eyes('idle'); brows('calm'); }]])],
+    ['Wrong', ()=>run([[0,()=>{ sink(0); head(6); eyes('confused'); brows('puzzled'); hands('shrug'); shake(); talk(1); }], [1.8,()=>{ hands('rest'); eyes('idle'); brows('calm'); head(0); }]])],
+    ['Wrong (peek)', ()=>run([[0,()=>{ head(4); eyes('confused'); brows('worried'); sink(104); look(-24,-6); voice('worried mumble: "uh-oh…"'); }],
+                            [.5,()=>look(24,-6)], [.9,()=>gsap.to('#pupIn',{ x:3, duration:.05, yoyo:true, repeat:7 })],
+                            [.6,()=>look(0,-10)], [.5,()=>{ sink(0); hands('rest'); eyes('idle'); brows('calm'); head(0); look(0,0); }]])],
+    ['Third miss', ()=>run([[0,()=>{ sink(0); head(-3); eyes('dots'); brows('worried'); hands('cover'); }], [.9,()=>{ hands('rest'); eyes('happy'); brows('happy'); head(5); }]])],
+    ['Correct', ()=>run([[0,()=>{ sink(0); head(0); eyes('happy'); brows('up'); hands('pump'); pop(); }],
+                       [.3,()=>gsap.to('#handR .flip',{ y:-26, duration:.14, yoyo:true, repeat:3, ease:'power2.out' })], [1.4,()=>{ hands('rest'); eyes('idle'); brows('calm'); }]])],
+    ['3 in a row', ()=>run([[0,()=>{ sink(0); head(0); eyes('happy'); brows('up'); hands('pump2'); pop(2); }],
+                          [.25,()=>{ gsap.to('#handL .flip',{ y:-28, duration:.14, yoyo:true, repeat:5, ease:'power2.out' }); gsap.to('#handR .flip',{ y:-28, duration:.14, yoyo:true, repeat:5, ease:'power2.out', delay:.14 });
+                                     gsap.fromTo('#cap',{ opacity:1 },{ opacity:0, duration:.9 }); }],
+                          [1.6,()=>{ hands('rest'); eyes('idle'); brows('calm'); }]])],
+    ['Round end', ()=>run([[0,()=>{ sink(0); head(5); eyes('happy'); brows('happy'); hands('clap'); }],
+                          [.3,()=>gsap.to(['#handL .flip','#handR .flip'],{ x:(i)=>i?-10:10, duration:.13, yoyo:true, repeat:7 })], [2.2,()=>hands('rest')]])],
+    ['Speaker locked', ()=>run([[0,()=>{ sink(0); eyes('idle'); brows('frown'); hands('shrug'); shake(); talk(2); }], [1.6,()=>{ hands('rest'); brows('calm'); }]])],
+  ];
+  const box = $('#moments');
+  MOMENTS.forEach(([name, fn])=>{
+    const b = document.createElement('button'); b.textContent = name; b.type = 'button';
+    b.addEventListener('click', ()=>{ voiceTxt = ''; say(name); stopPeek(); fn(); }); box.appendChild(b);
+  });
+
+  // ---------- blinking and wandering eyes
+  function blink(){
+    if (!reduce && state.eyes!=='happy' && state.eyes!=='squint'){
+      gsap.timeline().to('#eyes .eye',{ scaleY:.08, duration:.07, ease:'power1.in', transformOrigin:'50% 50%' })
+                     .to('#eyes .eye',{ scaleY:1, duration:.1, ease:'power1.out' });
+      if (Math.random()<.2) gsap.delayedCall(.25, ()=>gsap.timeline().to('#eyes .eye',{scaleY:.08,duration:.07}).to('#eyes .eye',{scaleY:1,duration:.1}));
+    }
+    gsap.delayedCall(2.2 + Math.random()*3, blink);
+  }
+  blink();
+  let following = false;
+  (function wander(){
+    if (!following && !reduce && state.hands!=='point') look((Math.random()-.5)*34, (Math.random()-.5)*18);
+    gsap.delayedCall(1.6+Math.random()*2.4, wander);
+  })();
+  Draggable.create('#tile',{ bounds:'#stage',
+    onPress(){ following = true; },
+    onDrag(e){
+      const p = e.touches ? e.touches[0] : e; const r = $('#rig').getBoundingClientRect();
+      const dx = p.clientX-(r.left+r.width*.53), dy = p.clientY-(r.top+r.height*.37), len = Math.hypot(dx,dy)||1;
+      look(dx/len*Math.min(30,len/5), dy/len*Math.min(18,len/7));
+      gsap.to('#head',{ rotation: state.head + Math.max(-8,Math.min(8,dx/25)), duration:.3, transformOrigin:HEAD, overwrite:'auto' });
+    },
+    onRelease(){ following = false; gsap.to('#tile',{ x:0, y:0, duration:.5, ease:'back.out(1.6)' }); look(0,0); head(state.head); }
+  });
+
+  // ---------- talking: real audio drives the visuals
+  const fx = { scope:true, eyes:true, cap:true, nod:true };
+  document.querySelectorAll('[data-fx]').forEach(b=>b.addEventListener('click',()=>{
+    fx[b.dataset.fx] = !fx[b.dataset.fx]; b.setAttribute('aria-pressed', String(fx[b.dataset.fx]));
+  }));
+  const CLIPS = ['../../static/sounds/error/so close but not really.mp3','../../static/sounds/error/actually that is cleverly wrong.mp3','../../static/sounds/error/hmm no.mp3'];
+  let ctx, analyser, buffers = [], clipIdx = 0, talking = false;
+  function b64ToBuf(b64){ const s = atob(b64); const a = new Uint8Array(s.length); for (let i=0;i<s.length;i++) a[i]=s.charCodeAt(i); return a.buffer; }
+  async function talk(which){
+    try {
+      if (!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)(); analyser = ctx.createAnalyser(); analyser.fftSize = 1024; analyser.connect(ctx.destination); }
+      if (ctx.state==='suspended') await ctx.resume();
+      const i = (typeof which==='number') ? which : clipIdx;
+      if (!buffers[i]) buffers[i] = await ctx.decodeAudioData(await (await fetch(encodeURI(CLIPS[i]))).arrayBuffer());
+      const src = ctx.createBufferSource(); src.buffer = buffers[i]; src.connect(analyser);
+      if (typeof which!=='number') clipIdx = (clipIdx+1) % 2;
+      talking = true; src.onended = ()=>{ talking = false; };
+      src.start();
+    } catch(e){ $('#talkBtn').textContent = 'Sound unavailable'; }
+  }
+  $('#talkBtn').addEventListener('click', ()=>talk());
+
+  const scope = $('#scope'), cap = $('#cap');
+  const wave = new Uint8Array(512);
+  let level = 0, lastPeak = 0, nodSign = 1, browUp = 0;
+  function frame(t){
+    let rms = 0;
+    if (talking && analyser){
+      analyser.getByteTimeDomainData(wave);
+      for (let i=0;i<wave.length;i++){ const v=(wave[i]-128)/128; rms += v*v; }
+      rms = Math.sqrt(rms/wave.length);
+    }
+    level += ((Math.min(1,rms*4)) - level) * 0.35;
+    if (fx.scope && level > .02 && analyser){
+      let d = ''; const n = 44;
+      for (let i=0;i<=n;i++){ const x = 556 + i*(220/n); const v = (wave[Math.min(wave.length-1,Math.floor(i*wave.length/n))]-128)/128;
+        d += (i?'L':'M') + x.toFixed(1) + ' ' + (548 + v*190*Math.sin(Math.PI*i/n)).toFixed(1); }
+      scope.setAttribute('d', d); scope.setAttribute('opacity', (0.55 + level*0.45).toFixed(2));
+    } else { scope.setAttribute('d','M556 548 L776 548'); scope.setAttribute('opacity', fx.scope ? '.28' : '0'); }
+    gsap.set('#eyeL .ball, #eyeR .ball', { scale: fx.eyes ? 1 + level*0.22 : 1, transformOrigin:'50% 50%' });
+    cap.setAttribute('opacity', fx.cap ? Math.min(1, level*1.6).toFixed(2) : '0');
+    if (fx.cap && level > .45) gsap.set('#sparks', { rotation:(Math.random()-.5)*20, svgOrigin:'722 186', opacity:Math.random()<.6?1:0 });
+    // eyebrows ride the voice
+    const target = talking ? -level*12 : 0; browUp += (target - browUp)*0.3;
+    gsap.set(['#browL .bf img','#browR .bf img'], { y:browUp });
+    if (fx.nod && !reduce && level > .5 && t - lastPeak > 220){
+      lastPeak = t; nodSign = -nodSign;
+      gsap.to('#head',{ rotation: state.head + nodSign*3, y:-4, duration:.1, yoyo:true, repeat:1, transformOrigin:HEAD });
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  hands('rest',0); eyes('idle',0); brows('calm');
+})();
+</script>
+
+</html>
