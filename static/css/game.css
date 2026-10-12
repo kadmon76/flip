@@ -388,7 +388,7 @@ body[data-screen="play"] .play-back-btn {
         3px 6px 10px var(--shadow-contact);
 }
 
-/* An icon button (DESIGN: play, themes, stickers, back): 72x56, the
+/* An icon button (DESIGN: play, themes, stickers, back, level): 72x56, the
    icon in ink. The words are only in aria-label. */
 .panel-btn {
     flex: 0 0 auto;
@@ -494,11 +494,13 @@ body[data-screen="play"] .play-back-btn {
 
 /* One cream card per theme showing the theme's picture (the first
    word's), not its name. Square, up to 240px, smaller on a short screen
-   so both cards and the button fit (two cards, three gaps, the button,
-   the logo line and the bottom safe area). */
+   so both cards, the level row and the button fit (two cards, their
+   gaps, the level row, the button, the logo line and the bottom safe
+   area: 244px), with 36px to spare so the first card keeps clear of the
+   header: 230px cards at 360x740. */
 .theme-btn {
     display: block;
-    width: min(240px, 100%, (100vh - 200px) / 2);
+    width: min(240px, 100%, (100vh - 280px) / 2);
     aspect-ratio: 1 / 1;
     padding: 8px;
     cursor: pointer;
@@ -517,6 +519,46 @@ body[data-screen="play"] .play-back-btn {
 
 .theme-btn:active {
     transform: scale(0.97);
+}
+
+/* The level picker (BACKLOG B-202), right above the stickers button:
+   three icon buttons with 1, 2 and 3 bulbs, the lives bulbs' look
+   (.bulb). Bulbs are dark until their button is the picked level
+   (aria-pressed="true", set by main.js): then the button sits pressed
+   in (shifted down-right, a darker face shaded at its upper-left inner
+   edge, the light being upper left, and a smaller cast shadow) and its
+   bulbs are lit. */
+.levels {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.level-btn {
+    gap: 6px;
+}
+
+.level-btn .bulb {
+    width: 14px;
+    height: 14px;
+}
+
+.level-btn .bulb::before {
+    opacity: 0;
+}
+
+.level-btn[aria-pressed="true"] {
+    transform: translate(1px, 2px);
+    background: linear-gradient(160deg, var(--cream-lo) 0%, var(--cream) 70%);
+    box-shadow:
+        inset 0 0 0 1px var(--brass-dark),
+        inset 2px 3px 5px var(--shadow-contact),
+        0 0 0 1px var(--brass-dark),
+        1px 2px 4px var(--shadow-contact);
+}
+
+.level-btn[aria-pressed="true"] .bulb::before {
+    opacity: 1;
 }
 
 /* --- Play screen: the lab scene (DESIGN.md "Layout") --- */

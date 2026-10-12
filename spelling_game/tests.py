@@ -1913,3 +1913,209 @@ class PlayBackTests(TestCase):
         for decl in ("screen: 'theme',", 'words: [],', 'results: [] },', 'current: { word: null,', 'speaking: false,',
                      'pressed: null,', 'idleBeat: null,'):
             self.assertIn(decl, themes, decl)
+
+
+class LevelTests(TestCase):
+    """The level picker and the level in state (BACKLOG B-202):
+    static/js/level.js levelRules(level) (pure, run through node), the
+    level remembered in localStorage `flip.level` through loadLevel /
+    saveLevel only (a missing or bad value, or broken storage, is
+    'easy'), the theme screen's row of three panel buttons with 1, 2 and
+    3 bulbs above the stickers button, and the round's level fixed when a
+    theme is tapped."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'level.js'
+    EASY = {'hearBefore': True, 'firstLetterGiven': True, 'shortWordsFirst': True,
+            'leverDropsWrongFirst': True, 'distractors': 0}
+    NORMAL = {'hearBefore': False, 'firstLetterGiven': False, 'shortWordsFirst': False,
+              'leverDropsWrongFirst': False, 'distractors': 0}
+    HARD = dict(NORMAL, distractors=2)
+
+    # In-memory storage; SEED is the initial value of flip.level or null.
+    FAKE_STORAGE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.level', SEED);
+        const fake = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { store.set(k, String(v)); },
+        };
+        const raw = () => store.get('flip.level') ?? null;
+        const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('quota'); } };
+    """
+
+    def run_node(self, body, seed=None):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const SEED = {json.dumps(seed)};"
+            f"{self.FAKE_STORAGE}"
+            f"const L = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        text = (self.ROOT / 'static' / 'js' / name).read_text()
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
+
+    def main_function(self, name):
+        js = (self.ROOT / 'static' / 'js' / 'main.js').read_text()
+        start = re.search(rf'\n(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    # --- levelRules (pure) ---
+
+    def test_level_rules_per_level(self):
+        self.assertEqual(
+            self.run_node("out([L.LEVELS, L.DEFAULT_LEVEL, L.levelRules('easy'), L.levelRules('normal'), L.levelRules('hard')]);"),
+            [['easy', 'normal', 'hard'], 'easy', self.EASY, self.NORMAL, self.HARD],
+        )
+
+    def test_anything_that_is_not_a_level_gets_easys_rules(self):
+        self.assertEqual(
+            self.run_node("out([undefined, null, '', 'Hard', 'insane', 3, {}].map((v) => L.levelRules(v)));"),
+            [self.EASY] * 7,
+        )
+
+    def test_rules_are_a_new_object_each_time(self):
+        # a caller changing what it got cannot change the table
+        self.assertEqual(
+            self.run_node("const r = L.levelRules('hard'); r.distractors = 9; r.hearBefore = true;"
+                          "out([L.levelRules('hard'), L.levelRules('hard') === L.levelRules('hard')]);"),
+            [self.HARD, False],
+        )
+
+    def test_level_js_has_no_dom(self):
+        code = self.code('level.js')
+        for word in ('document', 'window', 'import '):
+            self.assertNotIn(word, code, word)
+
+    # --- flip.level: loadLevel / saveLevel ---
+
+    def test_missing_or_bad_stored_value_is_easy(self):
+        for seed in (None, '', 'insane', 'Easy', ' hard', '"hard"', 'null'):
+            self.assertEqual(self.run_node("out(L.loadLevel(fake));", seed=seed), 'easy', seed)
+
+    def test_stored_level_is_read(self):
+        for level in ('easy', 'normal', 'hard'):
+            self.assertEqual(self.run_node("out(L.loadLevel(fake));", seed=level), level)
+
+    def test_save_writes_the_key_and_load_reads_it_back(self):
+        self.assertEqual(
+            self.run_node("L.saveLevel('hard', fake); const a = [raw(), L.loadLevel(fake)];"
+                          "L.saveLevel('normal', fake); out([...a, raw(), L.loadLevel(fake)]);"),
+            ['hard', 'hard', 'normal', 'normal'],
+        )
+
+    def test_save_ignores_a_bad_level(self):
+        self.assertEqual(
+            self.run_node("L.saveLevel('insane', fake); L.saveLevel(undefined, fake); out(raw());", seed='normal'),
+            'normal',
+        )
+
+    def test_broken_or_missing_storage_is_easy_and_never_throws(self):
+        self.assertEqual(
+            self.run_node(
+                "const a = L.loadLevel(broken); L.saveLevel('hard', broken);"
+                # the default storage: none at all, then one whose access throws
+                "delete globalThis.localStorage; const b = L.loadLevel(); L.saveLevel('hard');"
+                "Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked'); } });"
+                "const c = L.loadLevel(); L.saveLevel('hard');"
+                "out([a, b, c]);"),
+            ['easy', 'easy', 'easy'],
+        )
+
+    def test_default_storage_is_local_storage(self):
+        self.assertEqual(
+            self.run_node("globalThis.localStorage = fake; L.saveLevel('hard'); out([raw(), L.loadLevel()]);"),
+            ['hard', 'hard'],
+        )
+
+    def test_only_level_js_names_the_key(self):
+        js = self.ROOT / 'static' / 'js'
+        for f in sorted(js.glob('*.js')):
+            if f.name != 'level.js':
+                self.assertNotIn('flip.level', self.code(f.name), f.name)
+        self.assertIn("LEVEL_KEY = 'flip.level'", self.code('level.js'))
+        self.assertNotIn('localStorage', self.code('main.js'))
+
+    # --- theme screen: the picker ---
+
+    def test_three_bulb_buttons_above_the_stickers_button_with_no_text(self):
+        html = self.client.get('/').content.decode()
+        theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-play"')]
+        self.assertLess(theme.index('id="theme-buttons"'), theme.index('id="level-picker"'))
+        self.assertLess(theme.index('id="level-picker"'), theme.index('id="stickers-btn"'))
+        picker = theme[theme.index('id="level-picker"'):theme.index('<div class="actions">')]
+        buttons = re.findall(r'<button id="level-(\w+)"([^>]*)>(.*?)</button>', picker, flags=re.S)
+        self.assertEqual([b[0] for b in buttons], ['easy', 'normal', 'hard'])
+        for (level, attrs, inner), bulbs in zip(buttons, (1, 2, 3)):
+            self.assertIn('class="panel-btn level-btn"', attrs)
+            self.assertIn('type="button"', attrs)
+            self.assertIn(f'aria-label="{level}"', attrs)
+            self.assertRegex(attrs, r'aria-pressed="(true|false)"')
+            self.assertEqual(inner.count('<span class="bulb"></span>'), bulbs, level)
+            self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '', level)    # no text
+        # the markup's default matches state.level's default
+        self.assertIn('aria-pressed="true"', buttons[0][1])
+
+    def test_picked_button_is_pressed_in_with_lit_bulbs_the_others_dark(self):
+        self.assertIn('opacity: 0;', self.rule('.level-btn .bulb::before'))
+        self.assertIn('opacity: 1;', self.rule('.level-btn[aria-pressed="true"] .bulb::before'))
+        pressed = self.rule('.level-btn[aria-pressed="true"]')
+        self.assertIn('transform: translate(1px, 2px);', pressed)
+        self.assertIn('inset 2px 3px 5px var(--shadow-contact)', pressed)
+        # the bulbs are the lives bulbs (.bulb), not a new drawing
+        self.assertIn('.hearts span,\n.bulb {', self.css())
+
+    def test_theme_screen_fits_at_360x740_and_on_a_short_phone(self):
+        # logo line 70 + two cards + their 16px gap + 12px + level row 56
+        # + 12px + stickers button 56 + bottom safe area 22
+        n = int(re.search(r'width: min\(240px, 100%, \(100vh - (\d+)px\) / 2\);', self.rule('.theme-btn')).group(1))
+        self.assertEqual(self.rule('.level-btn .bulb').count('14px'), 2)
+        for height in (740, 667, 640):
+            card = min(240, 324, (height - n) / 2)
+            self.assertLessEqual(70 + 2 * card + 16 + 12 + 56 + 12 + 56 + 22, height, height)
+        self.assertGreaterEqual(min(240, 324, (740 - n) / 2), 230)
+
+    # --- state and wiring ---
+
+    def test_level_in_state_default_easy_and_the_rounds_level(self):
+        state = (self.ROOT / 'static' / 'js' / 'state.js').read_text()
+        self.assertRegex(state, r"\n    level: 'easy',")
+        self.assertIn('round: { index: 0, size: 5, level: null, results: [] },', state)
+
+    def test_wiring(self):
+        main = (self.ROOT / 'static' / 'js' / 'main.js').read_text()
+        self.assertIn("import { LEVELS, loadLevel, saveLevel } from './level.js';", main)
+        self.assertIn('setState({ level: loadLevel() });', main)
+        self.assertIn('subscribe(renderLevel);', main)
+        self.assertIn("for (const level of LEVELS) $(`level-${level}`).addEventListener('click', () => onLevel(level));", main)
+        render = self.main_function('renderLevel')
+        self.assertIn("$(`level-${level}`).setAttribute('aria-pressed', String(level === state.level));", render)
+        pick = self.main_function('onLevel')
+        self.assertIn("if (state.screen !== 'theme') return;", pick)
+        self.assertLess(pick.index('saveLevel(level);'), pick.index('setState({ level });'))
+
+    def test_the_level_is_fixed_for_the_round_once_a_theme_is_tapped(self):
+        start = self.main_function('startRound')
+        # read when the theme is tapped, before the data file is fetched
+        self.assertLess(start.index('const level = state.level;'), start.index('await fetch('))
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, level, results: [] },', start)
+        # nothing else writes a round level; leaving a round clears it
+        main = self.code('main.js')
+        self.assertEqual(len(re.findall(r'\blevel(: [^,}]+)?, results', main)), 2)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, level: null, results: [] },', self.main_function('onThemes'))
+        for name in ('onCheck', 'onNext'):
+            self.assertIn('...round', self.main_function(name), name)

@@ -6,7 +6,16 @@ export const state = {
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }] }] from themes.json and the data files; image is the first word's
     theme: null,
     words: [],                  // [{ word, image, audio }] for the current round
-    round: { index: 0, size: 5, results: [] },   // results[i] = { word, correct }
+    // results[i] = { word, correct }; level is the level the round is
+    // played at, copied from `level` when a theme is tapped (startRound)
+    // and fixed for the round (null while no round is in play); the
+    // round's rules are level.js levelRules(round.level).
+    round: { index: 0, size: 5, level: null, results: [] },
+    // The level the kid picked on the theme screen (BACKLOG B-202):
+    // 'easy' | 'normal' | 'hard'. Remembered in localStorage `flip.level`
+    // (level.js loadLevel / saveLevel); main.js sets it from there at
+    // start-up. A change takes effect from the next round.
+    level: 'easy',
     current: {
         word: null,
         image: null,

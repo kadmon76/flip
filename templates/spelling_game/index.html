@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=16">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=17">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -59,9 +59,24 @@
          readers only, never shown. -->
 
     <!-- Theme screen: one card per theme showing the theme's picture
-         (main.js), and the sticker book button (star sticker). -->
+         (main.js), the level picker and the sticker book button (star
+         sticker). The level picker (BACKLOG B-202) is three panel buttons
+         with 1, 2 and 3 bulbs (the lives bulbs' look); main.js sets
+         aria-pressed on the picked one, which CSS draws pressed in with
+         its bulbs lit (the others raised, bulbs dark). -->
     <div id="screen-theme" class="screen">
         <div id="theme-buttons"></div>
+        <div id="level-picker" class="levels" role="group" aria-label="level">
+            <button id="level-easy" class="panel-btn level-btn" type="button" aria-label="easy" aria-pressed="true">
+                <span class="bulb"></span>
+            </button>
+            <button id="level-normal" class="panel-btn level-btn" type="button" aria-label="normal" aria-pressed="false">
+                <span class="bulb"></span><span class="bulb"></span>
+            </button>
+            <button id="level-hard" class="panel-btn level-btn" type="button" aria-label="hard" aria-pressed="false">
+                <span class="bulb"></span><span class="bulb"></span><span class="bulb"></span>
+            </button>
+        </div>
         <div class="actions">
             <button id="stickers-btn" class="panel-btn" type="button" aria-label="Stickers">
                 <span class="sticker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
