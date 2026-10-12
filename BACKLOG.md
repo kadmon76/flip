@@ -103,7 +103,7 @@ Build order: tooling → theme → 5-word round → round-end → juice → stic
   - Uses `static/images/ui/mute-switch-on.png` (knob right, sound on) and `mute-switch-off.png` (knob left, muted): same 180x59 canvas, transparent, lit from the upper left, no baked-in cast shadow (add the DESIGN contact shadow in CSS). Assets are read-only.
   - The toggle becomes the small cream speaker glyph (about 14px, code, wave or cross) followed by the switch, both on the logo's centre line at the top right as in v5. The switch keeps its 3:1 shape, about 60x20px at 360 wide. One button covers glyph and switch, tap area at least 84x48. The two images are stacked and swapped by class (as the lever and dome do), so there is no flash on the first toggle. No game logic changes.
   - Screenshots: `header-switch-on.png`, `header-switch-off.png`, plus a 3x zoom of both. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/47
 
 ### B-109 Wrong feedback: wiggle and heart fade
 - why: a mistake should feel gentle and clear, not punishing.
