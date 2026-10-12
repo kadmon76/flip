@@ -8,7 +8,7 @@ import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
 import { returnAll } from './drag.js';
 import { renderFeedback } from './feedback.js';
-import { renderControls, domeAction, canReset, speakerState, PRESS_MS } from './controls.js';
+import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
@@ -186,11 +186,22 @@ function onLever() {
 
 // Speaker: plays the word's audio file through audio.js; `speaking` shows
 // `speaker-on` until it ends. A word without an audio file shows
-// `speaker-cap` and the tap is ignored; so is a tap while muted (nothing
-// would play).
+// `speaker-cap` and the tap is ignored. What a tap does depends on the
+// round's level (BACKLOG B-203, controls.js speakerAction): on normal and
+// hard, before the word is answered, the speaker holds the word back and
+// the tap counts one more `lockedTaps`, which is the robot's confused
+// "no" (character.js) with his "hmm no" (audio.js; nothing while muted,
+// the robot still shakes his head). Otherwise a tap while muted is
+// ignored (nothing would play).
 function onSpeak() {
     const { current } = state;
-    if (state.screen !== 'play' || state.muted || speakerState(current, state.speaking) === 'cap') return;
+    if (state.screen !== 'play') return;
+    const action = speakerAction(current, state.round.level);
+    if (action === 'locked') {
+        setState({ lockedTaps: state.lockedTaps + 1 });
+        return;
+    }
+    if (action !== 'word' || state.muted) return;
     setState({ speaking: true });
     speakWord(current.audio, () => setState({ speaking: false }));
 }

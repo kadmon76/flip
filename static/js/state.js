@@ -35,6 +35,12 @@ export const state = {
     // on the reset lever; null otherwise.
     pressed: null,
     speaking: false,            // the word's audio is playing (speaker-on)
+    // Taps on the speaker while it holds the word back (normal and hard,
+    // before the word is answered; BACKLOG B-203, controls.js
+    // speakerAction). Each tap is one more: the robot's `speakerLocked`
+    // moment (character.js) and its "hmm no" (audio.js) play on the
+    // change, so only the change matters; counted over the session.
+    lockedTaps: 0,
     // Sound off (the header's mute toggle, B-108): no sound plays at all.
     // Remembered in localStorage `flip.muted` (audio.js loadMuted /
     // saveMuted); main.js sets it from there at start-up.

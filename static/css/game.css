@@ -1025,13 +1025,18 @@ body.dragging-active {
 }
 
 /* The layer character.js slides up and down (yPercent of its height); at
-   rest the sprite's top is 75px above the console. One contact shadow. */
+   rest the sprite's top is 75px above the console. One contact shadow.
+   The speakerLocked head-shake (BACKLOG B-203) turns it about his neck:
+   the visor centre's column (72.6px, below) where the console's top edge
+   crosses him at rest (75px down), so his head swings and his shoulders
+   stay at the edge. */
 .robot-body {
     position: absolute;
     left: 0;
     right: 0;
     top: calc((130 - 75) * var(--rpx));
     height: calc(120 * var(--rpx));
+    transform-origin: calc(72.6 * var(--rpx)) calc(75 * var(--rpx));
     filter: drop-shadow(2px 3px 3px var(--shadow-contact));
 }
 

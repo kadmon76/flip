@@ -1026,6 +1026,43 @@ class ControlsTests(TestCase):
             ['off', 'on', 'cap', 'cap'],
         )
 
+    def test_speaker_action_per_level(self):
+        # BACKLOG B-203: easy plays the word at any time; normal and hard
+        # hold it back ('locked') until the word is answered (correct or
+        # revealed), then play it; no audio file: nothing (capped). A
+        # round level that is not a level (null between rounds) reads as
+        # easy (level.js levelRules).
+        self.assertEqual(
+            self.run_node(
+                "const st = ['playing', 'wrong', 'correct', 'revealed'];"
+                "out(['easy', 'normal', 'hard', null, 'bogus'].map((lv) => st.map((s) => c.speakerAction(cur(s, 'ca-'), lv))));"),
+            [
+                ['word'] * 4,
+                ['locked', 'locked', 'word', 'word'],
+                ['locked', 'locked', 'word', 'word'],
+                ['word'] * 4,
+                ['word'] * 4,
+            ],
+        )
+        self.assertEqual(
+            self.run_node(
+                "out([...['easy', 'normal', 'hard'].flatMap((lv) => [c.speakerAction(cur('playing', '---', null), lv),"
+                " c.speakerAction(cur('correct', 'cat', ''), lv)]),"
+                " c.speakerAction({ word: null, audio: '/a.mp3', status: 'playing', placed: [] }, 'normal'), c.speakerAction(null, 'easy')]);"),
+            [None] * 8,
+        )
+
+    def test_a_held_back_speaker_looks_the_same(self):
+        # no lock icon: speakerState does not depend on the level
+        self.assertEqual(
+            self.run_node("out([c.speakerState(cur('playing', '---'), false), c.speakerState(cur('wrong', 'tac'), false),"
+                          " c.speakerAction(cur('playing', '---'), 'hard')]);"),
+            ['off', 'off', 'locked'],
+        )
+        src = self.MODULE.read_text()
+        body = src[src.index('export function speakerState'):src.index('export function speakerAction')]
+        self.assertNotIn('level', re.sub(r'//[^\n]*', '', body))
+
 
 class ResetTransitionTests(TestCase):
     """static/js/drag.js returnAll() and afterMove(): the reset lever puts
@@ -1152,6 +1189,7 @@ class CharacterTests(TestCase):
             'streak': {'steps': steps(('excited', 'doublePop')), 'sound': 'correct'},
             'roundEndGood': {'steps': steps(('happy', 'none')), 'sound': 'tada'},
             'roundEnd': {'steps': steps(('idle', 'none')), 'sound': 'tada'},
+            'speakerLocked': {'steps': steps(('confused', 'shake')), 'sound': 'locked'},
         })
 
     def test_every_pose_is_an_image_and_every_move_exists(self):
@@ -1225,11 +1263,12 @@ class CharacterTests(TestCase):
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
+            'speakerLocked': ['locked'],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
             "const used = new Set(Object.values(c.MOMENTS).map((m) => m.sound).filter(Boolean)); out([...used].sort());"),
-            ['correct', 'error', 'swipe', 'tada'])
+            ['correct', 'error', 'locked', 'swipe', 'tada'])
 
     def test_wrong_check_confused_and_a_peek_on_the_last_bulb(self):
         self.assertEqual(self.run_node(
@@ -1273,6 +1312,54 @@ class CharacterTests(TestCase):
             " moments(st({ pressed: null }), st({ pressed: 'dome', speaking: true }))]);"),
             [[], [], [], [], []])
 
+    def test_each_tap_on_a_held_back_speaker_is_a_confused_no(self):
+        # BACKLOG B-203: main.js counts each tap on the speaker while it
+        # holds the word back (state.lockedTaps); every change of the count
+        # on the word is the moment speakerLocked (confused, a small
+        # head-shake, the 'locked' clip), the second tap too; a re-render
+        # is none. A sunk robot first wakes (the tap's pointerdown), then
+        # shakes his head (its click).
+        self.assertEqual(self.run_node(
+            "out([moments(st({ lockedTaps: 0 }), st({ lockedTaps: 1 })), moments(st({ lockedTaps: 1 }), st({ lockedTaps: 2 })),"
+            " moments(st({ lockedTaps: 2 }), st({ lockedTaps: 2 })), moments(st(), st({ lockedTaps: 0 })),"
+            " moments(st({ lockedTaps: 3, current: cur('wrong', 'tac'), lives: 2 }), st({ lockedTaps: 4, current: cur('wrong', 'tac'), lives: 2 })),"
+            " moments(st({ lockedTaps: 4, current: cur('playing', 'ca-') }), st({ lockedTaps: 5, current: cur('playing', 'ca-') })),"
+            " moments(st({ idleBeat: 'sunk', lockedTaps: 1 }), st({ idleBeat: 'over', lockedTaps: 1 })),"
+            " moments(st({ idleBeat: 'over', lockedTaps: 1 }), st({ idleBeat: 'over', lockedTaps: 2 })),"
+            " c.stepsFor(['speakerLocked']), c.soundsFor(['speakerLocked']),"
+            " c.snapshot(st({ lockedTaps: 7 })).lockedTaps, c.snapshot(st()).lockedTaps, c.NONE.lockedTaps]);"),
+            [['speakerLocked'], ['speakerLocked'], [], [], ['speakerLocked'], ['speakerLocked'],
+             ['wake'], ['speakerLocked'], [{'pose': 'confused', 'move': 'shake'}], ['locked'], 7, 0, 0])
+
+    def test_a_new_word_or_round_wins_over_the_tap_count(self):
+        # the count runs over the session; a new picture or round start is
+        # what the robot plays when the word changed, and off the play
+        # screen nothing
+        self.assertEqual(self.run_node(
+            "out([moments(st({ lockedTaps: 2, current: cur('correct', 'cat') }),"
+            " st({ lockedTaps: 2, round: { index: 1, size: 5, results: [{ correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })),"
+            " moments({ ...theme, lockedTaps: 2 }, st({ roundsStarted: 2, lockedTaps: 2 })),"
+            " moments({ ...theme, lockedTaps: 2 }, { ...theme, lockedTaps: 3 })]);"),
+            [['picture'], ['roundStart', 'picture'], []])
+
+    def test_the_head_shake_is_small_and_short(self):
+        # his head and shoulders swing 4.5° each side of upright about the
+        # neck (the 9° of design/reference/robot-puppet.html's shake,
+        # centred), 90ms a swing, sine in-out, 540ms in all; he stays at
+        # rest height and ends upright. Reduced motion: no turn at all.
+        shake = self.run_node("out(c.MOVES.shake);")
+        self.assertEqual([s['rotation'] for s in shake], [4.5, -4.5, 4.5, -4.5, 4.5, 0])
+        self.assertEqual({s['y'] for s in shake}, {0})
+        self.assertEqual({s['duration'] for s in shake}, {0.09})
+        self.assertEqual({s['ease'] for s in shake}, {'sine.inOut'})
+        self.assertAlmostEqual(sum(s['duration'] for s in shake), 0.54)
+        self.assertEqual(self.run_node("out(c.moveFor('shake', true));"), [{'y': 0, 'duration': 0, 'ease': 'none'}])
+        # no other move turns him
+        moves = self.run_node("out(c.MOVES);")
+        for name, segs in moves.items():
+            if name != 'shake':
+                self.assertFalse(any('rotation' in s for s in segs), name)
+
     def test_back_to_themes_is_no_moment_and_a_new_round_starts_fresh(self):
         # BACKLOG B-201: the play screen's back button (main.js onPlayBack
         # -> onThemes) leaves for the theme screen with the round cleared;
@@ -1309,16 +1396,19 @@ class CharacterTests(TestCase):
         # peek: only the eyes above the edge for 600ms, then normal
         self.assertEqual([s['y'] for s in moves['peek']], [18, 18, 0])
         self.assertEqual(moves['peek'][1]['duration'], 0.6)
-        # a vertical slide only; everything but the sink ends at rest
+        # a vertical slide only, except the speakerLocked head-shake (BACKLOG
+        # B-203), which also turns him about the neck; everything but the
+        # sink ends at rest
         for name, segs in moves.items():
-            self.assertEqual(set(k for s in segs for k in s), {'y', 'duration', 'ease'}, name)
+            keys = {'y', 'duration', 'ease', 'rotation'} if name == 'shake' else {'y', 'duration', 'ease'}
+            self.assertEqual(set(k for s in segs for k in s), keys, name)
             self.assertNotIn('back', ' '.join(s['ease'] for s in segs), name)
             if name != 'sink':
                 self.assertEqual(segs[-1]['y'], 0, name)
 
     def test_reduced_motion_swaps_poses_only(self):
         self.assertEqual(self.run_node("out(Object.keys(c.MOVES).map((k) => c.moveFor(k, true)));"),
-                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 5)
+                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 6)
         self.assertEqual(self.run_node("out(c.moveFor('pop', false));"), self.run_node("out(c.MOVES.pop);"))
 
     def test_idle_wait_is_10s_from_the_last_input_once_per_word(self):
@@ -1407,13 +1497,16 @@ class AudioTests(TestCase):
         # correct/*, error/*, celebration/tada.mp3, swipe/*: every file on
         # disk and nothing else (a renamed clip fails here, not on a phone)
         files = self.run_node("out(a.FILES);")
-        self.assertEqual(set(files), {'correct', 'error', 'tada', 'swipe'})
+        self.assertEqual(set(files), {'correct', 'error', 'tada', 'swipe', 'locked'})
         for kind, dir_ in (('correct', 'correct'), ('error', 'error'), ('swipe', 'swipe')):
             self.assertEqual(files[kind]['dir'], dir_)
             on_disk = sorted(f.name for f in (self.SOUNDS / dir_).iterdir() if f.is_file())
             self.assertEqual(sorted(files[kind]['names']), on_disk, kind)
         self.assertEqual(files['tada'], {'dir': 'celebration', 'names': ['tada.mp3']})
         self.assertTrue((self.SOUNDS / 'celebration' / 'tada.mp3').exists())
+        # BACKLOG B-203: the held-back speaker's "hmm no", the existing clip
+        self.assertEqual(files['locked'], {'dir': 'error', 'names': ['hmm no.mp3']})
+        self.assertTrue((self.SOUNDS / 'error' / 'hmm no.mp3').exists())
 
     def test_urls_are_encoded(self):
         urls = self.run_node(
@@ -1433,7 +1526,7 @@ class AudioTests(TestCase):
 
     def test_channels(self):
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx'})
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -1469,7 +1562,7 @@ class AudioTests(TestCase):
     def test_no_web_audio_means_silent_not_broken(self):
         self.assertEqual(self.run_node(
             "delete globalThis.AudioContext; a.init(); listeners.pointerup(); await settle();"
-            "['correct', 'error', 'tada', 'swipe'].forEach(a.play); out([ctxs.length, played()]);"),
+            "['correct', 'error', 'tada', 'swipe', 'locked'].forEach(a.play); out([ctxs.length, played()]);"),
             [0, []])
 
     def test_a_clip_that_fails_to_download_is_left_out(self):
@@ -1501,7 +1594,7 @@ class AudioTests(TestCase):
     def test_muted_means_no_sound_at_all(self):
         self.assertEqual(self.run_node(
             "await ready(); S.setState({ muted: true, speaking: false }); const n = made.length;"
-            "['correct', 'error', 'tada', 'swipe'].forEach(a.play);"
+            "['correct', 'error', 'tada', 'swipe', 'locked'].forEach(a.play);"
             "let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
             "out([played(), made.length - n, ended]);"),
             [[], 0, 1])
@@ -1552,6 +1645,37 @@ class AudioTests(TestCase):
             "S.setState(st({ muted: true, screen: 'round-end' }));"
             "out([swipeOn, word.paused, allStopped, played()]);"),
             [True, True, True, []])
+
+    def test_hmm_no_is_downloaded_and_decoded_once_for_both_pools(self):
+        # BACKLOG B-203: the 'locked' pool is the error pool's "hmm no";
+        # the file is fetched once and decoded once (decodeAudioData takes
+        # over its bytes), and both pools play it
+        self.assertEqual(self.run_node(
+            "const decodes = []; const dec = AudioContext.prototype.decodeAudioData;"
+            "AudioContext.prototype.decodeAudioData = function (d) { decodes.push(d.url); return dec.call(this, d); };"
+            "await ready(); S.setState({ muted: false, speaking: false });"
+            "const url = '/static/sounds/error/hmm%20no.mp3';"
+            "a.play('locked'); a.play('locked'); const locked = played(); clear();"
+            "Math.random = () => 0.45; a.play('error');"     # index 4 of the ten error clips
+            "out([fetched.filter((u) => u === url).length, decodes.filter((u) => u === url).length, decodes.length,"
+            " new Set(decodes).size, locked, played(), sounding()]);"),
+            [1, 1, 25, 25, ['error/hmm no.mp3', 'error/hmm no.mp3'], ['error/hmm no.mp3'], ['error']])
+
+    def test_a_tap_on_the_held_back_speaker_says_hmm_no(self):
+        # renderSound plays MOMENTS.speakerLocked.sound ('locked') on each
+        # change of state.lockedTaps: "hmm no" every tap, a new one cutting
+        # the last (one voice clip at a time); nothing on a re-render, and
+        # nothing while muted (the count still changes: the robot shakes
+        # his head silently)
+        self.assertEqual(self.run_node(
+            "await ready(); S.subscribe(a.renderSound);"
+            "const go = (o) => { clear(); S.setState(st(o)); return played(); };"
+            "out([go({ lockedTaps: 0 }), go({ lockedTaps: 1 }), go({ lockedTaps: 2 }), sounding(),"
+            " go({ lockedTaps: 2 }), go({ lockedTaps: 3, muted: true }), go({ lockedTaps: 3, muted: false }),"
+            # after a wrong check (its error clip), a tap still says hmm no
+            " (go({ lockedTaps: 3, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 }), kinds()),"
+            " go({ lockedTaps: 4, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 })]);"),
+            [[], ['error/hmm no.mp3'], ['error/hmm no.mp3'], ['error'], [], [], [], ['error'], ['error/hmm no.mp3']])
 
     def test_back_to_themes_stops_the_word_and_plays_nothing(self):
         # BACKLOG B-201: the play screen's back button (main.js onPlayBack
@@ -2119,3 +2243,73 @@ class LevelTests(TestCase):
         self.assertIn('round: { index: 0, size: ROUND_SIZE, level: null, results: [] },', self.main_function('onThemes'))
         for name in ('onCheck', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
+
+
+class SpeakerPerLevelTests(TestCase):
+    """The speaker per level (BACKLOG B-203): easy plays the word at any
+    time; normal and hard, before the word is answered, hold it back and
+    the robot says "hmm no" with a small confused head-shake; once the
+    word is answered it plays on every level; the speaker looks the same;
+    mute silences all of it. The pure parts are run through node in
+    ControlsTests, CharacterTests and AudioTests; this checks the wiring."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def code(self, name):
+        text = (self.ROOT / 'static' / 'js' / name).read_text()
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+    def main_function(self, name):
+        js = self.code('main.js')
+        start = re.search(rf'\n(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css_rule(self, selector):
+        css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', css).group(1)
+
+    def test_locked_taps_in_state(self):
+        self.assertRegex((self.ROOT / 'static' / 'js' / 'state.js').read_text(), r'\n    lockedTaps: 0,')
+
+    def test_the_tap_follows_the_rounds_level(self):
+        speak = self.main_function('onSpeak')
+        # the round's copy of the level (B-202), not the picker's
+        self.assertIn('speakerAction(current, state.round.level)', speak)
+        self.assertNotRegex(speak, r'state\.level\b')
+        # a held-back tap counts one more, even while muted (the robot
+        # still shakes his head; audio.js plays nothing), and plays no word
+        locked = speak.index("if (action === 'locked') {")
+        self.assertLess(locked, speak.index('state.muted'))
+        self.assertIn('setState({ lockedTaps: state.lockedTaps + 1 });\n        return;', speak[locked:])
+        self.assertLess(speak.index("if (action !== 'word' || state.muted) return;"), speak.index('speakWord('))
+        self.assertIn("import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';",
+                      (self.ROOT / 'static' / 'js' / 'main.js').read_text())
+
+    def test_only_the_speaker_tap_writes_the_count(self):
+        # state is written only through setState patches; the one that
+        # changes lockedTaps is the held-back tap in main.js onSpeak
+        js = self.ROOT / 'static' / 'js'
+        patches = {f.name: re.findall(r'setState\(\{[^}]*\blockedTaps\b', self.code(f.name)) for f in sorted(js.glob('*.js'))}
+        self.assertEqual({k: len(v) for k, v in patches.items() if v}, {'main.js': 1})
+        self.assertIn('setState({ lockedTaps: state.lockedTaps + 1 });', self.main_function('onSpeak'))
+
+    def test_the_held_back_speaker_is_not_disabled_and_has_no_lock(self):
+        # renderControls disables only the capped speaker, so a held-back
+        # tap still reaches main.js; no new speaker image or class
+        controls = self.code('controls.js')
+        self.assertIn("speaker.disabled = s === 'cap';", controls)
+        self.assertIn("speaker: ['off', 'on', 'cap'],", controls)
+        html = self.client.get('/').content.decode()
+        speaker = html[html.index('id="speak-btn"'):html.index('</button>', html.index('id="speak-btn"'))]
+        self.assertEqual(re.findall(r'class="(speaker-[a-z]+)"', speaker), ['speaker-off', 'speaker-on', 'speaker-cap'])
+        self.assertNotIn('lock', speaker)
+
+    def test_the_head_shake_turns_him_about_his_neck(self):
+        # the visor centre's column (72.6px) at the console's edge (75px
+        # below the sprite's top at rest): his head swings, his shoulders
+        # stay at the edge
+        self.assertIn('transform-origin: calc(72.6 * var(--rpx)) calc(75 * var(--rpx));', self.css_rule('.robot-body'))
+        self.assertIn('left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));', self.css_rule('.robot-body img'))
+        self.assertIn('top: calc((130 - 75) * var(--rpx));', self.css_rule('.robot-body'))
+        # every segment sets the turn, so no other move leaves him tilted
+        self.assertIn('rotation: s.rotation || 0', self.code('character.js'))
