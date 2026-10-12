@@ -176,7 +176,7 @@ h3 {
 
 /* On every screen the header lies inside the frame's safe area, logo
    top-left at (36, 36) as in v5 (over the lab shelf on the play screen),
-   the mute toggle top-right (B-108). The header box spans the column
+   the mute toggle top-right (B-108, B-108b). The header box spans the column
    (y 0-77 with the toggle), over the top of the screens' content, so it
    is click-through and only the toggle takes taps (the sticker book's
    back button and scrolled content stay tappable under it). */
@@ -209,22 +209,25 @@ h3 {
     color: var(--amber-deep);
 }
 
-/* The mute toggle (BACKLOG B-108): v5's cream speaker glyph, 28px, with
-   the contact shadow, in a 48x48 tap area (no face or border: the glyph
-   is the whole control). The box's top is the frame's inner edge (29),
-   its right edge the window's (334 at 360 wide); 8px of bottom padding
-   puts the glyph's centre on the logo's (y 49) and its right edge 36px
-   from the scene's edge, mirroring the logo's left. Muted: the speaker
-   with a cross instead of the wave (class is-muted, main.js). */
+/* The mute toggle (BACKLOG B-108, B-108b, v5): the small cream speaker
+   glyph (code, 14px tall) then the brass switch (images, 60px wide at the
+   asset's 180:59), one button with no face or border, 106x48. The box's
+   top is the frame's inner edge (29), its right edge the window's (334
+   at 360 wide); 8px of bottom padding puts the glyph's and the switch's
+   centres on the logo's (y 49), and 10px of right padding puts the
+   switch's right edge 36px from the scene's edge, mirroring the logo's
+   left. Muted: the speaker with a cross instead of the wave, and the
+   switch's knob on the left (class is-muted, main.js). */
 .mute-btn {
     flex: 0 0 auto;
-    width: 48px;
+    width: 106px;
     height: 48px;
     margin: -7px -10px 0 0;
-    padding: 0 0 8px;
+    padding: 0 10px 8px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
+    gap: 8px;
     color: var(--cream);
     background: none;
     border: none;
@@ -233,10 +236,15 @@ h3 {
     pointer-events: auto;
 }
 
+/* The glyph's viewBox is the bounding box of both icons (strokes
+   included), so 14px is the glyph's height; the wave or cross never
+   moves the speaker. overflow: visible keeps the anti-aliased edges. */
 .mute-btn svg {
-    width: 28px;
-    height: 28px;
-    filter: drop-shadow(1px 2px 1.5px var(--shadow-contact));
+    flex: 0 0 auto;
+    width: calc(14px * 19.8 / 15.6);
+    height: 14px;
+    overflow: visible;
+    filter: drop-shadow(1px 1px 1px var(--shadow-contact));
 }
 
 .mute-btn .body {
@@ -262,8 +270,37 @@ h3 {
     display: block;
 }
 
-.mute-btn:active svg {
-    transform: scale(0.92);
+/* The brass switch: both images stacked in one box and swapped by class
+   (as the lever and dome are), so both are loaded up front and the first
+   toggle does not flash. Knob right (on) at rest, knob left while muted.
+   One contact shadow for the stack (DESIGN "Assets": the images have no
+   cast shadow). */
+.mute-btn .switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 60px;
+    height: calc(60px * 59 / 180);
+    filter: drop-shadow(1px 2px 2px var(--shadow-contact));
+}
+
+.mute-btn .switch img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.mute-btn .switch .switch-on,
+.mute-btn.is-muted .switch .switch-off {
+    opacity: 1;
+}
+
+.mute-btn.is-muted .switch .switch-on {
+    opacity: 0;
 }
 
 /* --- Screens: one centered column --- */

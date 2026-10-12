@@ -1535,14 +1535,19 @@ class AudioTests(TestCase):
 
 
 class MuteToggleTests(TestCase):
-    """The header's mute toggle (BACKLOG B-108, DESIGN "Layout" header,
-    "Words on screen"): top-right after the logo, an icon button at least
-    48x48, speaker / muted speaker, no text; wired to state.muted."""
+    """The header's mute toggle (BACKLOG B-108, B-108b, DESIGN "Layout"
+    header, "Words on screen", v5): top-right after the logo, one button
+    holding the small cream speaker glyph (wave / cross) and the brass
+    switch (images, knob right / left), tap area at least 84x48, no text;
+    wired to state.muted."""
 
     ROOT = Path(__file__).resolve().parent.parent
 
     def css(self):
         return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
 
     def test_toggle_is_an_icon_button_in_the_header_after_the_logo(self):
         html = self.client.get('/').content.decode()
@@ -1557,13 +1562,69 @@ class MuteToggleTests(TestCase):
         self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '')
         self.assertLess(header.index('class="app-title"'), header.index('id="mute-btn"'))
 
-    def test_toggle_is_at_least_48px_and_shows_one_icon(self):
+    def test_glyph_then_switch_images_in_one_button(self):
+        # B-108b: the glyph (code) followed by the switch, both images in
+        # the markup so both load up front (no flash on the first toggle)
+        html = self.client.get('/').content.decode()
+        inner = re.search(r'<button id="mute-btn"[^>]*>(.*?)</button>', html, flags=re.S).group(1)
+        on = inner.index('<img class="switch-on" src="/static/images/ui/mute-switch-on.png" alt="" />')
+        off = inner.index('<img class="switch-off" src="/static/images/ui/mute-switch-off.png" alt="" />')
+        switch = inner.index('<span class="switch" aria-hidden="true">')
+        self.assertLess(inner.index('class="icon-sound"'), switch)
+        self.assertLess(inner.index('class="icon-muted"'), switch)
+        self.assertLess(switch, on)
+        self.assertLess(on, off)
+        self.assertEqual(html.count('mute-switch-'), 2)
+
+    def test_tap_area_is_at_least_84x48_and_shows_one_glyph(self):
         css = self.css()
-        rule = re.search(r'\n\.mute-btn\s*{([^}]*)}', css).group(1)
-        self.assertIn('width: 48px;', rule)
-        self.assertIn('height: 48px;', rule)
+        rule = self.rule('.mute-btn')
+        width = int(re.search(r'\n\s*width: (\d+)px;', rule).group(1))
+        height = int(re.search(r'\n\s*height: (\d+)px;', rule).group(1))
+        self.assertGreaterEqual(width, 84)
+        self.assertGreaterEqual(height, 48)
+        # glyph + gap + switch fit inside the padded box
+        pad = re.search(r'\n\s*padding: 0 (\d+)px 8px;', rule)
+        gap = re.search(r'\n\s*gap: (\d+)px;', rule)
+        self.assertIsNotNone(pad)
+        self.assertIsNotNone(gap)
+        self.assertLessEqual(14 * 19.8 / 15.6 + int(gap.group(1)) + 60, width - 2 * int(pad.group(1)))
         self.assertRegex(css, r'\.mute-btn \.icon-muted,\s*\.mute-btn\.is-muted \.icon-sound\s*{\s*display: none;')
         self.assertRegex(css, r'\.mute-btn\.is-muted \.icon-muted\s*{\s*display: block;')
+
+    def test_glyph_is_about_14px(self):
+        # both icons share one viewBox, the bounding box of their strokes,
+        # so the drawn glyph is 14px tall and the speaker never moves
+        html = self.client.get('/').content.decode()
+        for cls in ('icon-sound', 'icon-muted'):
+            self.assertIn(f'<svg class="{cls}" viewBox="2.4 4.2 19.8 15.6"', html)
+        svg = self.rule('.mute-btn svg')
+        self.assertIn('height: 14px;', svg)
+        self.assertIn('width: calc(14px * 19.8 / 15.6);', svg)
+        self.assertIn('overflow: visible;', svg)
+
+    def test_switch_images_are_stacked_and_swapped_by_class(self):
+        # B-108b: the 180x59 images at 60px wide (3:1, about 60x20 at 360),
+        # stacked in one box with one contact shadow; is-muted (main.js)
+        # shows knob left, otherwise knob right, as the lever and dome swap
+        ui = self.ROOT / 'static' / 'images' / 'ui'
+        for name in ('mute-switch-on.png', 'mute-switch-off.png'):
+            head = (ui / name).read_bytes()[:26]
+            self.assertEqual((int.from_bytes(head[16:20], 'big'), int.from_bytes(head[20:24], 'big')), (180, 59), name)
+        box = self.rule('.mute-btn .switch')
+        self.assertIn('position: relative;', box)
+        self.assertIn('width: 60px;', box)
+        self.assertIn('height: calc(60px * 59 / 180);', box)
+        self.assertIn('filter: drop-shadow(1px 2px 2px var(--shadow-contact));', box)
+        img = self.rule('.mute-btn .switch img')
+        for decl in ('position: absolute;', 'inset: 0;', 'width: 100%;', 'height: 100%;', 'opacity: 0;'):
+            self.assertIn(decl, img)
+        css = self.css()
+        self.assertRegex(css, r'\n\.mute-btn \.switch \.switch-on,\s*\.mute-btn\.is-muted \.switch \.switch-off\s*{\s*opacity: 1;\s*}')
+        self.assertRegex(css, r'\n\.mute-btn\.is-muted \.switch \.switch-on\s*{\s*opacity: 0;\s*}')
+        # the swap is by opacity only: no display or src change
+        self.assertNotRegex(css, r'\.switch-(on|off)[^{]*{[^}]*display:')
+        self.assertNotIn('mute-switch', (self.ROOT / 'static' / 'js' / 'main.js').read_text())
 
     def test_header_is_click_through_except_the_toggle(self):
         # the header box spans the column down to y 77 at 360x740, over

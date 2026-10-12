@@ -13,7 +13,7 @@ screens are not designed yet: see "Other screens (interim)".
 
 ## The layer model (most important rule)
 1. **Scene** = images from `static/images/ui/`. Background, frame,
-   console, check dome, reset lever, speaker button, robot.
+   console, check dome, reset lever, speaker button, mute switch, robot.
 2. **Interactive and data parts** = code, drawn to match the scene's
    light: picture on the TV screen, bulbs, flip counter, slot rail,
    letter blocks, glows and motion.
@@ -34,6 +34,7 @@ Exception: on the interim screens (see "Other screens (interim)") the cream pane
 | dome-off / -ready / -pressed.png | check button (also "next") | ~80px wide |
 | lever-up / -down.png | reset lever (same canvas, plate aligned) | ~40px wide |
 | speaker-off / -on / -cap.png | hear-the-word button; cap = blanked | ~38px wide |
+| mute-switch-on / -off.png | header mute switch (same canvas), knob right = sound on, knob left = muted, 180x59 | 60px wide (60x19.7) |
 | robot-*.png | idle, thinking, confused, excited, happy, oops, hero | see CHARACTER.md |
 
 All scene sprites are lit from the upper left. Every sprite gets a soft
@@ -106,7 +107,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   30ms stagger), lever springs back. Tap area 48x48.
 - **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
   playing. Where a mode hides it, show `speaker-cap` and ignore taps.
-- **Mute toggle:** top-right, remembered in localStorage.
+- **Mute toggle** (`#mute-btn`): top-right, one button: the small cream speaker glyph (code; wave, or cross while muted) then the brass switch (`mute-switch-on` knob right = sound on, `mute-switch-off` knob left = muted, stacked and swapped by class). Remembered in localStorage.
 
 ## Feedback (no words)
 - Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb

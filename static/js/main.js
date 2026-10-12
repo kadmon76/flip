@@ -345,10 +345,12 @@ function onThemes() {
     });
 }
 
-// --- Header: the mute toggle (BACKLOG B-108) ---
+// --- Header: the mute toggle (BACKLOG B-108, B-108b) ---
 
-// The toggle shows the speaker glyph, or the muted speaker while muted
-// (class is-muted; CSS shows one of the two icons). On every screen.
+// The toggle shows the speaker glyph and the switch with its knob right,
+// or the muted speaker and the knob left while muted (class is-muted; CSS
+// shows one of the two icons and one of the two switch images). On every
+// screen.
 function renderMute(state) {
     const btn = $('mute-btn');
     btn.classList.toggle('is-muted', state.muted);
