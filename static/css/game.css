@@ -178,8 +178,9 @@ h3 {
    top-left at (36, 36) as in v5 (over the lab shelf on the play screen),
    the mute toggle top-right (B-108, B-108b). The header box spans the column
    (y 0-77 with the toggle), over the top of the screens' content, so it
-   is click-through and only the toggle takes taps (the sticker book's
-   back button and scrolled content stay tappable under it). */
+   is click-through and only the toggle (and, on the play screen, the
+   back button, B-201) takes taps (the sticker book's back button and
+   scrolled content stay tappable under it). */
 .app-header {
     position: absolute;
     top: 0;
@@ -207,6 +208,55 @@ h3 {
 
 .app-title .flap:last-child {
     color: var(--amber-deep);
+}
+
+/* Back to the theme screen (BACKLOG B-201), on the play screen only
+   (screens.js mirrors state.screen onto <body data-screen>; hidden until
+   then, so it never shows on another screen and never moves the mute
+   toggle there). The sticker book's line arrow, same SVG at the same
+   30px, drawn as a cream glyph with a contact shadow and no face, like
+   the mute toggle's speaker glyph: the play screen is the v5 scene, where
+   no button face may be drawn in CSS (DESIGN "The layer model"). A 48x48
+   box with the mute toggle's top (29) and bottom padding, so the arrow
+   is centred on the logo's centre line (y 49). The auto left margin and
+   a 24px right margin centre the arrow between the logo (right edge 122)
+   and the speaker glyph (238): box x 156-204, the toggle's 228-334 at
+   360 wide, so it reads as its own control and a slip of the thumb
+   meant for the toggle does not drop the round. */
+.play-back-btn {
+    display: none;
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    margin: -7px 24px 0 auto;
+    padding: 0 0 8px;
+    align-items: center;
+    justify-content: center;
+    color: var(--cream);
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+}
+
+body[data-screen="play"] .play-back-btn {
+    display: flex;
+}
+
+.play-back-btn svg {
+    width: 30px;
+    height: 30px;
+    overflow: visible;
+    filter: drop-shadow(1px 2px 2px var(--shadow-contact));
+}
+
+.play-back-btn .stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* The mute toggle (BACKLOG B-108, B-108b, v5): the small cream speaker

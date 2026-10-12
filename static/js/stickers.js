@@ -69,6 +69,22 @@ export function add(theme, word) {
     return true;
 }
 
+// Take `word` out of `theme` (BACKLOG B-201: a round left with the back
+// button keeps no sticker it added). Returns true when the book had it,
+// false otherwise (nothing is written then). A theme left empty is
+// dropped from the book.
+export function remove(theme, word) {
+    if (typeof theme !== 'string' || typeof word !== 'string' || !theme || !word) return false;
+    const book = load();
+    const words = book[theme] || [];
+    if (!words.includes(word)) return false;
+    const rest = words.filter((w) => w !== word);
+    if (rest.length) book[theme] = rest;
+    else delete book[theme];
+    save(book);
+    return true;
+}
+
 // Every sticker as a flat list, [{ theme, word }], in book order.
 export function all() {
     const book = load();

@@ -1,6 +1,7 @@
 // main.js — wiring: theme selection, round flow, the console controls
-// (check dome, reset lever, speaker), the header's mute toggle, the
-// kid-idle timer for the robot, screen renders.
+// (check dome, reset lever, speaker), the header's mute toggle and the
+// play screen's back button, the kid-idle timer for the robot, screen
+// renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -11,7 +12,7 @@ import { renderControls, domeAction, canReset, speakerState, PRESS_MS } from './
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
-import { add as addSticker } from './stickers.js';
+import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
@@ -345,6 +346,25 @@ function onThemes() {
     });
 }
 
+// --- Header: the play screen's back button (BACKLOG B-201) ---
+
+// Leave the round for the theme screen at once, no confirmation. The
+// unfinished round is dropped: the stickers it added to the book (words
+// checked correct this round that were not in the book before, marked
+// `newSticker` by onCheck) come out again, and onThemes stops the word
+// clip and clears the round (words, results, current word), so no stars,
+// stickers or results are kept. A sticker the book already had stays.
+// Pending timers find the round gone: the dome's checks the screen, the
+// idle timer ends off the play screen, and the robot drops his waiting
+// steps when the screen changes (character.js).
+function onPlayBack() {
+    if (state.screen !== 'play') return;
+    for (const r of state.round.results) {
+        if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);
+    }
+    onThemes();
+}
+
 // --- Header: the mute toggle (BACKLOG B-108, B-108b) ---
 
 // The toggle shows the speaker glyph and the switch with its knob right,
@@ -399,6 +419,7 @@ $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
 $('mute-btn').addEventListener('click', onMute);
+$('play-back-btn').addEventListener('click', onPlayBack);
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
 document.addEventListener('pointerdown', onInput, true);
