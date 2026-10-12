@@ -52,8 +52,9 @@ Pose and movement change together; never more than one change per 300ms.
 |---|---|---|---|
 | Round start | idle, pop up | — | always |
 | Picture shown | thinking | — | always |
-| Block placed | idle (eyes follow) | swipe | always |
-| All slots filled | idle; points at dome via robot-excited for 2 rounds | — | first 2 rounds since the page was loaded (not stored) |
+| Block placed (into a slot: from the bench, from another slot, or swapping one out) | idle (eyes follow) | swipe | always |
+| Block returned (to the bench by tap, drag or the reset lever) | idle | — | always |
+| All slots filled | idle; points at dome via robot-excited for 2 rounds | swipe | first 2 rounds since the page was loaded (not stored) |
 | Kid idle 10s | thinking, then sink | — | once per word |
 | Wrong check | confused, peek | error clip | always |
 | Third miss | oops → happy as blocks fly in | error clip | always |

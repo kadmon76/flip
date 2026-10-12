@@ -129,8 +129,12 @@ shadow lifts, 120ms.
 ## Sound
 On by default, mute toggle remembered. Existing clips in `static/sounds/`:
 correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`,
-block into slot → `swipe/`. One voice clip at a time; a new one cuts the
-previous, except the target word. All playback goes through `audio.js`.
+block into slot → `swipe/` (not a block back to the bench or the reset
+lever; the reveal fly-in plays the error clip only). One voice clip at a
+time; a new one cuts the previous, except the target word: the word stops
+the voice clip playing, and a voice clip due while the word plays is
+dropped. The swipe is an effect and may overlap anything. Muted: nothing
+plays and a speaker tap is ignored. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
 Theme, round-end and sticker book use: `bg-lab.jpg` blurred 6px and

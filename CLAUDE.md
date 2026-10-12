@@ -41,7 +41,7 @@ a phone.
   - `stickers.js` is the only place the sticker book (localStorage key `flip.stickers.v1`) is read or written; no DOM, no module state. Other modules call `load()`/`has()`/`add()`/`all()`; nothing else touches that key.
   - `gallery.js` renders the sticker book screen (`#screen-gallery`) from `state.themes[].words` and `stickers.load()` on every render while `state.screen === 'gallery'`; it never mutates state and keeps no cache. `themeProgress(book, theme, words)` is the pure part (no DOM); a Django test runs it through `node`.
   - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle, bulb flicker, TV static, reveal fly-in, reset-lever rail shake and hop now; correct pulse, confetti and star pop in B-110), except the robot's poses and slides, which start in `character.js` (B-115). It is a subscriber after `renderCard`, keeps only a render cache of the current word's key and the last status, lives, `pressed` and placement, and never mutates state.
-  - `audio.js` is the only place sounds play.
+  - `audio.js` is the only place sounds play. Its subscriber `renderSound` plays `MOMENTS[moment].sound` (through character.js `momentsFor`/`soundsFor`) and keeps no trigger list of its own. It is the only module that reads or writes localStorage `flip.muted` (`loadMuted`/`saveMuted`).
   - `celebrate.js` is the only place the correct-check and round-end celebrations run (box pulse, confetti, star pop). It is a state subscriber that fires only on a transition it detects against what it last rendered (status became 'correct', screen became 'round-end'); a re-render in the same state must not replay a celebration.
   - `character.js` is the only place the robot's poses and moves are decided: one table (`MOMENTS`: moment → steps of pose and movement, plus a sound) and pure helpers (`snapshot`, `momentsFor`, `blockEntered`, `stepsFor`, `soundsFor`, `stepDelays`, `moveFor`, `idleWait`) that a Django test runs through `node`. `renderRobot` is a subscriber that plays a moment only on a transition it detects against its render cache (the last snapshot and the time of its last pose change, used only to keep changes 300ms apart); it never mutates state, and his current pose lives only on the `.robot` class. main.js owns the kid-idle timer and the input listener that write `lastInput` and `idleBeat`.
 
@@ -98,7 +98,7 @@ a phone.
   (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `check-btn`,
   `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`,
   `stickers-btn`, `gallery-back-btn`, `gallery-empty`, `gallery-themes`,
-  `reset-btn`, `speak-btn`) without a DECISIONS entry; card.js, controls.js, main.js and gallery.js key on
+  `reset-btn`, `speak-btn`, `mute-btn`) without a DECISIONS entry; card.js, controls.js, main.js and gallery.js key on
   them. `next-btn` and `result-line` were removed by B-114 (the check dome is also next).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.
