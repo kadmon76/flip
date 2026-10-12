@@ -238,7 +238,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - Tapping it goes to the theme screen at once, no confirmation. The unfinished round is dropped: no stars, no stickers, no results kept.
   - Any word clip playing stops.
   - Screenshots: `play-back.png` (play screen with the button), `theme-after-back.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/51
 
 ### B-202 Level picker and level in state
 - why: the kid chooses how hard a round is.
@@ -248,7 +248,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - The level is fixed for the round once a theme is tapped; changing it affects the next round.
   - Pure helper `levelRules(level)` (no DOM) returns the per-level rules used by B-203…B-207 (`hearBefore`, `firstLetterGiven`, `leverDropsWrongFirst`, `distractors`, `shortWordsFirst`); a Django test runs it through `node`.
   - Screenshots: `theme-level-easy.png`, `theme-level-hard.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/51
 
 ### B-203 Speaker per level
 - why: hearing the word is the main help on easy and a reward on every level.
@@ -258,7 +258,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - On every level, once the word is answered (correct or revealed), the speaker plays the word.
   - Mute (B-108) silences all of it.
   - Screenshots: `speaker-locked-robot.png` (normal, after tapping the speaker). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/51
 
 ### B-204 Easy: first letter given, short words first
 - why: an easy start for beginners.
