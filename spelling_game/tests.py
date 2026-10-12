@@ -576,6 +576,21 @@ class StickerBookTests(TestCase):
             [{}, True, False],
         )
 
+    def test_remove_takes_out_only_that_word_and_drops_an_empty_theme(self):
+        # BACKLOG B-201: a round left with the back button takes back the
+        # stickers it added; the rest of the book stays
+        self.assertEqual(
+            self.run_node(
+                "const a = s.remove('animals', 'duck'); const b = s.remove('animals', 'duck');"
+                "const c = s.remove('animals', 'horse'); const d = s.remove('transportation', 'bus');"
+                "const e = s.remove('', 'cat'); const f = s.remove('animals');"
+                "out([a, b, c, d, e, f, s.load(), JSON.parse(raw())]);",
+                seed='{"animals": ["cat", "duck"], "transportation": ["bus"]}'),
+            [True, False, False, True, False, False, {'animals': ['cat']}, {'animals': ['cat']}],
+        )
+        # nothing is written when the word was not in the book
+        self.assertEqual(self.run_node("out([s.remove('animals', 'duck'), raw()]);"), [False, None])
+
 
 class GalleryProgressTests(TestCase):
     """static/js/gallery.js themeProgress(): per-theme sticker count for
@@ -1258,6 +1273,24 @@ class CharacterTests(TestCase):
             " moments(st({ pressed: null }), st({ pressed: 'dome', speaking: true }))]);"),
             [[], [], [], [], []])
 
+    def test_back_to_themes_is_no_moment_and_a_new_round_starts_fresh(self):
+        # BACKLOG B-201: the play screen's back button (main.js onPlayBack
+        # -> onThemes) leaves for the theme screen with the round cleared;
+        # from any point of a word that is no moment (no pose, no sound),
+        # and the next round he pops up as at any round start
+        self.assertEqual(self.run_node(
+            "const back = (s) => ({ ...s, screen: 'theme', theme: null, words: [], round: { index: 0, size: 5, results: [] },"
+            " current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },"
+            " pressed: null, speaking: false, idleBeat: null });"
+            "const five = { index: 4, size: 5, results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) };"
+            "const from = [st(), st({ current: cur('playing', 'ca-') }), st({ current: cur('playing', 'tac') }),"
+            " st({ current: cur('wrong', 'tac'), lives: 1 }), st({ current: cur('revealed', 'cat'), lives: 0 }),"
+            " st({ current: cur('correct', 'cat'), round: five }), st({ idleBeat: 'sunk' }), st({ pressed: 'dome', current: cur('playing', 'cat') })];"
+            "out([from.map((s) => moments(s, back(s))), from.map((s) => c.soundsFor(moments(s, back(s)))),"
+            " moments(back(st()), st({ roundsStarted: 2 }))]);"), [
+            [[]] * 8, [[]] * 8, ['roundStart', 'picture'],
+        ])
+
     def test_changes_are_at_least_300ms_apart(self):
         self.assertEqual(self.run_node(
             "out([c.CHANGE_MS, c.stepDelays(1, Infinity), c.stepDelays(2, 1000), c.stepDelays(2, 100), c.stepDelays(1, 0)]);"),
@@ -1520,6 +1553,32 @@ class AudioTests(TestCase):
             "out([swipeOn, word.paused, allStopped, played()]);"),
             [True, True, True, []])
 
+    def test_back_to_themes_stops_the_word_and_plays_nothing(self):
+        # BACKLOG B-201: the play screen's back button (main.js onPlayBack
+        # -> onThemes) stops the word clip and clears the round in one
+        # setState; renderSound plays nothing for it (no tada after the
+        # fifth word either), and the stopped clip never calls its onEnd
+        self.assertEqual(self.run_node(
+            "await ready(); S.subscribe(a.renderSound);"
+            "const back = (o) => ({ ...o, screen: 'theme', theme: null, words: [], round: { index: 0, size: 5, results: [] },"
+            " current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },"
+            " pressed: null, speaking: false, idleBeat: null });"
+            "const five = { index: 4, size: 5, results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) };"
+            "const from = [st({ current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 }),"
+            " st({ current: { word: 'cat', status: 'correct', placed: put(['t1', 't2', 't3']) }, round: five }),"
+            " st({ current: { word: 'cat', status: 'revealed', placed: put(['t1', 't2', 't3']) }, lives: 0 }),"
+            " st({ current: { word: 'cat', status: 'playing', placed: put(['t1', null, null]) }, idleBeat: 'sunk' })];"
+            "const res = [];"
+            "for (const s of from) {"
+            " S.setState(s); let ended = 0; S.setState({ speaking: true });"
+            " a.speakWord('/static/sounds/themes/animals/cat.mp3', () => { ended++; });"
+            " const word = made[made.length - 1]; clear();"
+            " a.stopWord(); S.setState(back(S.state)); word.on.ended();"
+            " res.push([word.paused, ended, played()]);"
+            "}"
+            "out(res);"),
+            [[True, 0, []]] * 4)
+
     def test_nothing_else_constructs_audio(self):
         # BACKLOG B-108: audio.js is the only place sounds play; no other
         # module in static/js makes an Audio element, an AudioContext or an
@@ -1780,3 +1839,77 @@ class RobotLayoutTests(TestCase):
         # the reason for the z-order: the second row of a 7-10 letter word
         # is in the way of the pop-up
         self.assertEqual(sorted(json.loads(result.stdout)['idle']['pop'], key=int), ['7', '8', '9', '10'])
+
+
+class PlayBackTests(TestCase):
+    """The play screen's back button (BACKLOG B-201): the sticker book's
+    line arrow, no text, at least 48x48, in the header left of the mute
+    toggle and shown on the play screen only; tapping it goes to the theme
+    screen at once, drops the round (stickers it added come out of the
+    book, results cleared) and stops the word clip. The transition itself
+    is covered by CharacterTests / AudioTests / StickerBookTests
+    (`back_to_themes`, `remove`)."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
+
+    def main_js(self):
+        return (self.ROOT / 'static' / 'js' / 'main.js').read_text()
+
+    def function(self, name):
+        js = self.main_js()
+        start = js.index(f'\nfunction {name}(')
+        return js[start:js.index('\n}\n', start)]
+
+    def test_the_sticker_books_arrow_in_the_header_left_of_the_mute_toggle(self):
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<header'):html.index('</header>')]
+        m = re.search(r'<button id="play-back-btn"([^>]*)>(.*?)</button>', header, flags=re.S)
+        self.assertIsNotNone(m)
+        attrs, inner = m.groups()
+        self.assertIn('type="button"', attrs)
+        self.assertIn('aria-label="Back"', attrs)
+        self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '')     # no text
+        book = re.search(r'<button id="gallery-back-btn"[^>]*>(.*?)</button>', html, flags=re.S).group(1)
+        self.assertEqual(inner.strip(), book.strip())                     # the same SVG
+        self.assertLess(header.index('class="app-title"'), header.index('id="play-back-btn"'))
+        self.assertLess(header.index('id="play-back-btn"'), header.index('id="mute-btn"'))
+
+    def test_shown_on_the_play_screen_only_at_least_48px_and_tappable(self):
+        rule = self.rule('.play-back-btn')
+        self.assertIn('display: none;', rule)
+        self.assertGreaterEqual(int(re.search(r'\n\s*width: (\d+)px;', rule).group(1)), 48)
+        self.assertGreaterEqual(int(re.search(r'\n\s*height: (\d+)px;', rule).group(1)), 48)
+        self.assertIn('pointer-events: auto;', rule)                    # the header is click-through
+        # pushed right by an auto left margin, so the logo and the mute
+        # toggle keep their places; a gap before the toggle's tap area
+        margin = re.search(r'\n\s*margin: -7px (\d+)px 0 auto;', rule)
+        self.assertIsNotNone(margin)
+        self.assertGreaterEqual(int(margin.group(1)), 8)
+        self.assertIn('color: var(--cream);', rule)
+        self.assertNotIn('background:', rule.replace('background: none;', ''))   # no face on the v5 scene
+        self.assertIn('display: flex;', self.rule('body[data-screen="play"] .play-back-btn'))
+        # nothing else shows it
+        css = self.css()
+        shown = re.findall(r'\n([^{}\n]*\.play-back-btn[^{}\n]*?)\s*{[^}]*display: (?!none)', css)
+        self.assertEqual(shown, ['body[data-screen="play"] .play-back-btn'])
+
+    def test_tap_drops_the_round_and_goes_to_the_theme_screen(self):
+        main = self.main_js()
+        self.assertIn("$('play-back-btn').addEventListener('click', onPlayBack);", main)
+        self.assertIn("import { add as addSticker, remove as removeSticker } from './stickers.js';", main)
+        back = self.function('onPlayBack')
+        self.assertIn("if (state.screen !== 'play') return;", back)
+        self.assertIn('if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);', back)
+        self.assertTrue(back.rstrip().endswith('onThemes();'))
+        self.assertNotIn('confirm(', main)
+        themes = self.function('onThemes')
+        self.assertLess(themes.index('stopWord();'), themes.index('setState({'))
+        for decl in ("screen: 'theme',", 'words: [],', 'results: [] },', 'current: { word: null,', 'speaking: false,',
+                     'pressed: null,', 'idleBeat: null,'):
+            self.assertIn(decl, themes, decl)
