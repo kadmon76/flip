@@ -6,7 +6,16 @@ export const state = {
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }] }] from themes.json and the data files; image is the first word's
     theme: null,
     words: [],                  // [{ word, image, audio }] for the current round
-    round: { index: 0, size: 5, results: [] },   // results[i] = { word, correct }
+    // results[i] = { word, correct }; level is the level the round is
+    // played at, copied from `level` when a theme is tapped (startRound)
+    // and fixed for the round (null while no round is in play); the
+    // round's rules are level.js levelRules(round.level).
+    round: { index: 0, size: 5, level: null, results: [] },
+    // The level the kid picked on the theme screen (BACKLOG B-202):
+    // 'easy' | 'normal' | 'hard'. Remembered in localStorage `flip.level`
+    // (level.js loadLevel / saveLevel); main.js sets it from there at
+    // start-up. A change takes effect from the next round.
+    level: 'easy',
     current: {
         word: null,
         image: null,
@@ -26,6 +35,12 @@ export const state = {
     // on the reset lever; null otherwise.
     pressed: null,
     speaking: false,            // the word's audio is playing (speaker-on)
+    // Taps on the speaker while it holds the word back (normal and hard,
+    // before the word is answered; BACKLOG B-203, controls.js
+    // speakerAction). Each tap is one more: the robot's `speakerLocked`
+    // moment (character.js) and its "hmm no" (audio.js) play on the
+    // change, so only the change matters; counted over the session.
+    lockedTaps: 0,
     // Sound off (the header's mute toggle, B-108): no sound plays at all.
     // Remembered in localStorage `flip.muted` (audio.js loadMuted /
     // saveMuted); main.js sets it from there at start-up.

@@ -69,8 +69,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   dome (right). Reset and check stay far apart.
 - **Robot:** behind the console's left third, head and shoulders visible
   (~75px); the console, the rail and the bench blocks are drawn above him (on 7–10 letter words his pop-up passes under the second block row; BACKLOG B-115).
-- **Header:** split-flap logo "flip" top-left, mute toggle top-right,
-  inside the safe area over the shelf.
+- **Header:** split-flap logo "flip" top-left, mute toggle top-right, and on the play screen only the back arrow between them (24px left of the toggle's tap area; B-201), inside the safe area over the shelf.
 
 ## Palette (sampled from v5; use as CSS variables)
 ```
@@ -106,8 +105,9 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   ±4px for 200ms, placed blocks hop back to their starting spots (300ms,
   30ms stagger), lever springs back. Tap area 48x48.
 - **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
-  playing. Where a mode hides it, show `speaker-cap` and ignore taps.
+  playing. Where a mode hides it, show `speaker-cap` and ignore taps. On normal and hard, before the word is answered (correct or revealed), a tap holds the word back: the robot's confused head-shake and "hmm no" instead; the speaker looks the same, no lock icon (B-203).
 - **Mute toggle** (`#mute-btn`): top-right, one button: the small cream speaker glyph (code; wave, or cross while muted) then the brass switch (`mute-switch-on` knob right = sound on, `mute-switch-off` knob left = muted, stacked and swapped by class). Remembered in localStorage.
+- **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → theme screen at once, the round dropped (B-201).
 
 ## Feedback (no words)
 - Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb
@@ -129,7 +129,7 @@ shadow lifts, 120ms.
 
 ## Sound
 On by default, mute toggle remembered. Existing clips in `static/sounds/`:
-correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`,
+correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`, held-back speaker (B-203) → `error/hmm no.mp3`,
 block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays the error clip only). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops

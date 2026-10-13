@@ -58,13 +58,19 @@ export const FILES = {
     },
     tada: { dir: 'celebration', names: ['tada.mp3'] },
     swipe: { dir: 'swipe', names: ['swipe1.mp3', 'swipe2.mp3', 'swipe3.mp3', 'swipe4.mp3'] },
+    // His "not yet" when the speaker holds the word back (BACKLOG B-203,
+    // moment speakerLocked): the one "hmm no" clip, a placeholder until
+    // new lines exist. The file is also in the error pool; it is
+    // downloaded and decoded once (init, decodeAll).
+    locked: { dir: 'error', names: ['hmm no.mp3'] },
 };
 
-// The robot's voice (correct, error, tada): one clip at a time, a new one
-// cuts the one playing, and none starts over the target word (DESIGN
-// "Sound", CHARACTER "Rules"). The swipe is an effect, not his voice: it
-// plays whenever a block goes into a slot and may overlap anything.
-export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx' };
+// The robot's voice (correct, error, tada, locked): one clip at a time, a
+// new one cuts the one playing, and none starts over the target word
+// (DESIGN "Sound", CHARACTER "Rules"). The swipe is an effect, not his
+// voice: it plays whenever a block goes into a slot and may overlap
+// anything.
+export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx', locked: 'voice' };
 
 // A user gesture unlocks playback (see unlock): events that count
 // as a user activation in Chrome and as a user gesture in Safari.
@@ -137,21 +143,28 @@ const live = new Set();     // pooled sources now playing: { src, kind }
 // is `state.speaking`, set by main.js, and that is the truth.
 let wordClip = null;
 
+function download(url) {
+    try {
+        return fetch(url)
+            .then((r) => (r.ok ? r.arrayBuffer() : null))
+            .catch(() => null);
+    } catch (e) {
+        return Promise.resolve(null);
+    }
+}
+
 // Start downloading every clip and wait for the first gesture. Nothing
 // plays and no AudioContext exists yet, so loading the page raises no
 // autoplay-policy warning. A clip that fails to download is left out of
-// its pool.
+// its pool. A file named by two pools ('hmm no' is in error and locked)
+// is downloaded once; both pools share its bytes.
 export function init() {
+    const byUrl = new Map();    // url -> its download, for this call only
     for (const kind of Object.keys(FILES)) {
         buffers[kind] = FILES[kind].names.map(() => null);
         bytes[kind] = poolUrls(kind).map((url) => {
-            try {
-                return fetch(url)
-                    .then((r) => (r.ok ? r.arrayBuffer() : null))
-                    .catch(() => null);
-            } catch (e) {
-                return Promise.resolve(null);
-            }
+            if (!byUrl.has(url)) byUrl.set(url, download(url));
+            return byUrl.get(url);
         });
     }
     // iOS 17+: play like a media app (heard with the silent switch on, as
@@ -193,10 +206,15 @@ function unlock() {
     }
 }
 
+// Decode each download once (decodeAudioData takes over the bytes it is
+// given, so shared bytes cannot be decoded twice) and give the buffer to
+// every pool slot that names the file.
 function decodeAll() {
+    const decoded = new Map();  // download -> its decode, for this call only
     for (const kind of Object.keys(bytes)) {
         bytes[kind].forEach((p, i) => {
-            p.then((data) => (data ? ctx.decodeAudioData(data) : null))
+            if (!decoded.has(p)) decoded.set(p, p.then((data) => (data ? ctx.decodeAudioData(data) : null)));
+            decoded.get(p)
                 .then((buf) => { if (buf) buffers[kind][i] = buf; })
                 .catch(() => {});   // an undecodable clip is left out of its pool
         });
@@ -219,7 +237,8 @@ function stopVoice() {
     }
 }
 
-// Play a random clip of pool `kind` ('correct', 'error', 'tada', 'swipe').
+// Play a random clip of pool `kind` ('correct', 'error', 'tada', 'swipe',
+// 'locked').
 // Muted, before the first gesture, or while the pool is still decoding:
 // nothing. A voice clip cuts the voice clip playing, and does not start
 // while the target word plays (`state.speaking`): the word is spoken

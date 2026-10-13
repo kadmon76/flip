@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=15">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=18">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -31,9 +31,16 @@
          right for sound on, knob left for muted, stacked; CSS shows one,
          as the lever and dome do). main.js sets class is-muted and
          aria-pressed from state.muted. The aria-label is for screen
-         readers only, never shown. -->
+         readers only, never shown.
+         The back button (BACKLOG B-201) shows on the play screen only
+         (CSS keyed on body[data-screen]): the sticker book's line arrow
+         as a cream glyph with no face, left of the mute toggle; main.js
+         drops the round and goes to the theme screen. -->
     <header class="app-header">
         <span class="app-title" role="img" aria-label="flip"><span class="flap">f</span><span class="flap">l</span><span class="flap">i</span><span class="flap">p</span></span>
+        <button id="play-back-btn" class="play-back-btn" type="button" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19.5 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>
+        </button>
         <button id="mute-btn" class="mute-btn" type="button" aria-label="Mute" aria-pressed="false">
             <svg class="icon-sound" viewBox="2.4 4.2 19.8 15.6" aria-hidden="true"><path class="body" d="M3 9.2h3.6L12 4.8v14.4l-5.4-4.4H3z"/><path class="line" d="M15.6 8.4a5.2 5.2 0 0 1 0 7.2"/></svg>
             <svg class="icon-muted" viewBox="2.4 4.2 19.8 15.6" aria-hidden="true"><path class="body" d="M3 9.2h3.6L12 4.8v14.4l-5.4-4.4H3z"/><path class="line" d="M15.8 9.4l5.2 5.2M21 9.4l-5.2 5.2"/></svg>
@@ -52,9 +59,24 @@
          readers only, never shown. -->
 
     <!-- Theme screen: one card per theme showing the theme's picture
-         (main.js), and the sticker book button (star sticker). -->
+         (main.js), the level picker and the sticker book button (star
+         sticker). The level picker (BACKLOG B-202) is three panel buttons
+         with 1, 2 and 3 bulbs (the lives bulbs' look); main.js sets
+         aria-pressed on the picked one, which CSS draws pressed in with
+         its bulbs lit (the others raised, bulbs dark). -->
     <div id="screen-theme" class="screen">
         <div id="theme-buttons"></div>
+        <div id="level-picker" class="levels" role="group" aria-label="level">
+            <button id="level-easy" class="panel-btn level-btn" type="button" aria-label="easy" aria-pressed="true">
+                <span class="bulb"></span>
+            </button>
+            <button id="level-normal" class="panel-btn level-btn" type="button" aria-label="normal" aria-pressed="false">
+                <span class="bulb"></span><span class="bulb"></span>
+            </button>
+            <button id="level-hard" class="panel-btn level-btn" type="button" aria-label="hard" aria-pressed="false">
+                <span class="bulb"></span><span class="bulb"></span><span class="bulb"></span>
+            </button>
+        </div>
         <div class="actions">
             <button id="stickers-btn" class="panel-btn" type="button" aria-label="Stickers">
                 <span class="sticker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>

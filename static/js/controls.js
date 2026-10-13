@@ -5,6 +5,8 @@
 // the taps. The functions above renderControls are pure (no DOM) and a
 // Django test runs them through node.
 
+import { levelRules } from './level.js';
+
 // How long a control stays down after a tap, in ms: the dome shows
 // `dome-pressed` before the result, the lever `lever-down` before it
 // springs back.
@@ -40,10 +42,22 @@ export function leverState(pressed) {
 }
 
 // The speaker: 'cap' (blanked, taps ignored) when the word has no audio
-// file, 'on' while the word plays, 'off' otherwise.
+// file, 'on' while the word plays, 'off' otherwise. It looks the same
+// whether or not a tap would play the word (BACKLOG B-203: no lock icon).
 export function speakerState(current, speaking) {
     if (!current || !current.audio) return 'cap';
     return speaking ? 'on' : 'off';
+}
+
+// What a tap on the speaker does on `level` (the round's level,
+// state.round.level; BACKLOG B-203): 'word' plays the word, 'locked'
+// holds it back (normal and hard before the word is answered: the robot
+// says "hmm no" instead), null does nothing (no audio file: capped).
+// Once the word is answered (correct or revealed) it plays on every level.
+export function speakerAction(current, level) {
+    if (!current || !current.word || !current.audio) return null;
+    if (current.status === 'correct' || current.status === 'revealed') return 'word';
+    return levelRules(level).hearBefore ? 'word' : 'locked';
 }
 
 // --- Render ---

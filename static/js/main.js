@@ -1,20 +1,22 @@
-// main.js — wiring: theme selection, round flow, the console controls
-// (check dome, reset lever, speaker), the header's mute toggle, the
-// kid-idle timer for the robot, screen renders.
+// main.js — wiring: theme selection, the level picker, round flow, the
+// console controls (check dome, reset lever, speaker), the header's mute
+// toggle and the play screen's back button, the kid-idle timer for the
+// robot, screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
 import { returnAll } from './drag.js';
 import { renderFeedback } from './feedback.js';
-import { renderControls, domeAction, canReset, speakerState, PRESS_MS } from './controls.js';
+import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
-import { add as addSticker } from './stickers.js';
+import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
+import { LEVELS, loadLevel, saveLevel } from './level.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -107,7 +109,30 @@ function renderThemeButtons(state) {
     }
 }
 
+// The level picker (BACKLOG B-202): three panel buttons with 1, 2 and 3
+// bulbs (#level-easy, #level-normal, #level-hard). The picked one gets
+// aria-pressed="true", and CSS draws it pressed in with its bulbs lit;
+// the others are raised with dark bulbs. No text: the level's name is
+// only the aria-label.
+function renderLevel(state) {
+    for (const level of LEVELS) {
+        $(`level-${level}`).setAttribute('aria-pressed', String(level === state.level));
+    }
+}
+
+// Pick a level on the theme screen and remember it. A round already
+// started keeps its own (round.level); the pick is for the next one.
+function onLevel(level) {
+    if (state.screen !== 'theme') return;
+    saveLevel(level);
+    setState({ level });
+}
+
 async function startRound({ name, dataUrl }) {
+    // The round is played at the level picked when the theme is tapped,
+    // read before the fetch; a later pick changes the next round, not this
+    // one (nothing writes round.level again until the next startRound).
+    const level = state.level;
     // data shape: { "duck": { image, audio, difficulty }, ... }
     const data = await fetch(dataUrl).then((r) => r.json());
     const words = shuffle(Object.keys(data))
@@ -118,7 +143,7 @@ async function startRound({ name, dataUrl }) {
         theme: name,
         words,
         screen: 'play',
-        round: { index: 0, size: ROUND_SIZE, results: [] },
+        round: { index: 0, size: ROUND_SIZE, level, results: [] },
         current: makeCurrent(words[0]),
         lives: LIVES,
         pressed: null,
@@ -161,11 +186,22 @@ function onLever() {
 
 // Speaker: plays the word's audio file through audio.js; `speaking` shows
 // `speaker-on` until it ends. A word without an audio file shows
-// `speaker-cap` and the tap is ignored; so is a tap while muted (nothing
-// would play).
+// `speaker-cap` and the tap is ignored. What a tap does depends on the
+// round's level (BACKLOG B-203, controls.js speakerAction): on normal and
+// hard, before the word is answered, the speaker holds the word back and
+// the tap counts one more `lockedTaps`, which is the robot's confused
+// "no" (character.js) with his "hmm no" (audio.js; nothing while muted,
+// the robot still shakes his head). Otherwise a tap while muted is
+// ignored (nothing would play).
 function onSpeak() {
     const { current } = state;
-    if (state.screen !== 'play' || state.muted || speakerState(current, state.speaking) === 'cap') return;
+    if (state.screen !== 'play') return;
+    const action = speakerAction(current, state.round.level);
+    if (action === 'locked') {
+        setState({ lockedTaps: state.lockedTaps + 1 });
+        return;
+    }
+    if (action !== 'word' || state.muted) return;
     setState({ speaking: true });
     speakWord(current.audio, () => setState({ speaking: false }));
 }
@@ -337,12 +373,31 @@ function onThemes() {
         screen: 'theme',
         theme: null,
         words: [],
-        round: { index: 0, size: ROUND_SIZE, results: [] },
+        round: { index: 0, size: ROUND_SIZE, level: null, results: [] },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,
         idleBeat: null,
     });
+}
+
+// --- Header: the play screen's back button (BACKLOG B-201) ---
+
+// Leave the round for the theme screen at once, no confirmation. The
+// unfinished round is dropped: the stickers it added to the book (words
+// checked correct this round that were not in the book before, marked
+// `newSticker` by onCheck) come out again, and onThemes stops the word
+// clip and clears the round (words, results, current word), so no stars,
+// stickers or results are kept. A sticker the book already had stays.
+// Pending timers find the round gone: the dome's checks the screen, the
+// idle timer ends off the play screen, and the robot drops his waiting
+// steps when the screen changes (character.js).
+function onPlayBack() {
+    if (state.screen !== 'play') return;
+    for (const r of state.round.results) {
+        if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);
+    }
+    onThemes();
 }
 
 // --- Header: the mute toggle (BACKLOG B-108, B-108b) ---
@@ -381,6 +436,7 @@ function onGalleryBack() {
 
 subscribe(renderScreens);
 subscribe(renderThemeButtons);
+subscribe(renderLevel);
 subscribe(renderCard);
 subscribe(renderFeedback);    // after the card render: keys off its DOM
 subscribe(renderControls);
@@ -399,6 +455,8 @@ $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
 $('mute-btn').addEventListener('click', onMute);
+$('play-back-btn').addEventListener('click', onPlayBack);
+for (const level of LEVELS) $(`level-${level}`).addEventListener('click', () => onLevel(level));
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
 document.addEventListener('pointerdown', onInput, true);
@@ -406,9 +464,10 @@ document.addEventListener('keydown', onInput, true);
 
 renderScreens(state);
 // Preload the clips (nothing plays until the first gesture), then the
-// remembered mute flag.
+// remembered mute flag and level.
 initAudio();
 setState({ muted: loadMuted() });
+setState({ level: loadLevel() });
 loadThemes();
 
 // Box sizing depends on the row width (layout.js); re-render on rotate.

@@ -19,7 +19,8 @@ export const POSES = ['idle', 'thinking', 'confused', 'excited', 'happy', 'oops'
 
 // Moment -> the steps he takes (pose and movement change together, one
 // step at a time, CHANGE_MS apart) and the clip that goes with it
-// (B-108's pools: 'swipe', 'error', 'correct', 'tada'; null for none).
+// (audio.js's pools: 'swipe', 'error', 'correct', 'tada', 'locked'; null
+// for none).
 // Where the map gives a choice, the moment is split in two and
 // momentsFor() picks one:
 //   - "All slots filled": excited (pointing at the dome) in the first
@@ -33,6 +34,10 @@ export const POSES = ['idle', 'thinking', 'confused', 'excited', 'happy', 'oops'
 // drag or the reset lever (blockReturned, silent). A block that fills the
 // last slot is "All slots filled" (filledEarly / filled), and it went into
 // a slot too, so those swipe as well.
+// "speakerLocked" (BACKLOG B-203) is a tap on the speaker while it holds
+// the word back (normal and hard, before the word is answered): a short
+// confused "no", a small head-shake, and the "hmm no" clip (audio.js pool
+// 'locked'). Every such tap is one (state.lockedTaps).
 export const MOMENTS = {
     roundStart: { steps: [{ pose: 'idle', move: 'pop' }], sound: null },
     picture: { steps: [{ pose: 'thinking', move: 'none' }], sound: null },
@@ -49,19 +54,26 @@ export const MOMENTS = {
     streak: { steps: [{ pose: 'excited', move: 'doublePop' }], sound: 'correct' },
     roundEndGood: { steps: [{ pose: 'happy', move: 'none' }], sound: 'tada' },
     roundEnd: { steps: [{ pose: 'idle', move: 'none' }], sound: 'tada' },
+    speakerLocked: { steps: [{ pose: 'confused', move: 'shake' }], sound: 'locked' },
 };
 
-// Movements: a vertical slide and nothing else (CHARACTER "Presence").
-// Each is a list of segments: `y` is where he goes, in CSS px at 360
-// wide (0 = at rest with ~75px of him above the console; positive is
-// down, behind it), in `duration` seconds. Every movement except the
-// sink ends at rest.
+// Movements: a vertical slide (CHARACTER "Presence"), and one small
+// head-shake (BACKLOG B-203). Each is a list of segments: `y` is where he
+// goes, in CSS px at 360 wide (0 = at rest with ~75px of him above the
+// console; positive is down, behind it), in `duration` seconds; the
+// shake's segments also turn him by `rotation` degrees about his neck
+// (game.css .robot-body transform-origin; every other segment turns him
+// back to 0). Every movement except the sink ends at rest.
 //   - pop: rises 20px in 180ms, ease-out, then settles (120ms)
 //   - doublePop: two pops (3 correct in a row)
 //   - sink: slides down in 400ms until only the top of his head shows
 //     (14px of him)
 //   - peek: down until only his eyes are above the edge (57px of him),
 //     there for 600ms, then back
+//   - shake: a small "no": his head and shoulders swing about the neck,
+//     4.5° each side (the 9° of the puppet reference's head shake,
+//     design/reference/robot-puppet.html, centred on rest), 90ms a swing,
+//     sine in-out, 540ms in all, at rest height
 //   - none: no move of his own; back to rest if a move left him elsewhere
 export const MOVES = {
     none: [{ y: 0, duration: 0.2, ease: 'power2.out' }],
@@ -80,6 +92,14 @@ export const MOVES = {
         { y: 18, duration: 0.15, ease: 'power2.out' },
         { y: 18, duration: 0.6, ease: 'none' },
         { y: 0, duration: 0.2, ease: 'power2.out' },
+    ],
+    shake: [
+        { y: 0, rotation: 4.5, duration: 0.09, ease: 'sine.inOut' },
+        { y: 0, rotation: -4.5, duration: 0.09, ease: 'sine.inOut' },
+        { y: 0, rotation: 4.5, duration: 0.09, ease: 'sine.inOut' },
+        { y: 0, rotation: -4.5, duration: 0.09, ease: 'sine.inOut' },
+        { y: 0, rotation: 4.5, duration: 0.09, ease: 'sine.inOut' },
+        { y: 0, rotation: 0, duration: 0.09, ease: 'sine.inOut' },
     ],
 };
 
@@ -124,6 +144,7 @@ export function snapshot(state) {
         placed: onWord ? current.placed.map((p) => (p ? p.tileId : '-')).join(',') : '',
         filled: onWord && current.placed.length > 0 && current.placed.every(Boolean),
         idleBeat: state.idleBeat,
+        lockedTaps: state.lockedTaps || 0,
         streak: onWord ? streakOf(results, round.index) : 0,
         stars: screen === 'round-end' ? starsFor(results.filter((r) => r && r.correct).length, round.size) : null,
     };
@@ -144,6 +165,8 @@ export function momentsFor(prev, now) {
         if (now.status === 'correct') return [now.streak >= STREAK ? 'streak' : 'correct'];
         if (now.status === 'wrong') return [now.lives === 1 ? 'wrongPeek' : 'wrong'];
     }
+    // One more tap on the speaker while it holds the word back.
+    if (now.lockedTaps !== prev.lockedTaps) return ['speakerLocked'];
     if (now.idleBeat !== prev.idleBeat) {
         if (now.idleBeat === 'sunk') return ['kidIdle'];
         if (prev.idleBeat === 'sunk') return ['wake'];
@@ -192,7 +215,7 @@ export function idleWait(state, now) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, streak: 0, stars: null };
 
 // --- Render ---
 
@@ -237,14 +260,16 @@ function applyStep(step) {
 }
 
 // Play the segments on `el` as yPercent of its own height, so the px
-// numbers (at 360 wide) scale with the sprite.
+// numbers (at 360 wide) scale with the sprite. A segment without a
+// `rotation` turns him back upright (the shake's turn, about the neck,
+// never outlives it).
 function slide(el, segments) {
     if (!el) return;
     gsap.killTweensOf(el);
     const tl = gsap.timeline();
     for (const s of segments) {
-        const yPercent = (s.y / ROBOT_H) * 100;
-        if (s.duration === 0) tl.set(el, { yPercent });
-        else tl.to(el, { yPercent, duration: s.duration, ease: s.ease });
+        const to = { yPercent: (s.y / ROBOT_H) * 100, rotation: s.rotation || 0 };
+        if (s.duration === 0) tl.set(el, to);
+        else tl.to(el, { ...to, duration: s.duration, ease: s.ease });
     }
 }

@@ -576,6 +576,21 @@ class StickerBookTests(TestCase):
             [{}, True, False],
         )
 
+    def test_remove_takes_out_only_that_word_and_drops_an_empty_theme(self):
+        # BACKLOG B-201: a round left with the back button takes back the
+        # stickers it added; the rest of the book stays
+        self.assertEqual(
+            self.run_node(
+                "const a = s.remove('animals', 'duck'); const b = s.remove('animals', 'duck');"
+                "const c = s.remove('animals', 'horse'); const d = s.remove('transportation', 'bus');"
+                "const e = s.remove('', 'cat'); const f = s.remove('animals');"
+                "out([a, b, c, d, e, f, s.load(), JSON.parse(raw())]);",
+                seed='{"animals": ["cat", "duck"], "transportation": ["bus"]}'),
+            [True, False, False, True, False, False, {'animals': ['cat']}, {'animals': ['cat']}],
+        )
+        # nothing is written when the word was not in the book
+        self.assertEqual(self.run_node("out([s.remove('animals', 'duck'), raw()]);"), [False, None])
+
 
 class GalleryProgressTests(TestCase):
     """static/js/gallery.js themeProgress(): per-theme sticker count for
@@ -1011,6 +1026,43 @@ class ControlsTests(TestCase):
             ['off', 'on', 'cap', 'cap'],
         )
 
+    def test_speaker_action_per_level(self):
+        # BACKLOG B-203: easy plays the word at any time; normal and hard
+        # hold it back ('locked') until the word is answered (correct or
+        # revealed), then play it; no audio file: nothing (capped). A
+        # round level that is not a level (null between rounds) reads as
+        # easy (level.js levelRules).
+        self.assertEqual(
+            self.run_node(
+                "const st = ['playing', 'wrong', 'correct', 'revealed'];"
+                "out(['easy', 'normal', 'hard', null, 'bogus'].map((lv) => st.map((s) => c.speakerAction(cur(s, 'ca-'), lv))));"),
+            [
+                ['word'] * 4,
+                ['locked', 'locked', 'word', 'word'],
+                ['locked', 'locked', 'word', 'word'],
+                ['word'] * 4,
+                ['word'] * 4,
+            ],
+        )
+        self.assertEqual(
+            self.run_node(
+                "out([...['easy', 'normal', 'hard'].flatMap((lv) => [c.speakerAction(cur('playing', '---', null), lv),"
+                " c.speakerAction(cur('correct', 'cat', ''), lv)]),"
+                " c.speakerAction({ word: null, audio: '/a.mp3', status: 'playing', placed: [] }, 'normal'), c.speakerAction(null, 'easy')]);"),
+            [None] * 8,
+        )
+
+    def test_a_held_back_speaker_looks_the_same(self):
+        # no lock icon: speakerState does not depend on the level
+        self.assertEqual(
+            self.run_node("out([c.speakerState(cur('playing', '---'), false), c.speakerState(cur('wrong', 'tac'), false),"
+                          " c.speakerAction(cur('playing', '---'), 'hard')]);"),
+            ['off', 'off', 'locked'],
+        )
+        src = self.MODULE.read_text()
+        body = src[src.index('export function speakerState'):src.index('export function speakerAction')]
+        self.assertNotIn('level', re.sub(r'//[^\n]*', '', body))
+
 
 class ResetTransitionTests(TestCase):
     """static/js/drag.js returnAll() and afterMove(): the reset lever puts
@@ -1137,6 +1189,7 @@ class CharacterTests(TestCase):
             'streak': {'steps': steps(('excited', 'doublePop')), 'sound': 'correct'},
             'roundEndGood': {'steps': steps(('happy', 'none')), 'sound': 'tada'},
             'roundEnd': {'steps': steps(('idle', 'none')), 'sound': 'tada'},
+            'speakerLocked': {'steps': steps(('confused', 'shake')), 'sound': 'locked'},
         })
 
     def test_every_pose_is_an_image_and_every_move_exists(self):
@@ -1210,11 +1263,12 @@ class CharacterTests(TestCase):
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
+            'speakerLocked': ['locked'],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
             "const used = new Set(Object.values(c.MOMENTS).map((m) => m.sound).filter(Boolean)); out([...used].sort());"),
-            ['correct', 'error', 'swipe', 'tada'])
+            ['correct', 'error', 'locked', 'swipe', 'tada'])
 
     def test_wrong_check_confused_and_a_peek_on_the_last_bulb(self):
         self.assertEqual(self.run_node(
@@ -1258,6 +1312,72 @@ class CharacterTests(TestCase):
             " moments(st({ pressed: null }), st({ pressed: 'dome', speaking: true }))]);"),
             [[], [], [], [], []])
 
+    def test_each_tap_on_a_held_back_speaker_is_a_confused_no(self):
+        # BACKLOG B-203: main.js counts each tap on the speaker while it
+        # holds the word back (state.lockedTaps); every change of the count
+        # on the word is the moment speakerLocked (confused, a small
+        # head-shake, the 'locked' clip), the second tap too; a re-render
+        # is none. A sunk robot first wakes (the tap's pointerdown), then
+        # shakes his head (its click).
+        self.assertEqual(self.run_node(
+            "out([moments(st({ lockedTaps: 0 }), st({ lockedTaps: 1 })), moments(st({ lockedTaps: 1 }), st({ lockedTaps: 2 })),"
+            " moments(st({ lockedTaps: 2 }), st({ lockedTaps: 2 })), moments(st(), st({ lockedTaps: 0 })),"
+            " moments(st({ lockedTaps: 3, current: cur('wrong', 'tac'), lives: 2 }), st({ lockedTaps: 4, current: cur('wrong', 'tac'), lives: 2 })),"
+            " moments(st({ lockedTaps: 4, current: cur('playing', 'ca-') }), st({ lockedTaps: 5, current: cur('playing', 'ca-') })),"
+            " moments(st({ idleBeat: 'sunk', lockedTaps: 1 }), st({ idleBeat: 'over', lockedTaps: 1 })),"
+            " moments(st({ idleBeat: 'over', lockedTaps: 1 }), st({ idleBeat: 'over', lockedTaps: 2 })),"
+            " c.stepsFor(['speakerLocked']), c.soundsFor(['speakerLocked']),"
+            " c.snapshot(st({ lockedTaps: 7 })).lockedTaps, c.snapshot(st()).lockedTaps, c.NONE.lockedTaps]);"),
+            [['speakerLocked'], ['speakerLocked'], [], [], ['speakerLocked'], ['speakerLocked'],
+             ['wake'], ['speakerLocked'], [{'pose': 'confused', 'move': 'shake'}], ['locked'], 7, 0, 0])
+
+    def test_a_new_word_or_round_wins_over_the_tap_count(self):
+        # the count runs over the session; a new picture or round start is
+        # what the robot plays when the word changed, and off the play
+        # screen nothing
+        self.assertEqual(self.run_node(
+            "out([moments(st({ lockedTaps: 2, current: cur('correct', 'cat') }),"
+            " st({ lockedTaps: 2, round: { index: 1, size: 5, results: [{ correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })),"
+            " moments({ ...theme, lockedTaps: 2 }, st({ roundsStarted: 2, lockedTaps: 2 })),"
+            " moments({ ...theme, lockedTaps: 2 }, { ...theme, lockedTaps: 3 })]);"),
+            [['picture'], ['roundStart', 'picture'], []])
+
+    def test_the_head_shake_is_small_and_short(self):
+        # his head and shoulders swing 4.5° each side of upright about the
+        # neck (the 9° of design/reference/robot-puppet.html's shake,
+        # centred), 90ms a swing, sine in-out, 540ms in all; he stays at
+        # rest height and ends upright. Reduced motion: no turn at all.
+        shake = self.run_node("out(c.MOVES.shake);")
+        self.assertEqual([s['rotation'] for s in shake], [4.5, -4.5, 4.5, -4.5, 4.5, 0])
+        self.assertEqual({s['y'] for s in shake}, {0})
+        self.assertEqual({s['duration'] for s in shake}, {0.09})
+        self.assertEqual({s['ease'] for s in shake}, {'sine.inOut'})
+        self.assertAlmostEqual(sum(s['duration'] for s in shake), 0.54)
+        self.assertEqual(self.run_node("out(c.moveFor('shake', true));"), [{'y': 0, 'duration': 0, 'ease': 'none'}])
+        # no other move turns him
+        moves = self.run_node("out(c.MOVES);")
+        for name, segs in moves.items():
+            if name != 'shake':
+                self.assertFalse(any('rotation' in s for s in segs), name)
+
+    def test_back_to_themes_is_no_moment_and_a_new_round_starts_fresh(self):
+        # BACKLOG B-201: the play screen's back button (main.js onPlayBack
+        # -> onThemes) leaves for the theme screen with the round cleared;
+        # from any point of a word that is no moment (no pose, no sound),
+        # and the next round he pops up as at any round start
+        self.assertEqual(self.run_node(
+            "const back = (s) => ({ ...s, screen: 'theme', theme: null, words: [], round: { index: 0, size: 5, results: [] },"
+            " current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },"
+            " pressed: null, speaking: false, idleBeat: null });"
+            "const five = { index: 4, size: 5, results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) };"
+            "const from = [st(), st({ current: cur('playing', 'ca-') }), st({ current: cur('playing', 'tac') }),"
+            " st({ current: cur('wrong', 'tac'), lives: 1 }), st({ current: cur('revealed', 'cat'), lives: 0 }),"
+            " st({ current: cur('correct', 'cat'), round: five }), st({ idleBeat: 'sunk' }), st({ pressed: 'dome', current: cur('playing', 'cat') })];"
+            "out([from.map((s) => moments(s, back(s))), from.map((s) => c.soundsFor(moments(s, back(s)))),"
+            " moments(back(st()), st({ roundsStarted: 2 }))]);"), [
+            [[]] * 8, [[]] * 8, ['roundStart', 'picture'],
+        ])
+
     def test_changes_are_at_least_300ms_apart(self):
         self.assertEqual(self.run_node(
             "out([c.CHANGE_MS, c.stepDelays(1, Infinity), c.stepDelays(2, 1000), c.stepDelays(2, 100), c.stepDelays(1, 0)]);"),
@@ -1276,16 +1396,19 @@ class CharacterTests(TestCase):
         # peek: only the eyes above the edge for 600ms, then normal
         self.assertEqual([s['y'] for s in moves['peek']], [18, 18, 0])
         self.assertEqual(moves['peek'][1]['duration'], 0.6)
-        # a vertical slide only; everything but the sink ends at rest
+        # a vertical slide only, except the speakerLocked head-shake (BACKLOG
+        # B-203), which also turns him about the neck; everything but the
+        # sink ends at rest
         for name, segs in moves.items():
-            self.assertEqual(set(k for s in segs for k in s), {'y', 'duration', 'ease'}, name)
+            keys = {'y', 'duration', 'ease', 'rotation'} if name == 'shake' else {'y', 'duration', 'ease'}
+            self.assertEqual(set(k for s in segs for k in s), keys, name)
             self.assertNotIn('back', ' '.join(s['ease'] for s in segs), name)
             if name != 'sink':
                 self.assertEqual(segs[-1]['y'], 0, name)
 
     def test_reduced_motion_swaps_poses_only(self):
         self.assertEqual(self.run_node("out(Object.keys(c.MOVES).map((k) => c.moveFor(k, true)));"),
-                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 5)
+                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 6)
         self.assertEqual(self.run_node("out(c.moveFor('pop', false));"), self.run_node("out(c.MOVES.pop);"))
 
     def test_idle_wait_is_10s_from_the_last_input_once_per_word(self):
@@ -1374,13 +1497,16 @@ class AudioTests(TestCase):
         # correct/*, error/*, celebration/tada.mp3, swipe/*: every file on
         # disk and nothing else (a renamed clip fails here, not on a phone)
         files = self.run_node("out(a.FILES);")
-        self.assertEqual(set(files), {'correct', 'error', 'tada', 'swipe'})
+        self.assertEqual(set(files), {'correct', 'error', 'tada', 'swipe', 'locked'})
         for kind, dir_ in (('correct', 'correct'), ('error', 'error'), ('swipe', 'swipe')):
             self.assertEqual(files[kind]['dir'], dir_)
             on_disk = sorted(f.name for f in (self.SOUNDS / dir_).iterdir() if f.is_file())
             self.assertEqual(sorted(files[kind]['names']), on_disk, kind)
         self.assertEqual(files['tada'], {'dir': 'celebration', 'names': ['tada.mp3']})
         self.assertTrue((self.SOUNDS / 'celebration' / 'tada.mp3').exists())
+        # BACKLOG B-203: the held-back speaker's "hmm no", the existing clip
+        self.assertEqual(files['locked'], {'dir': 'error', 'names': ['hmm no.mp3']})
+        self.assertTrue((self.SOUNDS / 'error' / 'hmm no.mp3').exists())
 
     def test_urls_are_encoded(self):
         urls = self.run_node(
@@ -1400,7 +1526,7 @@ class AudioTests(TestCase):
 
     def test_channels(self):
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx'})
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -1436,7 +1562,7 @@ class AudioTests(TestCase):
     def test_no_web_audio_means_silent_not_broken(self):
         self.assertEqual(self.run_node(
             "delete globalThis.AudioContext; a.init(); listeners.pointerup(); await settle();"
-            "['correct', 'error', 'tada', 'swipe'].forEach(a.play); out([ctxs.length, played()]);"),
+            "['correct', 'error', 'tada', 'swipe', 'locked'].forEach(a.play); out([ctxs.length, played()]);"),
             [0, []])
 
     def test_a_clip_that_fails_to_download_is_left_out(self):
@@ -1468,7 +1594,7 @@ class AudioTests(TestCase):
     def test_muted_means_no_sound_at_all(self):
         self.assertEqual(self.run_node(
             "await ready(); S.setState({ muted: true, speaking: false }); const n = made.length;"
-            "['correct', 'error', 'tada', 'swipe'].forEach(a.play);"
+            "['correct', 'error', 'tada', 'swipe', 'locked'].forEach(a.play);"
             "let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
             "out([played(), made.length - n, ended]);"),
             [[], 0, 1])
@@ -1519,6 +1645,63 @@ class AudioTests(TestCase):
             "S.setState(st({ muted: true, screen: 'round-end' }));"
             "out([swipeOn, word.paused, allStopped, played()]);"),
             [True, True, True, []])
+
+    def test_hmm_no_is_downloaded_and_decoded_once_for_both_pools(self):
+        # BACKLOG B-203: the 'locked' pool is the error pool's "hmm no";
+        # the file is fetched once and decoded once (decodeAudioData takes
+        # over its bytes), and both pools play it
+        self.assertEqual(self.run_node(
+            "const decodes = []; const dec = AudioContext.prototype.decodeAudioData;"
+            "AudioContext.prototype.decodeAudioData = function (d) { decodes.push(d.url); return dec.call(this, d); };"
+            "await ready(); S.setState({ muted: false, speaking: false });"
+            "const url = '/static/sounds/error/hmm%20no.mp3';"
+            "a.play('locked'); a.play('locked'); const locked = played(); clear();"
+            "Math.random = () => 0.45; a.play('error');"     # index 4 of the ten error clips
+            "out([fetched.filter((u) => u === url).length, decodes.filter((u) => u === url).length, decodes.length,"
+            " new Set(decodes).size, locked, played(), sounding()]);"),
+            [1, 1, 25, 25, ['error/hmm no.mp3', 'error/hmm no.mp3'], ['error/hmm no.mp3'], ['error']])
+
+    def test_a_tap_on_the_held_back_speaker_says_hmm_no(self):
+        # renderSound plays MOMENTS.speakerLocked.sound ('locked') on each
+        # change of state.lockedTaps: "hmm no" every tap, a new one cutting
+        # the last (one voice clip at a time); nothing on a re-render, and
+        # nothing while muted (the count still changes: the robot shakes
+        # his head silently)
+        self.assertEqual(self.run_node(
+            "await ready(); S.subscribe(a.renderSound);"
+            "const go = (o) => { clear(); S.setState(st(o)); return played(); };"
+            "out([go({ lockedTaps: 0 }), go({ lockedTaps: 1 }), go({ lockedTaps: 2 }), sounding(),"
+            " go({ lockedTaps: 2 }), go({ lockedTaps: 3, muted: true }), go({ lockedTaps: 3, muted: false }),"
+            # after a wrong check (its error clip), a tap still says hmm no
+            " (go({ lockedTaps: 3, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 }), kinds()),"
+            " go({ lockedTaps: 4, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 })]);"),
+            [[], ['error/hmm no.mp3'], ['error/hmm no.mp3'], ['error'], [], [], [], ['error'], ['error/hmm no.mp3']])
+
+    def test_back_to_themes_stops_the_word_and_plays_nothing(self):
+        # BACKLOG B-201: the play screen's back button (main.js onPlayBack
+        # -> onThemes) stops the word clip and clears the round in one
+        # setState; renderSound plays nothing for it (no tada after the
+        # fifth word either), and the stopped clip never calls its onEnd
+        self.assertEqual(self.run_node(
+            "await ready(); S.subscribe(a.renderSound);"
+            "const back = (o) => ({ ...o, screen: 'theme', theme: null, words: [], round: { index: 0, size: 5, results: [] },"
+            " current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },"
+            " pressed: null, speaking: false, idleBeat: null });"
+            "const five = { index: 4, size: 5, results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) };"
+            "const from = [st({ current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 }),"
+            " st({ current: { word: 'cat', status: 'correct', placed: put(['t1', 't2', 't3']) }, round: five }),"
+            " st({ current: { word: 'cat', status: 'revealed', placed: put(['t1', 't2', 't3']) }, lives: 0 }),"
+            " st({ current: { word: 'cat', status: 'playing', placed: put(['t1', null, null]) }, idleBeat: 'sunk' })];"
+            "const res = [];"
+            "for (const s of from) {"
+            " S.setState(s); let ended = 0; S.setState({ speaking: true });"
+            " a.speakWord('/static/sounds/themes/animals/cat.mp3', () => { ended++; });"
+            " const word = made[made.length - 1]; clear();"
+            " a.stopWord(); S.setState(back(S.state)); word.on.ended();"
+            " res.push([word.paused, ended, played()]);"
+            "}"
+            "out(res);"),
+            [[True, 0, []]] * 4)
 
     def test_nothing_else_constructs_audio(self):
         # BACKLOG B-108: audio.js is the only place sounds play; no other
@@ -1780,3 +1963,353 @@ class RobotLayoutTests(TestCase):
         # the reason for the z-order: the second row of a 7-10 letter word
         # is in the way of the pop-up
         self.assertEqual(sorted(json.loads(result.stdout)['idle']['pop'], key=int), ['7', '8', '9', '10'])
+
+
+class PlayBackTests(TestCase):
+    """The play screen's back button (BACKLOG B-201): the sticker book's
+    line arrow, no text, at least 48x48, in the header left of the mute
+    toggle and shown on the play screen only; tapping it goes to the theme
+    screen at once, drops the round (stickers it added come out of the
+    book, results cleared) and stops the word clip. The transition itself
+    is covered by CharacterTests / AudioTests / StickerBookTests
+    (`back_to_themes`, `remove`)."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
+
+    def main_js(self):
+        return (self.ROOT / 'static' / 'js' / 'main.js').read_text()
+
+    def function(self, name):
+        js = self.main_js()
+        start = js.index(f'\nfunction {name}(')
+        return js[start:js.index('\n}\n', start)]
+
+    def test_the_sticker_books_arrow_in_the_header_left_of_the_mute_toggle(self):
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<header'):html.index('</header>')]
+        m = re.search(r'<button id="play-back-btn"([^>]*)>(.*?)</button>', header, flags=re.S)
+        self.assertIsNotNone(m)
+        attrs, inner = m.groups()
+        self.assertIn('type="button"', attrs)
+        self.assertIn('aria-label="Back"', attrs)
+        self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '')     # no text
+        book = re.search(r'<button id="gallery-back-btn"[^>]*>(.*?)</button>', html, flags=re.S).group(1)
+        self.assertEqual(inner.strip(), book.strip())                     # the same SVG
+        self.assertLess(header.index('class="app-title"'), header.index('id="play-back-btn"'))
+        self.assertLess(header.index('id="play-back-btn"'), header.index('id="mute-btn"'))
+
+    def test_shown_on_the_play_screen_only_at_least_48px_and_tappable(self):
+        rule = self.rule('.play-back-btn')
+        self.assertIn('display: none;', rule)
+        self.assertGreaterEqual(int(re.search(r'\n\s*width: (\d+)px;', rule).group(1)), 48)
+        self.assertGreaterEqual(int(re.search(r'\n\s*height: (\d+)px;', rule).group(1)), 48)
+        self.assertIn('pointer-events: auto;', rule)                    # the header is click-through
+        # pushed right by an auto left margin, so the logo and the mute
+        # toggle keep their places; a gap before the toggle's tap area
+        margin = re.search(r'\n\s*margin: -7px (\d+)px 0 auto;', rule)
+        self.assertIsNotNone(margin)
+        self.assertGreaterEqual(int(margin.group(1)), 8)
+        self.assertIn('color: var(--cream);', rule)
+        self.assertNotIn('background:', rule.replace('background: none;', ''))   # no face on the v5 scene
+        self.assertIn('display: flex;', self.rule('body[data-screen="play"] .play-back-btn'))
+        # nothing else shows it
+        css = self.css()
+        shown = re.findall(r'\n([^{}\n]*\.play-back-btn[^{}\n]*?)\s*{[^}]*display: (?!none)', css)
+        self.assertEqual(shown, ['body[data-screen="play"] .play-back-btn'])
+
+    def test_tap_drops_the_round_and_goes_to_the_theme_screen(self):
+        main = self.main_js()
+        self.assertIn("$('play-back-btn').addEventListener('click', onPlayBack);", main)
+        self.assertIn("import { add as addSticker, remove as removeSticker } from './stickers.js';", main)
+        back = self.function('onPlayBack')
+        self.assertIn("if (state.screen !== 'play') return;", back)
+        self.assertIn('if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);', back)
+        self.assertTrue(back.rstrip().endswith('onThemes();'))
+        self.assertNotIn('confirm(', main)
+        themes = self.function('onThemes')
+        self.assertLess(themes.index('stopWord();'), themes.index('setState({'))
+        for decl in ("screen: 'theme',", 'words: [],', 'results: [] },', 'current: { word: null,', 'speaking: false,',
+                     'pressed: null,', 'idleBeat: null,'):
+            self.assertIn(decl, themes, decl)
+
+
+class LevelTests(TestCase):
+    """The level picker and the level in state (BACKLOG B-202):
+    static/js/level.js levelRules(level) (pure, run through node), the
+    level remembered in localStorage `flip.level` through loadLevel /
+    saveLevel only (a missing or bad value, or broken storage, is
+    'easy'), the theme screen's row of three panel buttons with 1, 2 and
+    3 bulbs above the stickers button, and the round's level fixed when a
+    theme is tapped."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'level.js'
+    EASY = {'hearBefore': True, 'firstLetterGiven': True, 'shortWordsFirst': True,
+            'leverDropsWrongFirst': True, 'distractors': 0}
+    NORMAL = {'hearBefore': False, 'firstLetterGiven': False, 'shortWordsFirst': False,
+              'leverDropsWrongFirst': False, 'distractors': 0}
+    HARD = dict(NORMAL, distractors=2)
+
+    # In-memory storage; SEED is the initial value of flip.level or null.
+    FAKE_STORAGE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.level', SEED);
+        const fake = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { store.set(k, String(v)); },
+        };
+        const raw = () => store.get('flip.level') ?? null;
+        const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('quota'); } };
+    """
+
+    def run_node(self, body, seed=None):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const SEED = {json.dumps(seed)};"
+            f"{self.FAKE_STORAGE}"
+            f"const L = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        text = (self.ROOT / 'static' / 'js' / name).read_text()
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
+
+    def main_function(self, name):
+        js = (self.ROOT / 'static' / 'js' / 'main.js').read_text()
+        start = re.search(rf'\n(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    # --- levelRules (pure) ---
+
+    def test_level_rules_per_level(self):
+        self.assertEqual(
+            self.run_node("out([L.LEVELS, L.DEFAULT_LEVEL, L.levelRules('easy'), L.levelRules('normal'), L.levelRules('hard')]);"),
+            [['easy', 'normal', 'hard'], 'easy', self.EASY, self.NORMAL, self.HARD],
+        )
+
+    def test_anything_that_is_not_a_level_gets_easys_rules(self):
+        self.assertEqual(
+            self.run_node("out([undefined, null, '', 'Hard', 'insane', 3, {}].map((v) => L.levelRules(v)));"),
+            [self.EASY] * 7,
+        )
+
+    def test_rules_are_a_new_object_each_time(self):
+        # a caller changing what it got cannot change the table
+        self.assertEqual(
+            self.run_node("const r = L.levelRules('hard'); r.distractors = 9; r.hearBefore = true;"
+                          "out([L.levelRules('hard'), L.levelRules('hard') === L.levelRules('hard')]);"),
+            [self.HARD, False],
+        )
+
+    def test_level_js_has_no_dom(self):
+        code = self.code('level.js')
+        for word in ('document', 'window', 'import '):
+            self.assertNotIn(word, code, word)
+
+    # --- flip.level: loadLevel / saveLevel ---
+
+    def test_missing_or_bad_stored_value_is_easy(self):
+        for seed in (None, '', 'insane', 'Easy', ' hard', '"hard"', 'null'):
+            self.assertEqual(self.run_node("out(L.loadLevel(fake));", seed=seed), 'easy', seed)
+
+    def test_stored_level_is_read(self):
+        for level in ('easy', 'normal', 'hard'):
+            self.assertEqual(self.run_node("out(L.loadLevel(fake));", seed=level), level)
+
+    def test_save_writes_the_key_and_load_reads_it_back(self):
+        self.assertEqual(
+            self.run_node("L.saveLevel('hard', fake); const a = [raw(), L.loadLevel(fake)];"
+                          "L.saveLevel('normal', fake); out([...a, raw(), L.loadLevel(fake)]);"),
+            ['hard', 'hard', 'normal', 'normal'],
+        )
+
+    def test_save_ignores_a_bad_level(self):
+        self.assertEqual(
+            self.run_node("L.saveLevel('insane', fake); L.saveLevel(undefined, fake); out(raw());", seed='normal'),
+            'normal',
+        )
+
+    def test_broken_or_missing_storage_is_easy_and_never_throws(self):
+        self.assertEqual(
+            self.run_node(
+                "const a = L.loadLevel(broken); L.saveLevel('hard', broken);"
+                # the default storage: none at all, then one whose access throws
+                "delete globalThis.localStorage; const b = L.loadLevel(); L.saveLevel('hard');"
+                "Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked'); } });"
+                "const c = L.loadLevel(); L.saveLevel('hard');"
+                "out([a, b, c]);"),
+            ['easy', 'easy', 'easy'],
+        )
+
+    def test_default_storage_is_local_storage(self):
+        self.assertEqual(
+            self.run_node("globalThis.localStorage = fake; L.saveLevel('hard'); out([raw(), L.loadLevel()]);"),
+            ['hard', 'hard'],
+        )
+
+    def test_only_level_js_names_the_key(self):
+        js = self.ROOT / 'static' / 'js'
+        for f in sorted(js.glob('*.js')):
+            if f.name != 'level.js':
+                self.assertNotIn('flip.level', self.code(f.name), f.name)
+        self.assertIn("LEVEL_KEY = 'flip.level'", self.code('level.js'))
+        self.assertNotIn('localStorage', self.code('main.js'))
+
+    # --- theme screen: the picker ---
+
+    def test_three_bulb_buttons_above_the_stickers_button_with_no_text(self):
+        html = self.client.get('/').content.decode()
+        theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-play"')]
+        self.assertLess(theme.index('id="theme-buttons"'), theme.index('id="level-picker"'))
+        self.assertLess(theme.index('id="level-picker"'), theme.index('id="stickers-btn"'))
+        picker = theme[theme.index('id="level-picker"'):theme.index('<div class="actions">')]
+        buttons = re.findall(r'<button id="level-(\w+)"([^>]*)>(.*?)</button>', picker, flags=re.S)
+        self.assertEqual([b[0] for b in buttons], ['easy', 'normal', 'hard'])
+        for (level, attrs, inner), bulbs in zip(buttons, (1, 2, 3)):
+            self.assertIn('class="panel-btn level-btn"', attrs)
+            self.assertIn('type="button"', attrs)
+            self.assertIn(f'aria-label="{level}"', attrs)
+            self.assertRegex(attrs, r'aria-pressed="(true|false)"')
+            self.assertEqual(inner.count('<span class="bulb"></span>'), bulbs, level)
+            self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '', level)    # no text
+        # the markup's default matches state.level's default
+        self.assertIn('aria-pressed="true"', buttons[0][1])
+
+    def test_picked_button_is_pressed_in_with_lit_bulbs_the_others_dark(self):
+        self.assertIn('opacity: 0;', self.rule('.level-btn .bulb::before'))
+        self.assertIn('opacity: 1;', self.rule('.level-btn[aria-pressed="true"] .bulb::before'))
+        pressed = self.rule('.level-btn[aria-pressed="true"]')
+        self.assertIn('transform: translate(1px, 2px);', pressed)
+        self.assertIn('inset 2px 3px 5px var(--shadow-contact)', pressed)
+        # the bulbs are the lives bulbs (.bulb), not a new drawing
+        self.assertIn('.hearts span,\n.bulb {', self.css())
+
+    def test_theme_screen_fits_at_360x740_and_on_a_short_phone(self):
+        # logo line 70 + two cards + their 16px gap + 12px + level row 56
+        # + 12px + stickers button 56 + bottom safe area 22
+        n = int(re.search(r'width: min\(240px, 100%, \(100vh - (\d+)px\) / 2\);', self.rule('.theme-btn')).group(1))
+        self.assertEqual(self.rule('.level-btn .bulb').count('14px'), 2)
+        for height in (740, 667, 640):
+            card = min(240, 324, (height - n) / 2)
+            self.assertLessEqual(70 + 2 * card + 16 + 12 + 56 + 12 + 56 + 22, height, height)
+        self.assertGreaterEqual(min(240, 324, (740 - n) / 2), 230)
+
+    # --- state and wiring ---
+
+    def test_level_in_state_default_easy_and_the_rounds_level(self):
+        state = (self.ROOT / 'static' / 'js' / 'state.js').read_text()
+        self.assertRegex(state, r"\n    level: 'easy',")
+        self.assertIn('round: { index: 0, size: 5, level: null, results: [] },', state)
+
+    def test_wiring(self):
+        main = (self.ROOT / 'static' / 'js' / 'main.js').read_text()
+        self.assertIn("import { LEVELS, loadLevel, saveLevel } from './level.js';", main)
+        self.assertIn('setState({ level: loadLevel() });', main)
+        self.assertIn('subscribe(renderLevel);', main)
+        self.assertIn("for (const level of LEVELS) $(`level-${level}`).addEventListener('click', () => onLevel(level));", main)
+        render = self.main_function('renderLevel')
+        self.assertIn("$(`level-${level}`).setAttribute('aria-pressed', String(level === state.level));", render)
+        pick = self.main_function('onLevel')
+        self.assertIn("if (state.screen !== 'theme') return;", pick)
+        self.assertLess(pick.index('saveLevel(level);'), pick.index('setState({ level });'))
+
+    def test_the_level_is_fixed_for_the_round_once_a_theme_is_tapped(self):
+        start = self.main_function('startRound')
+        # read when the theme is tapped, before the data file is fetched
+        self.assertLess(start.index('const level = state.level;'), start.index('await fetch('))
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, level, results: [] },', start)
+        # nothing else writes a round level; leaving a round clears it
+        main = self.code('main.js')
+        self.assertEqual(len(re.findall(r'\blevel(: [^,}]+)?, results', main)), 2)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, level: null, results: [] },', self.main_function('onThemes'))
+        for name in ('onCheck', 'onNext'):
+            self.assertIn('...round', self.main_function(name), name)
+
+
+class SpeakerPerLevelTests(TestCase):
+    """The speaker per level (BACKLOG B-203): easy plays the word at any
+    time; normal and hard, before the word is answered, hold it back and
+    the robot says "hmm no" with a small confused head-shake; once the
+    word is answered it plays on every level; the speaker looks the same;
+    mute silences all of it. The pure parts are run through node in
+    ControlsTests, CharacterTests and AudioTests; this checks the wiring."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def code(self, name):
+        text = (self.ROOT / 'static' / 'js' / name).read_text()
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+    def main_function(self, name):
+        js = self.code('main.js')
+        start = re.search(rf'\n(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css_rule(self, selector):
+        css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', css).group(1)
+
+    def test_locked_taps_in_state(self):
+        self.assertRegex((self.ROOT / 'static' / 'js' / 'state.js').read_text(), r'\n    lockedTaps: 0,')
+
+    def test_the_tap_follows_the_rounds_level(self):
+        speak = self.main_function('onSpeak')
+        # the round's copy of the level (B-202), not the picker's
+        self.assertIn('speakerAction(current, state.round.level)', speak)
+        self.assertNotRegex(speak, r'state\.level\b')
+        # a held-back tap counts one more, even while muted (the robot
+        # still shakes his head; audio.js plays nothing), and plays no word
+        locked = speak.index("if (action === 'locked') {")
+        self.assertLess(locked, speak.index('state.muted'))
+        self.assertIn('setState({ lockedTaps: state.lockedTaps + 1 });\n        return;', speak[locked:])
+        self.assertLess(speak.index("if (action !== 'word' || state.muted) return;"), speak.index('speakWord('))
+        self.assertIn("import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';",
+                      (self.ROOT / 'static' / 'js' / 'main.js').read_text())
+
+    def test_only_the_speaker_tap_writes_the_count(self):
+        # state is written only through setState patches; the one that
+        # changes lockedTaps is the held-back tap in main.js onSpeak
+        js = self.ROOT / 'static' / 'js'
+        patches = {f.name: re.findall(r'setState\(\{[^}]*\blockedTaps\b', self.code(f.name)) for f in sorted(js.glob('*.js'))}
+        self.assertEqual({k: len(v) for k, v in patches.items() if v}, {'main.js': 1})
+        self.assertIn('setState({ lockedTaps: state.lockedTaps + 1 });', self.main_function('onSpeak'))
+
+    def test_the_held_back_speaker_is_not_disabled_and_has_no_lock(self):
+        # renderControls disables only the capped speaker, so a held-back
+        # tap still reaches main.js; no new speaker image or class
+        controls = self.code('controls.js')
+        self.assertIn("speaker.disabled = s === 'cap';", controls)
+        self.assertIn("speaker: ['off', 'on', 'cap'],", controls)
+        html = self.client.get('/').content.decode()
+        speaker = html[html.index('id="speak-btn"'):html.index('</button>', html.index('id="speak-btn"'))]
+        self.assertEqual(re.findall(r'class="(speaker-[a-z]+)"', speaker), ['speaker-off', 'speaker-on', 'speaker-cap'])
+        self.assertNotIn('lock', speaker)
+
+    def test_the_head_shake_turns_him_about_his_neck(self):
+        # the visor centre's column (72.6px) at the console's edge (75px
+        # below the sprite's top at rest): his head swings, his shoulders
+        # stay at the edge
+        self.assertIn('transform-origin: calc(72.6 * var(--rpx)) calc(75 * var(--rpx));', self.css_rule('.robot-body'))
+        self.assertIn('left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));', self.css_rule('.robot-body img'))
+        self.assertIn('top: calc((130 - 75) * var(--rpx));', self.css_rule('.robot-body'))
+        # every segment sets the turn, so no other move leaves him tilted
+        self.assertIn('rotation: s.rotation || 0', self.code('character.js'))
