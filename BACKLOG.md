@@ -330,7 +330,30 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - Screenshots: one per moment at 360x740 (`robot-<moment>.png`), plus `robot-talking.png` mid-clip and `robot-peek.png`. Checklist passes.
 - status:
 
+### B-211 Locked letters you can see at a glance
+- why: on easy, letters that stay put (the given first letter, right letters after the lever, the robot's hint letter) must look clearly different from letters the kid can move. B-204's thin amber edge on the brass bar is invisible at phone size (human, 2026-10-15, on #52).
+- acceptance:
+  - A locked letter differs from a movable one in at least two ways, and the difference is obvious at real phone size (360x740 screenshot, not zoomed): for example a different tile colour or material, sitting sunk/fixed into the slot, and a fixed-looking detail that fits the lab machine (brass rivets or a clamp on the tile). No words; a lock icon only if nothing else reads clearly.
+  - Fits DESIGN.md's retro lab look; colours from DESIGN tokens or new tokens added to DESIGN.md.
+  - One look for every locked letter (B-204 given letter, B-205 lever lock, B-206 hint letter), driven only by the slot's `locked` flag.
+  - When a letter becomes locked (lever or hint), a short "clunk" moment (small press-in motion; a sound only if a fitting one exists).
+  - Pick the look yourself: try 2–3 options, keep the clearest, put the others' screenshots in the PR. Don't ask the human.
+  - DESIGN.md "Controls and states" records the chosen look.
+  - Screenshots: `locked-easy-start.png`, `locked-after-lever.png` (locked and movable letters side by side). Checklist passes.
+- status:
+
+### B-212 Next-word dome you can't miss
+- why: after a correct word the kid must see at once that the dome means "go on". In the 2026-10-15 preview playtest its blink was too weak to notice (also raised 2026-10-13). This is about being noticed, not the overall look; the bolder restyle comes later.
+- acceptance:
+  - Once a word is correct, the check dome blinks clearly brighter and bigger than now (light that reaches past its rim, a visible on/off rhythm), obvious at 360x740 on a phone without zooming. Stays in DESIGN.md's palette and style.
+  - If the kid has not pressed it after about 4 seconds, the robot nudges toward it (a point or look at the dome, per CHARACTER.md; a voice line only if a fitting clip exists) and repeats at most every 8 seconds.
+  - The "all slots filled" ready pulse before a check stays calmer than the next-word blink, so the two read differently.
+  - `prefers-reduced-motion`: a steady strong glow instead of blinking.
+  - Screenshots: `dome-next-on.png`, `dome-next-off.png` (both blink phases), `dome-robot-nudge.png`. Checklist passes.
+- status:
+
 ## Later / not now
+- Design bump: the overall look feels mellow and restrained; make it bolder across all screens, worked out in Claude Design first (human, 2026-10-15).
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
 - Visual mascot on the theme, round-end and sticker book screens (no corner is reserved since B-116; CHARACTER.md "Poses": robot-hero on the theme screen); character text lines on screens.
 - Content in DB and generation pipeline (words, images in one cartoon style, TTS audio).
