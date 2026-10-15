@@ -5,7 +5,7 @@
 // across renders: they are moved between their bench spot and the slots,
 // never recreated, so a re-render can't destroy a tile that is mid-drag.
 
-import { makeDraggable, destroyDraggable, setDragEnabled } from './drag.js';
+import { makeDraggable, destroyDraggable, setDragEnabled, isLocked } from './drag.js';
 import { slotLayout, blockLayout } from './layout.js';
 
 const $ = (id) => document.getElementById(id);
@@ -25,17 +25,24 @@ export function renderCard(state) {
     renderHearts(lives);
     renderCounter(round);
     renderBoxes(current.placed.length);
-    const spots = renderSpots(current.tray.length);
+    // The given letter's block (easy, BACKLOG B-204; round.js makeWord)
+    // starts in its slot and has no spot on the bench.
+    const bench = current.tray.filter((t) => !t.given);
+    const spots = renderSpots(bench.length);
 
     removeStaleTiles(current.tray);
     current.tray.forEach((t) => {
         if (!tiles.has(t.id)) tiles.set(t.id, createTile(t));
     });
 
-    // Placed tiles live inside their box, upright…
+    // Placed tiles live inside their box, upright; a locked one (class
+    // `locked`: the lit-edge look in game.css) cannot be moved…
     const boxes = $('letter-boxes').children;
+    const locked = new Set();
     current.placed.forEach((slot, i) => {
         boxes[i].classList.toggle('filled', !!slot);
+        boxes[i].classList.toggle('locked', isLocked(slot));
+        if (isLocked(slot)) locked.add(slot.tileId);
         if (slot) mount(tiles.get(slot.tileId), boxes[i], 0);
     });
 
@@ -43,11 +50,11 @@ export function renderCard(state) {
     // tilted as the layout says. A used tile leaves its spot empty, so the
     // other blocks never shuffle and a returned block lands where it was.
     const spotEls = $('letter-tray').children;
-    current.tray.forEach((t, i) => {
+    bench.forEach((t, i) => {
         if (!t.used) mount(tiles.get(t.id), spotEls[i], spots[i].rot);
     });
 
-    setDragEnabled(current.status === 'playing' || current.status === 'wrong');
+    setDragEnabled(current.status === 'playing' || current.status === 'wrong', locked);
 }
 
 // No alt text: it would be English on screen if the picture failed to

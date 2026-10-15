@@ -2313,3 +2313,272 @@ class SpeakerPerLevelTests(TestCase):
         self.assertIn('top: calc((130 - 75) * var(--rpx));', self.css_rule('.robot-body'))
         # every segment sets the turn, so no other move leaves him tilted
         self.assertIn('rotation: s.rotation || 0', self.code('character.js'))
+
+
+class EasyStartTests(TestCase):
+    """Easy: first letter given, short words first (BACKLOG B-204).
+    static/js/round.js pickWords (on easy the easy-tagged words first, then
+    the shortest others; normal and hard as before) and makeWord (on easy
+    the first letter starts in the first slot, locked, its block off the
+    bench), and drag.js's lock rules (a locked slot takes nothing and
+    gives nothing back, the lever leaves it, its block cannot be dragged),
+    run through node; the wiring in main.js and card.js and the locked
+    look in game.css are checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # A seeded Math.random stand-in, so a pick can be repeated.
+    PRELUDE = """
+        const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const out = (v) => console.log(JSON.stringify(v));
+        let seq = 0;
+        const newId = () => `t${++seq}`;
+    """
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            f"{self.PRELUDE}"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def picks(self, data, level, seeds=40):
+        return self.run_node(
+            f"const data = {json.dumps(data)};"
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickWords(data, 5, {json.dumps(level)}, seeded(i + 1))));")
+
+    # --- pickWords ---
+
+    def test_easy_takes_only_easy_tagged_words_when_there_are_enough(self):
+        # animals has six easy-tagged words: every easy round is five of
+        # them, at random, so over many rounds all six come up
+        data = self.content('animals')
+        easy = {w for w, v in data.items() if v.get('difficulty') == 'easy'}
+        self.assertEqual(len(easy), 6)
+        rounds = self.picks(data, 'easy')
+        for words in rounds:
+            self.assertEqual(len(set(words)), 5)
+            self.assertLessEqual(set(words), easy)
+        self.assertEqual(set().union(*map(set, rounds)), easy)
+
+    def test_easy_fills_up_with_the_shortest_other_words(self):
+        # transportation has exactly five easy-tagged words (one of them,
+        # scooter, 7 letters long): they are the round
+        data = self.content('transportation')
+        for words in self.picks(data, 'easy'):
+            self.assertEqual(set(words), {'boat', 'bus', 'car', 'scooter', 'taxi'})
+        # two easy words, then the three shortest of the rest; the last
+        # place goes at random to one of the words of the cut length
+        data = {
+            'elephant': {'difficulty': 'easy'}, 'ox': {'difficulty': 'easy'},
+            'hippopotamus': {'difficulty': 'hard'}, 'bee': {'difficulty': 'medium'}, 'ant': {},
+            'crab': {'difficulty': 'hard'}, 'seal': {'difficulty': 'medium'}, 'kangaroo': {},
+            'giraffe': {'difficulty': 'medium'},
+        }
+        rounds = self.picks(data, 'easy')
+        for words in rounds:
+            self.assertEqual(len(words), 5)
+            self.assertLessEqual({'elephant', 'ox', 'bee', 'ant'}, set(words))
+            self.assertEqual(len(set(words) & {'crab', 'seal'}), 1)
+        self.assertEqual({w for words in rounds for w in words} & {'crab', 'seal'}, {'crab', 'seal'})
+
+    def test_easy_without_tags_gets_the_shortest_words(self):
+        data = {w: {'image': f'/{w}.svg'} for w in ('helicopter', 'bus', 'car', 'motorbike', 'taxi', 'boat', 'plane', 'submarine')}
+        for words in self.picks(data, 'easy'):
+            self.assertEqual(set(words), {'bus', 'car', 'taxi', 'boat', 'plane'})
+
+    def test_easy_plays_its_words_in_random_order(self):
+        data = self.content('transportation')
+        orders = {tuple(words) for words in self.picks(data, 'easy')}
+        self.assertGreater(len(orders), 5)
+
+    def test_normal_and_hard_pick_as_before(self):
+        # five words at random from the whole theme: the shuffle of the
+        # theme's words, cut at five, as main.js did before B-204
+        data = self.content('animals')
+        for level in ('normal', 'hard'):
+            same = self.run_node(
+                f"const data = {json.dumps(data)};"
+                "out(Array.from({ length: 20 }, (_, i) => JSON.stringify(R.pickWords(data, 5, "
+                f"{json.dumps(level)}, seeded(i + 1))) === JSON.stringify(R.shuffle(Object.keys(data), seeded(i + 1)).slice(0, 5))));")
+            self.assertEqual(same, [True] * 20, level)
+            seen = {w for words in self.picks(data, level) for w in words}
+            self.assertTrue(seen - {w for w, v in data.items() if v.get('difficulty') == 'easy'}, level)
+
+    def test_pick_leaves_the_data_alone_and_a_null_level_is_easy(self):
+        data = self.content('animals')
+        before, after, null_pick, easy_pick = self.run_node(
+            f"const data = {json.dumps(data)}; const before = JSON.stringify(data);"
+            "const n = R.pickWords(data, 5, null, seeded(7)); const e = R.pickWords(data, 5, 'easy', seeded(7));"
+            "out([before, JSON.stringify(data), n, e]);")
+        self.assertEqual(before, after)
+        self.assertEqual(null_pick, easy_pick)
+
+    # --- makeWord ---
+
+    def test_easy_gives_the_first_letter_locked_in_the_first_slot(self):
+        for word in ('duck', 'scooter', 'dad', 'submarine'):
+            cur = self.run_node(
+                f"out(R.makeWord({{ word: '{word}', image: '/i.svg', audio: '/a.mp3' }}, 'easy', newId, seeded(3)));")
+            self.assertEqual((cur['word'], cur['image'], cur['audio'], cur['status']), (word, '/i.svg', '/a.mp3', 'playing'))
+            self.assertEqual(sorted(t['letter'] for t in cur['tray']), sorted(word), word)
+            self.assertEqual(len({t['id'] for t in cur['tray']}), len(word))
+            given = [t for t in cur['tray'] if t.get('given')]
+            self.assertEqual(len(given), 1, word)
+            self.assertEqual(given[0]['letter'], word[0])
+            self.assertTrue(given[0]['used'])
+            self.assertEqual(cur['placed'][0], {'letter': word[0], 'tileId': given[0]['id'], 'locked': True})
+            self.assertEqual(cur['placed'][1:], [None] * (len(word) - 1))
+            # every other block is on the bench
+            self.assertEqual([t['used'] for t in cur['tray'] if not t.get('given')], [False] * (len(word) - 1))
+
+    def test_normal_and_hard_start_with_every_slot_empty(self):
+        for level in ('normal', 'hard'):
+            cur = self.run_node(f"out(R.makeWord({{ word: 'tiger', image: '/i.svg' }}, '{level}', newId));")
+            self.assertEqual(cur['placed'], [None] * 5)
+            self.assertEqual(sorted(t['letter'] for t in cur['tray']), sorted('tiger'))
+            for t in cur['tray']:
+                self.assertEqual(set(t), {'id', 'letter', 'used'})
+                self.assertFalse(t['used'])
+
+    def test_the_given_letter_still_needs_a_check(self):
+        # the dome is off at the start of an easy word and lights (check)
+        # only when every slot is full; a word whose only missing letter
+        # is the given one starts full, and still waits for the check
+        self.assertEqual(
+            self.run_node(
+                "const easy = R.makeWord({ word: 'cat' }, 'easy', newId);"
+                "const one = R.makeWord({ word: 'a' }, 'easy', newId);"
+                "out([C.domeAction(easy), C.domeState(easy, null), one.placed, C.domeAction(one), C.domeState(one, null), one.status]);"),
+            [None, 'off', [{'letter': 'a', 'tileId': 't4', 'locked': True}], 'check', 'ready', 'playing'],
+        )
+
+    # --- drag.js: the lock rules ---
+
+    START = {
+        'word': 'cat', 'status': 'playing',
+        'tray': [{'id': 'a', 'letter': 't', 'used': False}, {'id': 'b', 'letter': 'a', 'used': False},
+                 {'id': 'c', 'letter': 'c', 'used': True, 'given': True}],
+        'placed': [{'letter': 'c', 'tileId': 'c', 'locked': True}, None, None],
+    }
+
+    def lock_rules(self, body):
+        return self.run_node(f"const cur = {json.dumps(self.START)}; const before = JSON.stringify(cur); {body}")
+
+    def test_a_locked_slot_takes_nothing_and_its_block_never_moves(self):
+        res = self.lock_rules(
+            "out([D.placeIn(cur, 'a', 0), D.placeIn(cur, 'c', 1), D.placeIn(cur, 'c', 0), D.takeOut(cur, 'c'),"
+            " D.isLocked(cur.placed[0]), D.isLocked(cur.placed[1]), D.isLocked({ letter: 'x', tileId: 'x' }), JSON.stringify(cur) === before]);")
+        self.assertEqual(res, [None, None, None, None, True, False, False, True])
+
+    def test_other_slots_work_as_before(self):
+        placed, moved, swapped, out_, wrong_out = self.lock_rules(
+            "const p = D.placeIn(cur, 'a', 1); const m = D.placeIn(p, 'a', 2); const s = D.placeIn(m, 'b', 2);"
+            "const o = D.takeOut(s, 'b');"
+            "const w = D.takeOut({ ...p, status: 'wrong' }, 'a');"
+            "out([p, m, s, o, w]);")
+        self.assertEqual(placed['placed'], [self.START['placed'][0], {'letter': 't', 'tileId': 'a'}, None])
+        self.assertEqual([t['used'] for t in placed['tray']], [True, False, True])
+        self.assertEqual(moved['placed'][1:], [None, {'letter': 't', 'tileId': 'a'}])
+        # a swap sends the block that was there back to the bench
+        self.assertEqual(swapped['placed'][1:], [None, {'letter': 'a', 'tileId': 'b'}])
+        self.assertEqual([t['used'] for t in swapped['tray']], [False, True, True])
+        self.assertEqual(out_['placed'], [self.START['placed'][0], None, None])
+        self.assertEqual([t['used'] for t in out_['tray']], [False, False, True])
+        self.assertEqual(wrong_out['status'], 'playing')     # a move reopens a wrong check
+        for cur in (placed, moved, swapped, out_):
+            self.assertTrue(cur['placed'][0]['locked'])
+
+    def test_the_lever_leaves_a_locked_letter(self):
+        after = self.lock_rules(
+            "const full = D.placeIn(D.placeIn(cur, 'a', 1), 'b', 2);"
+            "out(D.returnAll({ ...full, status: 'wrong' }));")
+        self.assertEqual(after['placed'], [{'letter': 'c', 'tileId': 'c', 'locked': True}, None, None])
+        self.assertEqual(after['tray'], self.START['tray'])
+        self.assertEqual(after['status'], 'playing')
+
+    def test_a_locked_block_cannot_be_dragged(self):
+        # drag.js with stand-ins for GSAP and Draggable: card.js passes the
+        # locked tile ids, and their Draggables stay disabled while the
+        # others follow the word's status
+        res = self.run_node(
+            "globalThis.gsap = { set() {} };"
+            "const made = [];"
+            "globalThis.Draggable = { create(el) { const d = { on: true, enabled(v) { if (v === undefined) return this.on; this.on = v; return this; } };"
+            " made.push([el.dataset.tileId, d]); return [d]; } };"
+            "const el = (id) => ({ dataset: { tileId: id }, addEventListener() {} });"
+            "['a', 'b', 'c'].forEach((id) => D.makeDraggable(el(id)));"
+            "const state = () => made.map(([id, d]) => id + (d.enabled() ? '+' : '-')).join(' ');"
+            "D.setDragEnabled(true, new Set(['c'])); const s1 = state();"
+            "D.setDragEnabled(false, new Set(['c'])); const s2 = state();"
+            "D.setDragEnabled(true, new Set(['c'])); const s3 = state();"
+            "D.setDragEnabled(true); const s4 = state();"
+            "out([s1, s2, s3, s4]);")
+        self.assertEqual(res, ['a+ b+ c-', 'a- b- c-', 'a+ b+ c-', 'a+ b+ c+'])
+
+    # --- wiring ---
+
+    def test_round_js_has_no_dom_and_reads_the_level_rules(self):
+        code = self.code('round.js')
+        for word in ('document', 'window', 'state'):
+            self.assertNotIn(word, code, word)
+        self.assertIn("import { levelRules } from './level.js';", code)
+        self.assertIn('levelRules(level).shortWordsFirst', code)
+        self.assertIn('levelRules(level).firstLetterGiven', code)
+
+    def test_main_builds_the_round_from_the_rounds_level(self):
+        main = self.code('main.js')
+        self.assertIn("import { pickWords, makeWord } from './round.js';", main)
+        self.assertNotIn('makeCurrent', main)
+        self.assertNotIn('shuffle', main)
+        start = self.function('startRound')
+        # `level` is the one read when the theme was tapped, which is also
+        # the round's level (round.level)
+        self.assertIn('pickWords(data, ROUND_SIZE, level)', start)
+        self.assertIn('current: makeWord(words[0], level, newTileId),', start)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, level, results: [] },', start)
+        nxt = self.function('onNext')
+        self.assertIn('current: makeWord(state.words[nextIndex], state.round.level, newTileId),', nxt)
+        self.assertNotRegex(nxt, r'state\.level\b')
+
+    def test_the_reveal_keeps_a_locked_letter_locked(self):
+        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed'))
+
+    def test_card_lays_out_only_the_bench_blocks_and_marks_locked_slots(self):
+        card = self.function('renderCard', 'card.js')
+        self.assertIn('const bench = current.tray.filter((t) => !t.given);', card)
+        self.assertIn('const spots = renderSpots(bench.length);', card)
+        self.assertIn('bench.forEach((t, i) => {', card)
+        self.assertIn("boxes[i].classList.toggle('locked', isLocked(slot));", card)
+        self.assertIn("setDragEnabled(current.status === 'playing' || current.status === 'wrong', locked);", card)
+
+    def test_the_locked_look(self):
+        css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+        rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter\s*{([^}]*)}', css).group(1)
+        # drawn as placed (the placed block's clay edges), plus a thin lit
+        # edge and a soft glow in palette tokens, and no hand cursor
+        self.assertIn('inset -2px -3px 0 var(--cream-lo),', rule)
+        self.assertIn('1px 2px 3px var(--shadow-deep),', rule)
+        self.assertIn('0 0 0 2px var(--amber),', rule)
+        self.assertIn('0 0 6px 2px var(--glow-amber);', rule)
+        self.assertIn('cursor: default;', rule)

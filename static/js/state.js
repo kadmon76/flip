@@ -20,9 +20,9 @@ export const state = {
         word: null,
         image: null,
         audio: null,            // the word's audio file from the content JSON, or none
-        // placed[i] is null or { letter, tileId }; one slot per letter of word
+        // placed[i] is null or { letter, tileId, locked? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord) stays put: no drag, tap out or drop on it, and the lever leaves it (drag.js isLocked)
         placed: [],
-        // tray is [{ id, letter, used }] in tray display order; id is stable
+        // tray is [{ id, letter, used, given? }] in tray display order (given: the easy first letter's block, which has no bench spot); id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
         // 'playing' | 'wrong' (checked, lives left; the next block move

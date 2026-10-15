@@ -17,6 +17,7 @@ import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
 import { LEVELS, loadLevel, saveLevel } from './level.js';
+import { pickWords, makeWord } from './round.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -24,36 +25,19 @@ const ROUND_SIZE = 5;
 const LIVES = 3;
 let tileSeq = 0;
 
-function shuffle(arr) {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-}
-
-function makeCurrent(entry) {
-    const letters = entry.word.split('');
-    return {
-        word: entry.word,
-        image: entry.image,
-        audio: entry.audio,
-        tray: shuffle(letters).map((letter) => ({ id: `t${++tileSeq}`, letter, used: false })),
-        placed: new Array(letters.length).fill(null),
-        status: 'playing',
-    };
-}
+// A fresh tile id for round.js makeWord, unique over the session (card.js
+// keys the DOM tiles by id).
+const newTileId = () => `t${++tileSeq}`;
 
 // Fill every box with the right letter using the word's own tiles. A
-// block already in its right slot stays there, so on the reveal only the
-// others fly in (feedback.js).
+// block already in its right slot stays there (a locked one stays
+// locked), so on the reveal only the others fly in (feedback.js).
 function revealed(current) {
     const tray = current.tray.map((t) => ({ ...t, used: true }));
     const letters = current.word.split('');
     const placed = letters.map((ch, i) => {
         const p = current.placed[i];
-        return p && p.letter === ch ? { letter: ch, tileId: p.tileId } : null;
+        return p && p.letter === ch ? { ...p } : null;
     });
     const taken = new Set(placed.filter(Boolean).map((p) => p.tileId));
     letters.forEach((ch, i) => {
@@ -135,8 +119,10 @@ async function startRound({ name, dataUrl }) {
     const level = state.level;
     // data shape: { "duck": { image, audio, difficulty }, ... }
     const data = await fetch(dataUrl).then((r) => r.json());
-    const words = shuffle(Object.keys(data))
-        .slice(0, ROUND_SIZE)
+    // `level` is the round's level (round.level below): on easy the round
+    // prefers the easy-tagged, then the shortest words, and each word
+    // starts with its first letter given (round.js, BACKLOG B-204).
+    const words = pickWords(data, ROUND_SIZE, level)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
     stopWord();
     setState({
@@ -144,7 +130,7 @@ async function startRound({ name, dataUrl }) {
         words,
         screen: 'play',
         round: { index: 0, size: ROUND_SIZE, level, results: [] },
-        current: makeCurrent(words[0]),
+        current: makeWord(words[0], level, newTileId),
         lives: LIVES,
         pressed: null,
         speaking: false,
@@ -246,7 +232,7 @@ function onNext(extra = {}) {
     } else {
         setState({
             round: { ...round, index: nextIndex, results },
-            current: makeCurrent(state.words[nextIndex]),
+            current: makeWord(state.words[nextIndex], state.round.level, newTileId),
             lives: LIVES,
             speaking: false,
             lastInput: performance.now(),
