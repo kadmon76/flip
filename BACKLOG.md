@@ -267,7 +267,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - On easy a round prefers words tagged `"difficulty": "easy"` in the theme JSON, then fills up with the shortest remaining words. Normal and hard pick as today.
   - A word whose only missing letters are the given one still needs a check (the dome lights when all slots are full, as now).
   - Screenshots: `play-easy-start.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/56
 
 ### B-205 Lever: wrong letters first, pull again to start over
 - why: the kid fixes only what was wrong, but can always start the word over.
@@ -277,7 +277,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - Before any wrong check, on every level, a pull sends back every placed letter (except the easy given letter).
   - Pure helper `leverResult(level, current)` (no DOM) returns the letters that go back and the ones that lock; a Django test covers easy-after-wrong, easy-second-pull, normal and before-check.
   - Screenshots: `lever-easy-after-wrong.png` (wrong letters gone, right ones locked), `lever-easy-second-pull.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/56
 
 ### B-206 Second miss: the robot gives one letter
 - why: help grows with each mistake instead of jumping from "wrong" to "here is the word".
@@ -286,7 +286,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - The robot plays a new moment `hintGiven` (happy pose, small pop) after his confused reaction to the miss, per CHARACTER.md "Presence" spacing.
   - A word answered correctly after a hint still counts as mastered (bulbs left).
   - Screenshots: `hint-second-miss.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/56
 
 ### B-207 Hard: two extra letters on the bench
 - why: hard means choosing the right letters, not only ordering them.
