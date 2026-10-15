@@ -245,7 +245,10 @@ class SlotLayoutTests(TestCase):
 class BlockLayoutTests(TestCase):
     """static/js/layout.js blockLayout(): 52px letter blocks in loose
     staggered rows of at most four, each tilted at most 4 degrees, inside
-    the bench width (DESIGN.md "Layout", BACKLOG B-113)."""
+    the bench width (DESIGN.md "Layout", BACKLOG B-113). Hard adds two
+    extra letters (BACKLOG B-207): up to 12 blocks, still three rows at
+    360 wide, the first row taking a fifth block when the rows beside the
+    robot are full."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
     BENCH = 332
@@ -282,6 +285,10 @@ class BlockLayoutTests(TestCase):
         self.assertEqual(self.rows(self.layout(6)), [4, 2])       # as in the v5 reference
         self.assertEqual(self.rows(self.layout(7)), [4, 3])
         self.assertEqual(self.rows(self.layout(10)), [4, 4, 2])
+        # hard, 9 and 10 letters plus two extras (B-207): three rows, the
+        # third holds three beside the robot, the first takes the twelfth
+        self.assertEqual(self.rows(self.layout(11)), [4, 4, 3])
+        self.assertEqual(self.rows(self.layout(12)), [5, 4, 3])
 
     def test_tilt_is_at_most_four_degrees_and_not_all_equal(self):
         spots = self.layout(10)['spots']
@@ -289,7 +296,7 @@ class BlockLayoutTests(TestCase):
         self.assertGreater(len({s['rot'] for s in spots}), 1)
 
     def test_blocks_stay_on_the_bench_and_do_not_overlap(self):
-        for n in range(1, 11):
+        for n in range(1, 13):   # up to 10 letters plus hard's two extras
             l = self.layout(n)
             size = l['size']
             for s in l['spots']:
@@ -311,19 +318,53 @@ class BlockLayoutTests(TestCase):
     def test_same_input_same_spots(self):
         self.assertEqual(self.layout(6), self.layout(6))
 
+    def test_a_long_first_row_keeps_the_other_rows_spots(self):
+        # 12 blocks (B-207): the first row holds five, centred and not
+        # shifted, with narrower gaps inside the bench; the second row is
+        # the second row of 10 and 11 blocks (the robot's cap clearance
+        # is unchanged), the third that of 11
+        twelve, eleven, ten = self.layout(12)['spots'], self.layout(11)['spots'], self.layout(10)['spots']
+        self.assertEqual(twelve[5:9], ten[4:8])
+        self.assertEqual(twelve[9:], eleven[8:])
+        first = twelve[:5]
+        self.assertTrue(all(s['y'] < 52 / 2 for s in first), first)          # all on the first row
+        self.assertLessEqual(abs((first[0]['x'] + first[-1]['x'] + 52) / 2 - self.BENCH / 2), 4)   # centred
+        self.assertTrue(all(b['x'] - a['x'] >= 52 + 6 for a, b in zip(first, first[1:])), first)
+
+    def test_wider_benches(self):
+        # a 480px column: three rows of four beside the robot too; 412px:
+        # five on the first row
+        self.assertEqual(self.rows(self.layout(12, 452)), [4, 4, 4])
+        self.assertEqual(self.rows(self.layout(12, 384)), [5, 4, 3])
+        for width in (384, 452):
+            spots = self.layout(12, width)['spots']
+            for s in spots:
+                self.assertGreaterEqual(s['x'], 2)
+                self.assertLessEqual(s['x'] + 52, width - 2)
+
     def test_height_fits_ten_letters_above_the_console(self):
         # 360x740: rail top 347 + two slot rows (114) + 4px gap + bench
         # + 4px gap + the console (324px wide, 972x175) + 22px safe area
-        # must fit in 740 (BACKLOG B-114, DESIGN "Layout").
+        # must fit in 740 (BACKLOG B-114, DESIGN "Layout"); also with hard's
+        # two extra letters (B-207): 12 blocks keep the three rows
         console = 324 * 175 / 972
-        self.assertLessEqual(347 + 114 + 4 + self.layout(10)['height'] + 4 + console + 22, 740)
+        for n in (10, 12):
+            self.assertLessEqual(347 + 114 + 4 + self.layout(n)['height'] + 4 + console + 22, 740, n)
+        self.assertEqual(self.layout(12)['height'], self.layout(10)['height'])
 
     def test_third_row_sits_right_of_the_robot(self):
         # Rows from the third on are centred right of 40% of the bench
         # (the robot's head and shoulders end at about 36%).
-        for n in (9, 10):
+        for n in (9, 10, 11):
             spots = self.layout(n)['spots'][8:]
             self.assertTrue(all(s['x'] >= 0.4 * self.BENCH for s in spots), (n, spots))
+        self.assertTrue(all(s['x'] >= 0.4 * self.BENCH for s in self.layout(12)['spots'][9:]))
+        # three blocks beside him (B-207) start right of his widest pose's
+        # reach (44%), and keep at least 10px between them
+        for n in (11, 12):
+            third = self.layout(n)['spots'][-3:]
+            self.assertTrue(all(s['x'] >= 0.44 * self.BENCH - 2 for s in third), (n, third))
+            self.assertTrue(all(b['x'] - a['x'] >= 52 + 6 for a, b in zip(third, third[1:])), (n, third))
         # rows one and two keep the stagger
         first, second = self.layout(10)['spots'][:4], self.layout(10)['spots'][4:8]
         self.assertGreaterEqual(abs(sum(s['x'] for s in first) - sum(s['x'] for s in second)) / 4, 8)
@@ -805,19 +846,23 @@ class TenLetterFitTests(TestCase):
         return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
     def test_words_up_to_ten_letters_clear_the_console_dome_and_robot(self):
+        # also on hard, where the bench has two extra letters (B-207): a
+        # word of n letters has n + 2 blocks
         zones, console_top = self.keep_out()
         rail_top = 0.445 * self.W * 2739 / 1264
         for n in range(1, 11):
-            slots, blocks = self.layouts(n)
-            rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
-            bench_top = rail_top + rail_h + self.GAP
-            # the column fits the screen: the console is not pushed down
-            self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, n)
-            for s in blocks['spots']:
-                x, y = self.SIDE + s['x'], bench_top + s['y']
-                box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
-                for name, zone in zones.items():
-                    self.assertFalse(self.overlap(box, zone), (n, name, box, zone))
+            for extras in (0, 2):
+                slots, _ = self.layouts(n)
+                _, blocks = self.layouts(n + extras)
+                rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
+                bench_top = rail_top + rail_h + self.GAP
+                # the column fits the screen: the console is not pushed down
+                self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, (n, extras))
+                for s in blocks['spots']:
+                    x, y = self.SIDE + s['x'], bench_top + s['y']
+                    box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
+                    for name, zone in zones.items():
+                        self.assertFalse(self.overlap(box, zone), (n, extras, name, box, zone))
 
     # Decodes an 8-bit RGBA, non-interlaced PNG with node's zlib and
     # returns its alpha channel (the two scene images are that format).
@@ -1908,6 +1953,9 @@ class RobotLayoutTests(TestCase):
         # - at the top of a pop (20px up) he is clear of every block of a
         #   1-6 letter word and of the rail of any word; 7-10 letter words
         #   do reach him, which is why he is drawn under the blocks.
+        # Also on hard (B-207), where a word of n letters has n + 2 blocks
+        # (keys 'h1'-'h10'): clear at rest, and at the top of a pop only
+        # the second row of a 7-10 letter word passes over him.
         if shutil.which('node') is None:
             self.skipTest('node not installed')
         poses = self.geometry()
@@ -1922,16 +1970,19 @@ class RobotLayoutTests(TestCase):
             const s = 120 / 330, out = {{}};
             const words = [];
             for (let n = 1; n <= 10; n++) {{
-                const sl = slotLayout(n, BENCH), bl = blockLayout(n, BENCH);
-                const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap;
-                const benchTop = railBottom + GAP;
-                words.push({{ n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
-                    SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT]) }});
+                for (const extras of [0, 2]) {{
+                    const sl = slotLayout(n, BENCH), bl = blockLayout(n + extras, BENCH);
+                    const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap;
+                    const benchTop = railBottom + GAP;
+                    const row = (p) => Math.round(p.y / (bl.size + 10));
+                    words.push({{ n: extras ? 'h' + n : n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
+                        SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT, row(p)]) }});
+                }}
             }}
             for (const [pose, [sw, vx]] of Object.entries(poses)) {{
                 const img = alphaOf(UI + '/robot-' + pose + '.png');
                 const x0 = L + 72.6 - vx * s;
-                const r = {{ minX: Infinity, maxX: -Infinity, lowest: -Infinity, rest: {{}}, pop: {{}}, rail: 0 }};
+                const r = {{ minX: Infinity, maxX: -Infinity, lowest: -Infinity, rest: {{}}, pop: {{}}, popRows: {{}}, rail: 0 }};
                 for (let sy = 0; sy < img.h; sy++) {{
                     for (let sx = 0; sx < img.w; sx++) {{
                         if (img.at(sx, sy) < 128) continue;
@@ -1941,7 +1992,9 @@ class RobotLayoutTests(TestCase):
                         for (const [at, y] of [['rest', yRest], ['pop', yRest - 20]]) {{
                             for (const w of words) {{
                                 if (y < w.railBottom) r.rail++;
-                                if (w.blocks.some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d)) r[at][w.n] = (r[at][w.n] || 0) + 1;
+                                const hit = w.blocks.filter(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
+                                if (hit.length) r[at][w.n] = (r[at][w.n] || 0) + 1;
+                                if (at === 'pop') for (const blk of hit) r.popRows[blk[4]] = true;
                             }}
                         }}
                     }}
@@ -1962,9 +2015,13 @@ class RobotLayoutTests(TestCase):
             self.assertEqual(r['rest'], {}, pose)                             # at rest, clear of all blocks
             for n in range(1, 7):
                 self.assertNotIn(str(n), r['pop'], (pose, n))                # room for the pop-up
+                self.assertNotIn(f'h{n}', r['pop'], (pose, n))               # also with hard's extras
+            self.assertEqual(list(r['popRows']), ['1'], pose)                 # only the second row
         # the reason for the z-order: the second row of a 7-10 letter word
         # is in the way of the pop-up
-        self.assertEqual(sorted(json.loads(result.stdout)['idle']['pop'], key=int), ['7', '8', '9', '10'])
+        pops = json.loads(result.stdout)['idle']['pop']
+        self.assertEqual(sorted((k for k in pops if not k.startswith('h')), key=int), ['7', '8', '9', '10'])
+        self.assertEqual(sorted((k for k in pops if k.startswith('h')), key=lambda k: int(k[1:])), ['h7', 'h8', 'h9', 'h10'])
 
 
 class PlayBackTests(TestCase):
@@ -2458,8 +2515,11 @@ class EasyStartTests(TestCase):
         for level in ('normal', 'hard'):
             cur = self.run_node(f"out(R.makeWord({{ word: 'tiger', image: '/i.svg' }}, '{level}', newId));")
             self.assertEqual(cur['placed'], [None] * 5)
-            self.assertEqual(sorted(t['letter'] for t in cur['tray']), sorted('tiger'))
-            for t in cur['tray']:
+            # hard also has its two extra letters on the bench (B-207)
+            word_tiles = [t for t in cur['tray'] if not t.get('extra')]
+            self.assertEqual(len(cur['tray']) - len(word_tiles), 2 if level == 'hard' else 0)
+            self.assertEqual(sorted(t['letter'] for t in word_tiles), sorted('tiger'))
+            for t in word_tiles:
                 self.assertEqual(set(t), {'id', 'letter', 'used'})
                 self.assertFalse(t['used'])
 
@@ -2564,7 +2624,8 @@ class EasyStartTests(TestCase):
         self.assertNotRegex(nxt, r'state\.level\b')
 
     def test_the_reveal_keeps_a_locked_letter_locked(self):
-        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed'))
+        # the reveal moved to drag.js with B-207 (a pure transition)
+        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed', 'drag.js'))
 
     def test_card_lays_out_only_the_bench_blocks_and_marks_locked_slots(self):
         card = self.function('renderCard', 'card.js')
@@ -3099,7 +3160,7 @@ class HintTests(TestCase):
 
     def test_the_check_that_leaves_one_bulb_gives_the_letter_on_every_level(self):
         main = self.code('main.js')
-        self.assertIn("import { returnAll, giveHint } from './drag.js';", main)
+        self.assertIn("import { returnAll, giveHint, afterHint, revealed } from './drag.js';", main)
         check = self.function('onCheck')
         self.assertIn("const checked = { ...current, status: 'wrong' };", check)
         self.assertIn('const left = lives - 1;', check)
@@ -3113,8 +3174,8 @@ class HintTests(TestCase):
         self.assertIn("const correct = answer === current.word;", check)
         self.assertLess(check.index('addSticker('), check.index('lives - 1 <= 0'))
         # the reveal keeps a right slot's object (so the hint letter stays
-        # locked and marked through it)
-        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed'))
+        # locked and marked through it); drag.js since B-207
+        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed', 'drag.js'))
 
     def test_the_helpers_are_pure_and_the_lever_skips_the_hint(self):
         for name in ('hintFor', 'giveHint'):
@@ -3140,3 +3201,336 @@ class HintTests(TestCase):
         self.assertIn('1px 2px 3px var(--shadow-deep);', rule)
         self.assertNotIn('amber', rule)
         self.assertIn("?v=20", (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text())
+
+
+class HardExtrasTests(TestCase):
+    """Hard: two extra letters on the bench (BACKLOG B-207). static/js/
+    round.js extraLetters (the confusion table: partners of the word's
+    letters first, else random letters, never one of the word) and makeWord
+    (two `extra` blocks on hard, none on easy and normal); drag.js: an
+    extra moves like any block and is wrong in any slot, the lever sends it
+    back, the second-miss hint and the reveal never use one, and afterHint
+    reopens a word the robot's letter finished; character.js's moments
+    with extras; feedback.js hops an extra out of its slot on the reveal.
+    All run through node; the wiring in main.js is checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    PRELUDE = """
+        const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const out = (v) => console.log(JSON.stringify(v));
+        let seq = 0;
+        const newId = () => `t${++seq}`;
+    """
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            f"const H = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"{self.PRELUDE}"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def words(self):
+        return [w for theme in ('animals', 'transportation')
+                for w in json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())]
+
+    def extras(self, word, seeds=40, count=2):
+        return self.run_node(
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.extraLetters({json.dumps(word)}, {count}, seeded(i + 1))));")
+
+    # --- the letters ---
+
+    def test_two_different_letters_never_in_the_word(self):
+        words = self.words()
+        picks = self.run_node(
+            f"const words = {json.dumps(words)};"
+            "out(words.map((w) => Array.from({ length: 30 }, (_, i) => R.extraLetters(w, 2, seeded(i + 1)))));")
+        for word, runs in zip(words, picks):
+            for letters in runs:
+                self.assertEqual(len(letters), 2, word)
+                self.assertEqual(len(set(letters)), 2, (word, letters))
+                for ch in letters:
+                    self.assertRegex(ch, r'^[a-z]$')
+                    self.assertNotIn(ch, word, (word, letters))
+
+    def test_the_table_has_the_backlogs_pairs(self):
+        pairs = {frozenset(p) for p in self.run_node("out(R.CONFUSIONS);")}
+        for a, b in ('bd', 'pq', 'ck', 'sz', 'mn', 'ie', 'ae', 'uo'):
+            self.assertIn(frozenset((a, b)), pairs, a + b)
+
+    def test_partners_of_the_words_letters_come_first(self):
+        # duck: d -> b, u -> o, c -> s (c -> k and k -> c are in the word):
+        # both extras are always partners, and each of the three comes up
+        runs = self.extras('duck')
+        for letters in runs:
+            self.assertLessEqual(set(letters), {'b', 'o', 's'})
+        self.assertEqual(set().union(*map(set, runs)), {'b', 'o', 's'})
+        # helicopter: e -> a, i -> y, c -> k / s, o -> u, p -> q
+        for letters in self.extras('helicopter'):
+            self.assertLessEqual(set(letters), {'a', 'y', 'k', 's', 'u', 'q'})
+        # fly has one partner (y -> i): i, then a random letter not in it
+        runs = self.extras('fly')
+        for letters in runs:
+            self.assertIn('i', letters)
+        self.assertGreater(len({ch for letters in runs for ch in letters}), 5)
+        # no partner at all: two random letters, not in the word
+        runs = self.extras('fht')
+        for letters in runs:
+            self.assertFalse(set(letters) & set('fht'))
+        self.assertGreater(len({ch for letters in runs for ch in letters}), 10)
+
+    def test_no_extras_and_no_randomness_when_the_level_has_none(self):
+        self.assertEqual(
+            self.run_node("const never = () => { throw new Error('rand'); };"
+                          "out([R.extraLetters('duck', 0, never), R.extraLetters('duck', undefined, never)]);"),
+            [[], []])
+
+    def test_hard_puts_two_extra_blocks_on_the_bench(self):
+        words = self.words()
+        made = self.run_node(
+            f"const words = {json.dumps(words)};"
+            "out(words.map((w, i) => R.makeWord({ word: w, image: '/i.svg' }, 'hard', newId, seeded(i + 1))));")
+        positions = set()
+        for word, cur in zip(words, made):
+            self.assertEqual(cur['placed'], [None] * len(word))
+            self.assertEqual(cur['status'], 'playing')
+            extra = [t for t in cur['tray'] if t.get('extra')]
+            plain = [t for t in cur['tray'] if not t.get('extra')]
+            self.assertEqual(len(extra), 2, word)
+            self.assertEqual(sorted(t['letter'] for t in plain), sorted(word))
+            self.assertFalse({t['letter'] for t in extra} & set(word), word)
+            self.assertFalse(any(t['used'] or t.get('given') for t in cur['tray']), word)
+            self.assertEqual(len({t['id'] for t in cur['tray']}), len(word) + 2)
+            positions.update(i for i, t in enumerate(cur['tray']) if t.get('extra'))
+        # shuffled in with the others, not always at the end
+        self.assertGreater(len(positions), 4)
+
+    def test_easy_and_normal_have_none_and_start_as_before(self):
+        res = self.run_node(
+            "out(['easy', 'normal', null].map((lv) => Array.from({ length: 10 }, (_, i) => {"
+            "  const cur = R.makeWord({ word: 'helicopter' }, lv, newId, seeded(i + 1));"
+            "  return [cur.tray.length, cur.tray.some((t) => 'extra' in t),"
+            "          cur.tray.map((t) => t.letter).join('') === R.shuffle('helicopter'.split(''), seeded(i + 1)).join('')];"
+            "})));")
+        for runs in res:
+            for length, has_extra, same_order in runs:
+                self.assertEqual((length, has_extra, same_order), (10, False, True))
+
+    # --- an extra on the play screen: moves like any block, wrong in a slot ---
+
+    # duck on hard: blocks named by their letter, the extras xb and xo
+    @staticmethod
+    def duck(letters, status='playing', hint_at=None):
+        """`letters` in the slots (' ' empty; B and O are the extras)."""
+        ids = {'d': 'd', 'u': 'u', 'c': 'c', 'k': 'k', 'B': 'xb', 'O': 'xo'}
+        tray = [{'id': i, 'letter': i[-1], 'used': i in [ids[ch] for ch in letters if ch != ' ']}
+                for i in ('xo', 'k', 'd', 'xb', 'u', 'c')]
+        for t in tray:
+            if t['id'].startswith('x'):
+                t['extra'] = True
+        placed = []
+        for n, ch in enumerate(letters):
+            if ch == ' ':
+                placed.append(None)
+                continue
+            slot = {'letter': ids[ch][-1], 'tileId': ids[ch]}
+            if n == hint_at:
+                slot.update(locked=True, hint=True)
+            placed.append(slot)
+        return {'word': 'duck', 'image': '/i.svg', 'audio': '/a.mp3', 'status': status, 'tray': tray, 'placed': placed}
+
+    def test_an_extra_moves_like_any_block_and_the_check_ignores_the_bench(self):
+        res = self.run_node(
+            f"const empty = {json.dumps(self.duck('    '))};"
+            f"const spelled = {json.dumps(self.duck('duck'))};"
+            f"const withExtra = {json.dumps(self.duck('duBk'))};"
+            "const a = D.placeIn(empty, 'xb', 0); const b = D.placeIn(a, 'xb', 2); const c = D.takeOut(b, 'xb');"
+            "const swap = D.placeIn(withExtra, 'c', 2);"
+            "out([a.placed[0], b.placed, c.placed, c.tray.find((t) => t.id === 'xb'),"
+            " swap.placed[2], swap.tray.find((t) => t.id === 'xb').used,"
+            " C.domeAction(spelled), C.domeAction(withExtra), C.canReset(withExtra)]);")
+        self.assertEqual(res, [
+            {'letter': 'b', 'tileId': 'xb'},
+            [None, None, {'letter': 'b', 'tileId': 'xb'}, None],
+            [None, None, None, None],
+            {'id': 'xb', 'letter': 'b', 'used': False, 'extra': True},
+            {'letter': 'c', 'tileId': 'c'}, False,
+            # every slot right with both extras on the bench: ready to check;
+            # with an extra in a slot it can be checked too (and is wrong)
+            'check', 'check', True,
+        ])
+        # the check is the slots' letters against the word: the bench (and
+        # the extras on it) is not looked at, and an extra in a slot is a
+        # letter that is not the word's
+        check = self.function('onCheck')
+        self.assertIn("const answer = current.placed.map((p) => p.letter).join('');", check)
+        self.assertIn('const correct = answer === current.word;', check)
+        self.assertNotIn('tray', check)
+
+    def test_the_lever_sends_an_extra_back(self):
+        res = self.run_node(
+            f"const cur = {json.dumps(self.duck('dOBk', 'wrong'))};"
+            "const after = D.returnAll(cur, 'hard');"
+            "out([D.leverResult('hard', cur), after.placed, after.tray.filter((t) => t.used).length, after.status]);")
+        self.assertEqual(res, [{'back': ['d', 'xo', 'xb', 'k'], 'lock': []}, [None] * 4, 0, 'playing'])
+
+    # --- the second-miss hint never uses one ---
+
+    def test_the_hint_never_gives_an_extra(self):
+        res = self.run_node(
+            f"const a = {json.dumps(self.duck('dBck', 'wrong'))};"
+            f"const b = {json.dumps(self.duck('dukc', 'wrong'))};"
+            # a made-up bench where an extra block has the letter needed: it
+            # is still not taken (the d comes from the wrong slot it is in)
+            f"const c = {json.dumps(self.duck('kduc', 'wrong'))};"
+            "c.tray.find((t) => t.id === 'xo').letter = 'd';"
+            "const ga = D.giveHint(a);"
+            "out([D.hintFor(a), ga.placed[1], ga.tray.find((t) => t.id === 'xb').used, D.hintFor(b), D.hintFor(c)]);")
+        self.assertEqual(res, [
+            # its slot's extra goes back, its right letter comes from the bench
+            {'index': 1, 'tileId': 'u', 'back': 'xb'},
+            {'letter': 'u', 'tileId': 'u', 'locked': True, 'hint': True},
+            False,
+            {'index': 2, 'tileId': 'c', 'back': 'k'},
+            {'index': 0, 'tileId': 'd', 'back': 'k'},
+        ])
+
+    def test_a_hint_that_finishes_the_word_reopens_it(self):
+        # "duBk" checked wrong with one bulb left: the hint puts the c from
+        # the bench in slot 3 and sends the b back; every slot is right, an
+        # arrangement nobody checked, so the word reopens and the dome lights
+        res = self.run_node(
+            f"const done = D.giveHint({json.dumps(self.duck('duBk', 'wrong'))});"
+            f"const two = D.giveHint({json.dumps(self.duck('dOBk', 'wrong'))});"
+            f"const normal = D.giveHint({json.dumps(self.duck('dkcu', 'wrong'))});"
+            "const open = D.afterHint(done);"
+            f"const others = ['playing', 'correct', 'revealed'].map((s) => {{ const c = {{ ...{json.dumps(self.duck('duck'))}, status: s }}; return D.afterHint(c) === c; }});"
+            "out([done.status, C.domeAction(done), open.status, C.domeAction(open), C.domeState(open, null),"
+            " open.placed.map((p) => p.letter).join(''), open.placed[2],"
+            " D.afterHint(two) === two, C.domeAction(two), D.afterHint(normal) === normal, others]);")
+        self.assertEqual(res, [
+            'wrong', None, 'playing', 'check', 'ready', 'duck', {'letter': 'c', 'tileId': 'c', 'locked': True, 'hint': True},
+            # another wrong letter left (the o), or a slot left empty: the
+            # check's 'wrong' stays until a block moves, as before
+            True, None, True,
+            [True, True, True],
+        ])
+
+    def test_main_reopens_after_the_miss_in_a_setstate_of_its_own(self):
+        check = self.function('onCheck')
+        miss = check.index("current: left === 1 ? giveHint(checked) : checked")
+        after = check.index('const reopened = afterHint(state.current);')
+        self.assertLess(miss, after)
+        self.assertIn('if (reopened !== state.current) setState({ current: reopened });', check)
+        self.assertNotIn('level', check)
+        for name in ('afterHint', 'revealed'):
+            body = self.function(name, 'drag.js')
+            for word in ('document', 'window', 'state.', 'setState', 'gsap', 'levelRules'):
+                self.assertNotIn(word, body, (name, word))
+        self.assertNotIn('function revealed', self.code('main.js'))
+
+    def test_the_robot_hears_the_miss_then_nothing_more(self):
+        # the miss's setState (status 'wrong', his letter in) is his
+        # confused peek, his happy pop and the error clip; the reopen right
+        # after it is no moment and no sound
+        res = self.run_node(
+            f"const before = {json.dumps(self.duck('duBk'))};"
+            "const hinted = D.giveHint({ ...before, status: 'wrong' });"
+            "const st = (lives, current) => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives,"
+            " round: { index: 0, size: 5, results: [] }, current });"
+            "const a = H.snapshot(st(2, before)), b = H.snapshot(st(1, hinted)), c = H.snapshot(st(1, D.afterHint(hinted)));"
+            "out([H.momentsFor(a, b), H.soundsFor(H.momentsFor(a, b)), H.momentsFor(b, c)]);")
+        self.assertEqual(res, [['wrongPeek', 'hintGiven'], ['error'], []])
+
+    def test_the_robot_sees_an_extra_as_a_block(self):
+        res = self.run_node(
+            "const st = (letters, status = 'playing') => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives: 3,"
+            " round: { index: 0, size: 5, results: [] }, current: CUR(letters, status) });"
+            f"const CUR = (l, s) => ({{ ...{json.dumps(self.duck('    '))}, status: s, placed: l.split('').map((ch) => ch === ' ' ? null"
+            " : { letter: ch.toLowerCase(), tileId: { B: 'xb', O: 'xo' }[ch] || ch }) });"
+            "const m = (a, b) => H.momentsFor(H.snapshot(st(a)), H.snapshot(st(b)));"
+            "out([m('d   ', 'dB  '), m('duc ', 'ducO'), m('duBk', 'du k'), m('dOBk', '    ')]);")
+        self.assertEqual(res, [['blockPlaced'], ['filled'], ['blockReturned'], ['blockReturned']])
+
+    # --- the reveal never uses one ---
+
+    def test_the_reveal_never_uses_an_extra(self):
+        res = self.run_node(
+            f"const cur = {json.dumps(self.duck('BuOc', 'playing', hint_at=1))};"
+            "const r = D.revealed(cur);"
+            "const easy = D.revealed({ word: 'cat', status: 'playing', placed: [{ letter: 'c', tileId: 'c', locked: true }, { letter: 't', tileId: 't' }, null],"
+            " tray: [{ id: 't', letter: 't', used: true }, { id: 'a', letter: 'a', used: false }, { id: 'c', letter: 'c', used: true, given: true }] });"
+            "out([r.status, r.placed, r.tray.map((t) => [t.id, t.used]), easy.placed.map((p) => p.tileId), easy.tray.every((t) => t.used)]);")
+        status, placed, used, easy_ids, easy_used = res
+        self.assertEqual(status, 'revealed')
+        self.assertEqual(placed, [{'letter': 'd', 'tileId': 'd'}, {'letter': 'u', 'tileId': 'u', 'locked': True, 'hint': True},
+                                  {'letter': 'c', 'tileId': 'c'}, {'letter': 'k', 'tileId': 'k'}])
+        # the extras go back to the bench, every word block is in a slot
+        self.assertEqual(dict(used), {'xo': False, 'k': True, 'd': True, 'xb': False, 'u': True, 'c': True})
+        # easy and normal as before: every block in a slot, a locked one kept
+        self.assertEqual((easy_ids, easy_used), (['c', 'a', 't'], True))
+
+    def test_on_the_reveal_an_extra_hops_back_as_the_right_letters_fly_in(self):
+        # feedback.js with stand-ins for the DOM and GSAP: "duck" checked a
+        # third time as "Bdck" (the extra b in slot 1, the d in slot 2, the
+        # u on the bench): the d flies from slot 2 into slot 1, the u from
+        # its bench spot into slot 2 (review fix round 1: it used to jump
+        # there unseen), in slot order 120ms apart, and the b hops back
+        res = self.run_node(
+            "const log = [];"
+            "const r = (v) => Math.round(v * 1e4) / 1e4;"
+            "globalThis.gsap = { set(el, v) { log.push(['set', el.id || el.map((e) => e.id), v]); },"
+            " to() {}, fromTo(el, a, b) { log.push(['fromTo', el.id, Object.fromEntries(Object.entries(a).map(([k, v]) => [k, r(v)])),"
+            "  b.delay, b.ease, b.scale === undefined ? null : b.scale]); },"
+            " timeline() { const t = { fromTo(el) { log.push(['hop', el.id]); return t; }, to() { return t; } }; return t; },"
+            " killTweensOf() {}, getProperty() { return 0; }, delayedCall() {} };"
+            "globalThis.window = { matchMedia: () => ({ matches: false }) };"
+            "const el = (id, x, y, w) => ({ id, parentNode: null, offsetWidth: w,"
+            " getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) });"
+            # four 46px slots 52px apart at y 100; six 52px bench spots 60px apart at y 200
+            "const boxes = [0, 1, 2, 3].map((i) => el('box' + i, 20 + i * 52, 100, 46));"
+            "const spots = [0, 1, 2, 3, 4, 5].map((i) => el('spot' + i, 20 + i * 60, 200, 52));"
+            # where the render put them: d in slot 1, u in slot 2, c and k
+            # where they were, the extras on their bench spots (tray order
+            # xo k d xb u c)
+            "const tiles = { d: el('d', 20, 100, 46), u: el('u', 72, 100, 46), c: el('c', 124, 100, 46), k: el('k', 176, 100, 46),"
+            " xb: el('xb', 200, 200, 52), xo: el('xo', 20, 200, 52) };"
+            "globalThis.document = { getElementById: (n) => (n === 'letter-boxes' ? { children: boxes } : { children: spots }),"
+            " querySelector: (sel) => tiles[/data-tile-id=\"([^\"]+)\"/.exec(sel)?.[1]] || null, querySelectorAll: () => [] };"
+            f"const F = await import('{(self.JS / 'feedback.js').as_uri()}');"
+            f"const before = {json.dumps(self.duck('Bdck'))};"
+            "const after = D.revealed(before);"
+            "const st = (lives, current) => ({ screen: 'play', lives, pressed: null, round: { index: 0 }, current });"
+            "F.renderFeedback(st(1, before));"
+            "tiles.xb.parentNode = spots[3]; tiles.xo.parentNode = spots[0];"
+            "after.placed.forEach((p, i) => { tiles[p.tileId].parentNode = boxes[i]; });"
+            "F.renderFeedback(st(0, after));"
+            "out(log.filter((e) => e[0] === 'fromTo' || e[0] === 'hop'));")
+        fly = [e for e in res if e[0] == 'fromTo']
+        # d: from slot 2 (52px right), the size it has; u: from bench spot 5
+        # (centre 286,226; its slot's 95,123) at the bench's size (52/46)
+        self.assertEqual(fly, [
+            ['fromTo', 'd', {'x': 52, 'y': 0, 'rotation': 0}, 0, 'back.out(1.4)', None],
+            ['fromTo', 'u', {'x': 191, 'y': 103, 'rotation': 0, 'scale': round(52 / 46, 4)}, 0.12, 'back.out(1.4)', 1],
+        ])
+        # the b hops back to the bench (its hop's x and y parts); c and k
+        # stay, the o on the bench too
+        self.assertEqual({e[1] for e in res if e[0] == 'hop'}, {'xb'})

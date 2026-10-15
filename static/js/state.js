@@ -22,11 +22,12 @@ export const state = {
         audio: null,            // the word's audio file from the content JSON, or none
         // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord; a right letter the lever kept after a wrong check on easy, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
         placed: [],
-        // tray is [{ id, letter, used, given? }] in tray display order (given: the easy first letter's block, which has no bench spot); id is stable
+        // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: the easy first letter's block, which has no bench spot; extra: on hard, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
         // 'playing' | 'wrong' (checked, lives left; the next block move
-        // makes it 'playing' again) | 'correct' | 'revealed'
+        // makes it 'playing' again, as does the robot's letter when it
+        // finishes the word, drag.js afterHint) | 'correct' | 'revealed'
         status: 'playing',
     },
     lives: 3,                   // attempts left for the current word

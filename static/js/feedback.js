@@ -7,7 +7,8 @@
 //     times and stays dark, and the TV picture gets a short static flicker
 //   - status became 'wrong': blocks in wrong slots wiggle
 //   - status became 'revealed' (third miss): the right blocks fly into the
-//     slots in order
+//     slots in order, and an extra letter (hard, BACKLOG B-207) that was
+//     in a slot hops back to the bench
 //   - the robot's letter appeared (the miss that leaves one bulb lit,
 //     drag.js giveHint): the wrong block in its slot hops back to the
 //     bench, then his letter flies in from where it was
@@ -54,7 +55,10 @@ export function renderFeedback(state) {
         hintIn(prev.placed, current);
     }
     if (now.status === 'revealed' && prev.status !== 'revealed') {
-        flyIn(prev.placed, current.placed);
+        flyIn(prev.placed, current);
+        // an extra letter of hard (BACKLOG B-207) in a slot goes back to
+        // the bench as the right ones fly in
+        hopBack(prev.placed);
     }
     if (now.pressed === 'lever' && prev.pressed !== 'lever') {
         shakeRail();
@@ -95,8 +99,9 @@ function tileEl(tileId) {
     return document.querySelector(`#screen-play [data-tile-id="${tileId}"]`);
 }
 
-// Fly each { el, from } (a screen centre) to where the render put it,
-// m.stagger apart, upright to its rendered tilt. With `hop` the block
+// Fly each { el, from, scale? } (a screen centre, and the size to start
+// at, 1 if not given) to where the render put it, m.stagger apart,
+// upright to its rendered tilt. With `hop` the block
 // rises m.height px above the higher end of its path and drops onto its
 // spot. From take-off a block is lifted over the resting ones: on the
 // reveal a later one over an earlier one, so none passes under, or lands
@@ -108,7 +113,7 @@ function fly(moves, m, hop) {
     if (!moves.length) return;
     const els = moves.map((mv) => mv.el);
     restoreAfter(els, (moves.length - 1) * m.stagger + (m.duration || m.fade), 'position,zIndex,opacity');
-    moves.forEach(({ el, from }, k) => {
+    moves.forEach(({ el, from, scale = 1 }, k) => {
         const delay = k * m.stagger;
         const lift = () => gsap.set(el, { position: 'relative', zIndex: hop ? 10 + moves.length - k : 10 + k });
         gsap.killTweensOf(el);
@@ -122,8 +127,10 @@ function fly(moves, m, hop) {
         const dx = from.x - to.x;
         const dy = from.y - to.y;
         if (!hop) {
-            gsap.fromTo(el, { x: dx, y: dy, rotation: 0 }, {
-                x: 0, y: 0, rotation: rot, duration: m.duration, ease: m.ease, delay, onStart: lift,
+            // a block from the bench starts at the bench's size (`scale`)
+            const size = scale === 1 ? [{}, {}] : [{ scale }, { scale: 1 }];
+            gsap.fromTo(el, { x: dx, y: dy, rotation: 0, ...size[0] }, {
+                x: 0, y: 0, rotation: rot, ...size[1], duration: m.duration, ease: m.ease, delay, onStart: lift,
             });
             return;
         }
@@ -211,20 +218,25 @@ function staticTv() {
 // --- Third miss: reveal ---
 
 // Every block that is not already in its right slot flies there from the
-// slot it was in, in slot order, 120ms apart.
-function flyIn(prevPlaced, placed) {
+// slot it was in, in slot order, 120ms apart. A block that lay on the
+// bench (on hard, where an extra letter held its slot, BACKLOG B-207)
+// flies from its bench spot, starting at the bench's size, as the
+// second-miss hint's letter does.
+function flyIn(prevPlaced, current) {
     const boxes = document.getElementById('letter-boxes').children;
     const wasIn = new Map();
     prevPlaced.forEach((slot, i) => {
         if (slot && boxes[i]) wasIn.set(slot.tileId, boxes[i]);
     });
     const moves = [];
-    placed.forEach((slot, i) => {
+    current.placed.forEach((slot, i) => {
         if (!slot) return;
-        const from = wasIn.get(slot.tileId);
         const el = tileEl(slot.tileId);
+        const box = wasIn.get(slot.tileId);
+        const from = box || benchSpot(current, slot.tileId);
         if (!el || !from || from === boxes[i]) return;
-        moves.push({ el, from: centre(from) });
+        const scale = !box && el.offsetWidth ? from.offsetWidth / el.offsetWidth : 1;
+        moves.push({ el, from: centre(from), scale });
     });
     fly(moves, motionFor('flyIn', reducedMotion()), false);
 }
@@ -334,16 +346,18 @@ function shakeRail() {
     if (m.distance > 0) swing(rail, m);
 }
 
-// The blocks that were in slots and are not now hop from there back onto
-// their start spots, left to right, 30ms apart (a letter the lever left
-// or locked is still in its slot and stays still).
+// The blocks that were in slots and now lie on the bench hop from there
+// back onto their start spots, left to right, 30ms apart (a letter the
+// lever left or locked is still in its slot and stays still; on the
+// reveal, a block that went to another slot flies in instead, flyIn).
 function hopBack(prevPlaced) {
     const boxes = document.getElementById('letter-boxes').children;
+    const inSlot = (el) => Array.prototype.includes.call(boxes, el.parentNode);
     const moves = [];
     prevPlaced.forEach((slot, i) => {
         if (!slot || !boxes[i]) return;
         const el = tileEl(slot.tileId);
-        if (!el || el.parentNode === boxes[i]) return;
+        if (!el || inSlot(el)) return;
         moves.push({ el, from: centre(boxes[i]) });
     });
     fly(moves, motionFor('hop', reducedMotion()), true);

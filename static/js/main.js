@@ -6,7 +6,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
-import { returnAll, giveHint } from './drag.js';
+import { returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
@@ -28,26 +28,6 @@ let tileSeq = 0;
 // A fresh tile id for round.js makeWord, unique over the session (card.js
 // keys the DOM tiles by id).
 const newTileId = () => `t${++tileSeq}`;
-
-// Fill every box with the right letter using the word's own tiles. A
-// block already in its right slot stays there (a locked one stays
-// locked), so on the reveal only the others fly in (feedback.js).
-function revealed(current) {
-    const tray = current.tray.map((t) => ({ ...t, used: true }));
-    const letters = current.word.split('');
-    const placed = letters.map((ch, i) => {
-        const p = current.placed[i];
-        return p && p.letter === ch ? { ...p } : null;
-    });
-    const taken = new Set(placed.filter(Boolean).map((p) => p.tileId));
-    letters.forEach((ch, i) => {
-        if (placed[i]) return;
-        const tile = tray.find((t) => t.letter === ch && !taken.has(t.id));
-        taken.add(tile.id);
-        placed[i] = { letter: tile.letter, tileId: tile.id };
-    });
-    return { ...current, tray, placed, status: 'revealed' };
-}
 
 // --- Theme screen ---
 
@@ -223,6 +203,12 @@ function onCheck(extra = {}) {
         const checked = { ...current, status: 'wrong' };
         const left = lives - 1;
         setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
+        // On hard his letter can finish the word, in place of an extra
+        // letter (BACKLOG B-207, drag.js afterHint): the word then reopens
+        // and the dome lights at once. Its own setState, after the
+        // miss's, so the robot, the sound and the motion see the miss.
+        const reopened = afterHint(state.current);
+        if (reopened !== state.current) setState({ current: reopened });
     }
 }
 
