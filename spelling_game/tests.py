@@ -1191,6 +1191,7 @@ class CharacterTests(TestCase):
             'roundEndGood': {'steps': steps(('happy', 'none')), 'sound': 'tada'},
             'roundEnd': {'steps': steps(('idle', 'none')), 'sound': 'tada'},
             'speakerLocked': {'steps': steps(('confused', 'shake')), 'sound': 'locked'},
+            'hintGiven': {'steps': steps(('happy', 'smallPop')), 'sound': None},
         })
 
     def test_every_pose_is_an_image_and_every_move_exists(self):
@@ -1264,7 +1265,7 @@ class CharacterTests(TestCase):
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
-            'speakerLocked': ['locked'],
+            'speakerLocked': ['locked'], 'hintGiven': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
@@ -1409,7 +1410,7 @@ class CharacterTests(TestCase):
 
     def test_reduced_motion_swaps_poses_only(self):
         self.assertEqual(self.run_node("out(Object.keys(c.MOVES).map((k) => c.moveFor(k, true)));"),
-                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 6)
+                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 7)
         self.assertEqual(self.run_node("out(c.moveFor('pop', false));"), self.run_node("out(c.MOVES.pop);"))
 
     def test_idle_wait_is_10s_from_the_last_input_once_per_word(self):
@@ -2760,3 +2761,382 @@ class LeverTests(TestCase):
         lever = self.function('onLever', 'main.js')
         self.assertIn("setState({ pressed: 'lever', current: returnAll(state.current, state.round.level) });", lever)
         self.assertNotRegex(lever, r'state\.level\b')
+
+
+class HintTests(TestCase):
+    """Second miss: the robot gives one letter (BACKLOG B-206). On every
+    level the wrong check that leaves one bulb lit also places one letter:
+    the first slot that is empty or wrong gets its right letter (from the
+    bench if one lies there, else from the wrong slot it is in), the wrong
+    letter in that slot goes back to the bench, and the letter locks.
+    static/js/drag.js hintFor / giveHint and their lock and lever rules,
+    character.js's hintGiven moment and its timing, and feedback.js's
+    motion (with stand-ins for the DOM and GSAP) run through node; the
+    wiring in main.js and the look in game.css are checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            f"const R = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v, (k, x) => (typeof x === 'number' ? Math.round(x * 1e4) / 1e4 : x)));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    @staticmethod
+    def slot(letter, tile, locked=False, hint=False):
+        s = {'letter': letter, 'tileId': tile}
+        if locked:
+            s['locked'] = True
+        if hint:
+            s['hint'] = True
+        return s
+
+    def horse(self, level, status, letters, locked=()):
+        """The word "horse" with `letters` in its slots (' ' = empty), one
+        block per letter named by its letter (h, o, r, s, e), as in
+        LeverTests. On easy the h is the given letter (locked in slot 1,
+        its block `given`)."""
+        given = level == 'easy'
+        tray = [{'id': t, 'letter': t, 'used': t in letters} for t in 'sroeh']
+        if given:
+            tray[-1]['given'] = True
+        placed = [self.slot(ch, ch, (ch == 'h' and given) or ch in locked) if ch != ' ' else None for ch in letters]
+        return {'word': 'horse', 'image': '/i.svg', 'audio': None, 'status': status, 'tray': tray, 'placed': placed}
+
+    def hint(self, current):
+        """[hintFor(current), giveHint(current), whether `current` was left
+        untouched]."""
+        return self.run_node(
+            f"const cur = {json.dumps(current)}; const before = JSON.stringify(cur);"
+            "const r = D.hintFor(cur); const after = D.giveHint(cur);"
+            "out([r, after, JSON.stringify(cur) === before]);")
+
+    def used(self, current):
+        return {t['id']: t['used'] for t in current['tray']}
+
+    # --- which slot, which block ---
+
+    def test_normal_the_first_wrong_slot_gets_its_letter_from_the_wrong_slot_it_is_in(self):
+        # "hrose": r and o swapped. Slot 2 needs the o, which is in slot 3
+        # (every block is in a slot at a check): the o moves there and
+        # locks, the r goes back to the bench, slot 3 is left empty
+        result, after, pure = self.hint(self.horse('normal', 'wrong', 'hrose'))
+        self.assertEqual(result, {'index': 1, 'tileId': 'o', 'back': 'r'})
+        self.assertEqual(after['placed'], [self.slot('h', 'h'), self.slot('o', 'o', True, True), None,
+                                           self.slot('s', 's'), self.slot('e', 'e')])
+        self.assertEqual(self.used(after), {'s': True, 'r': False, 'o': True, 'e': True, 'h': True})
+        self.assertEqual(after['status'], 'wrong')     # the check's status: the dome stays off
+        self.assertTrue(pure)
+
+    def test_easy_skips_the_given_letter(self):
+        # h is given and locked; "hsore": slot 2 needs the o (in slot 3),
+        # the s there goes back
+        result, after, _ = self.hint(self.horse('easy', 'wrong', 'hsore'))
+        self.assertEqual(result, {'index': 1, 'tileId': 'o', 'back': 's'})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True, True), None,
+                                           self.slot('r', 'r'), self.slot('e', 'e')])
+        self.assertEqual(self.used(after), {'s': False, 'r': True, 'o': True, 'e': True, 'h': True})
+        # the first slot may be the one: "ohrse" on normal
+        result, after, _ = self.hint(self.horse('normal', 'wrong', 'ohrse'))
+        self.assertEqual(result, {'index': 0, 'tileId': 'h', 'back': 'o'})
+        self.assertEqual(after['placed'][:2], [self.slot('h', 'h', True, True), None])
+
+    def test_a_block_on_the_bench_comes_from_the_bench_and_an_empty_slot_counts(self):
+        # the o on the bench flies in from there; the r in the slot goes back
+        result, after, _ = self.hint(self.horse('normal', 'wrong', 'hr se'))
+        self.assertEqual(result, {'index': 1, 'tileId': 'o', 'back': 'r'})
+        self.assertEqual(after['placed'], [self.slot('h', 'h'), self.slot('o', 'o', True, True), None,
+                                           self.slot('s', 's'), self.slot('e', 'e')])
+        self.assertEqual(self.used(after), {'s': True, 'r': False, 'o': True, 'e': True, 'h': True})
+        # an empty first slot: nothing goes back; its o is in a wrong slot
+        result, after, _ = self.hint(self.horse('normal', 'playing', 'h ose'))
+        self.assertEqual(result, {'index': 1, 'tileId': 'o', 'back': None})
+        self.assertEqual(after['placed'], [self.slot('h', 'h'), self.slot('o', 'o', True, True), None,
+                                           self.slot('s', 's'), self.slot('e', 'e')])
+        self.assertEqual(self.used(after), {'s': True, 'r': False, 'o': True, 'e': True, 'h': True})
+        self.assertEqual(after['status'], 'playing')
+
+    def test_a_block_in_a_right_slot_is_never_taken(self):
+        # "sheep" checked as "shpee": slot 3 needs an e; e2 in slot 4 is
+        # right, so e1 in slot 5 (wrong) moves, and the p goes back
+        current = {
+            'word': 'sheep', 'status': 'wrong',
+            'tray': [{'id': 's', 'letter': 's', 'used': True}, {'id': 'e1', 'letter': 'e', 'used': True},
+                     {'id': 'p', 'letter': 'p', 'used': True}, {'id': 'h', 'letter': 'h', 'used': True},
+                     {'id': 'e2', 'letter': 'e', 'used': True}],
+            'placed': [self.slot('s', 's'), self.slot('h', 'h'), self.slot('p', 'p'), self.slot('e', 'e2'),
+                       self.slot('e', 'e1')],
+        }
+        result, after, _ = self.hint(current)
+        self.assertEqual(result, {'index': 2, 'tileId': 'e1', 'back': 'p'})
+        self.assertEqual(after['placed'], [self.slot('s', 's'), self.slot('h', 'h'), self.slot('e', 'e1', True, True),
+                                           self.slot('e', 'e2'), None])
+        # a letter the lever locked (always right) is skipped as a slot and
+        # as a block
+        result, _, _ = self.hint(self.horse('easy', 'wrong', 'hosre', locked='o'))
+        self.assertEqual(result, {'index': 2, 'tileId': 'r', 'back': 's'})
+
+    def test_nothing_to_give_when_every_slot_is_right(self):
+        result, after, pure = self.hint(self.horse('normal', 'playing', 'horse'))
+        self.assertIsNone(result)
+        self.assertEqual(after, self.horse('normal', 'playing', 'horse'))
+        self.assertTrue(pure)
+        self.assertTrue(self.run_node(
+            f"const cur = {json.dumps(self.horse('normal', 'playing', 'horse'))}; out(D.giveHint(cur) === cur);"))
+
+    # --- the letter locks ---
+
+    def test_the_hint_letter_is_locked_and_the_word_is_finished_by_hand(self):
+        after = self.hint(self.horse('normal', 'wrong', 'hrose'))[1]
+        res = self.run_node(
+            f"const cur = {json.dumps(after)};"
+            "const fixed = D.placeIn(cur, 'r', 2);"
+            "out([D.isLocked(cur.placed[1]), D.placeIn(cur, 'r', 1), D.placeIn(cur, 'o', 2), D.takeOut(cur, 'o'),"
+            " C.domeAction(cur), C.canReset(cur), fixed.status, C.domeAction(fixed),"
+            " fixed.placed.map((p) => p.letter).join(''), fixed.placed[1]]);")
+        self.assertEqual(res, [True, None, None, None, None, True, 'playing', 'check', 'horse',
+                               self.slot('o', 'o', True, True)])
+
+    def test_the_lever_leaves_the_hint_letter_on_every_level(self):
+        pull = lambda level, cur: self.run_node(
+            f"const cur = {json.dumps(cur)};"
+            f"out([D.leverResult({json.dumps(level)}, cur), D.returnAll(cur, {json.dumps(level)})]);")
+        # normal and hard: one pull sends back every other letter
+        for level in ('normal', 'hard'):
+            after = self.hint(self.horse(level, 'wrong', 'hrose'))[1]
+            result, pulled = pull(level, after)
+            self.assertEqual(result, {'back': ['h', 's', 'e'], 'lock': []}, level)
+            self.assertEqual(pulled['placed'], [None, self.slot('o', 'o', True, True), None, None, None], level)
+            self.assertEqual(self.used(pulled), {'s': False, 'r': False, 'o': True, 'e': False, 'h': False}, level)
+        # easy right after the second miss: the wrong letters go back, the
+        # right ones lock; the given and the hint letter are in neither list
+        after = self.hint(self.horse('easy', 'wrong', 'hsore'))[1]
+        result, first = pull('easy', after)
+        self.assertEqual(result, {'back': ['r'], 'lock': ['e']})
+        self.assertEqual(first['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True, True), None, None,
+                                           self.slot('e', 'e', True)])
+        # the next pull starts over: the lever-locked e goes back, the
+        # given h and the robot's o stay
+        result, second = pull('easy', first)
+        self.assertEqual(result, {'back': ['e'], 'lock': []})
+        self.assertEqual(second['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True, True), None, None, None])
+
+    # --- the robot ---
+
+    def test_the_robot_is_confused_then_gives_the_letter_happy(self):
+        res = self.run_node(
+            "const P = (s) => s.map((p) => (p ? { letter: p[0], tileId: p[1], ...(p[2] ? { locked: true, hint: true } : {}) } : null));"
+            "const st = (lives, status, placed) => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status, placed: P(placed) } });"
+            "const m = (a, b) => R.momentsFor(R.snapshot(a), R.snapshot(b));"
+            "const checked = st(2, 'playing', [['a', 't0'], ['c', 't1'], ['t', 't2']]);"
+            "const hinted = st(1, 'wrong', [['c', 't1', 1], null, ['t', 't2']]);"
+            "const filled = st(1, 'playing', [['c', 't1', 1], ['t', 't2'], ['a', 't0']]);"
+            "const reveal = st(0, 'revealed', [['c', 't1', 1], ['a', 't0'], ['t', 't2']]);"
+            "out([m(checked, hinted), m(hinted, hinted), m(st(3, 'playing', [['a', 't0'], ['c', 't1'], ['t', 't2']]),"
+            " st(2, 'wrong', [['a', 't0'], ['c', 't1'], ['t', 't2']])), m(hinted, filled), m(filled, reveal),"
+            " R.snapshot(hinted).hint, R.snapshot(checked).hint, R.NONE.hint,"
+            " R.stepsFor(['wrongPeek', 'hintGiven']), R.soundsFor(['wrongPeek', 'hintGiven'])]);")
+        self.assertEqual(res, [
+            ['wrongPeek', 'hintGiven'], [], ['wrong'], ['filled'], ['thirdMiss'], 0, -1, -1,
+            [{'pose': 'confused', 'move': 'peek'}, {'pose': 'happy', 'move': 'smallPop'}], ['error'],
+        ])
+
+    def test_his_pop_waits_for_the_peek_and_is_small(self):
+        # CHARACTER "Presence": the peek keeps only his eyes above the
+        # edge for 600ms, and changes are at least 300ms apart; the next
+        # step waits for a step's move to end, so hintGiven comes when the
+        # peek is over (950ms). Every other run of steps keeps 300ms.
+        res = self.run_node(
+            "const lasts = (ms, red) => R.stepsFor(ms).map((s) => R.moveMs(s.move, red));"
+            "const two = ['wrongPeek', 'hintGiven'];"
+            "out([R.moveMs('peek', false), R.moveMs('peek', true), R.moveMs('smallPop', false), R.moveMs('pop', false),"
+            " R.stepDelays(2, Infinity, lasts(two, false)), R.stepDelays(2, 100, lasts(two, false)),"
+            " R.stepDelays(2, Infinity, lasts(two, true)),"
+            " [['kidIdle'], ['thirdMiss'], ['roundStart', 'picture']].map((ms) =>"
+            "   JSON.stringify(R.stepDelays(R.stepsFor(ms).length, Infinity, lasts(ms, false))) === JSON.stringify(R.stepDelays(R.stepsFor(ms).length, Infinity))),"
+            " R.MOVES.smallPop, R.MOVES.pop]);")
+        peek, peek_reduced, small, pop, delays, delays_soon, delays_reduced, others, small_pop, full_pop = res
+        self.assertEqual([peek, peek_reduced, small, pop], [950, 0, 300, 300])
+        self.assertEqual(delays, [0, 950])
+        self.assertEqual(delays_soon, [200, 1150])
+        self.assertEqual(delays_reduced, [0, 300])
+        self.assertEqual(others, [True, True, True])
+        # the small pop is the pop at half the height, same timing
+        self.assertEqual([s['y'] for s in small_pop], [p['y'] / 2 for p in full_pop])
+        self.assertEqual([(s['duration'], s['ease']) for s in small_pop], [(p['duration'], p['ease']) for p in full_pop])
+
+    # --- the motion (feedback.js, with stand-ins for the DOM and GSAP) ---
+
+    FAKE_DOM = """
+        const log = [];
+        const later = [];
+        const id = (el) => (Array.isArray(el) ? el.map((e) => e.id) : el.id);
+        const timeline = () => {
+            const t = { to(el, v, at) { log.push(['tl.to', id(el), v, at === undefined ? null : at]); return t; } };
+            log.push(['timeline']);
+            return t;
+        };
+        globalThis.gsap = {
+            set(el, v) { log.push(['set', id(el), v]); },
+            to(el, v) { log.push(['to', id(el), v]); },
+            fromTo(el, a, b) { log.push(['fromTo', id(el), a, b]); },
+            timeline,
+            killTweensOf() {},
+            getProperty(el) { return el.rot || 0; },
+            delayedCall(s, fn) { log.push(['later', s]); later.push(fn); },
+        };
+        let reduced = false;
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        const cls = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c) }; };
+        const el = (name, x, y, w, rot = 0) => ({ id: name, rot, offsetWidth: w, classList: cls(),
+            getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) });
+        // five slots 46px wide, 52px apart, at y 100; five bench spots 52px, 60px apart, at y 200
+        const boxes = [0, 1, 2, 3, 4].map((i) => el('box' + i, 20 + i * 52, 100, 46));
+        const spots = [0, 1, 2, 3, 4].map((i) => el('spot' + i, 20 + i * 60, 200, 52));
+        const tiles = {};
+        globalThis.document = {
+            getElementById: (name) => (name === 'letter-boxes' ? { children: boxes } : name === 'letter-tray' ? { children: spots } : null),
+            querySelector: (sel) => { const m = /data-tile-id="([^"]+)"/.exec(sel); return m ? tiles[m[1]] || null : null; },
+            querySelectorAll: () => [],
+        };
+        const F = await import('FEEDBACK');
+        // "horse" on normal, tray order s r o e h (bench spots 0-4), checked
+        // as "hrose" with two bulbs lit: the miss leaves one and gives the o
+        const tray = ['s', 'r', 'o', 'e', 'h'].map((t) => ({ id: t, letter: t, used: true }));
+        const at = (letters) => letters.split('').map((ch) => (ch === ' ' ? null : { letter: ch, tileId: ch }));
+        const before = { screen: 'play', lives: 2, pressed: null, round: { index: 0 },
+            current: { word: 'horse', status: 'playing', tray, placed: at('hrose') } };
+        const placed = at('hrose'); placed[1] = { letter: 'o', tileId: 'o', locked: true, hint: true }; placed[2] = null;
+        const after = { ...before, lives: 1, current: { ...before.current, status: 'wrong', placed,
+            tray: tray.map((t) => (t.id === 'r' ? { ...t, used: false } : t)) } };
+        // where the render put them: r on its bench spot (tilted 3deg), o in slot 2
+        tiles.r = el('r', 80, 200, 52, 3);
+        tiles.o = el('o', 72, 100, 46);
+        boxes.forEach((b) => { b.firstElementChild = null; });
+    """
+
+    def run_feedback(self, body):
+        prelude = self.FAKE_DOM.replace('FEEDBACK', (self.JS / 'feedback.js').as_uri())
+        return self.run_node(prelude + body)
+
+    def test_the_wrong_letter_hops_back_then_his_letter_flies_in(self):
+        log, landing, landed, cleared, again = self.run_feedback(
+            "F.renderFeedback(before); F.renderFeedback(after);"
+            "const landing = tiles.o.classList.contains('landing');"
+            "const n = log.length; later.forEach((fn) => fn());"
+            "const landed = tiles.o.classList.contains('landing');"
+            "const cleared = log.slice(n); const m = log.length;"
+            "F.renderFeedback(after);"
+            "out([log.slice(0, n), landing, landed, cleared, log.length - m]);")
+        r = [e for e in log if e[1:2] == ['r']]
+        o = [e for e in log if e[1:2] == ['o']]
+        size = round(46 / 52, 4)
+        # r: held in slot 2 (centre 95,123; its spot's is 106,226), upright,
+        # at a slot's size, lifted (over the o, which waits in slot 3 while
+        # r hops past); it wiggles there, then hops (the lever's hop) back
+        # onto its spot at 0.3s, turning to its tilt
+        self.assertEqual(r[0], ['set', 'r', {'x': -11, 'y': -103, 'rotation': 0, 'scale': size,
+                                             'position': 'relative', 'zIndex': 11}])
+        self.assertEqual([e[2]['x'] for e in r[1:5]], [-17, -5, -17, -11])
+        self.assertEqual(r[5], ['tl.to', 'r', {'x': 0, 'rotation': 3, 'scale': 1, 'duration': 0.3, 'ease': 'power1.inOut'}, 0.3])
+        self.assertEqual(r[6], ['tl.to', 'r', {'y': -119, 'duration': 0.12, 'ease': 'power2.out'}, 0.3])
+        self.assertEqual(r[7], ['tl.to', 'r', {'y': 0, 'duration': 0.18, 'ease': 'power2.in'}, 0.42])
+        # o: held in slot 3 where it was checked (52px to the right), wiggles
+        # there, then flies in like the reveal once r is down (0.6s)
+        self.assertEqual(o[0], ['set', 'o', {'x': 52, 'y': 0, 'rotation': 0, 'scale': 1, 'position': 'relative', 'zIndex': 10}])
+        self.assertEqual([e[2]['x'] for e in o[1:5]], [46, 58, 46, 52])
+        self.assertEqual(o[5], ['tl.to', 'o', {'x': 0, 'y': 0, 'rotation': 0, 'scale': 1, 'duration': 0.3,
+                                               'ease': 'back.out(1.4)'}, 0.6])
+        self.assertEqual(len(r) + len(o), 14)
+        # its locked edge lights as it lands (class `landing` until 0.9s);
+        # everything set is put back by then
+        self.assertTrue(landing)
+        self.assertFalse(landed)
+        self.assertEqual(sorted(e[1] for e in log if e[0] == 'later'), [0.6, 0.9, 0.9])
+        self.assertEqual(cleared, [['set', 'r', {'clearProps': 'position,zIndex'}],
+                                   ['set', 'o', {'clearProps': 'position,zIndex'}]])
+        # a re-render in the same state starts nothing
+        self.assertEqual(again, 0)
+
+    def test_reduced_motion_fades_them_in_one_after_the_other(self):
+        log, landing = self.run_feedback(
+            "reduced = true; F.renderFeedback(before); F.renderFeedback(after);"
+            "out([log, tiles.o.classList.contains('landing')]);")
+        self.assertEqual([e for e in log if e[0] in ('set', 'fromTo', 'timeline')], [
+            ['set', 'r', {'x': 0, 'y': 0}],
+            ['fromTo', 'r', {'opacity': 0}, {'opacity': 1, 'duration': 0.2, 'delay': 0, 'ease': 'power1.out'}],
+            ['set', 'o', {'x': 0, 'y': 0}],
+            ['fromTo', 'o', {'opacity': 0}, {'opacity': 1, 'duration': 0.2, 'delay': 0.2, 'ease': 'power1.out'}],
+        ])
+        self.assertFalse(landing)
+
+    def test_the_first_miss_gives_nothing(self):
+        log = self.run_feedback(
+            "const miss = { ...before, lives: 2, current: { ...before.current, status: 'wrong' } };"
+            "F.renderFeedback({ ...before, lives: 3 }); F.renderFeedback(miss); out(log);")
+        self.assertEqual([e for e in log if e[0] in ('set', 'timeline', 'later')], [])
+
+    # --- wiring ---
+
+    def test_the_check_that_leaves_one_bulb_gives_the_letter_on_every_level(self):
+        main = self.code('main.js')
+        self.assertIn("import { returnAll, giveHint } from './drag.js';", main)
+        check = self.function('onCheck')
+        self.assertIn("const checked = { ...current, status: 'wrong' };", check)
+        self.assertIn('const left = lives - 1;', check)
+        self.assertIn('current: left === 1 ? giveHint(checked) : checked', check)
+        self.assertEqual(check.count('giveHint('), 1)
+        # every level: the round's level is not read
+        self.assertNotIn('level', check)
+        # a word checked correct after the hint is mastered like any other:
+        # the result is the letters against the word, the sticker added
+        # before the lives are looked at
+        self.assertIn("const correct = answer === current.word;", check)
+        self.assertLess(check.index('addSticker('), check.index('lives - 1 <= 0'))
+        # the reveal keeps a right slot's object (so the hint letter stays
+        # locked and marked through it)
+        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed'))
+
+    def test_the_helpers_are_pure_and_the_lever_skips_the_hint(self):
+        for name in ('hintFor', 'giveHint'):
+            body = self.function(name, 'drag.js')
+            for word in ('document', 'window', 'state.', 'setState', 'gsap', 'levelRules'):
+                self.assertNotIn(word, body, (name, word))
+        self.assertIn('.filter(({ p }) => p && !given.has(p.tileId) && !p.hint);', self.function('leverResult', 'drag.js'))
+        # a block picked up mid-motion stops where it is: its x, y and
+        # scale tweens end on the press, also the parts of its motion not
+        # yet started; a turn to its tilt (or a fade) still finishes
+        drag = self.code('drag.js')
+        press = drag[drag.index('onPress(e) {'):drag.index('onRelease()')]
+        self.assertLess(press.index("gsap.killTweensOf(this.target, 'x,y,scale');"), press.index('pickUp(this.target);'))
+        self.assertNotIn('gsap.killTweensOf(this.target);', press)
+        # a block let go away from a slot springs back in x, y and scale
+        # only, so that turn still ends at the bench spot's tilt
+        self.assertIn("gsap.killTweensOf(el, 'x,y,scale');", self.function('springBack', 'drag.js'))
+
+    def test_the_landing_look(self):
+        css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+        rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter\.landing\s*{([^}]*)}', css).group(1)
+        # drawn as a placed block, without the lit edge until it lands
+        self.assertIn('1px 2px 3px var(--shadow-deep);', rule)
+        self.assertNotIn('amber', rule)
+        self.assertIn("?v=20", (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text())

@@ -20,7 +20,7 @@ export const state = {
         word: null,
         image: null,
         audio: null,            // the word's audio file from the content JSON, or none
-        // placed[i] is null or { letter, tileId, locked? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord; a right letter the lever kept after a wrong check on easy, drag.js leverResult) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter; its next pull sends a lever-locked one back
+        // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord; a right letter the lever kept after a wrong check on easy, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
         placed: [],
         // tray is [{ id, letter, used, given? }] in tray display order (given: the easy first letter's block, which has no bench spot); id is stable
         // for the life of the word so the DOM tile can be keyed to it

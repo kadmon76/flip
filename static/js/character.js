@@ -38,6 +38,11 @@ export const POSES = ['idle', 'thinking', 'confused', 'excited', 'happy', 'oops'
 // the word back (normal and hard, before the word is answered): a short
 // confused "no", a small head-shake, and the "hmm no" clip (audio.js pool
 // 'locked'). Every such tap is one (state.lockedTaps).
+// "hintGiven" (BACKLOG B-206) is his letter on the miss that leaves one
+// bulb lit (drag.js giveHint): happy, a small pop, after his confused
+// peek at that miss (stepDelays waits for the peek to end); no clip of
+// its own (the miss has its error clip, and as on the reveal the letter
+// flies in without the swipe).
 export const MOMENTS = {
     roundStart: { steps: [{ pose: 'idle', move: 'pop' }], sound: null },
     picture: { steps: [{ pose: 'thinking', move: 'none' }], sound: null },
@@ -55,6 +60,7 @@ export const MOMENTS = {
     roundEndGood: { steps: [{ pose: 'happy', move: 'none' }], sound: 'tada' },
     roundEnd: { steps: [{ pose: 'idle', move: 'none' }], sound: 'tada' },
     speakerLocked: { steps: [{ pose: 'confused', move: 'shake' }], sound: 'locked' },
+    hintGiven: { steps: [{ pose: 'happy', move: 'smallPop' }], sound: null },
 };
 
 // Movements: a vertical slide (CHARACTER "Presence"), and one small
@@ -65,6 +71,8 @@ export const MOMENTS = {
 // (game.css .robot-body transform-origin; every other segment turns him
 // back to 0). Every movement except the sink ends at rest.
 //   - pop: rises 20px in 180ms, ease-out, then settles (120ms)
+//   - smallPop: the pop at half the height, 10px (his letter on the
+//     second miss, BACKLOG B-206: glad, not a win)
 //   - doublePop: two pops (3 correct in a row)
 //   - sink: slides down in 400ms until only the top of his head shows
 //     (14px of him)
@@ -79,6 +87,10 @@ export const MOVES = {
     none: [{ y: 0, duration: 0.2, ease: 'power2.out' }],
     pop: [
         { y: -20, duration: 0.18, ease: 'power2.out' },
+        { y: 0, duration: 0.12, ease: 'power1.inOut' },
+    ],
+    smallPop: [
+        { y: -10, duration: 0.18, ease: 'power2.out' },
         { y: 0, duration: 0.12, ease: 'power1.inOut' },
     ],
     doublePop: [
@@ -118,6 +130,11 @@ export function moveFor(kind, reduced) {
     return segments.map((s) => ({ ...s }));
 }
 
+// How long the movement for `kind` lasts, in ms (0 under reduced motion).
+export function moveMs(kind, reduced) {
+    return Math.round(moveFor(kind, reduced).reduce((sum, s) => sum + s.duration, 0) * 1000);
+}
+
 // The current word: the round (counted over the session) and its index.
 export function wordKey(state) {
     return `${state.roundsStarted}:${state.round.index}`;
@@ -145,6 +162,8 @@ export function snapshot(state) {
         filled: onWord && current.placed.length > 0 && current.placed.every(Boolean),
         idleBeat: state.idleBeat,
         lockedTaps: state.lockedTaps || 0,
+        // the slot holding his second-miss letter (BACKLOG B-206), or -1
+        hint: onWord ? current.placed.findIndex((p) => !!p && !!p.hint) : -1,
         streak: onWord ? streakOf(results, round.index) : 0,
         stars: screen === 'round-end' ? starsFor(results.filter((r) => r && r.correct).length, round.size) : null,
     };
@@ -163,7 +182,11 @@ export function momentsFor(prev, now) {
     if (now.status !== prev.status || now.lives < prev.lives) {
         if (now.status === 'revealed') return ['thirdMiss'];
         if (now.status === 'correct') return [now.streak >= STREAK ? 'streak' : 'correct'];
-        if (now.status === 'wrong') return [now.lives === 1 ? 'wrongPeek' : 'wrong'];
+        if (now.status === 'wrong') {
+            const miss = now.lives === 1 ? 'wrongPeek' : 'wrong';
+            // the miss that leaves one bulb also gave his letter (B-206)
+            return now.hint !== -1 && now.hint !== prev.hint ? [miss, 'hintGiven'] : [miss];
+        }
     }
     // One more tap on the speaker while it holds the word back.
     if (now.lockedTaps !== prev.lockedTaps) return ['speakerLocked'];
@@ -199,10 +222,18 @@ export function soundsFor(moments) {
 
 // When each of `count` steps starts (ms from now) if the last change was
 // `sinceLast` ms ago: CHANGE_MS after the last change at the earliest,
-// then CHANGE_MS apart.
-export function stepDelays(count, sinceLast) {
-    const first = Math.max(0, CHANGE_MS - sinceLast);
-    return Array.from({ length: count }, (_, i) => first + i * CHANGE_MS);
+// then CHANGE_MS apart, or later when a step's movement lasts longer
+// (`lasts[i]`, ms; moveMs): the next step waits for it to end, so the
+// peek of the second miss is over before his hintGiven pop (BACKLOG
+// B-206). Every other run of steps moves for CHANGE_MS or less.
+export function stepDelays(count, sinceLast, lasts = []) {
+    const delays = [];
+    let at = Math.max(0, CHANGE_MS - sinceLast);
+    for (let i = 0; i < count; i++) {
+        delays.push(at);
+        at += Math.max(CHANGE_MS, lasts[i] || 0);
+    }
+    return delays;
 }
 
 // Ms until the kid has been idle IDLE_MS on this word (0 = now), counted
@@ -215,7 +246,7 @@ export function idleWait(state, now) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, streak: 0, stars: null };
 
 // --- Render ---
 
@@ -240,7 +271,8 @@ export function renderRobot(state) {
     }
     if (!moments.length) return;
     const steps = stepsFor(moments);
-    const delays = stepDelays(steps.length, performance.now() - last.changedAt);
+    const reduced = reducedMotion();
+    const delays = stepDelays(steps.length, performance.now() - last.changedAt, steps.map((s) => moveMs(s.move, reduced)));
     // A new moment replaces the steps an earlier one still had waiting.
     gsap.killTweensOf(applyStep);
     steps.forEach((step, i) => {

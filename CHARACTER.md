@@ -28,7 +28,7 @@ eyebrow angle + hands.
 | robot-thinking | picture shown; kid idle |
 | robot-confused | wrong check |
 | robot-excited | correct; streak |
-| robot-happy | round end (good); reveal resolved |
+| robot-happy | round end (good); reveal resolved; his letter on the second miss (B-206) |
 | robot-oops | third miss (before the reveal) |
 | robot-hero | theme screen, larger |
 
@@ -57,6 +57,7 @@ Pose and movement change together; never more than one change per 300ms.
 | All slots filled | idle; points at dome via robot-excited for 2 rounds | swipe | first 2 rounds since the page was loaded (not stored) |
 | Kid idle 10s | thinking, then sink | — | once per word |
 | Wrong check | confused, peek | error clip | always |
+| Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | happy, small pop (10px), when the peek ends | — | always |
 | Third miss | oops → happy as blocks fly in | error clip | always |
 | Correct | excited, pop up | correct clip | always |
 | 3 correct in a row | excited, double pop | correct clip | always |

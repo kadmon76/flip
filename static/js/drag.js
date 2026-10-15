@@ -31,6 +31,15 @@ export function makeDraggable(el) {
         allowContextMenu: false,
         onPress(e) {
             if (e.pointerType === 'touch') e.preventDefault();
+            // A block picked up while feedback.js still moves it (the
+            // second-miss hint's wiggle and hop back, BACKLOG B-206)
+            // stays where it is and follows the finger: its x, y and
+            // scale tweens end here, also the ones of its motion not yet
+            // started (Draggable itself only stops the running x/y ones).
+            // A turn to its tilt (and a reduced-motion fade) still
+            // finishes, so a block let go away from a slot lies at the
+            // tilt the render set; pickUp / putDown own the scale.
+            gsap.killTweensOf(this.target, 'x,y,scale');
             this.target.classList.add('gsap-dragging');
             document.body.classList.add('dragging-active');
             pickUp(this.target);
@@ -124,10 +133,12 @@ function moveTile(el, change) {
 }
 
 // Drop anywhere that is not a box or the tray: slide back to where the
-// tile came from.
+// tile came from. Only x, y and scale are taken over: a turn to its tilt
+// still under way or still to come (a snap, or the second-miss hop back,
+// BACKLOG B-206) finishes, so the block lies at the tilt the render set.
 function springBack(el) {
     const m = motionFor('return', reducedMotion());
-    gsap.killTweensOf(el);
+    gsap.killTweensOf(el, 'x,y,scale');
     tween(el, { x: 0, y: 0, scale: m.scale }, m);
 }
 
@@ -193,7 +204,8 @@ function placedIndex(current, tileId) {
 
 // A slot holding a locked letter (round.js makeWord: the given first
 // letter on easy, BACKLOG B-204; a right letter the lever kept after a
-// wrong check on easy, B-205, leverResult): it stays where it is.
+// wrong check on easy, B-205, leverResult; the robot's letter on the
+// second miss, B-206, giveHint): it stays where it is.
 export function isLocked(slot) {
     return !!(slot && slot.locked);
 }
@@ -263,7 +275,8 @@ export function afterMove(status) {
 // state.round.level; BACKLOG B-205): { back, lock }, the tile ids of the
 // placed letters that go back to the bench and of the ones that stay in
 // their slot, locked. The easy given first letter (its tray tile is
-// `given`, BACKLOG B-204) is in neither: it always stays, locked.
+// `given`, BACKLOG B-204) and the robot's second-miss letter (its slot is
+// `hint`, B-206, giveHint) are in neither: they always stay, locked.
 //   - Easy (leverDropsWrongFirst), right after a wrong check (status
 //     'wrong': the checked letters have not moved since): only the
 //     letters in wrong slots go back; the ones in right slots lock.
@@ -275,7 +288,7 @@ export function leverResult(level, current) {
     const given = new Set(current.tray.filter((t) => t.given).map((t) => t.id));
     const placed = current.placed
         .map((p, i) => ({ p, right: !!p && p.letter === current.word[i] }))
-        .filter(({ p }) => p && !given.has(p.tileId));
+        .filter(({ p }) => p && !given.has(p.tileId) && !p.hint);
     const ids = (list) => list.map(({ p }) => p.tileId);
     if (current.status === 'wrong' && levelRules(level).leverDropsWrongFirst) {
         return { back: ids(placed.filter((s) => !s.right)), lock: ids(placed.filter((s) => s.right)) };
@@ -286,9 +299,9 @@ export function leverResult(level, current) {
 // The reset lever's pull on `level` (leverResult): the letters it sends
 // back leave their slot (unlocked, as the slot is emptied) for their
 // start spot on the bench, the ones it locks stay with `locked: true`,
-// and the given letter stays as it is. Pure (main.js applies it through
-// setState, feedback.js hops the blocks that left a slot); a wrong check
-// is reopened as by any other move.
+// and the given letter and the robot's letter stay as they are. Pure
+// (main.js applies it through setState, feedback.js hops the blocks that
+// left a slot); a wrong check is reopened as by any other move.
 export function returnAll(current, level) {
     const { back, lock } = leverResult(level, current);
     const goBack = new Set(back);
@@ -304,4 +317,55 @@ export function returnAll(current, level) {
         tray: current.tray.map((t) => ({ ...t, used: stay.has(t.id) })),
         status: afterMove(current.status),
     };
+}
+
+// The robot's letter on the second miss (BACKLOG B-206): the wrong check
+// that leaves one lives bulb lit also places one letter, on every level.
+// { index, tileId, back }: the first slot that is empty or holds a wrong
+// letter (`index`; a locked slot is always right and is skipped), the
+// block that gets its right letter (`tileId`) and the block already in
+// that slot, which goes back to the bench (`back`, null when the slot is
+// empty). The block is one with that letter lying on the bench if there
+// is one, else the one in the first wrong slot holding that letter (that
+// slot is emptied); never one in a right slot. On easy and normal every
+// block is in a slot when a check is made, so it comes from a wrong
+// slot. null when there is nothing to give (every slot right).
+export function hintFor(current) {
+    const { word, placed, tray } = current;
+    const right = (p, i) => !!p && p.letter === word[i];
+    const index = placed.findIndex((p, i) => !isLocked(p) && !right(p, i));
+    if (index === -1) return null;
+    const letter = word[index];
+    const onBench = tray.find((t) => t.letter === letter && !t.used);
+    let tileId = onBench ? onBench.id : null;
+    if (!tileId) {
+        const from = placed.findIndex((p, i) => !!p && p.letter === letter && !right(p, i) && !isLocked(p));
+        if (from === -1) return null;
+        tileId = placed[from].tileId;
+    }
+    const occupant = placed[index];
+    return { index, tileId, back: occupant ? occupant.tileId : null };
+}
+
+// The second-miss hint applied (hintFor): the block leaves the bench or
+// its wrong slot for slot `index`, where it is locked (`locked: true`,
+// the same lock as the given letter: no drag, tap out or drop on it) and
+// marked `hint` (the reset lever leaves it, leverResult; the robot's
+// `hintGiven` and feedback.js's fly-in key on it); the block that was
+// there goes back to its spot on the bench. The status is kept: main.js
+// applies it in the same setState as the wrong check, so the word stays
+// 'wrong' (the dome off until a block moves). Pure; `current` itself
+// when there is nothing to give.
+export function giveHint(current) {
+    const hint = hintFor(current);
+    if (!hint) return current;
+    const { index, tileId, back } = hint;
+    const placed = current.placed.map((p) => (p && p.tileId === tileId ? null : p));
+    placed[index] = { letter: current.word[index], tileId, locked: true, hint: true };
+    const tray = current.tray.map((t) => {
+        if (t.id === tileId) return { ...t, used: true };
+        if (t.id === back) return { ...t, used: false };
+        return { ...t };
+    });
+    return { ...current, placed, tray };
 }

@@ -6,7 +6,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
-import { returnAll } from './drag.js';
+import { returnAll, giveHint } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
@@ -215,7 +215,14 @@ function onCheck(extra = {}) {
     } else if (lives - 1 <= 0) {
         setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
     } else {
-        setState({ lives: lives - 1, round: { ...round, results }, current: { ...current, status: 'wrong' }, ...extra });
+        // The miss that leaves one bulb lit also gives one letter, on
+        // every level (BACKLOG B-206, drag.js giveHint): in the same
+        // setState, so the robot (character.js hintGiven) and the fly-in
+        // (feedback.js) see it with the miss. A word then checked correct
+        // is mastered as any other (a bulb is left).
+        const checked = { ...current, status: 'wrong' };
+        const left = lives - 1;
+        setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
     }
 }
 
