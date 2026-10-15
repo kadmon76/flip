@@ -6,7 +6,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
-import { returnAll } from './drag.js';
+import { returnAll, giveHint } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
@@ -17,6 +17,7 @@ import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
 import { LEVELS, loadLevel, saveLevel } from './level.js';
+import { pickWords, makeWord } from './round.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -24,36 +25,19 @@ const ROUND_SIZE = 5;
 const LIVES = 3;
 let tileSeq = 0;
 
-function shuffle(arr) {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-}
-
-function makeCurrent(entry) {
-    const letters = entry.word.split('');
-    return {
-        word: entry.word,
-        image: entry.image,
-        audio: entry.audio,
-        tray: shuffle(letters).map((letter) => ({ id: `t${++tileSeq}`, letter, used: false })),
-        placed: new Array(letters.length).fill(null),
-        status: 'playing',
-    };
-}
+// A fresh tile id for round.js makeWord, unique over the session (card.js
+// keys the DOM tiles by id).
+const newTileId = () => `t${++tileSeq}`;
 
 // Fill every box with the right letter using the word's own tiles. A
-// block already in its right slot stays there, so on the reveal only the
-// others fly in (feedback.js).
+// block already in its right slot stays there (a locked one stays
+// locked), so on the reveal only the others fly in (feedback.js).
 function revealed(current) {
     const tray = current.tray.map((t) => ({ ...t, used: true }));
     const letters = current.word.split('');
     const placed = letters.map((ch, i) => {
         const p = current.placed[i];
-        return p && p.letter === ch ? { letter: ch, tileId: p.tileId } : null;
+        return p && p.letter === ch ? { ...p } : null;
     });
     const taken = new Set(placed.filter(Boolean).map((p) => p.tileId));
     letters.forEach((ch, i) => {
@@ -135,8 +119,10 @@ async function startRound({ name, dataUrl }) {
     const level = state.level;
     // data shape: { "duck": { image, audio, difficulty }, ... }
     const data = await fetch(dataUrl).then((r) => r.json());
-    const words = shuffle(Object.keys(data))
-        .slice(0, ROUND_SIZE)
+    // `level` is the round's level (round.level below): on easy the round
+    // prefers the easy-tagged, then the shortest words, and each word
+    // starts with its first letter given (round.js, BACKLOG B-204).
+    const words = pickWords(data, ROUND_SIZE, level)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
     stopWord();
     setState({
@@ -144,7 +130,7 @@ async function startRound({ name, dataUrl }) {
         words,
         screen: 'play',
         round: { index: 0, size: ROUND_SIZE, level, results: [] },
-        current: makeCurrent(words[0]),
+        current: makeWord(words[0], level, newTileId),
         lives: LIVES,
         pressed: null,
         speaking: false,
@@ -172,13 +158,16 @@ function onDome() {
     }, PRESS_MS.dome);
 }
 
-// Reset lever: down for 250ms, and every placed block goes back to its
-// start spot at once (feedback.js shakes the rail and hops the blocks).
-// Input is not blocked; tapping a single placed block still returns only
-// that block (drag.js).
+// Reset lever: down for 250ms, and the placed blocks go back to their
+// start spots at once (feedback.js shakes the rail and hops the blocks).
+// Which ones go depends on the round's level (BACKLOG B-205, drag.js
+// leverResult): on easy, right after a wrong check, only the wrong
+// letters go and the right ones lock; otherwise every one but the easy
+// given letter. Input is not blocked; tapping a single placed block
+// still returns only that block (drag.js).
 function onLever() {
     if (state.screen !== 'play' || state.pressed || !canReset(state.current)) return;
-    setState({ pressed: 'lever', current: returnAll(state.current) });
+    setState({ pressed: 'lever', current: returnAll(state.current, state.round.level) });
     setTimeout(() => {
         if (state.pressed === 'lever') setState({ pressed: null });
     }, PRESS_MS.lever);
@@ -226,7 +215,14 @@ function onCheck(extra = {}) {
     } else if (lives - 1 <= 0) {
         setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
     } else {
-        setState({ lives: lives - 1, round: { ...round, results }, current: { ...current, status: 'wrong' }, ...extra });
+        // The miss that leaves one bulb lit also gives one letter, on
+        // every level (BACKLOG B-206, drag.js giveHint): in the same
+        // setState, so the robot (character.js hintGiven) and the fly-in
+        // (feedback.js) see it with the miss. A word then checked correct
+        // is mastered as any other (a bulb is left).
+        const checked = { ...current, status: 'wrong' };
+        const left = lives - 1;
+        setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
     }
 }
 
@@ -246,7 +242,7 @@ function onNext(extra = {}) {
     } else {
         setState({
             round: { ...round, index: nextIndex, results },
-            current: makeCurrent(state.words[nextIndex]),
+            current: makeWord(state.words[nextIndex], state.round.level, newTileId),
             lives: LIVES,
             speaking: false,
             lastInput: performance.now(),

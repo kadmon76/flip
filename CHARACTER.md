@@ -28,7 +28,7 @@ eyebrow angle + hands.
 | robot-thinking | picture shown; kid idle |
 | robot-confused | wrong check |
 | robot-excited | correct; streak |
-| robot-happy | round end (good); reveal resolved |
+| robot-happy | round end (good); reveal resolved; his letter on the second miss (B-206) |
 | robot-oops | third miss (before the reveal) |
 | robot-hero | theme screen, larger |
 
@@ -38,7 +38,7 @@ same sheet style; until then use the closest pose above.
 ## Presence on the play screen
 He stands **behind the console's left third**; the console is drawn over
 him. Normally head and shoulders show (~75px). Movement is a vertical
-slide, nothing else:
+slide, nothing else, except the small head-shake of "Speaker locked" (a ±4.5° turn about the neck, 90ms swings, 540ms; B-203):
 - **Pop up** (react): rises ~20px over 180ms, ease-out, then settles.
 - **Sink** (bored, idle 10s+): slides down until only the top of the head
   shows, 400ms; pops back up on the kid's next action.
@@ -57,10 +57,12 @@ Pose and movement change together; never more than one change per 300ms.
 | All slots filled | idle; points at dome via robot-excited for 2 rounds | swipe | first 2 rounds since the page was loaded (not stored) |
 | Kid idle 10s | thinking, then sink | — | once per word |
 | Wrong check | confused, peek | error clip | always |
+| Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | happy, small pop (10px), when the peek ends | — | always |
 | Third miss | oops → happy as blocks fly in | error clip | always |
 | Correct | excited, pop up | correct clip | always |
 | 3 correct in a row | excited, double pop | correct clip | always |
 | Round end | happy (2–3 stars) / idle (0–1 stars, never sad) | tada | always |
+| Speaker locked (normal and hard, before the word is answered) | confused, small head-shake | hmm no (placeholder, `error/hmm no.mp3`) | every tap |
 
 Voice lines (the ~60-line pool, pre-generated AI voice, his own quirks
 after the target word) are a later item; M1 uses the existing clips.

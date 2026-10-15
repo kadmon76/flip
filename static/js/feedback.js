@@ -8,8 +8,12 @@
 //   - status became 'wrong': blocks in wrong slots wiggle
 //   - status became 'revealed' (third miss): the right blocks fly into the
 //     slots in order
-//   - the reset lever went down: the rail shakes and the blocks that were
-//     in slots hop back to their start spots
+//   - the robot's letter appeared (the miss that leaves one bulb lit,
+//     drag.js giveHint): the wrong block in its slot hops back to the
+//     bench, then his letter flies in from where it was
+//   - the reset lever went down: the rail shakes and the blocks it took
+//     out of slots hop back to their start spots (a letter it left or
+//     locked stays put; drag.js leverResult)
 // The correct-check beat (slot pulse, TV flash, sparks) is celebrate.js.
 // Every tween clears what it set when it ends, so the CSS render of state
 // is what stays.
@@ -19,8 +23,8 @@ import { centre } from './drag.js';
 
 // Render cache (like `last` in celebrate.js): what the last render showed
 // of the current word, so a transition can be told from a re-render. The
-// placement is kept so the reveal and the reset can fly blocks from the
-// slots they were in.
+// placement is kept so the reveal, the second-miss hint and the reset
+// can fly blocks from the slots they were in.
 const NONE = { key: null, status: null, lives: null, pressed: null, placed: [] };
 let last = NONE;
 
@@ -45,6 +49,9 @@ export function renderFeedback(state) {
     }
     if (now.status === 'wrong' && (prev.status !== 'wrong' || now.lives < prev.lives)) {
         wiggleWrong(current);
+    }
+    if (hintSlot(now.placed) !== -1 && hintSlot(prev.placed) === -1) {
+        hintIn(prev.placed, current);
     }
     if (now.status === 'revealed' && prev.status !== 'revealed') {
         flyIn(prev.placed, current.placed);
@@ -222,6 +229,102 @@ function flyIn(prevPlaced, placed) {
     fly(moves, motionFor('flyIn', reducedMotion()), false);
 }
 
+// --- Second miss: the robot's letter (BACKLOG B-206) ---
+
+// The slot holding the robot's letter (drag.js giveHint), or -1.
+function hintSlot(placed) {
+    return placed.findIndex((p) => !!p && !!p.hint);
+}
+
+// The bench spot of tray tile `tileId` (card.js lays out one per block
+// that is not `given`, in tray order), or null.
+function benchSpot(current, tileId) {
+    const i = current.tray.filter((t) => !t.given).findIndex((t) => t.id === tileId);
+    return i === -1 ? null : document.getElementById('letter-tray').children[i] || null;
+}
+
+// The miss that left one bulb lit also gave the robot's letter, in the
+// same render (drag.js giveHint): the block that was in that slot is on
+// the bench now and his letter is in the slot, locked. Both start where
+// the check found them (travel) and, if they were in a wrong slot,
+// wiggle there with the other wrong blocks (wiggleWrong); then the one
+// that was in the way hops back onto its bench spot (the lever's hop,
+// over his letter still waiting where it was) and, once it is down, his
+// letter flies into the slot (the reveal's fly-in), landing about when
+// the robot, done peeking, pops up happy (character.js hintGiven). Until
+// it lands it has class `landing`, so its locked edge (game.css) lights
+// as it lands. Reduced motion: no wiggle and no flight; the two fade in
+// where they now are, one after the other.
+function hintIn(prevPlaced, current) {
+    const boxes = document.getElementById('letter-boxes').children;
+    const k = hintSlot(current.placed);
+    const hint = current.placed[k];
+    const el = tileEl(hint.tileId);
+    if (!el || !boxes[k]) return;
+    const reduced = reducedMotion();
+    const wiggle = motionFor('wiggle', reduced);
+    const hop = motionFor('hop', reduced);
+    const flyIn = motionFor('flyIn', reduced);
+    const was = prevPlaced[k];
+    const out = was && was.tileId !== hint.tileId ? tileEl(was.tileId) : null;
+    const j = prevPlaced.findIndex((p) => !!p && p.tileId === hint.tileId);
+    const from = j !== -1 ? boxes[j] : benchSpot(current, hint.tileId);
+    let at = wiggle.duration;
+    if (out) {
+        travel(out, boxes[k], { wiggle, at, m: hop, hop: true, z: 11 });
+        at += hop.duration || hop.fade;
+    }
+    if (!from) return;
+    const wrongThere = j !== -1 && prevPlaced[j].letter !== current.word[j];
+    if (!reduced) {
+        el.classList.add('landing');
+        gsap.delayedCall(at + flyIn.duration, () => el.classList.remove('landing'));
+    }
+    travel(el, from, { wiggle: wrongThere ? wiggle : null, at, m: flyIn, hop: false, z: 10 });
+}
+
+// Move `el` from where `fromEl` is (a slot or a bench spot) to where the
+// render put it: from now it is held there, upright, at that place's
+// size and lifted over the other blocks; with `wiggle` it swings there
+// first (the wrong wiggle); at `at` seconds it leaves along `m` (with
+// `hop` the lever's hop, else the reveal's fly-in) and turns to its
+// rendered tilt. What it set is put back when it has landed. Reduced
+// motion (m.duration 0): it fades in where it is at `at`.
+function travel(el, fromEl, { wiggle, at, m, hop, z }) {
+    gsap.killTweensOf(el);
+    if (m.duration === 0) {
+        gsap.set(el, { x: 0, y: 0 });
+        if (m.fade > 0) gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: m.fade, delay: at, ease: 'power1.out' });
+        restoreAfter(el, at + m.fade, 'opacity');
+        return;
+    }
+    const to = centre(el);
+    const from = centre(fromEl);
+    const dx = from.x - to.x;
+    const dy = from.y - to.y;
+    const rot = gsap.getProperty(el, 'rotation');
+    const size = el.offsetWidth ? fromEl.offsetWidth / el.offsetWidth : 1;
+    gsap.set(el, { x: dx, y: dy, rotation: 0, scale: size, position: 'relative', zIndex: z });
+    const tl = gsap.timeline();
+    if (wiggle && wiggle.distance > 0) {
+        const step = wiggle.duration / 6;
+        const d = wiggle.distance;
+        tl.to(el, { x: dx - d, duration: step, ease: wiggle.ease }, 0)
+            .to(el, { x: dx + d, duration: step * 2, ease: wiggle.ease })
+            .to(el, { x: dx - d, duration: step * 2, ease: wiggle.ease })
+            .to(el, { x: dx, duration: step, ease: wiggle.ease });
+    }
+    if (hop) {
+        const up = m.duration * 0.4;
+        tl.to(el, { x: 0, rotation: rot, scale: 1, duration: m.duration, ease: 'power1.inOut' }, at)
+            .to(el, { y: Math.min(dy, 0) - m.height, duration: up, ease: m.ease }, at)
+            .to(el, { y: 0, duration: m.duration - up, ease: 'power2.in' }, at + up);
+    } else {
+        tl.to(el, { x: 0, y: 0, rotation: rot, scale: 1, duration: m.duration, ease: m.ease }, at);
+    }
+    restoreAfter(el, at + m.duration, 'position,zIndex');
+}
+
 // --- Reset lever ---
 
 // The rail shakes ±4px for 200ms (the swing of the wrong wiggle).
@@ -231,8 +334,9 @@ function shakeRail() {
     if (m.distance > 0) swing(rail, m);
 }
 
-// The blocks that were in slots hop from there back onto their start
-// spots, left to right, 30ms apart.
+// The blocks that were in slots and are not now hop from there back onto
+// their start spots, left to right, 30ms apart (a letter the lever left
+// or locked is still in its slot and stays still).
 function hopBack(prevPlaced) {
     const boxes = document.getElementById('letter-boxes').children;
     const moves = [];
