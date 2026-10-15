@@ -135,7 +135,7 @@ lever; the reveal fly-in plays the error clip only). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
 dropped. The swipe is an effect and may overlap anything. Muted: nothing
-plays and a speaker tap is ignored. All playback goes through `audio.js`.
+plays; a speaker tap that would play the word is ignored, and a tap on the held-back speaker (B-203) still gets the robot's head-shake, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
 Theme, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
@@ -145,7 +145,7 @@ labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
 theme's picture, not its name. These are placeholders; a design pass
 will replace them.
 
-Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned and mastered / missed are lit / dark (stars, bulbs), never ticks, crosses or outlines.
+Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned and mastered / missed are lit / dark (stars, bulbs), never ticks, crosses or outlines; a picked option (the level picker) is an icon button pressed in with its bulbs lit (`aria-pressed="true"`), the others raised with dark bulbs.
 
 ## Screenshots (implementer produces, reviewer checks)
 - `tools/shot.mjs`, viewport 360x740, device scale 2, saved under

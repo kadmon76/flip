@@ -39,6 +39,7 @@ a phone.
   - `flaps.js` `renderFlaps(el, text)` is the only helper that writes a number as split-flap `.flap` characters on the interim screens (round-end score, sticker book counts); no state, no module globals, rebuilt on every call; a Django test runs it through `node` with a fake DOM. `card.js`'s counter keeps its own `renderCounter` until folded.
   - `controls.js` renders the console controls (`#check-btn` dome, `#reset-btn` lever, `#speak-btn` speaker) from `current`, `pressed` and `speaking` in state; its rules (`domeAction`, `domeState`, `canReset`, `leverState`, `speakerState`, `speakerAction`, `PRESS_MS`) are pure, no DOM (`speakerAction` reads `levelRules` from level.js), and a Django test runs them through `node`.
   - `stickers.js` is the only place the sticker book (localStorage key `flip.stickers.v1`) is read or written; no DOM, no module state. Other modules call `load()`/`has()`/`add()`/`remove()`/`all()`; nothing else touches that key.
+  - `level.js` is the only place localStorage `flip.level` is read or written (`loadLevel`/`saveLevel`, both in try/catch); `levelRules(level)` is the per-level rules table. Later items take a round's rules from `levelRules(state.round.level)`, not `state.level`. No DOM, no module state; a Django test runs it through `node`.
   - `gallery.js` renders the sticker book screen (`#screen-gallery`) from `state.themes[].words` and `stickers.load()` on every render while `state.screen === 'gallery'`; it never mutates state and keeps no cache. `themeProgress(book, theme, words)` is the pure part (no DOM); a Django test runs it through `node`.
   - `feedback.js` is the only place one-shot motion keyed on a state transition starts (wrong wiggle, bulb flicker, TV static, reveal fly-in, reset-lever rail shake and hop now; correct pulse, confetti and star pop in B-110), except the robot's poses and slides, which start in `character.js` (B-115). It is a subscriber after `renderCard`, keeps only a render cache of the current word's key and the last status, lives, `pressed` and placement, and never mutates state.
   - `audio.js` is the only place sounds play. Its subscriber `renderSound` plays `MOMENTS[moment].sound` (through character.js `momentsFor`/`soundsFor`) and keeps no trigger list of its own. It is the only module that reads or writes localStorage `flip.muted` (`loadMuted`/`saveMuted`).
@@ -98,7 +99,7 @@ a phone.
   (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `check-btn`,
   `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`,
   `stickers-btn`, `gallery-back-btn`, `gallery-empty`, `gallery-themes`,
-  `reset-btn`, `speak-btn`, `mute-btn`) without a DECISIONS entry; card.js, controls.js, main.js and gallery.js key on
+  `reset-btn`, `speak-btn`, `mute-btn`, `play-back-btn`, `level-picker`, `level-easy`, `level-normal`, `level-hard`) without a DECISIONS entry; card.js, controls.js, main.js and gallery.js key on
   them. `next-btn` and `result-line` were removed by B-114 (the check dome is also next).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.
