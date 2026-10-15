@@ -838,7 +838,8 @@ body[data-screen="play"] .play-back-btn {
     }
 }
 
-/* A locked letter (BACKLOG B-204: the first letter given on easy; card.js
+/* A locked letter (BACKLOG B-204: the first letter given on easy; B-205:
+   a right letter the lever kept after a wrong check on easy; card.js
    sets class `locked` on its slot): drawn as placed, with a small lit
    edge, a thin line of lamp light (the lit bulbs' amber) round the block
    where it meets the slot's rim and a soft glow on the brass, as if the

@@ -43,9 +43,10 @@ export function pickWords(data, size, level, rand = Math.random) {
 // on the bench (card.js lays out only the other blocks) and never goes
 // back there.
 // A slot's `locked: true` means its letter stays: it cannot be dragged,
-// tapped out or swapped out, nothing can be dropped on it, the reset
-// lever leaves it (drag.js placeIn, takeOut, returnAll), and card.js
-// draws it with the locked look (game.css .letter-box.locked).
+// tapped out or swapped out, nothing can be dropped on it (drag.js
+// placeIn, takeOut), the reset lever leaves the given letter (drag.js
+// leverResult, returnAll), and card.js draws it with the locked look
+// (game.css .letter-box.locked).
 export function makeWord(entry, level, newId, rand = Math.random) {
     const letters = entry.word.split('');
     const tray = shuffle(letters, rand).map((letter) => ({ id: newId(), letter, used: false }));

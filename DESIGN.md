@@ -103,7 +103,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   stays `off` until a block moves (drag, tap or the reset lever).
 - **Reset lever** (`#reset-btn`): tap → `lever-down` for 250ms, rail shakes
   ±4px for 200ms, placed blocks hop back to their starting spots (300ms,
-  30ms stagger), except a locked letter (easy's given first letter, B-204), which stays in its slot; lever springs back. Tap area 48x48.
+  30ms stagger), except a locked letter (easy's given first letter, B-204), which stays in its slot; lever springs back. Tap area 48x48. On easy, a pull right after a wrong check (no block moved since) sends back only the letters in wrong slots, and the right ones stay and lock with the same look; any other pull sends back every letter but the given one, including the letters an earlier pull locked (B-205).
 - **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
   playing. Where a mode hides it, show `speaker-cap` and ignore taps. On normal and hard, before the word is answered (correct or revealed), a tap holds the word back: the robot's confused head-shake and "hmm no" instead; the speaker looks the same, no lock icon (B-203).
 - **Mute toggle** (`#mute-btn`): top-right, one button: the small cream speaker glyph (code; wave, or cross while muted) then the brass switch (`mute-switch-on` knob right = sound on, `mute-switch-off` knob left = muted, stacked and swapped by class). Remembered in localStorage.

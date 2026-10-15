@@ -6,6 +6,7 @@
 
 import { state, setState } from './state.js';
 import { motionFor } from './motion.js';
+import { levelRules } from './level.js';
 
 const draggables = new Map();   // tile element -> Draggable instance
 
@@ -191,7 +192,8 @@ function placedIndex(current, tileId) {
 }
 
 // A slot holding a locked letter (round.js makeWord: the given first
-// letter on easy, BACKLOG B-204): it stays where it is.
+// letter on easy, BACKLOG B-204; a right letter the lever kept after a
+// wrong check on easy, B-205, leverResult): it stays where it is.
 export function isLocked(slot) {
     return !!(slot && slot.locked);
 }
@@ -257,13 +259,44 @@ export function afterMove(status) {
     return status === 'wrong' ? 'playing' : status;
 }
 
-// The reset lever: every placed tile goes back to its start spot on the
-// bench, except a locked one (the easy given letter, BACKLOG B-204),
-// which stays in its slot. Pure (main.js applies it through setState,
-// feedback.js animates the hop); a wrong check is reopened as by any
-// other move.
-export function returnAll(current) {
-    const placed = current.placed.map((p) => (isLocked(p) ? p : null));
+// What a pull on the reset lever does on `level` (the round's level,
+// state.round.level; BACKLOG B-205): { back, lock }, the tile ids of the
+// placed letters that go back to the bench and of the ones that stay in
+// their slot, locked. The easy given first letter (its tray tile is
+// `given`, BACKLOG B-204) is in neither: it always stays, locked.
+//   - Easy (leverDropsWrongFirst), right after a wrong check (status
+//     'wrong': the checked letters have not moved since): only the
+//     letters in wrong slots go back; the ones in right slots lock.
+//   - Otherwise (before any wrong check, after a block moved since the
+//     check, the next pull after a wrong-letters pull, and every pull on
+//     normal and hard): every placed letter goes back, a locked one too
+//     (it unlocks), and nothing locks.
+export function leverResult(level, current) {
+    const given = new Set(current.tray.filter((t) => t.given).map((t) => t.id));
+    const placed = current.placed
+        .map((p, i) => ({ p, right: !!p && p.letter === current.word[i] }))
+        .filter(({ p }) => p && !given.has(p.tileId));
+    const ids = (list) => list.map(({ p }) => p.tileId);
+    if (current.status === 'wrong' && levelRules(level).leverDropsWrongFirst) {
+        return { back: ids(placed.filter((s) => !s.right)), lock: ids(placed.filter((s) => s.right)) };
+    }
+    return { back: ids(placed), lock: [] };
+}
+
+// The reset lever's pull on `level` (leverResult): the letters it sends
+// back leave their slot (unlocked, as the slot is emptied) for their
+// start spot on the bench, the ones it locks stay with `locked: true`,
+// and the given letter stays as it is. Pure (main.js applies it through
+// setState, feedback.js hops the blocks that left a slot); a wrong check
+// is reopened as by any other move.
+export function returnAll(current, level) {
+    const { back, lock } = leverResult(level, current);
+    const goBack = new Set(back);
+    const locks = new Set(lock);
+    const placed = current.placed.map((p) => {
+        if (!p || goBack.has(p.tileId)) return null;
+        return locks.has(p.tileId) ? { ...p, locked: true } : p;
+    });
     const stay = new Set(placed.filter(Boolean).map((p) => p.tileId));
     return {
         ...current,

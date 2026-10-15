@@ -1066,8 +1066,9 @@ class ControlsTests(TestCase):
 
 class ResetTransitionTests(TestCase):
     """static/js/drag.js returnAll() and afterMove(): the reset lever puts
-    every placed block back on the bench; any block move after a wrong
-    check reopens the word (BACKLOG B-114)."""
+    every placed block back on the bench (on normal and hard always; easy's
+    wrong-letters-first pull is LeverTests, B-205); any block move after a
+    wrong check reopens the word (BACKLOG B-114)."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'drag.js'
 
@@ -1096,7 +1097,7 @@ class ResetTransitionTests(TestCase):
             'placed': [{'letter': 't', 'tileId': 'a'}, {'letter': 'a', 'tileId': 'b'}, None],
         }
         after, before = self.run_node(f"const cur = {json.dumps(current)}; const before = JSON.stringify(cur);"
-                                      "out([d.returnAll(cur), JSON.parse(before)]);")
+                                      "out([d.returnAll(cur, 'normal'), JSON.parse(before)]);")
         self.assertEqual(after['placed'], [None, None, None])
         self.assertEqual([t['used'] for t in after['tray']], [False, False, False])
         self.assertEqual([t['id'] for t in after['tray']], ['a', 'b', 'c'])   # start spots keep their order
@@ -2582,3 +2583,180 @@ class EasyStartTests(TestCase):
         self.assertIn('0 0 0 2px var(--amber),', rule)
         self.assertIn('0 0 6px 2px var(--glow-amber);', rule)
         self.assertIn('cursor: default;', rule)
+
+
+class LeverTests(TestCase):
+    """Lever: wrong letters first, pull again to start over (BACKLOG
+    B-205). static/js/drag.js leverResult(level, current) (which placed
+    letters a pull sends back and which lock) and returnAll(current, level)
+    (the pull applied to the word), run through node: on easy right after
+    a wrong check only the wrong letters go back and the right ones lock;
+    the next pull sends back every letter but the given one; normal and
+    hard, and every level before a wrong check, send back every letter.
+    The wiring in main.js is checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    @staticmethod
+    def slot(letter, tile, locked=False):
+        s = {'letter': letter, 'tileId': tile}
+        if locked:
+            s['locked'] = True
+        return s
+
+    def horse(self, level, status, letters, locked=()):
+        """The word "horse" with `letters` in its slots (' ' = empty), one
+        block per letter named by its letter (h, o, r, s, e). On easy the
+        h is the given letter (locked in slot 1, its block `given`); the
+        letters in `locked` (block ids) are locked too."""
+        given = level == 'easy'
+        tray = [{'id': t, 'letter': t, 'used': t in letters} for t in 'sroeh']
+        if given:
+            tray[-1]['given'] = True
+        placed = [self.slot(ch, ch, (ch == 'h' and given) or ch in locked) if ch != ' ' else None for ch in letters]
+        return {'word': 'horse', 'image': '/i.svg', 'audio': None, 'status': status, 'tray': tray, 'placed': placed}
+
+    def pull(self, level, current):
+        """[leverResult(level, current), returnAll(current, level), whether
+        `current` was left untouched]."""
+        return self.run_node(
+            f"const cur = {json.dumps(current)}; const before = JSON.stringify(cur);"
+            f"const r = D.leverResult({json.dumps(level)}, cur); const after = D.returnAll(cur, {json.dumps(level)});"
+            "out([r, after, JSON.stringify(cur) === before]);")
+
+    def used(self, current):
+        return {t['id']: t['used'] for t in current['tray']}
+
+    # --- leverResult and the pull ---
+
+    def test_easy_after_a_wrong_check_sends_back_only_the_wrong_letters_and_locks_the_right(self):
+        # "hsore": h given, s o r wrong, e right -> s, o, r go back; e locks
+        result, after, pure = self.pull('easy', self.horse('easy', 'wrong', 'hsore'))
+        self.assertEqual(result, {'back': ['s', 'o', 'r'], 'lock': ['e']})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, self.slot('e', 'e', True)])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': True, 'h': True})
+        self.assertEqual(after['status'], 'playing')     # the dome stays off until the slots are full again
+        self.assertTrue(pure)
+        # the locked right letter is a locked slot like the given one: it
+        # takes nothing and its block cannot be moved or tapped out
+        self.assertEqual(self.run_node(
+            f"const cur = {json.dumps(after)};"
+            "out([D.isLocked(cur.placed[4]), D.placeIn(cur, 's', 4), D.placeIn(cur, 'e', 1), D.takeOut(cur, 'e'),"
+            " C.domeAction(cur), C.canReset(cur)]);"),
+            [True, None, None, None, None, True])
+
+    def test_easy_second_pull_sends_back_everything_but_the_given_letter_and_unlocks_it(self):
+        first = self.pull('easy', self.horse('easy', 'wrong', 'hsore'))[1]
+        result, after, pure = self.pull('easy', first)
+        self.assertEqual(result, {'back': ['e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
+        self.assertTrue(pure)
+        # any time later: blocks placed since the first pull go back too,
+        # and the locked one unlocks (its slot is emptied)
+        later = self.run_node(f"const cur = {json.dumps(first)}; out(D.placeIn(D.placeIn(cur, 'r', 1), 'o', 2));")
+        result, after, _ = self.pull('easy', later)
+        self.assertEqual(result, {'back': ['r', 'o', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
+        # with only the given letter left, a pull sends nothing back
+        result, again, _ = self.pull('easy', after)
+        self.assertEqual(result, {'back': [], 'lock': []})
+        self.assertEqual(again['placed'], after['placed'])
+
+    def test_easy_a_new_wrong_check_makes_the_next_pull_drop_the_wrong_letters_again(self):
+        # after the first pull (e locked) the kid fills "hosre" and checks
+        # wrong again: o is right now and locks, e stays locked, s and r go
+        current = self.horse('easy', 'wrong', 'hosre', locked='e')
+        result, after, _ = self.pull('easy', current)
+        self.assertEqual(result, {'back': ['s', 'r'], 'lock': ['o', 'e']})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True), None, None,
+                                           self.slot('e', 'e', True)])
+
+    def test_easy_after_a_block_moved_since_the_wrong_check_the_pull_starts_over(self):
+        # the wrong check belongs to the arrangement that was checked: once
+        # a block moved (status back to 'playing') the lever cannot tell
+        # right from wrong without a check, so it sends back every letter
+        moved = self.run_node(f"out(D.takeOut({json.dumps(self.horse('easy', 'wrong', 'hsore'))}, 's'));")
+        self.assertEqual(moved['status'], 'playing')
+        result, after, _ = self.pull('easy', moved)
+        self.assertEqual(result, {'back': ['o', 'r', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
+
+    def test_normal_and_hard_one_pull_sends_back_every_letter_and_never_locks(self):
+        for level in ('normal', 'hard'):
+            for status in ('wrong', 'playing'):
+                result, after, pure = self.pull(level, self.horse(level, status, 'hsore'))
+                self.assertEqual(result, {'back': ['h', 's', 'o', 'r', 'e'], 'lock': []}, (level, status))
+                self.assertEqual(after['placed'], [None] * 5, (level, status))
+                self.assertEqual(set(self.used(after).values()), {False}, (level, status))
+                self.assertEqual(after['status'], 'playing')
+                self.assertTrue(pure)
+
+    def test_before_any_wrong_check_every_level_sends_back_every_letter_but_the_given_one(self):
+        result, after, _ = self.pull('easy', self.horse('easy', 'playing', 'hro e'))
+        self.assertEqual(result, {'back': ['r', 'o', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
+        for level in ('normal', 'hard'):
+            result, after, _ = self.pull(level, self.horse(level, 'playing', 'hro e'))
+            self.assertEqual(result, {'back': ['h', 'r', 'o', 'e'], 'lock': []}, level)
+            self.assertEqual(after['placed'], [None] * 5, level)
+
+    def test_a_word_with_a_letter_twice_judges_each_slot_by_its_letter(self):
+        # "sheep" on easy, s given, checked as "seehp": either e block is
+        # right in an e slot (as the check compares letters), so e2 in
+        # slot 3 locks while e1 in slot 2 goes back, with the h; p locks
+        current = {
+            'word': 'sheep', 'status': 'wrong',
+            'tray': [{'id': 's', 'letter': 's', 'used': True, 'given': True}, {'id': 'e1', 'letter': 'e', 'used': True},
+                     {'id': 'p', 'letter': 'p', 'used': True}, {'id': 'h', 'letter': 'h', 'used': True},
+                     {'id': 'e2', 'letter': 'e', 'used': True}],
+            'placed': [self.slot('s', 's', True), self.slot('e', 'e1'), self.slot('e', 'e2'), self.slot('h', 'h'),
+                       self.slot('p', 'p')],
+        }
+        result, after, _ = self.pull('easy', current)
+        self.assertEqual(result, {'back': ['e1', 'h'], 'lock': ['e2', 'p']})
+        self.assertEqual(after['placed'], [self.slot('s', 's', True), None, self.slot('e', 'e2', True), None,
+                                           self.slot('p', 'p', True)])
+        self.assertEqual(self.used(after), {'s': True, 'e1': False, 'p': True, 'h': False, 'e2': True})
+
+    # --- wiring ---
+
+    def test_the_rule_is_pure_and_reads_the_level_rules(self):
+        drag = self.code('drag.js')
+        self.assertIn("import { levelRules } from './level.js';", drag)
+        for name in ('leverResult', 'returnAll'):
+            body = self.function(name, 'drag.js')
+            for word in ('document', 'window', 'state.', 'setState', 'gsap'):
+                self.assertNotIn(word, body, (name, word))
+        self.assertIn("current.status === 'wrong' && levelRules(level).leverDropsWrongFirst", self.function('leverResult', 'drag.js'))
+        self.assertIn('leverResult(level, current)', self.function('returnAll', 'drag.js'))
+
+    def test_the_lever_pulls_on_the_rounds_level(self):
+        lever = self.function('onLever', 'main.js')
+        self.assertIn("setState({ pressed: 'lever', current: returnAll(state.current, state.round.level) });", lever)
+        self.assertNotRegex(lever, r'state\.level\b')

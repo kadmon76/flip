@@ -158,13 +158,16 @@ function onDome() {
     }, PRESS_MS.dome);
 }
 
-// Reset lever: down for 250ms, and every placed block goes back to its
-// start spot at once (feedback.js shakes the rail and hops the blocks).
-// Input is not blocked; tapping a single placed block still returns only
-// that block (drag.js).
+// Reset lever: down for 250ms, and the placed blocks go back to their
+// start spots at once (feedback.js shakes the rail and hops the blocks).
+// Which ones go depends on the round's level (BACKLOG B-205, drag.js
+// leverResult): on easy, right after a wrong check, only the wrong
+// letters go and the right ones lock; otherwise every one but the easy
+// given letter. Input is not blocked; tapping a single placed block
+// still returns only that block (drag.js).
 function onLever() {
     if (state.screen !== 'play' || state.pressed || !canReset(state.current)) return;
-    setState({ pressed: 'lever', current: returnAll(state.current) });
+    setState({ pressed: 'lever', current: returnAll(state.current, state.round.level) });
     setTimeout(() => {
         if (state.pressed === 'lever') setState({ pressed: null });
     }, PRESS_MS.lever);

@@ -8,8 +8,9 @@
 //   - status became 'wrong': blocks in wrong slots wiggle
 //   - status became 'revealed' (third miss): the right blocks fly into the
 //     slots in order
-//   - the reset lever went down: the rail shakes and the blocks that were
-//     in slots hop back to their start spots
+//   - the reset lever went down: the rail shakes and the blocks it took
+//     out of slots hop back to their start spots (a letter it left or
+//     locked stays put; drag.js leverResult)
 // The correct-check beat (slot pulse, TV flash, sparks) is celebrate.js.
 // Every tween clears what it set when it ends, so the CSS render of state
 // is what stays.
@@ -231,8 +232,9 @@ function shakeRail() {
     if (m.distance > 0) swing(rail, m);
 }
 
-// The blocks that were in slots hop from there back onto their start
-// spots, left to right, 30ms apart.
+// The blocks that were in slots and are not now hop from there back onto
+// their start spots, left to right, 30ms apart (a letter the lever left
+// or locked is still in its slot and stays still).
 function hopBack(prevPlaced) {
     const boxes = document.getElementById('letter-boxes').children;
     const moves = [];
