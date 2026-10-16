@@ -2281,7 +2281,7 @@ class LevelTests(TestCase):
 
     def test_wiring(self):
         main = (self.ROOT / 'static' / 'js' / 'main.js').read_text()
-        self.assertIn("import { LEVELS, loadLevel, saveLevel } from './level.js';", main)
+        self.assertIn("import { LEVELS, loadLevel, saveLevel, streakAfter, levelUpFor } from './level.js';", main)
         self.assertIn('setState({ level: loadLevel() });', main)
         self.assertIn('subscribe(renderLevel);', main)
         self.assertIn("for (const level of LEVELS) $(`level-${level}`).addEventListener('click', () => onLevel(level));", main)
@@ -3202,7 +3202,9 @@ class HintTests(TestCase):
         # drawn as a placed block, without the lit edge until it lands
         self.assertIn('1px 2px 3px var(--shadow-deep);', rule)
         self.assertNotIn('amber', rule)
-        self.assertIn("?v=20", (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text())
+        # the CSS cache-buster was bumped for this look (later items bump it again)
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 20)
 
 
 class HardExtrasTests(TestCase):
@@ -3830,3 +3832,266 @@ class MissedWordsTests(TestCase):
         branch = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
         self.assertIn('results[round.index].newSticker = addSticker(state.theme, current.word);', branch)
         self.assertNotIn('missed', self.code('stickers.js'))
+
+
+class LevelUpTests(TestCase):
+    """The level-up nudge (BACKLOG B-209): level.js nextLevel, streakAfter
+    and levelUpFor (pure, run through node); the streak of 3-star rounds
+    on one level in state.js, this session only, written once per
+    finished round (main.js onNext) and never by a round left with the
+    back button; the round-end screen's #level-up-btn (the next level's
+    bulbs, lit, in a pulsing glow; none on hard) and its tap, which sets
+    the level through level.js and starts a round of the same theme."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'level.js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const L = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        text = (self.ROOT / 'static' / 'js' / name).read_text()
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+    def function(self, name, module='main.js'):
+        js = self.code(module)
+        start = re.search(rf'\n(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
+
+    # --- level.js (pure) ---
+
+    def test_next_level(self):
+        self.assertEqual(
+            self.run_node("out([L.nextLevel('easy'), L.nextLevel('normal'), L.nextLevel('hard'),"
+                          " L.nextLevel(null), L.nextLevel(undefined), L.nextLevel('Hard')]);"),
+            ['normal', 'hard', None, None, None, None],
+        )
+
+    def test_three_star_rounds_on_one_level_count_up(self):
+        self.assertEqual(
+            self.run_node("const a = L.streakAfter({ level: null, rounds: 0 }, 'easy', 3);"
+                          "const b = L.streakAfter(a, 'easy', 3); const c = L.streakAfter(b, 'easy', 3);"
+                          "out([a, b, c, L.LEVEL_UP_ROUNDS]);"),
+            [{'level': 'easy', 'rounds': 1}, {'level': 'easy', 'rounds': 2}, {'level': 'easy', 'rounds': 3}, 2],
+        )
+
+    def test_fewer_than_three_stars_break_the_streak(self):
+        self.assertEqual(
+            self.run_node("out([0, 1, 2].map((s) => L.streakAfter({ level: 'easy', rounds: 2 }, 'easy', s)));"),
+            [{'level': 'easy', 'rounds': 0}] * 3,
+        )
+
+    def test_a_round_on_another_level_starts_over(self):
+        self.assertEqual(
+            self.run_node("out([L.streakAfter({ level: 'easy', rounds: 2 }, 'normal', 3),"
+                          " L.streakAfter({ level: 'easy', rounds: 2 }, 'normal', 2),"
+                          " L.streakAfter({ level: 'normal', rounds: 1 }, 'easy', 3)]);"),
+            [{'level': 'normal', 'rounds': 1}, {'level': 'normal', 'rounds': 0}, {'level': 'easy', 'rounds': 1}],
+        )
+
+    def test_streak_after_is_a_new_object_and_takes_any_start(self):
+        self.assertEqual(
+            self.run_node("const s = Object.freeze({ level: 'easy', rounds: 1 }); const n = L.streakAfter(s, 'easy', 3);"
+                          "out([n, s, n === s,"
+                          " [undefined, null, {}, { level: 'easy' }, { level: 'easy', rounds: 'x' }, { level: 'easy', rounds: -1 }]"
+                          "   .map((v) => L.streakAfter(v, 'easy', 3))]);"),
+            [{'level': 'easy', 'rounds': 2}, {'level': 'easy', 'rounds': 1}, False,
+             [{'level': 'easy', 'rounds': 1}] * 6],
+        )
+
+    def test_level_up_for(self):
+        self.assertEqual(
+            self.run_node("out([{ level: null, rounds: 0 }, { level: 'easy', rounds: 1 }, { level: 'easy', rounds: 2 },"
+                          " { level: 'easy', rounds: 3 }, { level: 'normal', rounds: 2 }, { level: 'hard', rounds: 2 },"
+                          " { level: 'hard', rounds: 7 }, { level: 'Hard', rounds: 2 }, { level: 'easy', rounds: '2' },"
+                          " null, undefined, {}].map((s) => L.levelUpFor(s)));"),
+            [None, None, 'normal', 'normal', 'hard', None, None, None, None, None, None, None],
+        )
+
+    def test_rounds_in_a_row_as_main_js_plays_them(self):
+        # each round's end: streakAfter, then what the round-end screen
+        # shows (levelUpFor); the stars come from score.js as in onNext
+        score = (self.ROOT / 'static' / 'js' / 'score.js').as_uri()
+        self.assertEqual(
+            self.run_node(
+                f"const {{ starsFor }} = await import('{score}');"
+                "const play = (rounds) => { let s = { level: null, rounds: 0 }; return rounds.map(([level, correct]) => {"
+                "  s = L.streakAfter(s, level, starsFor(correct, 5)); return L.levelUpFor(s); }); };"
+                "out([play([['easy', 5], ['easy', 5]]),"
+                " play([['easy', 5], ['easy', 4], ['easy', 5]]),"
+                " play([['easy', 5], ['normal', 5]]),"
+                " play([['easy', 5], ['easy', 5], ['easy', 5]]),"
+                " play([['easy', 5], ['easy', 5], ['normal', 5], ['normal', 5]]),"
+                " play([['normal', 5], ['normal', 5]]),"
+                " play([['hard', 5], ['hard', 5], ['hard', 5]]),"
+                " play([['easy', 4], ['easy', 4], ['easy', 0]])]);"),
+            [[None, 'normal'],
+             [None, None, None],
+             [None, None],
+             [None, 'normal', 'normal'],
+             [None, 'normal', None, 'hard'],
+             [None, 'hard'],
+             [None, None, None],
+             [None, None, None]],
+        )
+
+    # --- state and main.js ---
+
+    def test_the_streak_is_in_state_for_this_session_only(self):
+        state = (self.ROOT / 'static' / 'js' / 'state.js').read_text()
+        self.assertIn('\n    streak: { level: null, rounds: 0 },', state)
+        for f in sorted((self.ROOT / 'static' / 'js').glob('*.js')):
+            self.assertNotIn('flip.streak', self.code(f.name), f.name)
+        for name in ('level.js', 'main.js'):
+            self.assertNotRegex(self.code(name), r'setItem\([^)]*streak', name)
+
+    def test_the_streak_moves_once_per_finished_round(self):
+        main = self.code('main.js')
+        self.assertEqual(len(re.findall(r'\bstreak:', main)), 1)
+        nxt = self.function('onNext')
+        end = nxt.index('if (nextIndex >= round.size) {')
+        branch = nxt[end:nxt.index('} else {', end)]
+        self.assertIn('const stars = starsFor(results.filter((r) => r.correct).length, round.size);', branch)
+        # in the setState that shows the round-end screen
+        call = branch[branch.index('setState({'):]
+        self.assertIn("screen: 'round-end',", call)
+        self.assertIn('streak: streakAfter(state.streak, round.level, stars),', call)
+        # a round left with the back button (or for the theme screen), a
+        # new round, a check and the nudge's tap leave it
+        for name in ('onPlayBack', 'onThemes', 'startRound', 'onCheck', 'onLevelUp', 'onLevel'):
+            self.assertNotIn('streak:', self.function(name), name)
+        self.assertNotRegex(nxt, r'state\.level\b')
+
+    def test_round_end_renders_the_nudge_from_the_streak(self):
+        self.assertIn('renderLevelUp(state);', self.function('renderRoundEnd'))
+        render = self.function('renderLevelUp')
+        self.assertIn('const next = levelUpFor(state.streak);', render)
+        self.assertIn("const btn = $('level-up-btn');", render)
+        self.assertIn('btn.hidden = !next;', render)
+        self.assertIn("btn.innerHTML = next ? '<span class=\"bulb\"></span>'.repeat(LEVELS.indexOf(next) + 1) : '';", render)
+        self.assertIn("btn.setAttribute('aria-label', next ? `next level: ${next}` : 'next level');", render)
+
+    def test_the_tap_sets_the_level_and_starts_the_same_theme(self):
+        main = self.code('main.js')
+        self.assertIn("$('level-up-btn').addEventListener('click', onLevelUp);", main)
+        tap = self.function('onLevelUp')
+        self.assertIn("if (state.screen !== 'round-end' || state.startingRound) return;", tap)
+        self.assertIn('const next = levelUpFor(state.streak);', tap)
+        self.assertIn('if (!next) return;', tap)
+        # remembered through level.js as a pick on the theme screen is,
+        # set before the round starts (startRound reads state.level)
+        self.assertLess(tap.index('saveLevel(next);'), tap.index('setState({ level: next });'))
+        self.assertLess(tap.index('setState({ level: next });'), tap.index('onPlayAgain();'))
+        self.assertIn('const theme = state.themes.find((t) => t.name === state.theme);', self.function('onPlayAgain'))
+        self.assertLess(self.function('startRound').index('const level = state.level;'),
+                        self.function('startRound').index('await fetch('))
+
+    # --- the button ---
+
+    def test_the_button_is_a_bulb_icon_button_right_of_play_again(self):
+        html = self.client.get('/').content.decode()
+        end = html[html.index('<div id="screen-round-end"'):html.index('<div id="screen-gallery"')]
+        actions = end[end.index('<div class="actions">'):]
+        self.assertLess(actions.index('id="themes-btn"'), actions.index('id="play-again-btn"'))
+        self.assertLess(actions.index('id="play-again-btn"'), actions.index('id="level-up-btn"'))
+        m = re.search(r'<button id="level-up-btn"([^>]*)>(.*?)</button>', actions, flags=re.S)
+        self.assertIsNotNone(m)
+        attrs, inner = m.groups()
+        self.assertIn('class="panel-btn level-btn level-up"', attrs)
+        self.assertIn('type="button"', attrs)
+        self.assertRegex(attrs, r'aria-label="[^"]+"')
+        self.assertRegex(attrs, r'\shidden(\s|$)')
+        self.assertNotIn('aria-pressed', attrs)
+        self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '')    # no text
+        # one button with that id, not in the theme screen's picker
+        self.assertEqual(html.count('id="level-up-btn"'), 1)
+
+    def test_the_glow_pulses_and_the_bulbs_are_lit(self):
+        css = self.css()
+        self.assertIn('display: none;', self.rule('.level-up[hidden]'))
+        self.assertIn('opacity: 1;', self.rule('.level-up .bulb::before'))
+        self.assertIn('position: relative;', self.rule('.level-up'))
+        glow = self.rule('.level-up::after')
+        self.assertIn('animation: level-up-glow 1.2s ease-in-out infinite alternate;', glow)
+        self.assertIn('pointer-events: none;', glow)
+        self.assertRegex(glow, r'box-shadow: [^;]*var\(--amber\)[^;]*var\(--glow-amber\);')
+        frames = re.search(r'@keyframes level-up-glow\s*{(.*?)\n}', css, flags=re.S).group(1)
+        self.assertRegex(frames, r'from\s*{\s*opacity: 0\.3;\s*}')
+        self.assertRegex(frames, r'to\s*{\s*opacity: 1;\s*}')
+        # reduced motion: a steady glow
+        self.assertRegex(css, r'@media \(prefers-reduced-motion: reduce\) {\s*\.level-up::after {\s*animation: none;\s*}')
+        # the picker's bulbs (14px) through .level-btn, the lives bulbs' look
+        self.assertIn('width: 14px;', self.rule('.level-btn .bulb'))
+
+    def test_three_buttons_fit_the_row_clear_of_the_bezel(self):
+        # the column is 324px at 360 (18px safe sides); the row of three
+        # stays 36px or more from the screen's edges (the frame's 28px
+        # border and 8px); the row of two keeps its 48px gap
+        gap = int(re.search(r'gap: (\d+)px;', self.rule('#screen-round-end .actions:has(.level-up:not([hidden]))')).group(1))
+        width = 3 * 72 + 2 * gap
+        self.assertLessEqual(width, 360 - 2 * 36)
+        self.assertIn('gap: 48px;', self.rule('.actions'))
+
+    def test_the_ring_clears_the_bezel_below(self):
+        # review fix round 1: the row ends `margin-bottom` above the safe
+        # area's bottom (the column's padding, --safe-bottom); the ring
+        # reaches `inset` + its spread below the button. Its bottom must
+        # be at or above the safe-area bottom + 2px (the bezel's visible
+        # inner edge, y 720 at 360x740), on any screen height, since the
+        # row sits at the bottom whenever the screen fits.
+        css = self.css()
+        safe_bottom = int(re.search(r'--safe-bottom: (\d+)px;', css).group(1))
+        rows = re.findall(r'\n#screen-round-end \.actions\s*{([^}]*)}', css)
+        margins = [int(m) for body in rows for m in re.findall(r'margin-bottom: (\d+)px;', body)]
+        self.assertEqual(len(margins), 1)
+        glow = self.rule('.level-up::after')
+        inset = -int(re.search(r'inset: (-\d+)px;', glow).group(1))
+        spread = int(re.search(r'box-shadow: 0 0 0 (\d+)px var\(--amber\)', glow).group(1))
+        self.assertEqual(inset + spread, 8)
+        for height in (740, 667, 640):
+            button_bottom = height - safe_bottom - margins[0]
+            self.assertLessEqual(button_bottom + inset + spread, height - safe_bottom + 2, height)
+        # on every round-end, not only with the nudge
+        self.assertNotIn('margin-bottom', self.rule('#screen-round-end .actions:has(.level-up:not([hidden]))'))
+
+    # --- one round at a time (review fix round 1) ---
+
+    def test_a_round_being_started_takes_no_second_tap(self):
+        state = (self.ROOT / 'static' / 'js' / 'state.js').read_text()
+        self.assertIn('\n    startingRound: false,', state)
+        start = self.function('startRound')
+        # the guard first, then the level, then the flag before the fetch
+        self.assertLess(start.index('if (state.startingRound) return;'), start.index('const level = state.level;'))
+        self.assertLess(start.index('const level = state.level;'), start.index('setState({ startingRound: true });'))
+        self.assertLess(start.index('setState({ startingRound: true });'), start.index('await fetch('))
+        # a failed fetch lets the next tap try again; the round's own
+        # setState clears it with everything else
+        catch = start[start.index('} catch (e) {'):]
+        self.assertLess(catch.index('setState({ startingRound: false });'), catch.index('throw e;'))
+        last = start[start.rindex('setState({'):]
+        self.assertIn("screen: 'play',", last)
+        self.assertIn('roundsStarted: state.roundsStarted + 1,', last)
+        self.assertIn('startingRound: false,', last)
+        # only startRound writes it; the nudge also waits (its level must
+        # not change under a round play again already started)
+        main = self.code('main.js')
+        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 3)
+        self.assertIn("if (state.screen !== 'round-end' || state.startingRound) return;", self.function('onLevelUp'))
+        for name in ('onPlayAgain', 'onThemes', 'onNext', 'onLevelUp', 'onLevel', 'onPlayBack'):
+            self.assertNotIn('startingRound:', self.function(name), name)
