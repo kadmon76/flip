@@ -17,7 +17,8 @@ import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
 import { LEVELS, loadLevel, saveLevel } from './level.js';
-import { pickWords, makeWord } from './round.js';
+import { pickRound, makeWord } from './round.js';
+import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -101,8 +102,10 @@ async function startRound({ name, dataUrl }) {
     const data = await fetch(dataUrl).then((r) => r.json());
     // `level` is the round's level (round.level below): on easy the round
     // prefers the easy-tagged, then the shortest words, and each word
-    // starts with its first letter given (round.js, BACKLOG B-204).
-    const words = pickWords(data, ROUND_SIZE, level)
+    // starts with its first letter given (round.js, BACKLOG B-204). Up to
+    // two of the words this theme's earlier rounds missed come back, in
+    // random places (round.js pickRound, missed.js; BACKLOG B-208).
+    const words = pickRound(data, ROUND_SIZE, level, missedWords(name))
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
     stopWord();
     setState({
@@ -215,7 +218,10 @@ function onCheck(extra = {}) {
 // Next word, or the round-end screen after the fifth. The dome offers it
 // only after a correct answer or a reveal, so every word has a result by
 // then; one without would count as wrong. The word clip stops with its
-// word.
+// word. At the round end the theme's missed words are recorded (missed.js,
+// BACKLOG B-208): the words not checked correct are remembered, the ones
+// checked correct come out; a round left with the back button never gets
+// here, so it records nothing (B-201).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -224,6 +230,7 @@ function onNext(extra = {}) {
     stopWord();
     const nextIndex = round.index + 1;
     if (nextIndex >= round.size) {
+        recordMissed(state.theme, results);
         setState({ round: { ...round, results }, screen: 'round-end', speaking: false, idleBeat: null, ...extra });
     } else {
         setState({

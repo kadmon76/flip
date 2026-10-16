@@ -1,7 +1,8 @@
 // round.js — pure helpers that set up a round from a theme's data file
 // and the round's level (state.round.level; the rules are level.js
-// levelRules): which words the round plays (pickWords) and how each word
-// starts (makeWord; on hard with extra letters, extraLetters). No DOM and
+// levelRules): which words the round plays (pickRound: the theme's missed
+// words back, then pickWords by the level) and how each word starts
+// (makeWord; on hard with extra letters, extraLetters). No DOM and
 // no module state; main.js calls them and puts the result in state, and
 // a Django test runs them through node.
 // `rand` (default Math.random) is there so the test can seed them.
@@ -33,6 +34,33 @@ export function pickWords(data, size, level, rand = Math.random) {
     const easy = names.filter(isEasy);
     const rest = names.filter((w) => !isEasy(w)).sort((a, b) => a.length - b.length);
     return shuffle([...easy, ...rest].slice(0, size), rand);
+}
+
+// How many remembered missed words a round brings back (BACKLOG B-208).
+export const MISSED_BACK = 2;
+
+// The words of a round with the theme's missed words back (BACKLOG
+// B-208): `missed` is the theme's list (missed.js wordsFor, the oldest
+// miss first). The round takes the first MISSED_BACK of them that are
+// still in `data`, on every level, and fills the other places with
+// pickWords (the level's pick) from the theme's words that are not
+// remembered, or, when those run out, from the other remembered ones; so
+// a round holds no more than MISSED_BACK remembered words while the
+// theme has enough others. All in random order. With no remembered word
+// in `data` it is pickWords exactly.
+export function pickRound(data, size, level, missed = [], rand = Math.random) {
+    const names = Object.keys(data);
+    const list = Array.isArray(missed) ? missed : [];
+    const remembered = list.filter((w, i) => names.includes(w) && list.indexOf(w) === i);
+    const back = remembered.slice(0, Math.min(MISSED_BACK, size));
+    if (!back.length) return pickWords(data, size, level, rand);
+    const only = (keep) => Object.fromEntries(names.filter(keep).map((w) => [w, data[w]]));
+    const need = size - back.length;
+    const fresh = pickWords(only((w) => !remembered.includes(w)), need, level, rand);
+    const more = fresh.length < need
+        ? pickWords(only((w) => remembered.includes(w) && !back.includes(w)), need - fresh.length, level, rand)
+        : [];
+    return shuffle([...back, ...fresh, ...more], rand);
 }
 
 // Letters a beginner mixes up (BACKLOG B-207): the pairs the backlog

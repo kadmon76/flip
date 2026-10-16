@@ -2610,13 +2610,15 @@ class EasyStartTests(TestCase):
 
     def test_main_builds_the_round_from_the_rounds_level(self):
         main = self.code('main.js')
-        self.assertIn("import { pickWords, makeWord } from './round.js';", main)
+        # since B-208 the pick goes through pickRound (the theme's missed
+        # words back, then pickWords by the level)
+        self.assertIn("import { pickRound, makeWord } from './round.js';", main)
         self.assertNotIn('makeCurrent', main)
         self.assertNotIn('shuffle', main)
         start = self.function('startRound')
         # `level` is the one read when the theme was tapped, which is also
         # the round's level (round.level)
-        self.assertIn('pickWords(data, ROUND_SIZE, level)', start)
+        self.assertIn('pickRound(data, ROUND_SIZE, level, missedWords(name))', start)
         self.assertIn('current: makeWord(words[0], level, newTileId),', start)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, level, results: [] },', start)
         nxt = self.function('onNext')
@@ -3534,3 +3536,297 @@ class HardExtrasTests(TestCase):
         # the b hops back to the bench (its hop's x and y parts); c and k
         # stay, the o on the bench too
         self.assertEqual({e[1] for e in res if e[0] == 'hop'}, {'xb'})
+
+
+class MissedWordsTests(TestCase):
+    """Missed words come back (BACKLOG B-208). static/js/missed.js keeps
+    the words a round missed per theme in localStorage `flip.missed.v1`
+    (shape { "<theme>": ["horse", ...] }, the oldest miss first; read and
+    written only there), and round.js pickRound brings up to two of them
+    back in the theme's next round, in random places; run through node
+    with a fake localStorage and a seeded Math.random. The wiring in
+    main.js (the pick at startRound, the record at the round end only) is
+    checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # In-memory localStorage (SEED: the key's initial value or null),
+    # counting writes; a seeded Math.random stand-in.
+    PRELUDE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.missed.v1', SEED);
+        let writes = 0;
+        globalThis.localStorage = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { writes++; store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const raw = () => store.get('flip.missed.v1') ?? null;
+        const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const out = (v) => console.log(JSON.stringify(v));
+    """
+
+    def run_node(self, body, seed=None):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const SEED = {json.dumps(seed)};"
+            f"{self.PRELUDE}"
+            f"const M = await import('{(self.JS / 'missed.js').as_uri()}');"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def rounds(self, data, level, missed, seeds=60):
+        return self.run_node(
+            f"const data = {json.dumps(data)}; const missed = {json.dumps(missed)};"
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickRound(data, 5, {json.dumps(level)}, missed, seeded(i + 1))));")
+
+    # --- missed.js: the list per theme ---
+
+    def test_missing_key_is_no_missed_words(self):
+        self.assertEqual(self.run_node("out([M.load(), M.wordsFor('animals'), raw(), writes]);"), [{}, [], None, 0])
+
+    def test_a_round_end_remembers_the_missed_words_in_the_documented_shape(self):
+        # the revealed words (correct: false) are remembered in round
+        # order; the words checked correct are not
+        results = [
+            {'word': 'duck', 'correct': True, 'newSticker': True}, {'word': 'horse', 'correct': False},
+            {'word': 'wolf', 'correct': True, 'newSticker': False}, {'word': 'tiger', 'correct': False},
+            {'word': 'bear', 'correct': True, 'newSticker': True},
+        ]
+        back, lists, stored, mine = self.run_node(
+            f"const back = M.record('animals', {json.dumps(results)});"
+            "out([back, M.load(), JSON.parse(raw()), M.wordsFor('animals')]);")
+        self.assertEqual(back, ['horse', 'tiger'])
+        self.assertEqual(lists, {'animals': ['horse', 'tiger']})
+        self.assertEqual(stored, {'animals': ['horse', 'tiger']})
+        self.assertEqual(mine, ['horse', 'tiger'])
+
+    def test_a_word_left_without_a_correct_check_counts_as_missed(self):
+        # "skipped": today the only way past a word is a correct check or
+        # the reveal; onNext records a word without a result as
+        # { word, correct: false }, and anything not correct is missed
+        self.assertEqual(
+            self.run_node("out(M.record('animals', [{ word: 'deer', correct: false }, { word: 'lion' }, null, { correct: false }, { word: '' }]));"),
+            ['deer', 'lion'])
+
+    def test_a_correct_word_comes_out_and_a_new_miss_goes_to_the_end(self):
+        lists, writes = self.run_node(
+            "M.record('animals', [{ word: 'horse', correct: true }, { word: 'lion', correct: false },"
+            " { word: 'cat', correct: false }, { word: 'dog', correct: true }, { word: 'mouse', correct: true }]);"
+            "out([M.load(), writes]);",
+            seed='{"animals": ["horse", "tiger", "lion"], "transportation": ["bus"]}')
+        # horse spelled: out; lion missed again: now the newest; cat new;
+        # tiger not played: keeps its place; the other theme untouched
+        self.assertEqual(lists, {'animals': ['tiger', 'lion', 'cat'], 'transportation': ['bus']})
+        self.assertEqual(writes, 1)
+
+    def test_the_last_word_out_drops_the_theme_and_no_change_writes_nothing(self):
+        lists, stored = self.run_node(
+            "M.record('animals', [{ word: 'horse', correct: true }]); out([M.load(), JSON.parse(raw())]);",
+            seed='{"animals": ["horse"], "transportation": ["bus"]}')
+        self.assertEqual(lists, {'transportation': ['bus']})
+        self.assertEqual(stored, {'transportation': ['bus']})
+        # a round all correct with none of them in the list: nothing to write
+        self.assertEqual(
+            self.run_node(
+                "const r = M.record('transportation', [{ word: 'car', correct: true }, { word: 'taxi', correct: true }]);"
+                "out([r, writes, raw()]);", seed='{"transportation": ["bus"]}'),
+            [['bus'], 0, '{"transportation": ["bus"]}'])
+        # nor for no theme
+        self.assertEqual(self.run_node("out([M.record('', [{ word: 'cat', correct: false }]), M.record(null, []), writes]);"), [[], [], 0])
+
+    def test_corrupt_json_is_no_missed_words_and_a_round_end_recovers(self):
+        for seed in ('{not json', '"a string"', '[1, 2]', 'null', '42'):
+            self.assertEqual(
+                self.run_node("out([M.load(), M.wordsFor('animals'), M.record('animals', [{ word: 'cat', correct: false }]), M.load()]);", seed=seed),
+                [{}, [], ['cat'], {'animals': ['cat']}], seed)
+
+    def test_bad_entries_inside_the_lists_are_dropped(self):
+        self.assertEqual(
+            self.run_node("out(M.load());", seed='{"animals": ["deer", "deer", 3, null, "", "lion"], "transportation": "bus", "x": null, "y": []}'),
+            {'animals': ['deer', 'lion']})
+
+    def test_no_or_blocked_localstorage_is_no_missed_words(self):
+        self.assertEqual(
+            self.run_node(
+                "delete globalThis.localStorage;"
+                "const a = [M.load(), M.wordsFor('animals'), M.record('animals', [{ word: 'cat', correct: false }]), M.wordsFor('animals')];"
+                "Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked'); } });"
+                "out([...a, M.load(), M.record('animals', [{ word: 'cat', correct: false }])]);"),
+            [{}, [], ['cat'], [], {}, ['cat']])
+
+    def test_after_round_is_pure(self):
+        words, results, after = self.run_node(
+            "const words = ['horse', 'tiger']; const results = [{ word: 'tiger', correct: false }, { word: 'horse', correct: true }];"
+            "const after = M.afterRound(words, results); out([words, results, after]);")
+        self.assertEqual(words, ['horse', 'tiger'])
+        self.assertEqual(results, [{'word': 'tiger', 'correct': False}, {'word': 'horse', 'correct': True}])
+        self.assertEqual(after, ['tiger'])
+        self.assertEqual(self.run_node("out([M.afterRound(undefined, [{ word: 'cat' }]), M.afterRound(['cat'], undefined)]);"),
+                         [['cat'], ['cat']])
+
+    # --- round.js pickRound: the round-picking helper ---
+
+    def test_with_no_missed_word_the_pick_is_as_before(self):
+        # nothing remembered, or only words the theme no longer has: the
+        # level's pick (pickWords) with the same random numbers
+        data = self.content('animals')
+        for level in ('easy', 'normal', 'hard'):
+            for missed in ([], None, ['unicorn', 'dragon']):
+                same = self.run_node(
+                    f"const data = {json.dumps(data)};"
+                    "out(Array.from({ length: 20 }, (_, i) => JSON.stringify(R.pickRound(data, 5, "
+                    f"{json.dumps(level)}, {json.dumps(missed) if missed is not None else 'undefined'}, seeded(i + 1))) ==="
+                    f" JSON.stringify(R.pickWords(data, 5, {json.dumps(level)}, seeded(i + 1)))));")
+                self.assertEqual(same, [True] * 20, (level, missed))
+
+    def test_the_two_oldest_missed_words_come_back_on_every_level(self):
+        data = self.content('animals')
+        missed = ['tiger', 'rabbit', 'lion', 'wolf']
+        for level in ('easy', 'normal', 'hard'):
+            for words in self.rounds(data, level, missed):
+                self.assertEqual(len(words), 5, level)
+                self.assertEqual(len(set(words)), 5, level)
+                self.assertLessEqual(set(words), set(data), level)
+                self.assertLessEqual({'tiger', 'rabbit'}, set(words), level)
+                # up to two: the newer misses wait for a later round
+                self.assertEqual(set(words) & set(missed), {'tiger', 'rabbit'}, level)
+
+    def test_one_missed_word_comes_back_and_the_others_follow_the_level(self):
+        data = self.content('animals')
+        easy = {w for w, v in data.items() if v.get('difficulty') == 'easy'}
+        seen = set()
+        for words in self.rounds(data, 'easy', ['horse']):
+            self.assertIn('horse', words)
+            # easy fills the other four from its easy-tagged words
+            self.assertLessEqual(set(words) - {'horse'}, easy)
+            seen |= set(words)
+        self.assertEqual(seen, easy | {'horse'})
+        # transportation on easy: a long word missed on hard comes back,
+        # and the other places are three of easy's five tagged words
+        data = self.content('transportation')
+        tagged = {'boat', 'bus', 'car', 'scooter', 'taxi'}
+        for words in self.rounds(data, 'easy', ['helicopter', 'submarine']):
+            self.assertLessEqual({'helicopter', 'submarine'}, set(words))
+            self.assertEqual(len(set(words) & tagged), 3)
+        # normal and hard: the other places from the whole rest of the theme
+        for level in ('normal', 'hard'):
+            seen = {w for words in self.rounds(data, level, ['helicopter']) for w in words}
+            self.assertEqual(seen, set(data), level)
+
+    def test_missed_words_come_back_in_random_places(self):
+        data = self.content('animals')
+        for level in ('easy', 'normal'):
+            rounds = self.rounds(data, level, ['tiger', 'rabbit'])
+            for word in ('tiger', 'rabbit'):
+                self.assertEqual({words.index(word) for words in rounds}, {0, 1, 2, 3, 4}, (level, word))
+
+    def test_words_the_theme_no_longer_has_are_skipped(self):
+        data = self.content('animals')
+        for words in self.rounds(data, 'normal', ['unicorn', 'tiger', 'tiger', 'dragon', 'lion', 'bear']):
+            self.assertEqual(set(words) & {'tiger', 'lion', 'bear'}, {'tiger', 'lion'})
+
+    def test_a_theme_with_every_word_missed_still_gets_a_full_round(self):
+        data = {w: {'image': f'/{w}.svg'} for w in ('ant', 'bee', 'cow', 'pig', 'yak', 'emu')}
+        missed = ['pig', 'emu', 'ant', 'bee', 'cow', 'yak']
+        for level in ('easy', 'hard'):
+            for words in self.rounds(data, level, missed, seeds=20):
+                self.assertEqual(len(set(words)), 5, level)
+                self.assertLessEqual({'pig', 'emu'}, set(words), level)
+        # and a round shorter than the list takes only the oldest
+        self.assertEqual(sorted(self.run_node(
+            f"out(R.pickRound({json.dumps(data)}, 1, 'normal', {json.dumps(missed)}, seeded(3)));")), ['pig'])
+
+    def test_the_pick_leaves_its_inputs_alone(self):
+        data = self.content('animals')
+        before, after, missed = self.run_node(
+            f"const data = {json.dumps(data)}; const missed = ['tiger', 'lion', 'wolf']; const before = JSON.stringify(data);"
+            "R.pickRound(data, 5, 'easy', missed, seeded(5)); out([before, JSON.stringify(data), missed]);")
+        self.assertEqual(before, after)
+        self.assertEqual(missed, ['tiger', 'lion', 'wolf'])
+
+    def test_a_missed_word_comes_back_until_it_is_spelled(self):
+        # three rounds of animals on normal through both modules, as
+        # main.js runs them: startRound picks with wordsFor(theme), the
+        # round end records the results
+        data = self.content('animals')
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const rounds = [];"
+            "const play = (seed, wrong) => {"
+            "  const words = R.pickRound(data, 5, 'normal', M.wordsFor('animals'), seeded(seed));"
+            "  const missed = wrong(words);"
+            "  M.record('animals', words.map((word) => ({ word, correct: !missed.includes(word) })));"
+            "  rounds.push({ words, after: M.wordsFor('animals') }); return missed; };"
+            # round 1: the 2nd and 4th words revealed; round 2: the first of
+            # them missed again; round 3: all spelled
+            "const missed = play(1, (w) => [w[1], w[3]]);"
+            "play(2, () => [missed[0]]); play(3, () => []);"
+            "out({ missed, rounds });")
+        missed, rounds = res['missed'], res['rounds']
+        self.assertEqual(rounds[0]['after'], missed)
+        self.assertLessEqual(set(missed), set(rounds[1]['words']))
+        self.assertEqual(rounds[1]['after'], [missed[0]])
+        self.assertIn(missed[0], rounds[2]['words'])
+        self.assertEqual(rounds[2]['after'], [])
+
+    # --- wiring ---
+
+    def test_only_missed_js_names_the_key_and_it_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            text = path.read_text()
+            if path.name == 'missed.js':
+                self.assertIn("export const KEY = 'flip.missed.v1';", text)
+            else:
+                self.assertNotIn('flip.missed', text, path.name)
+        code = self.code('missed.js')
+        for word in ('document', 'window', 'import', 'state'):
+            self.assertNotIn(word, code, word)
+        self.assertNotIn('localStorage', self.code('main.js'))
+
+    def test_pick_round_is_pure_and_reads_the_level_through_pick_words(self):
+        pick = self.function('pickRound', 'round.js')
+        self.assertIn('pickWords(', pick)
+        self.assertNotRegex(pick, r'localStorage|document|window|state\.')
+        self.assertIn('export const MISSED_BACK = 2;', self.code('round.js'))
+
+    def test_main_picks_with_the_themes_missed_words_and_records_only_at_the_round_end(self):
+        main = self.code('main.js')
+        self.assertIn("import { wordsFor as missedWords, record as recordMissed } from './missed.js';", main)
+        self.assertIn('pickRound(data, ROUND_SIZE, level, missedWords(name))', self.function('startRound'))
+        # recorded once, in onNext's round-end branch, before the screen
+        # changes; a round left with the back button records nothing
+        self.assertEqual(main.count('recordMissed('), 1)
+        nxt = self.function('onNext')
+        end = nxt.index('if (nextIndex >= round.size) {')
+        rec = nxt.index('recordMissed(state.theme, results);')
+        self.assertLess(end, rec)
+        self.assertLess(rec, nxt.index("screen: 'round-end'"))
+        self.assertLess(rec, nxt.index('} else {', end))
+        for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound'):
+            self.assertNotIn('recordMissed', self.function(name), name)
+
+    def test_stickers_still_only_for_correct_words(self):
+        main = self.code('main.js')
+        self.assertEqual(main.count('addSticker('), 1)
+        check = self.function('onCheck')
+        branch = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
+        self.assertIn('results[round.index].newSticker = addSticker(state.theme, current.word);', branch)
+        self.assertNotIn('missed', self.code('stickers.js'))
