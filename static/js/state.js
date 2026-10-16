@@ -16,17 +16,31 @@ export const state = {
     // (level.js loadLevel / saveLevel); main.js sets it from there at
     // start-up. A change takes effect from the next round.
     level: 'easy',
+    // Rounds in a row finished with 3 stars on one level (BACKLOG B-209):
+    // { level, rounds }, this session only (not stored). main.js onNext
+    // updates it once per finished round (level.js streakAfter: fewer
+    // stars, or a round on another level, start it over); a round left
+    // with the back button never gets there and changes nothing. From
+    // LEVEL_UP_ROUNDS on, the round-end screen suggests the next level
+    // (level.js levelUpFor), except on hard.
+    streak: { level: null, rounds: 0 },
+    // A round is being set up: true from a tap that starts one (a theme
+    // card, play again, the level-up nudge) until main.js startRound has
+    // the theme's data file and shows the round. A second tap meanwhile
+    // starts nothing.
+    startingRound: false,
     current: {
         word: null,
         image: null,
         audio: null,            // the word's audio file from the content JSON, or none
         // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord; a right letter the lever kept after a wrong check on easy, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
         placed: [],
-        // tray is [{ id, letter, used, given? }] in tray display order (given: the easy first letter's block, which has no bench spot); id is stable
+        // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: the easy first letter's block, which has no bench spot; extra: on hard, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
         // 'playing' | 'wrong' (checked, lives left; the next block move
-        // makes it 'playing' again) | 'correct' | 'revealed'
+        // makes it 'playing' again, as does the robot's letter when it
+        // finishes the word, drag.js afterHint) | 'correct' | 'revealed'
         status: 'playing',
     },
     lives: 3,                   // attempts left for the current word

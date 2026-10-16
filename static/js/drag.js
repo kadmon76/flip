@@ -329,14 +329,17 @@ export function returnAll(current, level) {
 // is one, else the one in the first wrong slot holding that letter (that
 // slot is emptied); never one in a right slot. On easy and normal every
 // block is in a slot when a check is made, so it comes from a wrong
-// slot. null when there is nothing to give (every slot right).
+// slot. On hard the bench also holds extra letters (BACKLOG B-207,
+// round.js makeWord): they are never the letter given; one in the slot
+// goes back like any wrong letter. null when there is nothing to give
+// (every slot right).
 export function hintFor(current) {
     const { word, placed, tray } = current;
     const right = (p, i) => !!p && p.letter === word[i];
     const index = placed.findIndex((p, i) => !isLocked(p) && !right(p, i));
     if (index === -1) return null;
     const letter = word[index];
-    const onBench = tray.find((t) => t.letter === letter && !t.used);
+    const onBench = tray.find((t) => t.letter === letter && !t.used && !t.extra);
     let tileId = onBench ? onBench.id : null;
     if (!tileId) {
         const from = placed.findIndex((p, i) => !!p && p.letter === letter && !right(p, i) && !isLocked(p));
@@ -354,8 +357,9 @@ export function hintFor(current) {
 // `hintGiven` and feedback.js's fly-in key on it); the block that was
 // there goes back to its spot on the bench. The status is kept: main.js
 // applies it in the same setState as the wrong check, so the word stays
-// 'wrong' (the dome off until a block moves). Pure; `current` itself
-// when there is nothing to give.
+// 'wrong' (the dome off until a block moves; on hard afterHint may
+// reopen it right after, when his letter finished the word, BACKLOG
+// B-207). Pure; `current` itself when there is nothing to give.
 export function giveHint(current) {
     const hint = hintFor(current);
     if (!hint) return current;
@@ -368,4 +372,42 @@ export function giveHint(current) {
         return { ...t };
     });
     return { ...current, placed, tray };
+}
+
+// After the robot's letter (giveHint): on hard it can finish the word,
+// when the only wrong slot held an extra letter and the right block lay
+// on the bench (BACKLOG B-207). Every slot then holds its right letter,
+// an arrangement that was never checked, so the word reopens ('playing'):
+// the dome lights at once and the kid checks it (a word counts as
+// mastered only when checked correct). Otherwise `current` itself: a
+// slot is empty or a wrong letter is left, and the check's 'wrong' stays
+// until a block moves. Pure; main.js applies it in a setState of its own
+// right after the check's, so the robot, the sound and the motion see
+// the miss first.
+export function afterHint(current) {
+    const solved = current.placed.length > 0 && current.placed.every((p, i) => !!p && p.letter === current.word[i]);
+    return current.status === 'wrong' && solved ? { ...current, status: 'playing' } : current;
+}
+
+// The third miss (main.js onCheck): every slot gets its right letter from
+// the word's own blocks. A block already in its right slot stays there (a
+// locked one stays locked: the given letter, a lever-locked one, the
+// robot's letter), so on the reveal only the others fly in (feedback.js).
+// The extra letters of hard (BACKLOG B-207) are never used: one in a slot
+// goes back to its bench spot (`used` is whether a block is in a slot).
+export function revealed(current) {
+    const letters = current.word.split('');
+    const placed = letters.map((ch, i) => {
+        const p = current.placed[i];
+        return p && p.letter === ch ? { ...p } : null;
+    });
+    const taken = new Set(placed.filter(Boolean).map((p) => p.tileId));
+    letters.forEach((ch, i) => {
+        if (placed[i]) return;
+        const tile = current.tray.find((t) => t.letter === ch && !t.extra && !taken.has(t.id));
+        taken.add(tile.id);
+        placed[i] = { letter: tile.letter, tileId: tile.id };
+    });
+    const tray = current.tray.map((t) => ({ ...t, used: taken.has(t.id) }));
+    return { ...current, tray, placed, status: 'revealed' };
 }

@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=20">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=21">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -160,7 +160,12 @@
          book and a lit or dark bulb; then themes and play again (BACKLOG
          B-107, B-111, B-116). main.js fills the stars (class "earned"),
          #round-score, #round-new and #round-words. Each star is a dark
-         star plus a lit "fill" layer that celebrate.js pops in. -->
+         star plus a lit "fill" layer that celebrate.js pops in.
+         #level-up-btn is the level-up nudge (BACKLOG B-209): hidden
+         until two rounds in a row earn 3 stars on one level (not on
+         hard); main.js then fills it with the next level's bulbs, lit,
+         and game.css pulses a glow around it. A tap starts a round of
+         the same theme at that level. -->
     <div id="screen-round-end" class="screen" style="display: none;">
         <div id="round-stars" class="stars" aria-label="Stars">
             <span>
@@ -190,6 +195,7 @@
             <button id="play-again-btn" class="panel-btn" type="button" aria-label="Play again">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4.8v14.4a1 1 0 0 0 1.5.86l11.3-7.2a1 1 0 0 0 0-1.72L9.5 3.94A1 1 0 0 0 8 4.8z"/></svg>
             </button>
+            <button id="level-up-btn" class="panel-btn level-btn level-up" type="button" aria-label="next level" hidden></button>
         </div>
     </div>
 

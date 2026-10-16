@@ -295,7 +295,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - The check ignores the extras; they can be placed and are wrong where placed. Reveal and the second-miss hint never use them.
   - The bench still fits 10-letter words plus 2 extras at 360x740 without overlap (new rows if needed; layout.js test extended).
   - Screenshots: `play-hard-extras.png`, `play-hard-10-letters.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/59
 
 ### B-208 Missed words come back
 - why: practice lands on the words that are hard for this kid.
@@ -304,14 +304,14 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - The next round of that theme includes up to 2 remembered missed words, in random positions; a word spelled correctly is removed from the list.
   - Stickers only for correct words (unchanged).
   - A Django test runs the round-picking helper through `node`.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/59
 
 ### B-209 Level-up nudge
 - why: kids move up when ready, never forced.
 - acceptance:
   - After two rounds in a row with 3 stars on the same level (not stored across page loads), on the round-end screen the robot (or, if the robot is not on that screen, a pulsing glow) points at a "next level" icon button (the next level's bulbs). Tapping it sets the level and starts a new round of the same theme. On hard there is no nudge.
   - Screenshots: `round-end-level-up.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/59
 
 ### B-210 Robot as a puppet
 - why: six still pictures feel stiff. A puppet of separate parts with code-drawn eyes and a voice-driven "mouth" feels alive and lets the kid connect his voice to him. Approved by the human on 2026-10-11 after several rounds on a test page.

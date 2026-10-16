@@ -1104,10 +1104,11 @@ body.dragging-active {
 
 /* Under the logo, top to bottom: the three stars on the dark backdrop,
    one cream panel (the score and the new stickers, then the five words)
-   and the themes / play again buttons at the bottom of the safe area.
-   Stars and panel are centred in the space between the logo and the
-   buttons. At 360x740 (~420px of content above 56px of buttons) nothing
-   scrolls. */
+   and the button row near the bottom of the safe area: themes and play
+   again, plus the level-up nudge right of play again when it shows
+   (B-209). Stars and panel are centred in the space between the logo
+   and the buttons. At 360x740 (~420px of content above 56px of buttons)
+   and at 360x640 nothing scrolls. */
 #screen-round-end {
     gap: 14px;
 }
@@ -1115,6 +1116,13 @@ body.dragging-active {
 #round-stars,
 #screen-round-end .actions {
     margin-top: auto;
+}
+
+/* The row sits 10px above the safe area's bottom on every round-end, so
+   the nudge's ring (8px outside its button, below) clears the bezel and
+   the buttons are in the same place with or without the nudge. */
+#screen-round-end .actions {
+    margin-bottom: 10px;
 }
 
 /* Three stars: a dark star (the unlit bulb's colours) with a lit amber
@@ -1229,6 +1237,57 @@ body.dragging-active {
 .round-words .bulb {
     width: 22px;
     height: 22px;
+}
+
+/* The level-up nudge (BACKLOG B-209): a third icon button right of play
+   again, shown by main.js after two 3-star rounds in a row on one level.
+   It is a level button (.level-btn: the picker's 14px bulbs) holding the
+   next level's bulbs, raised and lit, with an amber ring and glow
+   around it that pulse in the ready dome's rhythm but deeper, so it is
+   noticed (opacity 0.3 <-> 1, 1.2s each way, ease-in-out; steady under
+   reduced motion): the robot is not on this screen, so the glow is what
+   points at it. With three buttons the row's gap narrows to 32px
+   (72 * 3 + 32 * 2 = 280px, clear of the bezel at the sides); the row's
+   10px bottom margin (above) keeps the ring clear of it below. */
+.level-up[hidden] {
+    display: none;
+}
+
+#screen-round-end .actions:has(.level-up:not([hidden])) {
+    gap: 32px;
+}
+
+.level-up {
+    position: relative;
+}
+
+.level-up .bulb::before {
+    opacity: 1;
+}
+
+.level-up::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 18px;
+    box-shadow: 0 0 0 3px var(--amber), 0 0 26px 11px var(--glow-amber);
+    pointer-events: none;
+    animation: level-up-glow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes level-up-glow {
+    from {
+        opacity: 0.3;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .level-up::after {
+        animation: none;
+    }
 }
 
 /* --- Sticker book screen (interim, DESIGN "Other screens (interim)") --- */

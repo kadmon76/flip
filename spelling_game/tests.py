@@ -245,7 +245,10 @@ class SlotLayoutTests(TestCase):
 class BlockLayoutTests(TestCase):
     """static/js/layout.js blockLayout(): 52px letter blocks in loose
     staggered rows of at most four, each tilted at most 4 degrees, inside
-    the bench width (DESIGN.md "Layout", BACKLOG B-113)."""
+    the bench width (DESIGN.md "Layout", BACKLOG B-113). Hard adds two
+    extra letters (BACKLOG B-207): up to 12 blocks, still three rows at
+    360 wide, the first row taking a fifth block when the rows beside the
+    robot are full."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
     BENCH = 332
@@ -282,6 +285,10 @@ class BlockLayoutTests(TestCase):
         self.assertEqual(self.rows(self.layout(6)), [4, 2])       # as in the v5 reference
         self.assertEqual(self.rows(self.layout(7)), [4, 3])
         self.assertEqual(self.rows(self.layout(10)), [4, 4, 2])
+        # hard, 9 and 10 letters plus two extras (B-207): three rows, the
+        # third holds three beside the robot, the first takes the twelfth
+        self.assertEqual(self.rows(self.layout(11)), [4, 4, 3])
+        self.assertEqual(self.rows(self.layout(12)), [5, 4, 3])
 
     def test_tilt_is_at_most_four_degrees_and_not_all_equal(self):
         spots = self.layout(10)['spots']
@@ -289,7 +296,7 @@ class BlockLayoutTests(TestCase):
         self.assertGreater(len({s['rot'] for s in spots}), 1)
 
     def test_blocks_stay_on_the_bench_and_do_not_overlap(self):
-        for n in range(1, 11):
+        for n in range(1, 13):   # up to 10 letters plus hard's two extras
             l = self.layout(n)
             size = l['size']
             for s in l['spots']:
@@ -311,19 +318,53 @@ class BlockLayoutTests(TestCase):
     def test_same_input_same_spots(self):
         self.assertEqual(self.layout(6), self.layout(6))
 
+    def test_a_long_first_row_keeps_the_other_rows_spots(self):
+        # 12 blocks (B-207): the first row holds five, centred and not
+        # shifted, with narrower gaps inside the bench; the second row is
+        # the second row of 10 and 11 blocks (the robot's cap clearance
+        # is unchanged), the third that of 11
+        twelve, eleven, ten = self.layout(12)['spots'], self.layout(11)['spots'], self.layout(10)['spots']
+        self.assertEqual(twelve[5:9], ten[4:8])
+        self.assertEqual(twelve[9:], eleven[8:])
+        first = twelve[:5]
+        self.assertTrue(all(s['y'] < 52 / 2 for s in first), first)          # all on the first row
+        self.assertLessEqual(abs((first[0]['x'] + first[-1]['x'] + 52) / 2 - self.BENCH / 2), 4)   # centred
+        self.assertTrue(all(b['x'] - a['x'] >= 52 + 6 for a, b in zip(first, first[1:])), first)
+
+    def test_wider_benches(self):
+        # a 480px column: three rows of four beside the robot too; 412px:
+        # five on the first row
+        self.assertEqual(self.rows(self.layout(12, 452)), [4, 4, 4])
+        self.assertEqual(self.rows(self.layout(12, 384)), [5, 4, 3])
+        for width in (384, 452):
+            spots = self.layout(12, width)['spots']
+            for s in spots:
+                self.assertGreaterEqual(s['x'], 2)
+                self.assertLessEqual(s['x'] + 52, width - 2)
+
     def test_height_fits_ten_letters_above_the_console(self):
         # 360x740: rail top 347 + two slot rows (114) + 4px gap + bench
         # + 4px gap + the console (324px wide, 972x175) + 22px safe area
-        # must fit in 740 (BACKLOG B-114, DESIGN "Layout").
+        # must fit in 740 (BACKLOG B-114, DESIGN "Layout"); also with hard's
+        # two extra letters (B-207): 12 blocks keep the three rows
         console = 324 * 175 / 972
-        self.assertLessEqual(347 + 114 + 4 + self.layout(10)['height'] + 4 + console + 22, 740)
+        for n in (10, 12):
+            self.assertLessEqual(347 + 114 + 4 + self.layout(n)['height'] + 4 + console + 22, 740, n)
+        self.assertEqual(self.layout(12)['height'], self.layout(10)['height'])
 
     def test_third_row_sits_right_of_the_robot(self):
         # Rows from the third on are centred right of 40% of the bench
         # (the robot's head and shoulders end at about 36%).
-        for n in (9, 10):
+        for n in (9, 10, 11):
             spots = self.layout(n)['spots'][8:]
             self.assertTrue(all(s['x'] >= 0.4 * self.BENCH for s in spots), (n, spots))
+        self.assertTrue(all(s['x'] >= 0.4 * self.BENCH for s in self.layout(12)['spots'][9:]))
+        # three blocks beside him (B-207) start right of his widest pose's
+        # reach (44%), and keep at least 10px between them
+        for n in (11, 12):
+            third = self.layout(n)['spots'][-3:]
+            self.assertTrue(all(s['x'] >= 0.44 * self.BENCH - 2 for s in third), (n, third))
+            self.assertTrue(all(b['x'] - a['x'] >= 52 + 6 for a, b in zip(third, third[1:])), (n, third))
         # rows one and two keep the stagger
         first, second = self.layout(10)['spots'][:4], self.layout(10)['spots'][4:8]
         self.assertGreaterEqual(abs(sum(s['x'] for s in first) - sum(s['x'] for s in second)) / 4, 8)
@@ -805,19 +846,23 @@ class TenLetterFitTests(TestCase):
         return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
     def test_words_up_to_ten_letters_clear_the_console_dome_and_robot(self):
+        # also on hard, where the bench has two extra letters (B-207): a
+        # word of n letters has n + 2 blocks
         zones, console_top = self.keep_out()
         rail_top = 0.445 * self.W * 2739 / 1264
         for n in range(1, 11):
-            slots, blocks = self.layouts(n)
-            rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
-            bench_top = rail_top + rail_h + self.GAP
-            # the column fits the screen: the console is not pushed down
-            self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, n)
-            for s in blocks['spots']:
-                x, y = self.SIDE + s['x'], bench_top + s['y']
-                box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
-                for name, zone in zones.items():
-                    self.assertFalse(self.overlap(box, zone), (n, name, box, zone))
+            for extras in (0, 2):
+                slots, _ = self.layouts(n)
+                _, blocks = self.layouts(n + extras)
+                rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
+                bench_top = rail_top + rail_h + self.GAP
+                # the column fits the screen: the console is not pushed down
+                self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, (n, extras))
+                for s in blocks['spots']:
+                    x, y = self.SIDE + s['x'], bench_top + s['y']
+                    box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
+                    for name, zone in zones.items():
+                        self.assertFalse(self.overlap(box, zone), (n, extras, name, box, zone))
 
     # Decodes an 8-bit RGBA, non-interlaced PNG with node's zlib and
     # returns its alpha channel (the two scene images are that format).
@@ -1908,6 +1953,9 @@ class RobotLayoutTests(TestCase):
         # - at the top of a pop (20px up) he is clear of every block of a
         #   1-6 letter word and of the rail of any word; 7-10 letter words
         #   do reach him, which is why he is drawn under the blocks.
+        # Also on hard (B-207), where a word of n letters has n + 2 blocks
+        # (keys 'h1'-'h10'): clear at rest, and at the top of a pop only
+        # the second row of a 7-10 letter word passes over him.
         if shutil.which('node') is None:
             self.skipTest('node not installed')
         poses = self.geometry()
@@ -1922,16 +1970,19 @@ class RobotLayoutTests(TestCase):
             const s = 120 / 330, out = {{}};
             const words = [];
             for (let n = 1; n <= 10; n++) {{
-                const sl = slotLayout(n, BENCH), bl = blockLayout(n, BENCH);
-                const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap;
-                const benchTop = railBottom + GAP;
-                words.push({{ n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
-                    SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT]) }});
+                for (const extras of [0, 2]) {{
+                    const sl = slotLayout(n, BENCH), bl = blockLayout(n + extras, BENCH);
+                    const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap;
+                    const benchTop = railBottom + GAP;
+                    const row = (p) => Math.round(p.y / (bl.size + 10));
+                    words.push({{ n: extras ? 'h' + n : n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
+                        SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT, row(p)]) }});
+                }}
             }}
             for (const [pose, [sw, vx]] of Object.entries(poses)) {{
                 const img = alphaOf(UI + '/robot-' + pose + '.png');
                 const x0 = L + 72.6 - vx * s;
-                const r = {{ minX: Infinity, maxX: -Infinity, lowest: -Infinity, rest: {{}}, pop: {{}}, rail: 0 }};
+                const r = {{ minX: Infinity, maxX: -Infinity, lowest: -Infinity, rest: {{}}, pop: {{}}, popRows: {{}}, rail: 0 }};
                 for (let sy = 0; sy < img.h; sy++) {{
                     for (let sx = 0; sx < img.w; sx++) {{
                         if (img.at(sx, sy) < 128) continue;
@@ -1941,7 +1992,9 @@ class RobotLayoutTests(TestCase):
                         for (const [at, y] of [['rest', yRest], ['pop', yRest - 20]]) {{
                             for (const w of words) {{
                                 if (y < w.railBottom) r.rail++;
-                                if (w.blocks.some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d)) r[at][w.n] = (r[at][w.n] || 0) + 1;
+                                const hit = w.blocks.filter(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
+                                if (hit.length) r[at][w.n] = (r[at][w.n] || 0) + 1;
+                                if (at === 'pop') for (const blk of hit) r.popRows[blk[4]] = true;
                             }}
                         }}
                     }}
@@ -1962,9 +2015,13 @@ class RobotLayoutTests(TestCase):
             self.assertEqual(r['rest'], {}, pose)                             # at rest, clear of all blocks
             for n in range(1, 7):
                 self.assertNotIn(str(n), r['pop'], (pose, n))                # room for the pop-up
+                self.assertNotIn(f'h{n}', r['pop'], (pose, n))               # also with hard's extras
+            self.assertEqual(list(r['popRows']), ['1'], pose)                 # only the second row
         # the reason for the z-order: the second row of a 7-10 letter word
         # is in the way of the pop-up
-        self.assertEqual(sorted(json.loads(result.stdout)['idle']['pop'], key=int), ['7', '8', '9', '10'])
+        pops = json.loads(result.stdout)['idle']['pop']
+        self.assertEqual(sorted((k for k in pops if not k.startswith('h')), key=int), ['7', '8', '9', '10'])
+        self.assertEqual(sorted((k for k in pops if k.startswith('h')), key=lambda k: int(k[1:])), ['h7', 'h8', 'h9', 'h10'])
 
 
 class PlayBackTests(TestCase):
@@ -2224,7 +2281,7 @@ class LevelTests(TestCase):
 
     def test_wiring(self):
         main = (self.ROOT / 'static' / 'js' / 'main.js').read_text()
-        self.assertIn("import { LEVELS, loadLevel, saveLevel } from './level.js';", main)
+        self.assertIn("import { LEVELS, loadLevel, saveLevel, streakAfter, levelUpFor } from './level.js';", main)
         self.assertIn('setState({ level: loadLevel() });', main)
         self.assertIn('subscribe(renderLevel);', main)
         self.assertIn("for (const level of LEVELS) $(`level-${level}`).addEventListener('click', () => onLevel(level));", main)
@@ -2458,8 +2515,11 @@ class EasyStartTests(TestCase):
         for level in ('normal', 'hard'):
             cur = self.run_node(f"out(R.makeWord({{ word: 'tiger', image: '/i.svg' }}, '{level}', newId));")
             self.assertEqual(cur['placed'], [None] * 5)
-            self.assertEqual(sorted(t['letter'] for t in cur['tray']), sorted('tiger'))
-            for t in cur['tray']:
+            # hard also has its two extra letters on the bench (B-207)
+            word_tiles = [t for t in cur['tray'] if not t.get('extra')]
+            self.assertEqual(len(cur['tray']) - len(word_tiles), 2 if level == 'hard' else 0)
+            self.assertEqual(sorted(t['letter'] for t in word_tiles), sorted('tiger'))
+            for t in word_tiles:
                 self.assertEqual(set(t), {'id', 'letter', 'used'})
                 self.assertFalse(t['used'])
 
@@ -2550,13 +2610,15 @@ class EasyStartTests(TestCase):
 
     def test_main_builds_the_round_from_the_rounds_level(self):
         main = self.code('main.js')
-        self.assertIn("import { pickWords, makeWord } from './round.js';", main)
+        # since B-208 the pick goes through pickRound (the theme's missed
+        # words back, then pickWords by the level)
+        self.assertIn("import { pickRound, makeWord } from './round.js';", main)
         self.assertNotIn('makeCurrent', main)
         self.assertNotIn('shuffle', main)
         start = self.function('startRound')
         # `level` is the one read when the theme was tapped, which is also
         # the round's level (round.level)
-        self.assertIn('pickWords(data, ROUND_SIZE, level)', start)
+        self.assertIn('pickRound(data, ROUND_SIZE, level, missedWords(name))', start)
         self.assertIn('current: makeWord(words[0], level, newTileId),', start)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, level, results: [] },', start)
         nxt = self.function('onNext')
@@ -2564,7 +2626,8 @@ class EasyStartTests(TestCase):
         self.assertNotRegex(nxt, r'state\.level\b')
 
     def test_the_reveal_keeps_a_locked_letter_locked(self):
-        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed'))
+        # the reveal moved to drag.js with B-207 (a pure transition)
+        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed', 'drag.js'))
 
     def test_card_lays_out_only_the_bench_blocks_and_marks_locked_slots(self):
         card = self.function('renderCard', 'card.js')
@@ -3099,7 +3162,7 @@ class HintTests(TestCase):
 
     def test_the_check_that_leaves_one_bulb_gives_the_letter_on_every_level(self):
         main = self.code('main.js')
-        self.assertIn("import { returnAll, giveHint } from './drag.js';", main)
+        self.assertIn("import { returnAll, giveHint, afterHint, revealed } from './drag.js';", main)
         check = self.function('onCheck')
         self.assertIn("const checked = { ...current, status: 'wrong' };", check)
         self.assertIn('const left = lives - 1;', check)
@@ -3113,8 +3176,8 @@ class HintTests(TestCase):
         self.assertIn("const correct = answer === current.word;", check)
         self.assertLess(check.index('addSticker('), check.index('lives - 1 <= 0'))
         # the reveal keeps a right slot's object (so the hint letter stays
-        # locked and marked through it)
-        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed'))
+        # locked and marked through it); drag.js since B-207
+        self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed', 'drag.js'))
 
     def test_the_helpers_are_pure_and_the_lever_skips_the_hint(self):
         for name in ('hintFor', 'giveHint'):
@@ -3139,4 +3202,896 @@ class HintTests(TestCase):
         # drawn as a placed block, without the lit edge until it lands
         self.assertIn('1px 2px 3px var(--shadow-deep);', rule)
         self.assertNotIn('amber', rule)
-        self.assertIn("?v=20", (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text())
+        # the CSS cache-buster was bumped for this look (later items bump it again)
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 20)
+
+
+class HardExtrasTests(TestCase):
+    """Hard: two extra letters on the bench (BACKLOG B-207). static/js/
+    round.js extraLetters (the confusion table: partners of the word's
+    letters first, else random letters, never one of the word) and makeWord
+    (two `extra` blocks on hard, none on easy and normal); drag.js: an
+    extra moves like any block and is wrong in any slot, the lever sends it
+    back, the second-miss hint and the reveal never use one, and afterHint
+    reopens a word the robot's letter finished; character.js's moments
+    with extras; feedback.js hops an extra out of its slot on the reveal.
+    All run through node; the wiring in main.js is checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    PRELUDE = """
+        const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const out = (v) => console.log(JSON.stringify(v));
+        let seq = 0;
+        const newId = () => `t${++seq}`;
+    """
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            f"const H = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"{self.PRELUDE}"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def words(self):
+        return [w for theme in ('animals', 'transportation')
+                for w in json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())]
+
+    def extras(self, word, seeds=40, count=2):
+        return self.run_node(
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.extraLetters({json.dumps(word)}, {count}, seeded(i + 1))));")
+
+    # --- the letters ---
+
+    def test_two_different_letters_never_in_the_word(self):
+        words = self.words()
+        picks = self.run_node(
+            f"const words = {json.dumps(words)};"
+            "out(words.map((w) => Array.from({ length: 30 }, (_, i) => R.extraLetters(w, 2, seeded(i + 1)))));")
+        for word, runs in zip(words, picks):
+            for letters in runs:
+                self.assertEqual(len(letters), 2, word)
+                self.assertEqual(len(set(letters)), 2, (word, letters))
+                for ch in letters:
+                    self.assertRegex(ch, r'^[a-z]$')
+                    self.assertNotIn(ch, word, (word, letters))
+
+    def test_the_table_has_the_backlogs_pairs(self):
+        pairs = {frozenset(p) for p in self.run_node("out(R.CONFUSIONS);")}
+        for a, b in ('bd', 'pq', 'ck', 'sz', 'mn', 'ie', 'ae', 'uo'):
+            self.assertIn(frozenset((a, b)), pairs, a + b)
+
+    def test_partners_of_the_words_letters_come_first(self):
+        # duck: d -> b, u -> o, c -> s (c -> k and k -> c are in the word):
+        # both extras are always partners, and each of the three comes up
+        runs = self.extras('duck')
+        for letters in runs:
+            self.assertLessEqual(set(letters), {'b', 'o', 's'})
+        self.assertEqual(set().union(*map(set, runs)), {'b', 'o', 's'})
+        # helicopter: e -> a, i -> y, c -> k / s, o -> u, p -> q
+        for letters in self.extras('helicopter'):
+            self.assertLessEqual(set(letters), {'a', 'y', 'k', 's', 'u', 'q'})
+        # fly has one partner (y -> i): i, then a random letter not in it
+        runs = self.extras('fly')
+        for letters in runs:
+            self.assertIn('i', letters)
+        self.assertGreater(len({ch for letters in runs for ch in letters}), 5)
+        # no partner at all: two random letters, not in the word
+        runs = self.extras('fht')
+        for letters in runs:
+            self.assertFalse(set(letters) & set('fht'))
+        self.assertGreater(len({ch for letters in runs for ch in letters}), 10)
+
+    def test_no_extras_and_no_randomness_when_the_level_has_none(self):
+        self.assertEqual(
+            self.run_node("const never = () => { throw new Error('rand'); };"
+                          "out([R.extraLetters('duck', 0, never), R.extraLetters('duck', undefined, never)]);"),
+            [[], []])
+
+    def test_hard_puts_two_extra_blocks_on_the_bench(self):
+        words = self.words()
+        made = self.run_node(
+            f"const words = {json.dumps(words)};"
+            "out(words.map((w, i) => R.makeWord({ word: w, image: '/i.svg' }, 'hard', newId, seeded(i + 1))));")
+        positions = set()
+        for word, cur in zip(words, made):
+            self.assertEqual(cur['placed'], [None] * len(word))
+            self.assertEqual(cur['status'], 'playing')
+            extra = [t for t in cur['tray'] if t.get('extra')]
+            plain = [t for t in cur['tray'] if not t.get('extra')]
+            self.assertEqual(len(extra), 2, word)
+            self.assertEqual(sorted(t['letter'] for t in plain), sorted(word))
+            self.assertFalse({t['letter'] for t in extra} & set(word), word)
+            self.assertFalse(any(t['used'] or t.get('given') for t in cur['tray']), word)
+            self.assertEqual(len({t['id'] for t in cur['tray']}), len(word) + 2)
+            positions.update(i for i, t in enumerate(cur['tray']) if t.get('extra'))
+        # shuffled in with the others, not always at the end
+        self.assertGreater(len(positions), 4)
+
+    def test_easy_and_normal_have_none_and_start_as_before(self):
+        res = self.run_node(
+            "out(['easy', 'normal', null].map((lv) => Array.from({ length: 10 }, (_, i) => {"
+            "  const cur = R.makeWord({ word: 'helicopter' }, lv, newId, seeded(i + 1));"
+            "  return [cur.tray.length, cur.tray.some((t) => 'extra' in t),"
+            "          cur.tray.map((t) => t.letter).join('') === R.shuffle('helicopter'.split(''), seeded(i + 1)).join('')];"
+            "})));")
+        for runs in res:
+            for length, has_extra, same_order in runs:
+                self.assertEqual((length, has_extra, same_order), (10, False, True))
+
+    # --- an extra on the play screen: moves like any block, wrong in a slot ---
+
+    # duck on hard: blocks named by their letter, the extras xb and xo
+    @staticmethod
+    def duck(letters, status='playing', hint_at=None):
+        """`letters` in the slots (' ' empty; B and O are the extras)."""
+        ids = {'d': 'd', 'u': 'u', 'c': 'c', 'k': 'k', 'B': 'xb', 'O': 'xo'}
+        tray = [{'id': i, 'letter': i[-1], 'used': i in [ids[ch] for ch in letters if ch != ' ']}
+                for i in ('xo', 'k', 'd', 'xb', 'u', 'c')]
+        for t in tray:
+            if t['id'].startswith('x'):
+                t['extra'] = True
+        placed = []
+        for n, ch in enumerate(letters):
+            if ch == ' ':
+                placed.append(None)
+                continue
+            slot = {'letter': ids[ch][-1], 'tileId': ids[ch]}
+            if n == hint_at:
+                slot.update(locked=True, hint=True)
+            placed.append(slot)
+        return {'word': 'duck', 'image': '/i.svg', 'audio': '/a.mp3', 'status': status, 'tray': tray, 'placed': placed}
+
+    def test_an_extra_moves_like_any_block_and_the_check_ignores_the_bench(self):
+        res = self.run_node(
+            f"const empty = {json.dumps(self.duck('    '))};"
+            f"const spelled = {json.dumps(self.duck('duck'))};"
+            f"const withExtra = {json.dumps(self.duck('duBk'))};"
+            "const a = D.placeIn(empty, 'xb', 0); const b = D.placeIn(a, 'xb', 2); const c = D.takeOut(b, 'xb');"
+            "const swap = D.placeIn(withExtra, 'c', 2);"
+            "out([a.placed[0], b.placed, c.placed, c.tray.find((t) => t.id === 'xb'),"
+            " swap.placed[2], swap.tray.find((t) => t.id === 'xb').used,"
+            " C.domeAction(spelled), C.domeAction(withExtra), C.canReset(withExtra)]);")
+        self.assertEqual(res, [
+            {'letter': 'b', 'tileId': 'xb'},
+            [None, None, {'letter': 'b', 'tileId': 'xb'}, None],
+            [None, None, None, None],
+            {'id': 'xb', 'letter': 'b', 'used': False, 'extra': True},
+            {'letter': 'c', 'tileId': 'c'}, False,
+            # every slot right with both extras on the bench: ready to check;
+            # with an extra in a slot it can be checked too (and is wrong)
+            'check', 'check', True,
+        ])
+        # the check is the slots' letters against the word: the bench (and
+        # the extras on it) is not looked at, and an extra in a slot is a
+        # letter that is not the word's
+        check = self.function('onCheck')
+        self.assertIn("const answer = current.placed.map((p) => p.letter).join('');", check)
+        self.assertIn('const correct = answer === current.word;', check)
+        self.assertNotIn('tray', check)
+
+    def test_the_lever_sends_an_extra_back(self):
+        res = self.run_node(
+            f"const cur = {json.dumps(self.duck('dOBk', 'wrong'))};"
+            "const after = D.returnAll(cur, 'hard');"
+            "out([D.leverResult('hard', cur), after.placed, after.tray.filter((t) => t.used).length, after.status]);")
+        self.assertEqual(res, [{'back': ['d', 'xo', 'xb', 'k'], 'lock': []}, [None] * 4, 0, 'playing'])
+
+    # --- the second-miss hint never uses one ---
+
+    def test_the_hint_never_gives_an_extra(self):
+        res = self.run_node(
+            f"const a = {json.dumps(self.duck('dBck', 'wrong'))};"
+            f"const b = {json.dumps(self.duck('dukc', 'wrong'))};"
+            # a made-up bench where an extra block has the letter needed: it
+            # is still not taken (the d comes from the wrong slot it is in)
+            f"const c = {json.dumps(self.duck('kduc', 'wrong'))};"
+            "c.tray.find((t) => t.id === 'xo').letter = 'd';"
+            "const ga = D.giveHint(a);"
+            "out([D.hintFor(a), ga.placed[1], ga.tray.find((t) => t.id === 'xb').used, D.hintFor(b), D.hintFor(c)]);")
+        self.assertEqual(res, [
+            # its slot's extra goes back, its right letter comes from the bench
+            {'index': 1, 'tileId': 'u', 'back': 'xb'},
+            {'letter': 'u', 'tileId': 'u', 'locked': True, 'hint': True},
+            False,
+            {'index': 2, 'tileId': 'c', 'back': 'k'},
+            {'index': 0, 'tileId': 'd', 'back': 'k'},
+        ])
+
+    def test_a_hint_that_finishes_the_word_reopens_it(self):
+        # "duBk" checked wrong with one bulb left: the hint puts the c from
+        # the bench in slot 3 and sends the b back; every slot is right, an
+        # arrangement nobody checked, so the word reopens and the dome lights
+        res = self.run_node(
+            f"const done = D.giveHint({json.dumps(self.duck('duBk', 'wrong'))});"
+            f"const two = D.giveHint({json.dumps(self.duck('dOBk', 'wrong'))});"
+            f"const normal = D.giveHint({json.dumps(self.duck('dkcu', 'wrong'))});"
+            "const open = D.afterHint(done);"
+            f"const others = ['playing', 'correct', 'revealed'].map((s) => {{ const c = {{ ...{json.dumps(self.duck('duck'))}, status: s }}; return D.afterHint(c) === c; }});"
+            "out([done.status, C.domeAction(done), open.status, C.domeAction(open), C.domeState(open, null),"
+            " open.placed.map((p) => p.letter).join(''), open.placed[2],"
+            " D.afterHint(two) === two, C.domeAction(two), D.afterHint(normal) === normal, others]);")
+        self.assertEqual(res, [
+            'wrong', None, 'playing', 'check', 'ready', 'duck', {'letter': 'c', 'tileId': 'c', 'locked': True, 'hint': True},
+            # another wrong letter left (the o), or a slot left empty: the
+            # check's 'wrong' stays until a block moves, as before
+            True, None, True,
+            [True, True, True],
+        ])
+
+    def test_main_reopens_after_the_miss_in_a_setstate_of_its_own(self):
+        check = self.function('onCheck')
+        miss = check.index("current: left === 1 ? giveHint(checked) : checked")
+        after = check.index('const reopened = afterHint(state.current);')
+        self.assertLess(miss, after)
+        self.assertIn('if (reopened !== state.current) setState({ current: reopened });', check)
+        self.assertNotIn('level', check)
+        for name in ('afterHint', 'revealed'):
+            body = self.function(name, 'drag.js')
+            for word in ('document', 'window', 'state.', 'setState', 'gsap', 'levelRules'):
+                self.assertNotIn(word, body, (name, word))
+        self.assertNotIn('function revealed', self.code('main.js'))
+
+    def test_the_robot_hears_the_miss_then_nothing_more(self):
+        # the miss's setState (status 'wrong', his letter in) is his
+        # confused peek, his happy pop and the error clip; the reopen right
+        # after it is no moment and no sound
+        res = self.run_node(
+            f"const before = {json.dumps(self.duck('duBk'))};"
+            "const hinted = D.giveHint({ ...before, status: 'wrong' });"
+            "const st = (lives, current) => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives,"
+            " round: { index: 0, size: 5, results: [] }, current });"
+            "const a = H.snapshot(st(2, before)), b = H.snapshot(st(1, hinted)), c = H.snapshot(st(1, D.afterHint(hinted)));"
+            "out([H.momentsFor(a, b), H.soundsFor(H.momentsFor(a, b)), H.momentsFor(b, c)]);")
+        self.assertEqual(res, [['wrongPeek', 'hintGiven'], ['error'], []])
+
+    def test_the_robot_sees_an_extra_as_a_block(self):
+        res = self.run_node(
+            "const st = (letters, status = 'playing') => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives: 3,"
+            " round: { index: 0, size: 5, results: [] }, current: CUR(letters, status) });"
+            f"const CUR = (l, s) => ({{ ...{json.dumps(self.duck('    '))}, status: s, placed: l.split('').map((ch) => ch === ' ' ? null"
+            " : { letter: ch.toLowerCase(), tileId: { B: 'xb', O: 'xo' }[ch] || ch }) });"
+            "const m = (a, b) => H.momentsFor(H.snapshot(st(a)), H.snapshot(st(b)));"
+            "out([m('d   ', 'dB  '), m('duc ', 'ducO'), m('duBk', 'du k'), m('dOBk', '    ')]);")
+        self.assertEqual(res, [['blockPlaced'], ['filled'], ['blockReturned'], ['blockReturned']])
+
+    # --- the reveal never uses one ---
+
+    def test_the_reveal_never_uses_an_extra(self):
+        res = self.run_node(
+            f"const cur = {json.dumps(self.duck('BuOc', 'playing', hint_at=1))};"
+            "const r = D.revealed(cur);"
+            "const easy = D.revealed({ word: 'cat', status: 'playing', placed: [{ letter: 'c', tileId: 'c', locked: true }, { letter: 't', tileId: 't' }, null],"
+            " tray: [{ id: 't', letter: 't', used: true }, { id: 'a', letter: 'a', used: false }, { id: 'c', letter: 'c', used: true, given: true }] });"
+            "out([r.status, r.placed, r.tray.map((t) => [t.id, t.used]), easy.placed.map((p) => p.tileId), easy.tray.every((t) => t.used)]);")
+        status, placed, used, easy_ids, easy_used = res
+        self.assertEqual(status, 'revealed')
+        self.assertEqual(placed, [{'letter': 'd', 'tileId': 'd'}, {'letter': 'u', 'tileId': 'u', 'locked': True, 'hint': True},
+                                  {'letter': 'c', 'tileId': 'c'}, {'letter': 'k', 'tileId': 'k'}])
+        # the extras go back to the bench, every word block is in a slot
+        self.assertEqual(dict(used), {'xo': False, 'k': True, 'd': True, 'xb': False, 'u': True, 'c': True})
+        # easy and normal as before: every block in a slot, a locked one kept
+        self.assertEqual((easy_ids, easy_used), (['c', 'a', 't'], True))
+
+    def test_on_the_reveal_an_extra_hops_back_as_the_right_letters_fly_in(self):
+        # feedback.js with stand-ins for the DOM and GSAP: "duck" checked a
+        # third time as "Bdck" (the extra b in slot 1, the d in slot 2, the
+        # u on the bench): the d flies from slot 2 into slot 1, the u from
+        # its bench spot into slot 2 (review fix round 1: it used to jump
+        # there unseen), in slot order 120ms apart, and the b hops back
+        res = self.run_node(
+            "const log = [];"
+            "const r = (v) => Math.round(v * 1e4) / 1e4;"
+            "globalThis.gsap = { set(el, v) { log.push(['set', el.id || el.map((e) => e.id), v]); },"
+            " to() {}, fromTo(el, a, b) { log.push(['fromTo', el.id, Object.fromEntries(Object.entries(a).map(([k, v]) => [k, r(v)])),"
+            "  b.delay, b.ease, b.scale === undefined ? null : b.scale]); },"
+            " timeline() { const t = { fromTo(el) { log.push(['hop', el.id]); return t; }, to() { return t; } }; return t; },"
+            " killTweensOf() {}, getProperty() { return 0; }, delayedCall() {} };"
+            "globalThis.window = { matchMedia: () => ({ matches: false }) };"
+            "const el = (id, x, y, w) => ({ id, parentNode: null, offsetWidth: w,"
+            " getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) });"
+            # four 46px slots 52px apart at y 100; six 52px bench spots 60px apart at y 200
+            "const boxes = [0, 1, 2, 3].map((i) => el('box' + i, 20 + i * 52, 100, 46));"
+            "const spots = [0, 1, 2, 3, 4, 5].map((i) => el('spot' + i, 20 + i * 60, 200, 52));"
+            # where the render put them: d in slot 1, u in slot 2, c and k
+            # where they were, the extras on their bench spots (tray order
+            # xo k d xb u c)
+            "const tiles = { d: el('d', 20, 100, 46), u: el('u', 72, 100, 46), c: el('c', 124, 100, 46), k: el('k', 176, 100, 46),"
+            " xb: el('xb', 200, 200, 52), xo: el('xo', 20, 200, 52) };"
+            "globalThis.document = { getElementById: (n) => (n === 'letter-boxes' ? { children: boxes } : { children: spots }),"
+            " querySelector: (sel) => tiles[/data-tile-id=\"([^\"]+)\"/.exec(sel)?.[1]] || null, querySelectorAll: () => [] };"
+            f"const F = await import('{(self.JS / 'feedback.js').as_uri()}');"
+            f"const before = {json.dumps(self.duck('Bdck'))};"
+            "const after = D.revealed(before);"
+            "const st = (lives, current) => ({ screen: 'play', lives, pressed: null, round: { index: 0 }, current });"
+            "F.renderFeedback(st(1, before));"
+            "tiles.xb.parentNode = spots[3]; tiles.xo.parentNode = spots[0];"
+            "after.placed.forEach((p, i) => { tiles[p.tileId].parentNode = boxes[i]; });"
+            "F.renderFeedback(st(0, after));"
+            "out(log.filter((e) => e[0] === 'fromTo' || e[0] === 'hop'));")
+        fly = [e for e in res if e[0] == 'fromTo']
+        # d: from slot 2 (52px right), the size it has; u: from bench spot 5
+        # (centre 286,226; its slot's 95,123) at the bench's size (52/46)
+        self.assertEqual(fly, [
+            ['fromTo', 'd', {'x': 52, 'y': 0, 'rotation': 0}, 0, 'back.out(1.4)', None],
+            ['fromTo', 'u', {'x': 191, 'y': 103, 'rotation': 0, 'scale': round(52 / 46, 4)}, 0.12, 'back.out(1.4)', 1],
+        ])
+        # the b hops back to the bench (its hop's x and y parts); c and k
+        # stay, the o on the bench too
+        self.assertEqual({e[1] for e in res if e[0] == 'hop'}, {'xb'})
+
+
+class MissedWordsTests(TestCase):
+    """Missed words come back (BACKLOG B-208). static/js/missed.js keeps
+    the words a round missed per theme in localStorage `flip.missed.v1`
+    (shape { "<theme>": ["horse", ...] }, the oldest miss first; read and
+    written only there), and round.js pickRound brings up to two of them
+    back in the theme's next round, in random places; run through node
+    with a fake localStorage and a seeded Math.random. The wiring in
+    main.js (the pick at startRound, the record at the round end only) is
+    checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # In-memory localStorage (SEED: the key's initial value or null),
+    # counting writes; a seeded Math.random stand-in.
+    PRELUDE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.missed.v1', SEED);
+        let writes = 0;
+        globalThis.localStorage = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { writes++; store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const raw = () => store.get('flip.missed.v1') ?? null;
+        const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const out = (v) => console.log(JSON.stringify(v));
+    """
+
+    def run_node(self, body, seed=None):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const SEED = {json.dumps(seed)};"
+            f"{self.PRELUDE}"
+            f"const M = await import('{(self.JS / 'missed.js').as_uri()}');"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def rounds(self, data, level, missed, seeds=60):
+        return self.run_node(
+            f"const data = {json.dumps(data)}; const missed = {json.dumps(missed)};"
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickRound(data, 5, {json.dumps(level)}, missed, seeded(i + 1))));")
+
+    # --- missed.js: the list per theme ---
+
+    def test_missing_key_is_no_missed_words(self):
+        self.assertEqual(self.run_node("out([M.load(), M.wordsFor('animals'), raw(), writes]);"), [{}, [], None, 0])
+
+    def test_a_round_end_remembers_the_missed_words_in_the_documented_shape(self):
+        # the revealed words (correct: false) are remembered in round
+        # order; the words checked correct are not
+        results = [
+            {'word': 'duck', 'correct': True, 'newSticker': True}, {'word': 'horse', 'correct': False},
+            {'word': 'wolf', 'correct': True, 'newSticker': False}, {'word': 'tiger', 'correct': False},
+            {'word': 'bear', 'correct': True, 'newSticker': True},
+        ]
+        back, lists, stored, mine = self.run_node(
+            f"const back = M.record('animals', {json.dumps(results)});"
+            "out([back, M.load(), JSON.parse(raw()), M.wordsFor('animals')]);")
+        self.assertEqual(back, ['horse', 'tiger'])
+        self.assertEqual(lists, {'animals': ['horse', 'tiger']})
+        self.assertEqual(stored, {'animals': ['horse', 'tiger']})
+        self.assertEqual(mine, ['horse', 'tiger'])
+
+    def test_a_word_left_without_a_correct_check_counts_as_missed(self):
+        # "skipped": today the only way past a word is a correct check or
+        # the reveal; onNext records a word without a result as
+        # { word, correct: false }, and anything not correct is missed
+        self.assertEqual(
+            self.run_node("out(M.record('animals', [{ word: 'deer', correct: false }, { word: 'lion' }, null, { correct: false }, { word: '' }]));"),
+            ['deer', 'lion'])
+
+    def test_a_correct_word_comes_out_and_a_new_miss_goes_to_the_end(self):
+        lists, writes = self.run_node(
+            "M.record('animals', [{ word: 'horse', correct: true }, { word: 'lion', correct: false },"
+            " { word: 'cat', correct: false }, { word: 'dog', correct: true }, { word: 'mouse', correct: true }]);"
+            "out([M.load(), writes]);",
+            seed='{"animals": ["horse", "tiger", "lion"], "transportation": ["bus"]}')
+        # horse spelled: out; lion missed again: now the newest; cat new;
+        # tiger not played: keeps its place; the other theme untouched
+        self.assertEqual(lists, {'animals': ['tiger', 'lion', 'cat'], 'transportation': ['bus']})
+        self.assertEqual(writes, 1)
+
+    def test_the_last_word_out_drops_the_theme_and_no_change_writes_nothing(self):
+        lists, stored = self.run_node(
+            "M.record('animals', [{ word: 'horse', correct: true }]); out([M.load(), JSON.parse(raw())]);",
+            seed='{"animals": ["horse"], "transportation": ["bus"]}')
+        self.assertEqual(lists, {'transportation': ['bus']})
+        self.assertEqual(stored, {'transportation': ['bus']})
+        # a round all correct with none of them in the list: nothing to write
+        self.assertEqual(
+            self.run_node(
+                "const r = M.record('transportation', [{ word: 'car', correct: true }, { word: 'taxi', correct: true }]);"
+                "out([r, writes, raw()]);", seed='{"transportation": ["bus"]}'),
+            [['bus'], 0, '{"transportation": ["bus"]}'])
+        # nor for no theme
+        self.assertEqual(self.run_node("out([M.record('', [{ word: 'cat', correct: false }]), M.record(null, []), writes]);"), [[], [], 0])
+
+    def test_corrupt_json_is_no_missed_words_and_a_round_end_recovers(self):
+        for seed in ('{not json', '"a string"', '[1, 2]', 'null', '42'):
+            self.assertEqual(
+                self.run_node("out([M.load(), M.wordsFor('animals'), M.record('animals', [{ word: 'cat', correct: false }]), M.load()]);", seed=seed),
+                [{}, [], ['cat'], {'animals': ['cat']}], seed)
+
+    def test_bad_entries_inside_the_lists_are_dropped(self):
+        self.assertEqual(
+            self.run_node("out(M.load());", seed='{"animals": ["deer", "deer", 3, null, "", "lion"], "transportation": "bus", "x": null, "y": []}'),
+            {'animals': ['deer', 'lion']})
+
+    def test_no_or_blocked_localstorage_is_no_missed_words(self):
+        self.assertEqual(
+            self.run_node(
+                "delete globalThis.localStorage;"
+                "const a = [M.load(), M.wordsFor('animals'), M.record('animals', [{ word: 'cat', correct: false }]), M.wordsFor('animals')];"
+                "Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked'); } });"
+                "out([...a, M.load(), M.record('animals', [{ word: 'cat', correct: false }])]);"),
+            [{}, [], ['cat'], [], {}, ['cat']])
+
+    def test_after_round_is_pure(self):
+        words, results, after = self.run_node(
+            "const words = ['horse', 'tiger']; const results = [{ word: 'tiger', correct: false }, { word: 'horse', correct: true }];"
+            "const after = M.afterRound(words, results); out([words, results, after]);")
+        self.assertEqual(words, ['horse', 'tiger'])
+        self.assertEqual(results, [{'word': 'tiger', 'correct': False}, {'word': 'horse', 'correct': True}])
+        self.assertEqual(after, ['tiger'])
+        self.assertEqual(self.run_node("out([M.afterRound(undefined, [{ word: 'cat' }]), M.afterRound(['cat'], undefined)]);"),
+                         [['cat'], ['cat']])
+
+    # --- round.js pickRound: the round-picking helper ---
+
+    def test_with_no_missed_word_the_pick_is_as_before(self):
+        # nothing remembered, or only words the theme no longer has: the
+        # level's pick (pickWords) with the same random numbers
+        data = self.content('animals')
+        for level in ('easy', 'normal', 'hard'):
+            for missed in ([], None, ['unicorn', 'dragon']):
+                same = self.run_node(
+                    f"const data = {json.dumps(data)};"
+                    "out(Array.from({ length: 20 }, (_, i) => JSON.stringify(R.pickRound(data, 5, "
+                    f"{json.dumps(level)}, {json.dumps(missed) if missed is not None else 'undefined'}, seeded(i + 1))) ==="
+                    f" JSON.stringify(R.pickWords(data, 5, {json.dumps(level)}, seeded(i + 1)))));")
+                self.assertEqual(same, [True] * 20, (level, missed))
+
+    def test_the_two_oldest_missed_words_come_back_on_every_level(self):
+        data = self.content('animals')
+        missed = ['tiger', 'rabbit', 'lion', 'wolf']
+        for level in ('easy', 'normal', 'hard'):
+            for words in self.rounds(data, level, missed):
+                self.assertEqual(len(words), 5, level)
+                self.assertEqual(len(set(words)), 5, level)
+                self.assertLessEqual(set(words), set(data), level)
+                self.assertLessEqual({'tiger', 'rabbit'}, set(words), level)
+                # up to two: the newer misses wait for a later round
+                self.assertEqual(set(words) & set(missed), {'tiger', 'rabbit'}, level)
+
+    def test_one_missed_word_comes_back_and_the_others_follow_the_level(self):
+        data = self.content('animals')
+        easy = {w for w, v in data.items() if v.get('difficulty') == 'easy'}
+        seen = set()
+        for words in self.rounds(data, 'easy', ['horse']):
+            self.assertIn('horse', words)
+            # easy fills the other four from its easy-tagged words
+            self.assertLessEqual(set(words) - {'horse'}, easy)
+            seen |= set(words)
+        self.assertEqual(seen, easy | {'horse'})
+        # transportation on easy: a long word missed on hard comes back,
+        # and the other places are three of easy's five tagged words
+        data = self.content('transportation')
+        tagged = {'boat', 'bus', 'car', 'scooter', 'taxi'}
+        for words in self.rounds(data, 'easy', ['helicopter', 'submarine']):
+            self.assertLessEqual({'helicopter', 'submarine'}, set(words))
+            self.assertEqual(len(set(words) & tagged), 3)
+        # normal and hard: the other places from the whole rest of the theme
+        for level in ('normal', 'hard'):
+            seen = {w for words in self.rounds(data, level, ['helicopter']) for w in words}
+            self.assertEqual(seen, set(data), level)
+
+    def test_missed_words_come_back_in_random_places(self):
+        data = self.content('animals')
+        for level in ('easy', 'normal'):
+            rounds = self.rounds(data, level, ['tiger', 'rabbit'])
+            for word in ('tiger', 'rabbit'):
+                self.assertEqual({words.index(word) for words in rounds}, {0, 1, 2, 3, 4}, (level, word))
+
+    def test_words_the_theme_no_longer_has_are_skipped(self):
+        data = self.content('animals')
+        for words in self.rounds(data, 'normal', ['unicorn', 'tiger', 'tiger', 'dragon', 'lion', 'bear']):
+            self.assertEqual(set(words) & {'tiger', 'lion', 'bear'}, {'tiger', 'lion'})
+
+    def test_a_theme_with_every_word_missed_still_gets_a_full_round(self):
+        data = {w: {'image': f'/{w}.svg'} for w in ('ant', 'bee', 'cow', 'pig', 'yak', 'emu')}
+        missed = ['pig', 'emu', 'ant', 'bee', 'cow', 'yak']
+        for level in ('easy', 'hard'):
+            for words in self.rounds(data, level, missed, seeds=20):
+                self.assertEqual(len(set(words)), 5, level)
+                self.assertLessEqual({'pig', 'emu'}, set(words), level)
+        # and a round shorter than the list takes only the oldest
+        self.assertEqual(sorted(self.run_node(
+            f"out(R.pickRound({json.dumps(data)}, 1, 'normal', {json.dumps(missed)}, seeded(3)));")), ['pig'])
+
+    def test_the_pick_leaves_its_inputs_alone(self):
+        data = self.content('animals')
+        before, after, missed = self.run_node(
+            f"const data = {json.dumps(data)}; const missed = ['tiger', 'lion', 'wolf']; const before = JSON.stringify(data);"
+            "R.pickRound(data, 5, 'easy', missed, seeded(5)); out([before, JSON.stringify(data), missed]);")
+        self.assertEqual(before, after)
+        self.assertEqual(missed, ['tiger', 'lion', 'wolf'])
+
+    def test_a_missed_word_comes_back_until_it_is_spelled(self):
+        # three rounds of animals on normal through both modules, as
+        # main.js runs them: startRound picks with wordsFor(theme), the
+        # round end records the results
+        data = self.content('animals')
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const rounds = [];"
+            "const play = (seed, wrong) => {"
+            "  const words = R.pickRound(data, 5, 'normal', M.wordsFor('animals'), seeded(seed));"
+            "  const missed = wrong(words);"
+            "  M.record('animals', words.map((word) => ({ word, correct: !missed.includes(word) })));"
+            "  rounds.push({ words, after: M.wordsFor('animals') }); return missed; };"
+            # round 1: the 2nd and 4th words revealed; round 2: the first of
+            # them missed again; round 3: all spelled
+            "const missed = play(1, (w) => [w[1], w[3]]);"
+            "play(2, () => [missed[0]]); play(3, () => []);"
+            "out({ missed, rounds });")
+        missed, rounds = res['missed'], res['rounds']
+        self.assertEqual(rounds[0]['after'], missed)
+        self.assertLessEqual(set(missed), set(rounds[1]['words']))
+        self.assertEqual(rounds[1]['after'], [missed[0]])
+        self.assertIn(missed[0], rounds[2]['words'])
+        self.assertEqual(rounds[2]['after'], [])
+
+    # --- wiring ---
+
+    def test_only_missed_js_names_the_key_and_it_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            text = path.read_text()
+            if path.name == 'missed.js':
+                self.assertIn("export const KEY = 'flip.missed.v1';", text)
+            else:
+                self.assertNotIn('flip.missed', text, path.name)
+        code = self.code('missed.js')
+        for word in ('document', 'window', 'import', 'state'):
+            self.assertNotIn(word, code, word)
+        self.assertNotIn('localStorage', self.code('main.js'))
+
+    def test_pick_round_is_pure_and_reads_the_level_through_pick_words(self):
+        pick = self.function('pickRound', 'round.js')
+        self.assertIn('pickWords(', pick)
+        self.assertNotRegex(pick, r'localStorage|document|window|state\.')
+        self.assertIn('export const MISSED_BACK = 2;', self.code('round.js'))
+
+    def test_main_picks_with_the_themes_missed_words_and_records_only_at_the_round_end(self):
+        main = self.code('main.js')
+        self.assertIn("import { wordsFor as missedWords, record as recordMissed } from './missed.js';", main)
+        self.assertIn('pickRound(data, ROUND_SIZE, level, missedWords(name))', self.function('startRound'))
+        # recorded once, in onNext's round-end branch, before the screen
+        # changes; a round left with the back button records nothing
+        self.assertEqual(main.count('recordMissed('), 1)
+        nxt = self.function('onNext')
+        end = nxt.index('if (nextIndex >= round.size) {')
+        rec = nxt.index('recordMissed(state.theme, results);')
+        self.assertLess(end, rec)
+        self.assertLess(rec, nxt.index("screen: 'round-end'"))
+        self.assertLess(rec, nxt.index('} else {', end))
+        for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound'):
+            self.assertNotIn('recordMissed', self.function(name), name)
+
+    def test_stickers_still_only_for_correct_words(self):
+        main = self.code('main.js')
+        self.assertEqual(main.count('addSticker('), 1)
+        check = self.function('onCheck')
+        branch = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
+        self.assertIn('results[round.index].newSticker = addSticker(state.theme, current.word);', branch)
+        self.assertNotIn('missed', self.code('stickers.js'))
+
+
+class LevelUpTests(TestCase):
+    """The level-up nudge (BACKLOG B-209): level.js nextLevel, streakAfter
+    and levelUpFor (pure, run through node); the streak of 3-star rounds
+    on one level in state.js, this session only, written once per
+    finished round (main.js onNext) and never by a round left with the
+    back button; the round-end screen's #level-up-btn (the next level's
+    bulbs, lit, in a pulsing glow; none on hard) and its tap, which sets
+    the level through level.js and starts a round of the same theme."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'level.js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const L = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        text = (self.ROOT / 'static' / 'js' / name).read_text()
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+    def function(self, name, module='main.js'):
+        js = self.code(module)
+        start = re.search(rf'\n(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css()).group(1)
+
+    # --- level.js (pure) ---
+
+    def test_next_level(self):
+        self.assertEqual(
+            self.run_node("out([L.nextLevel('easy'), L.nextLevel('normal'), L.nextLevel('hard'),"
+                          " L.nextLevel(null), L.nextLevel(undefined), L.nextLevel('Hard')]);"),
+            ['normal', 'hard', None, None, None, None],
+        )
+
+    def test_three_star_rounds_on_one_level_count_up(self):
+        self.assertEqual(
+            self.run_node("const a = L.streakAfter({ level: null, rounds: 0 }, 'easy', 3);"
+                          "const b = L.streakAfter(a, 'easy', 3); const c = L.streakAfter(b, 'easy', 3);"
+                          "out([a, b, c, L.LEVEL_UP_ROUNDS]);"),
+            [{'level': 'easy', 'rounds': 1}, {'level': 'easy', 'rounds': 2}, {'level': 'easy', 'rounds': 3}, 2],
+        )
+
+    def test_fewer_than_three_stars_break_the_streak(self):
+        self.assertEqual(
+            self.run_node("out([0, 1, 2].map((s) => L.streakAfter({ level: 'easy', rounds: 2 }, 'easy', s)));"),
+            [{'level': 'easy', 'rounds': 0}] * 3,
+        )
+
+    def test_a_round_on_another_level_starts_over(self):
+        self.assertEqual(
+            self.run_node("out([L.streakAfter({ level: 'easy', rounds: 2 }, 'normal', 3),"
+                          " L.streakAfter({ level: 'easy', rounds: 2 }, 'normal', 2),"
+                          " L.streakAfter({ level: 'normal', rounds: 1 }, 'easy', 3)]);"),
+            [{'level': 'normal', 'rounds': 1}, {'level': 'normal', 'rounds': 0}, {'level': 'easy', 'rounds': 1}],
+        )
+
+    def test_streak_after_is_a_new_object_and_takes_any_start(self):
+        self.assertEqual(
+            self.run_node("const s = Object.freeze({ level: 'easy', rounds: 1 }); const n = L.streakAfter(s, 'easy', 3);"
+                          "out([n, s, n === s,"
+                          " [undefined, null, {}, { level: 'easy' }, { level: 'easy', rounds: 'x' }, { level: 'easy', rounds: -1 }]"
+                          "   .map((v) => L.streakAfter(v, 'easy', 3))]);"),
+            [{'level': 'easy', 'rounds': 2}, {'level': 'easy', 'rounds': 1}, False,
+             [{'level': 'easy', 'rounds': 1}] * 6],
+        )
+
+    def test_level_up_for(self):
+        self.assertEqual(
+            self.run_node("out([{ level: null, rounds: 0 }, { level: 'easy', rounds: 1 }, { level: 'easy', rounds: 2 },"
+                          " { level: 'easy', rounds: 3 }, { level: 'normal', rounds: 2 }, { level: 'hard', rounds: 2 },"
+                          " { level: 'hard', rounds: 7 }, { level: 'Hard', rounds: 2 }, { level: 'easy', rounds: '2' },"
+                          " null, undefined, {}].map((s) => L.levelUpFor(s)));"),
+            [None, None, 'normal', 'normal', 'hard', None, None, None, None, None, None, None],
+        )
+
+    def test_rounds_in_a_row_as_main_js_plays_them(self):
+        # each round's end: streakAfter, then what the round-end screen
+        # shows (levelUpFor); the stars come from score.js as in onNext
+        score = (self.ROOT / 'static' / 'js' / 'score.js').as_uri()
+        self.assertEqual(
+            self.run_node(
+                f"const {{ starsFor }} = await import('{score}');"
+                "const play = (rounds) => { let s = { level: null, rounds: 0 }; return rounds.map(([level, correct]) => {"
+                "  s = L.streakAfter(s, level, starsFor(correct, 5)); return L.levelUpFor(s); }); };"
+                "out([play([['easy', 5], ['easy', 5]]),"
+                " play([['easy', 5], ['easy', 4], ['easy', 5]]),"
+                " play([['easy', 5], ['normal', 5]]),"
+                " play([['easy', 5], ['easy', 5], ['easy', 5]]),"
+                " play([['easy', 5], ['easy', 5], ['normal', 5], ['normal', 5]]),"
+                " play([['normal', 5], ['normal', 5]]),"
+                " play([['hard', 5], ['hard', 5], ['hard', 5]]),"
+                " play([['easy', 4], ['easy', 4], ['easy', 0]])]);"),
+            [[None, 'normal'],
+             [None, None, None],
+             [None, None],
+             [None, 'normal', 'normal'],
+             [None, 'normal', None, 'hard'],
+             [None, 'hard'],
+             [None, None, None],
+             [None, None, None]],
+        )
+
+    # --- state and main.js ---
+
+    def test_the_streak_is_in_state_for_this_session_only(self):
+        state = (self.ROOT / 'static' / 'js' / 'state.js').read_text()
+        self.assertIn('\n    streak: { level: null, rounds: 0 },', state)
+        for f in sorted((self.ROOT / 'static' / 'js').glob('*.js')):
+            self.assertNotIn('flip.streak', self.code(f.name), f.name)
+        for name in ('level.js', 'main.js'):
+            self.assertNotRegex(self.code(name), r'setItem\([^)]*streak', name)
+
+    def test_the_streak_moves_once_per_finished_round(self):
+        main = self.code('main.js')
+        self.assertEqual(len(re.findall(r'\bstreak:', main)), 1)
+        nxt = self.function('onNext')
+        end = nxt.index('if (nextIndex >= round.size) {')
+        branch = nxt[end:nxt.index('} else {', end)]
+        self.assertIn('const stars = starsFor(results.filter((r) => r.correct).length, round.size);', branch)
+        # in the setState that shows the round-end screen
+        call = branch[branch.index('setState({'):]
+        self.assertIn("screen: 'round-end',", call)
+        self.assertIn('streak: streakAfter(state.streak, round.level, stars),', call)
+        # a round left with the back button (or for the theme screen), a
+        # new round, a check and the nudge's tap leave it
+        for name in ('onPlayBack', 'onThemes', 'startRound', 'onCheck', 'onLevelUp', 'onLevel'):
+            self.assertNotIn('streak:', self.function(name), name)
+        self.assertNotRegex(nxt, r'state\.level\b')
+
+    def test_round_end_renders_the_nudge_from_the_streak(self):
+        self.assertIn('renderLevelUp(state);', self.function('renderRoundEnd'))
+        render = self.function('renderLevelUp')
+        self.assertIn('const next = levelUpFor(state.streak);', render)
+        self.assertIn("const btn = $('level-up-btn');", render)
+        self.assertIn('btn.hidden = !next;', render)
+        self.assertIn("btn.innerHTML = next ? '<span class=\"bulb\"></span>'.repeat(LEVELS.indexOf(next) + 1) : '';", render)
+        self.assertIn("btn.setAttribute('aria-label', next ? `next level: ${next}` : 'next level');", render)
+
+    def test_the_tap_sets_the_level_and_starts_the_same_theme(self):
+        main = self.code('main.js')
+        self.assertIn("$('level-up-btn').addEventListener('click', onLevelUp);", main)
+        tap = self.function('onLevelUp')
+        self.assertIn("if (state.screen !== 'round-end' || state.startingRound) return;", tap)
+        self.assertIn('const next = levelUpFor(state.streak);', tap)
+        self.assertIn('if (!next) return;', tap)
+        # remembered through level.js as a pick on the theme screen is,
+        # set before the round starts (startRound reads state.level)
+        self.assertLess(tap.index('saveLevel(next);'), tap.index('setState({ level: next });'))
+        self.assertLess(tap.index('setState({ level: next });'), tap.index('onPlayAgain();'))
+        self.assertIn('const theme = state.themes.find((t) => t.name === state.theme);', self.function('onPlayAgain'))
+        self.assertLess(self.function('startRound').index('const level = state.level;'),
+                        self.function('startRound').index('await fetch('))
+
+    # --- the button ---
+
+    def test_the_button_is_a_bulb_icon_button_right_of_play_again(self):
+        html = self.client.get('/').content.decode()
+        end = html[html.index('<div id="screen-round-end"'):html.index('<div id="screen-gallery"')]
+        actions = end[end.index('<div class="actions">'):]
+        self.assertLess(actions.index('id="themes-btn"'), actions.index('id="play-again-btn"'))
+        self.assertLess(actions.index('id="play-again-btn"'), actions.index('id="level-up-btn"'))
+        m = re.search(r'<button id="level-up-btn"([^>]*)>(.*?)</button>', actions, flags=re.S)
+        self.assertIsNotNone(m)
+        attrs, inner = m.groups()
+        self.assertIn('class="panel-btn level-btn level-up"', attrs)
+        self.assertIn('type="button"', attrs)
+        self.assertRegex(attrs, r'aria-label="[^"]+"')
+        self.assertRegex(attrs, r'\shidden(\s|$)')
+        self.assertNotIn('aria-pressed', attrs)
+        self.assertEqual(re.sub(r'<[^>]+>', '', inner).strip(), '')    # no text
+        # one button with that id, not in the theme screen's picker
+        self.assertEqual(html.count('id="level-up-btn"'), 1)
+
+    def test_the_glow_pulses_and_the_bulbs_are_lit(self):
+        css = self.css()
+        self.assertIn('display: none;', self.rule('.level-up[hidden]'))
+        self.assertIn('opacity: 1;', self.rule('.level-up .bulb::before'))
+        self.assertIn('position: relative;', self.rule('.level-up'))
+        glow = self.rule('.level-up::after')
+        self.assertIn('animation: level-up-glow 1.2s ease-in-out infinite alternate;', glow)
+        self.assertIn('pointer-events: none;', glow)
+        self.assertRegex(glow, r'box-shadow: [^;]*var\(--amber\)[^;]*var\(--glow-amber\);')
+        frames = re.search(r'@keyframes level-up-glow\s*{(.*?)\n}', css, flags=re.S).group(1)
+        self.assertRegex(frames, r'from\s*{\s*opacity: 0\.3;\s*}')
+        self.assertRegex(frames, r'to\s*{\s*opacity: 1;\s*}')
+        # reduced motion: a steady glow
+        self.assertRegex(css, r'@media \(prefers-reduced-motion: reduce\) {\s*\.level-up::after {\s*animation: none;\s*}')
+        # the picker's bulbs (14px) through .level-btn, the lives bulbs' look
+        self.assertIn('width: 14px;', self.rule('.level-btn .bulb'))
+
+    def test_three_buttons_fit_the_row_clear_of_the_bezel(self):
+        # the column is 324px at 360 (18px safe sides); the row of three
+        # stays 36px or more from the screen's edges (the frame's 28px
+        # border and 8px); the row of two keeps its 48px gap
+        gap = int(re.search(r'gap: (\d+)px;', self.rule('#screen-round-end .actions:has(.level-up:not([hidden]))')).group(1))
+        width = 3 * 72 + 2 * gap
+        self.assertLessEqual(width, 360 - 2 * 36)
+        self.assertIn('gap: 48px;', self.rule('.actions'))
+
+    def test_the_ring_clears_the_bezel_below(self):
+        # review fix round 1: the row ends `margin-bottom` above the safe
+        # area's bottom (the column's padding, --safe-bottom); the ring
+        # reaches `inset` + its spread below the button. Its bottom must
+        # be at or above the safe-area bottom + 2px (the bezel's visible
+        # inner edge, y 720 at 360x740), on any screen height, since the
+        # row sits at the bottom whenever the screen fits.
+        css = self.css()
+        safe_bottom = int(re.search(r'--safe-bottom: (\d+)px;', css).group(1))
+        rows = re.findall(r'\n#screen-round-end \.actions\s*{([^}]*)}', css)
+        margins = [int(m) for body in rows for m in re.findall(r'margin-bottom: (\d+)px;', body)]
+        self.assertEqual(len(margins), 1)
+        glow = self.rule('.level-up::after')
+        inset = -int(re.search(r'inset: (-\d+)px;', glow).group(1))
+        spread = int(re.search(r'box-shadow: 0 0 0 (\d+)px var\(--amber\)', glow).group(1))
+        self.assertEqual(inset + spread, 8)
+        for height in (740, 667, 640):
+            button_bottom = height - safe_bottom - margins[0]
+            self.assertLessEqual(button_bottom + inset + spread, height - safe_bottom + 2, height)
+        # on every round-end, not only with the nudge
+        self.assertNotIn('margin-bottom', self.rule('#screen-round-end .actions:has(.level-up:not([hidden]))'))
+
+    # --- one round at a time (review fix round 1) ---
+
+    def test_a_round_being_started_takes_no_second_tap(self):
+        state = (self.ROOT / 'static' / 'js' / 'state.js').read_text()
+        self.assertIn('\n    startingRound: false,', state)
+        start = self.function('startRound')
+        # the guard first, then the level, then the flag before the fetch
+        self.assertLess(start.index('if (state.startingRound) return;'), start.index('const level = state.level;'))
+        self.assertLess(start.index('const level = state.level;'), start.index('setState({ startingRound: true });'))
+        self.assertLess(start.index('setState({ startingRound: true });'), start.index('await fetch('))
+        # a failed fetch lets the next tap try again; the round's own
+        # setState clears it with everything else
+        catch = start[start.index('} catch (e) {'):]
+        self.assertLess(catch.index('setState({ startingRound: false });'), catch.index('throw e;'))
+        last = start[start.rindex('setState({'):]
+        self.assertIn("screen: 'play',", last)
+        self.assertIn('roundsStarted: state.roundsStarted + 1,', last)
+        self.assertIn('startingRound: false,', last)
+        # only startRound writes it; the nudge also waits (its level must
+        # not change under a round play again already started)
+        main = self.code('main.js')
+        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 3)
+        self.assertIn("if (state.screen !== 'round-end' || state.startingRound) return;", self.function('onLevelUp'))
+        for name in ('onPlayAgain', 'onThemes', 'onNext', 'onLevelUp', 'onLevel', 'onPlayBack'):
+            self.assertNotIn('startingRound:', self.function(name), name)

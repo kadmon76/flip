@@ -6,7 +6,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
-import { returnAll, giveHint } from './drag.js';
+import { returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
@@ -16,8 +16,9 @@ import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
-import { LEVELS, loadLevel, saveLevel } from './level.js';
-import { pickWords, makeWord } from './round.js';
+import { LEVELS, loadLevel, saveLevel, streakAfter, levelUpFor } from './level.js';
+import { pickRound, makeWord } from './round.js';
+import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,26 +29,6 @@ let tileSeq = 0;
 // A fresh tile id for round.js makeWord, unique over the session (card.js
 // keys the DOM tiles by id).
 const newTileId = () => `t${++tileSeq}`;
-
-// Fill every box with the right letter using the word's own tiles. A
-// block already in its right slot stays there (a locked one stays
-// locked), so on the reveal only the others fly in (feedback.js).
-function revealed(current) {
-    const tray = current.tray.map((t) => ({ ...t, used: true }));
-    const letters = current.word.split('');
-    const placed = letters.map((ch, i) => {
-        const p = current.placed[i];
-        return p && p.letter === ch ? { ...p } : null;
-    });
-    const taken = new Set(placed.filter(Boolean).map((p) => p.tileId));
-    letters.forEach((ch, i) => {
-        if (placed[i]) return;
-        const tile = tray.find((t) => t.letter === ch && !taken.has(t.id));
-        taken.add(tile.id);
-        placed[i] = { letter: tile.letter, tileId: tile.id };
-    });
-    return { ...current, tray, placed, status: 'revealed' };
-}
 
 // --- Theme screen ---
 
@@ -113,16 +94,29 @@ function onLevel(level) {
 }
 
 async function startRound({ name, dataUrl }) {
+    // One round at a time: while the data file of a round just started is
+    // on its way, another tap (a second tap on a theme card, play again or
+    // the level-up nudge) starts nothing (BACKLOG B-209, review fix).
+    if (state.startingRound) return;
     // The round is played at the level picked when the theme is tapped,
     // read before the fetch; a later pick changes the next round, not this
     // one (nothing writes round.level again until the next startRound).
     const level = state.level;
+    setState({ startingRound: true });
     // data shape: { "duck": { image, audio, difficulty }, ... }
-    const data = await fetch(dataUrl).then((r) => r.json());
+    let data;
+    try {
+        data = await fetch(dataUrl).then((r) => r.json());
+    } catch (e) {
+        setState({ startingRound: false });
+        throw e;
+    }
     // `level` is the round's level (round.level below): on easy the round
     // prefers the easy-tagged, then the shortest words, and each word
-    // starts with its first letter given (round.js, BACKLOG B-204).
-    const words = pickWords(data, ROUND_SIZE, level)
+    // starts with its first letter given (round.js, BACKLOG B-204). Up to
+    // two of the words this theme's earlier rounds missed come back, in
+    // random places (round.js pickRound, missed.js; BACKLOG B-208).
+    const words = pickRound(data, ROUND_SIZE, level, missedWords(name))
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
     stopWord();
     setState({
@@ -137,6 +131,7 @@ async function startRound({ name, dataUrl }) {
         roundsStarted: state.roundsStarted + 1,
         lastInput: performance.now(),
         idleBeat: null,
+        startingRound: false,
     });
     armIdle();
 }
@@ -223,13 +218,24 @@ function onCheck(extra = {}) {
         const checked = { ...current, status: 'wrong' };
         const left = lives - 1;
         setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
+        // On hard his letter can finish the word, in place of an extra
+        // letter (BACKLOG B-207, drag.js afterHint): the word then reopens
+        // and the dome lights at once. Its own setState, after the
+        // miss's, so the robot, the sound and the motion see the miss.
+        const reopened = afterHint(state.current);
+        if (reopened !== state.current) setState({ current: reopened });
     }
 }
 
 // Next word, or the round-end screen after the fifth. The dome offers it
 // only after a correct answer or a reveal, so every word has a result by
 // then; one without would count as wrong. The word clip stops with its
-// word.
+// word. At the round end the theme's missed words are recorded (missed.js,
+// BACKLOG B-208): the words not checked correct are remembered, the ones
+// checked correct come out; and the streak of 3-star rounds on one level
+// moves on (level.js streakAfter, BACKLOG B-209), which the round-end
+// screen reads for the level-up nudge. A round left with the back button
+// never gets here, so it records nothing and leaves the streak (B-201).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -238,7 +244,16 @@ function onNext(extra = {}) {
     stopWord();
     const nextIndex = round.index + 1;
     if (nextIndex >= round.size) {
-        setState({ round: { ...round, results }, screen: 'round-end', speaking: false, idleBeat: null, ...extra });
+        recordMissed(state.theme, results);
+        const stars = starsFor(results.filter((r) => r.correct).length, round.size);
+        setState({
+            round: { ...round, results },
+            screen: 'round-end',
+            streak: streakAfter(state.streak, round.level, stars),
+            speaking: false,
+            idleBeat: null,
+            ...extra,
+        });
     } else {
         setState({
             round: { ...round, index: nextIndex, results },
@@ -352,6 +367,23 @@ function renderRoundEnd(state) {
 
         list.appendChild(li);
     });
+
+    renderLevelUp(state);
+}
+
+// The level-up nudge (BACKLOG B-209): after LEVEL_UP_ROUNDS rounds in a
+// row with 3 stars on one level (level.js levelUpFor on state.streak),
+// #level-up-btn shows beside play again with the next level's bulbs,
+// lit (the level picker's bulbs), in a slowly pulsing amber glow
+// (game.css): the robot is not on this screen, so the glow points at
+// it. Hidden otherwise, and always on hard. No text: the level is only
+// in the aria-label.
+function renderLevelUp(state) {
+    const next = levelUpFor(state.streak);
+    const btn = $('level-up-btn');
+    btn.hidden = !next;
+    btn.innerHTML = next ? '<span class="bulb"></span>'.repeat(LEVELS.indexOf(next) + 1) : '';
+    btn.setAttribute('aria-label', next ? `next level: ${next}` : 'next level');
 }
 
 // New round in the same theme: new random words, hearts and results
@@ -361,6 +393,20 @@ function onPlayAgain() {
     const theme = state.themes.find((t) => t.name === state.theme);
     if (theme) startRound(theme);
     else onThemes();
+}
+
+// The level-up nudge's button: the next level becomes the kid's level
+// (remembered, as a pick on the theme screen is) and a new round of the
+// same theme starts at it (startRound reads state.level). Nothing while a
+// round is being started (a second tap, or play again tapped first): the
+// level stays as that round has it.
+function onLevelUp() {
+    if (state.screen !== 'round-end' || state.startingRound) return;
+    const next = levelUpFor(state.streak);
+    if (!next) return;
+    saveLevel(next);
+    setState({ level: next });
+    onPlayAgain();
 }
 
 function onThemes() {
@@ -447,6 +493,7 @@ $('check-btn').addEventListener('click', onDome);
 $('reset-btn').addEventListener('click', onLever);
 $('speak-btn').addEventListener('click', onSpeak);
 $('play-again-btn').addEventListener('click', onPlayAgain);
+$('level-up-btn').addEventListener('click', onLevelUp);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
