@@ -61,7 +61,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   one row; 7+ letters wrap into two even rows.
 - **Letter blocks:** cream clay blocks lying on the bench below the rail,
   52px min, slightly rotated (±4°), in loose staggered rows (max 4 per
-  row). Lowercase by default.
+  row; on hard a 10-letter word's 12 blocks put five on the first row in a play column narrower than 462px, that is on every phone, and a third row of three starts right of the robot's reach, B-207). Lowercase by default.
 - **Console:** pinned to the bottom of the safe area, inset 4px from each
   side of it (324px wide at 360) so its lower corners clear the frame's
   rounded inner corners. On its brass plate,
@@ -100,7 +100,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   taken out. Press: `pressed` for 120ms, then the result. After a correct
   answer or a reveal, it returns to `ready` pulse and pressing it goes to
   the next word (the dome is both check and next). After a wrong check it
-  stays `off` until a block moves (drag, tap or the reset lever).
+  stays `off` until a block moves (drag, tap or the reset lever), or until the robot's second-miss letter completes the word (hard, B-207), when it is `ready` at once.
 - **Reset lever** (`#reset-btn`): tap → `lever-down` for 250ms, rail shakes
   ±4px for 200ms, placed blocks hop back to their starting spots (300ms,
   30ms stagger), except a locked letter (easy's given first letter, B-204), which stays in its slot; lever springs back. Tap area 48x48. On easy, a pull right after a wrong check (no block moved since) sends back only the letters in wrong slots, and the right ones stay and lock with the same look; any other pull sends back every letter but the given one and the robot's second-miss letter, including the letters an earlier pull locked (B-205). The robot's second-miss letter (B-206) stays through every pull on every level, like the given one.
@@ -114,7 +114,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   flickers three times and goes dark (`--bulb-off`); the TV picture gets a
   150ms static flicker; robot `confused`.
 - Second miss (the wrong check that leaves one bulb lit, every level; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, its lit edge coming on as it lands; robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
-- Third wrong: correct blocks fly into the slots in order (120ms stagger);
+- Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on hard, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
   robot `oops` then `happy`.
 - Correct: slots pulse once; TV screen flashes warm white (200ms); up to
   40 sparks (amber, teal, cream) burst from the TV, 600ms, removed after;
