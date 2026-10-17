@@ -839,32 +839,39 @@ body[data-screen="play"] .play-back-btn {
     }
 }
 
-/* A locked letter (BACKLOG B-204: the first letter given on easy; B-205:
-   a right letter the lever kept after a wrong check on easy; card.js
-   sets class `locked` on its slot): drawn as placed, with a small lit
-   edge, a thin line of lamp light (the lit bulbs' amber) round the block
-   where it meets the slot's rim and a soft glow on the brass, as if the
-   machine holds it. It never lifts or moves (drag.js keeps it disabled),
-   so it has no hand cursor. */
+/* A locked letter (BACKLOG B-211; card.js sets class `locked` on its slot
+   from the slot's `locked` flag, one look for all: B-204 the first letter
+   given on easy, B-205 a right letter the lever kept after a wrong check
+   on easy, B-206 the robot's letter on the second miss). It never lifts
+   or moves (drag.js keeps it disabled), so it has no hand cursor. */
 .letter-box.locked > .draggable-letter {
-    box-shadow:
-        inset -2px -3px 0 var(--cream-lo),
-        inset 1px 1px 0 var(--cream-hi),
-        1px 2px 3px var(--shadow-deep),
-        0 0 0 2px var(--amber),
-        0 0 6px 2px var(--glow-amber);
     cursor: default;
 }
 
-/* The robot's letter on the second miss (BACKLOG B-206) is locked the
-   same way; feedback.js gives it class `landing` while it flies into its
-   slot, so the lit edge comes on (the 120ms box-shadow transition above)
-   as it lands, not before. */
-.letter-box.locked > .draggable-letter.landing {
+/* The locked look: a brass plate riveted into the slot, part of the
+   machine. Brass face (the rail's metal) with the letter stamped in ink,
+   a brass rivet in each corner, and sunk: smaller than the slot, so the
+   hole's dark rim shows round it, its top shaded by the rim and no
+   shadow of its own. feedback.js gives the block class `landing` while
+   it is pressed in (the clunk) or flies in (the robot's letter), which
+   draws it as a placed block until the hit. */
+.letter-box.locked > .draggable-letter:not(.landing) {
+    --rivet: radial-gradient(circle at 40% 35%, var(--amber-hi) 0 0.6px, var(--brass-hi) 1.2px, var(--brass-dark) 2.3px, transparent 2.9px);
+    width: 86%;
+    height: 86%;
+    font-size: 25px;
+    border-radius: 5px;
+    color: var(--ink);
+    text-shadow: 0 1px 0 var(--brass-hi);
+    background:
+        var(--rivet) left 2px top 2px / 6px 6px no-repeat,
+        var(--rivet) right 2px top 2px / 6px 6px no-repeat,
+        var(--rivet) left 2px bottom 2px / 6px 6px no-repeat,
+        var(--rivet) right 2px bottom 2px / 6px 6px no-repeat,
+        linear-gradient(150deg, var(--brass-hi) 0%, var(--brass) 55%, var(--brass-dark) 100%);
     box-shadow:
-        inset -2px -3px 0 var(--cream-lo),
-        inset 1px 1px 0 var(--cream-hi),
-        1px 2px 3px var(--shadow-deep);
+        inset 0 3px 3px var(--shadow-deep),
+        inset -1px -2px 0 var(--brass-dark-lo);
 }
 
 body.dragging-active {

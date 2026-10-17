@@ -36,7 +36,8 @@ export function renderCard(state) {
     });
 
     // Placed tiles live inside their box, upright; a locked one (class
-    // `locked`: the lit-edge look in game.css) cannot be moved…
+    // `locked`: the riveted brass look in game.css, BACKLOG B-211) cannot
+    // be moved…
     const boxes = $('letter-boxes').children;
     const locked = new Set();
     current.placed.forEach((slot, i) => {

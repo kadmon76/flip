@@ -3396,13 +3396,11 @@ class EasyStartTests(TestCase):
     def test_the_locked_look(self):
         css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
         rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter\s*{([^}]*)}', css).group(1)
-        # drawn as placed (the placed block's clay edges), plus a thin lit
-        # edge and a soft glow in palette tokens, and no hand cursor
-        self.assertIn('inset -2px -3px 0 var(--cream-lo),', rule)
-        self.assertIn('1px 2px 3px var(--shadow-deep),', rule)
-        self.assertIn('0 0 0 2px var(--amber),', rule)
-        self.assertIn('0 0 6px 2px var(--glow-amber);', rule)
+        # it never lifts, so no hand cursor; the look itself (the riveted
+        # brass plate that replaced B-204's amber edge) is BACKLOG B-211's,
+        # checked in LockedLookTests
         self.assertIn('cursor: default;', rule)
+        self.assertIn('\n.letter-box.locked > .draggable-letter:not(.landing) {', css)
 
 
 class LeverTests(TestCase):
@@ -3878,14 +3876,19 @@ class HintTests(TestCase):
         self.assertEqual([e[2]['x'] for e in o[1:5]], [46, 58, 46, 52])
         self.assertEqual(o[5], ['tl.to', 'o', {'x': 0, 'y': 0, 'rotation': 0, 'scale': 1, 'duration': 0.3,
                                                'ease': 'back.out(1.4)'}, 0.6])
-        self.assertEqual(len(r) + len(o), 14)
-        # its locked edge lights as it lands (class `landing` until 0.9s);
-        # everything set is put back by then
+        # as it lands (0.9s) it clunks into the slot (BACKLOG B-211): it
+        # is pressed in, and at the hit (0.99s) its locked look comes on
+        # (class `landing` until then) and it comes up to its locked size
+        self.assertEqual(o[6], ['to', 'o', {'scale': 0.8, 'duration': 0.09, 'ease': 'power2.in', 'delay': 0.9}])
+        self.assertEqual(len(r) + len(o), 15)
         self.assertTrue(landing)
         self.assertFalse(landed)
-        self.assertEqual(sorted(e[1] for e in log if e[0] == 'later'), [0.6, 0.9, 0.9])
+        self.assertEqual(sorted(e[1] for e in log if e[0] == 'later'), [0.6, 0.9, 0.99])
+        # everything set is put back by then (the clunk ends at scale 1)
         self.assertEqual(cleared, [['set', 'r', {'clearProps': 'position,zIndex'}],
-                                   ['set', 'o', {'clearProps': 'position,zIndex'}]])
+                                   ['set', 'o', {'clearProps': 'position,zIndex'}],
+                                   ['fromTo', 'o', {'scale': 0.8},
+                                    {'scale': 1, 'duration': 0.11, 'ease': 'power2.out', 'lazy': False}]])
         # a re-render in the same state starts nothing
         self.assertEqual(again, 0)
 
@@ -3947,10 +3950,13 @@ class HintTests(TestCase):
 
     def test_the_landing_look(self):
         css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
-        rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter\.landing\s*{([^}]*)}', css).group(1)
-        # drawn as a placed block, without the lit edge until it lands
-        self.assertIn('1px 2px 3px var(--shadow-deep);', rule)
-        self.assertNotIn('amber', rule)
+        # drawn as a placed block until it lands: the locked look (BACKLOG
+        # B-211) leaves out a block with class `landing`, so the placed
+        # block's rule draws it and no override is needed
+        self.assertIn('\n.letter-box.locked > .draggable-letter:not(.landing) {', css)
+        self.assertNotRegex(css, r'\.letter-box\.locked > \.draggable-letter\.landing\s*{')
+        placed = re.search(r'\n\.letter-box > \.draggable-letter\s*{([^}]*)}', css).group(1)
+        self.assertIn('1px 2px 3px var(--shadow-deep);', placed)
         # the CSS cache-buster was bumped for this look (later items bump it again)
         html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
         self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 20)
@@ -4844,3 +4850,255 @@ class LevelUpTests(TestCase):
         self.assertIn("if (state.screen !== 'round-end' || state.startingRound) return;", self.function('onLevelUp'))
         for name in ('onPlayAgain', 'onThemes', 'onNext', 'onLevelUp', 'onLevel', 'onPlayBack'):
             self.assertNotIn('startingRound:', self.function(name), name)
+
+
+class LockedLookTests(TestCase):
+    """Locked letters you can see at a glance (BACKLOG B-211). One look for
+    every locked letter (easy's given letter, the right letters the easy
+    lever keeps, the robot's letter), keyed only on the slot's `locked`
+    flag (card.js class `locked`): a brass plate riveted into the slot,
+    sunk below the rim (game.css), in place of B-204's amber edge. A letter
+    that locks clunks into its slot (feedback.js): the lever's at once,
+    the robot's as it lands (HintTests). `newlyLocked` and the clunk run
+    through node with stand-ins for the DOM and GSAP, the motion spec
+    through motion.js; the look and the wiring are checked in the
+    source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    FAKE_DOM = """
+        const log = [];
+        const later = [];
+        const id = (el) => (Array.isArray(el) ? el.map((e) => e.id) : el.id);
+        const timeline = () => {
+            const t = {};
+            for (const k of ['to', 'fromTo', 'set']) t[k] = (el) => { log.push(['tl.' + k, id(el)]); return t; };
+            return t;
+        };
+        globalThis.gsap = {
+            set(el, v) { log.push(['set', id(el), v]); },
+            to(el, v) { log.push(['to', id(el), v]); },
+            fromTo(el, a, b) { log.push(['fromTo', id(el), a, b]); },
+            timeline,
+            killTweensOf() {},
+            getProperty(el) { return el.rot || 0; },
+            delayedCall(s, fn) { log.push(['later', s]); later.push(fn); },
+        };
+        let reduced = false;
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        const cls = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c) }; };
+        // a block: `w` px as rendered; a block in a slot is 46px while it
+        // has class `landing` (drawn as a placed block) and 40px drawn locked
+        const el = (name, x, y, w) => {
+            const e = { id: name, classList: cls(), parentNode: null,
+                getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) };
+            Object.defineProperty(e, 'offsetWidth', { get: () => (e.classList.contains('landing') ? 46 : w) });
+            return e;
+        };
+        const rect = (name, x, y, w) => ({ id: name, getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) });
+        const boxes = [0, 1, 2, 3, 4].map((i) => rect('box' + i, 20 + i * 52, 100, 46));
+        const spots = [0, 1, 2, 3].map((i) => rect('spot' + i, 20 + i * 60, 200, 52));
+        const tiles = {};
+        globalThis.document = {
+            getElementById: (name) => (name === 'letter-boxes' ? { id: 'rail', children: boxes } : name === 'letter-tray' ? { children: spots } : null),
+            querySelector: (sel) => { const m = /data-tile-id="([^"]+)"/.exec(sel); return m ? tiles[m[1]] || null : null; },
+            querySelectorAll: () => [],
+        };
+        const F = await import('FEEDBACK');
+        const D = await import('DRAG');
+        // "horse" on easy: h given (locked in slot 1, no bench spot),
+        // checked as "hosre" (o and e right, s and r wrong), one bulb out
+        const tray = [{ id: 'h', letter: 'h', used: true, given: true }].concat(
+            ['s', 'r', 'o', 'e'].map((t) => ({ id: t, letter: t, used: true })));
+        const P = (letters, locked = 'h') => letters.split('').map((ch) => (ch === '_' ? null
+            : { letter: ch, tileId: ch, ...(locked.includes(ch) ? { locked: true } : {}) }));
+        const wrong = { screen: 'play', lives: 2, pressed: null, round: { index: 0 },
+            current: { word: 'horse', status: 'wrong', tray, placed: P('hosre') } };
+        // where the render put them: h, o, e in slots 1, 2, 5; s, r on the bench
+        tiles.h = el('h', 23, 103, 40); tiles.o = el('o', 75, 103, 40); tiles.e = el('e', 231, 103, 40);
+        tiles.s = el('s', 20, 200, 52); tiles.r = el('r', 80, 200, 52);
+        tiles.h.parentNode = boxes[0]; tiles.o.parentNode = boxes[1]; tiles.e.parentNode = boxes[4];
+        const mine = (e) => ['h', 'o', 'e'].includes(e[1]);
+        const clunks = () => log.filter((e) => e[0] === 'to' && e[2].scale === 0.8).map((e) => e[1]);
+    """
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v, (k, x) => (typeof x === 'number' ? Math.round(x * 1e4) / 1e4 : x)));"
+            + self.FAKE_DOM.replace('FEEDBACK', (self.JS / 'feedback.js').as_uri())
+                           .replace('DRAG', (self.JS / 'drag.js').as_uri())
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    # --- which letters just locked (pure) ---
+
+    def test_newly_locked_is_the_slots_locked_since_the_last_render(self):
+        hinted = [{'letter': 'h', 'tileId': 'h'}, {'letter': 'o', 'tileId': 'o', 'locked': True, 'hint': True},
+                  None, {'letter': 's', 'tileId': 's'}, {'letter': 'e', 'tileId': 'e'}]
+        res = self.run_node(
+            "const before = P('hosre'); const copy = JSON.stringify(before);"
+            f"const hinted = {json.dumps(hinted)};"
+            "out([F.newlyLocked([], []), F.newlyLocked(before, P('ho__e', 'hoe')), F.newlyLocked(P('ho__e', 'hoe'), P('ho__e', 'hoe')),"
+            " F.newlyLocked(P('ho__e', 'hoe'), P('h____')), F.newlyLocked(P('hrose', ''), hinted),"
+            " F.newlyLocked([{ letter: 'o', tileId: 'o1', locked: true }], [{ letter: 'o', tileId: 'o2', locked: true }]),"
+            " F.newlyLocked(P('hosre', ''), P('hosre', '')), JSON.stringify(before) === copy]);")
+        self.assertEqual(res, [
+            [],
+            [1, 4],     # the lever kept o and e (the given h was locked already)
+            [],         # a re-render
+            [],         # a start-over pull unlocks; nothing locks
+            [1],        # the robot's letter
+            [0],        # a slot locked with another block
+            [],         # nothing locked
+            True,       # inputs untouched
+        ])
+
+    # --- the clunk (feedback.js) ---
+
+    def test_the_letters_the_lever_keeps_clunk_into_their_slots(self):
+        placed, before, landing, landed, hit, laters, again = self.run_node(
+            "const pulled = { ...wrong, pressed: 'lever', current: D.returnAll(wrong.current, 'easy') };"
+            "F.renderFeedback(wrong); F.renderFeedback(pulled);"
+            "const n = log.length; const landing = ['h', 'o', 'e'].map((k) => tiles[k].classList.contains('landing'));"
+            "later.forEach((fn) => fn());"
+            "const landed = ['h', 'o', 'e'].map((k) => tiles[k].classList.contains('landing'));"
+            "const hit = log.slice(n).filter(mine); const m = log.length;"
+            "F.renderFeedback(pulled);"
+            "out([pulled.current.placed, log.slice(0, n).filter(mine), landing, landed, hit,"
+            " log.slice(0, n).filter((e) => e[0] === 'later' && e[1] === 0.09).length, log.length - m]);")
+        # easy, right after a wrong check: o and e stay and lock, s and r go
+        self.assertEqual(placed, [{'letter': 'h', 'tileId': 'h', 'locked': True}, {'letter': 'o', 'tileId': 'o', 'locked': True},
+                                  None, None, {'letter': 'e', 'tileId': 'e', 'locked': True}])
+        # o and e are drawn as placed blocks and pressed in at once (90ms,
+        # ease-in); the given h, locked from the start, does nothing
+        press = {'scale': 0.8, 'duration': 0.09, 'ease': 'power2.in', 'delay': 0}
+        self.assertEqual(before, [['to', 'o', press], ['to', 'e', press]])
+        self.assertEqual(landing, [False, True, True])
+        self.assertEqual(laters, 2)
+        # at the hit their locked look comes on (40px) and they come up from
+        # where the press left them (0.8 of 46px) to their locked size
+        self.assertEqual(landed, [False, False, False])
+        up = {'scale': 1, 'duration': 0.11, 'ease': 'power2.out', 'lazy': False}
+        self.assertEqual(hit, [['fromTo', 'o', {'scale': 0.92}, up], ['fromTo', 'e', {'scale': 0.92}, up]])
+        # a re-render in the same state starts nothing
+        self.assertEqual(again, 0)
+
+    def test_reduced_motion_dips_them_instead(self):
+        mine, landing = self.run_node(
+            "reduced = true; const pulled = { ...wrong, pressed: 'lever', current: D.returnAll(wrong.current, 'easy') };"
+            "F.renderFeedback(wrong); F.renderFeedback(pulled);"
+            "out([log.filter(mine), ['o', 'e'].map((k) => tiles[k].classList.contains('landing'))]);")
+        dip = [{'opacity': 0.4}, {'opacity': 1, 'duration': 0.2, 'ease': 'power1.out'}]
+        self.assertEqual(mine, [['fromTo', 'o', *dip], ['fromTo', 'e', *dip]])
+        self.assertEqual(landing, [False, False])
+
+    def test_nothing_clunks_when_nothing_locks(self):
+        res = self.run_node(
+            "const out1 = [];"
+            # normal: the lever sends every letter but the given one back
+            "F.renderFeedback(wrong); F.renderFeedback({ ...wrong, pressed: 'lever', current: D.returnAll(wrong.current, 'normal') });"
+            "out1.push(clunks());"
+            # a new word starts with its given letter locked: no clunk
+            "const start = { ...wrong, round: { index: 1 }, current: { ...wrong.current, status: 'playing', placed: P('h____') } };"
+            "F.renderFeedback({ ...start, screen: 'theme' }); F.renderFeedback(start); out1.push(clunks());"
+            # a block placed, a correct check, a start-over pull on easy
+            "F.renderFeedback({ ...start, current: { ...start.current, placed: P('ho___') } });"
+            "F.renderFeedback({ ...start, current: { ...start.current, status: 'correct', placed: P('horse') } });"
+            "F.renderFeedback({ ...start, pressed: 'lever', current: D.returnAll({ ...start.current, placed: P('horse') }, 'easy') });"
+            "out1.push(clunks()); out(out1);")
+        self.assertEqual(res, [[], [], []])
+
+    # --- the motion spec ---
+
+    def test_the_clunk_spec(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (f"import {{ motionFor }} from '{(self.JS / 'motion.js').as_uri()}';"
+                  "console.log(JSON.stringify([motionFor('clunk', false), motionFor('clunk', true)]));")
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        m, still = json.loads(result.stdout)
+        # DESIGN "Motion": 120-300ms; a press in (ease-in to the hit), then
+        # ease-out, no back.out overshoot
+        self.assertEqual(m, {'duration': 0.2, 'ease': 'power2.out', 'scale': 0.8, 'press': 0.09, 'fade': 0.2})
+        self.assertTrue(0.12 <= m['duration'] <= 0.3)
+        self.assertLess(m['press'], m['duration'])
+        self.assertNotIn('back', m['ease'])
+        # reduced motion: no press, an opacity fade
+        self.assertEqual(still, {'duration': 0, 'ease': 'none', 'scale': 1, 'fade': 0.2})
+
+    # --- the look (game.css) ---
+
+    def test_the_locked_look_is_a_riveted_brass_plate_sunk_into_the_slot(self):
+        css = self.css()
+        rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter:not\(\.landing\)\s*{([^}]*)}', css).group(1)
+        # material: a brass face, the letter in ink
+        self.assertIn('linear-gradient(150deg, var(--brass-hi) 0%, var(--brass) 55%, var(--brass-dark) 100%);', rule)
+        self.assertIn('color: var(--ink);', rule)
+        # a rivet in each corner
+        self.assertIn('--rivet: radial-gradient(', rule)
+        self.assertEqual(rule.count('var(--rivet) '), 4)
+        for corner in ('left 2px top 2px', 'right 2px top 2px', 'left 2px bottom 2px', 'right 2px bottom 2px'):
+            self.assertIn(f'var(--rivet) {corner} / 6px 6px no-repeat', rule)
+        # sunk: smaller than the slot, shaded from the rim, no shadow of its own
+        self.assertIn('width: 86%;', rule)
+        self.assertIn('height: 86%;', rule)
+        shadow = re.search(r'box-shadow:([^;]*);', rule).group(1)
+        layers = [s.strip() for s in shadow.split(',')]
+        self.assertEqual(layers, ['inset 0 3px 3px var(--shadow-deep)', 'inset -1px -2px 0 var(--brass-dark-lo)'])
+        # B-204's amber edge is gone; palette tokens only
+        self.assertNotIn('amber)', rule.replace('var(--amber-hi)', ''))
+        self.assertNotIn('#', rule)
+        self.assertNotIn('rgb', rule)
+        # only these two rules draw a locked letter: the look keys on the
+        # slot's class alone
+        self.assertEqual(re.findall(r'\n([^\n{]*\.letter-box\.locked[^\n{]*){', css),
+                         ['.letter-box.locked > .draggable-letter ', '.letter-box.locked > .draggable-letter:not(.landing) '])
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 23)
+
+    # --- wiring ---
+
+    def test_the_look_keys_on_the_flag_and_the_clunk_on_the_transition(self):
+        # one look for every locked letter: card.js sets the class from the
+        # slot's flag (drag.js isLocked), and nothing else sets it
+        self.assertIn("boxes[i].classList.toggle('locked', isLocked(slot));", self.code('card.js'))
+        self.assertIn('return !!(slot && slot.locked);', self.function('isLocked', 'drag.js'))
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name in ('card.js', 'gallery.js'):
+                continue
+            self.assertNotRegex(self.code(f.name), r"classList\.(add|toggle)\('locked'", f.name)
+        # feedback.js: the letters that locked since the last render clunk,
+        # the robot's when it lands (after its travel, which stops its tweens)
+        render = self.function('renderFeedback', 'feedback.js')
+        self.assertIn('newlyLocked(prev.placed, now.placed)', render)
+        self.assertIn('.filter((i) => !now.placed[i].hint)', render)
+        self.assertIn('.forEach((i) => clunk(tileEl(now.placed[i].tileId), 0));', render)
+        hint = self.function('hintIn', 'feedback.js')
+        self.assertLess(hint.index("if (!reduced) el.classList.add('landing');"), hint.index('travel(el, from,'))
+        self.assertLess(hint.index('travel(el, from,'), hint.index('if (!reduced) clunk(el, at + flyIn.duration);'))
+        # pure, and the clunk never touches state
+        for name in ('newlyLocked', 'clunk'):
+            body = self.function(name, 'feedback.js')
+            for word in ('state.', 'setState'):
+                self.assertNotIn(word, body, (name, word))
+        for word in ('document', 'window', 'gsap'):
+            self.assertNotIn(word, self.function('newlyLocked', 'feedback.js'))

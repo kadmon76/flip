@@ -15,6 +15,10 @@
 //   - the reset lever went down: the rail shakes and the blocks it took
 //     out of slots hop back to their start spots (a letter it left or
 //     locked stays put; drag.js leverResult)
+//   - a letter locked (BACKLOG B-211): the right letters the lever kept
+//     on easy, at once, and the robot's letter as it lands, are pressed
+//     into their slots with a short clunk, their locked look (game.css)
+//     coming on at the hit
 // The correct-check beat (slot pulse, TV flash, sparks) is celebrate.js.
 // Every tween clears what it set when it ends, so the CSS render of state
 // is what stays.
@@ -64,6 +68,11 @@ export function renderFeedback(state) {
         shakeRail();
         hopBack(prev.placed);
     }
+    // a letter that locked clunks into its slot now (the lever on easy,
+    // BACKLOG B-205); the robot's letter clunks as it lands (hintIn)
+    newlyLocked(prev.placed, now.placed)
+        .filter((i) => !now.placed[i].hint)
+        .forEach((i) => clunk(tileEl(now.placed[i].tileId), 0));
 }
 
 // --- Shared motion ---
@@ -264,10 +273,11 @@ function benchSpot(current, tileId) {
 // over his letter still waiting where it was) and, once it is down, his
 // letter flies into the slot (the reveal's fly-in), landing while the
 // robot still peeks; he pops up happy when his peek is over (2.5s, the
-// puppet's peek, BACKLOG B-210; character.js hintGiven). Until
-// it lands it has class `landing`, so its locked edge (game.css) lights
-// as it lands. Reduced motion: no wiggle and no flight; the two fade in
-// where they now are, one after the other.
+// puppet's peek, BACKLOG B-210; character.js hintGiven). As it lands it
+// clunks into the slot (BACKLOG B-211): until the hit it has class
+// `landing`, so it flies as a plain block and its locked look (game.css)
+// comes on at the hit. Reduced motion: no wiggle, flight or clunk; the
+// two fade in where they now are, one after the other.
 function hintIn(prevPlaced, current) {
     const boxes = document.getElementById('letter-boxes').children;
     const k = hintSlot(current.placed);
@@ -289,11 +299,11 @@ function hintIn(prevPlaced, current) {
     }
     if (!from) return;
     const wrongThere = j !== -1 && prevPlaced[j].letter !== current.word[j];
-    if (!reduced) {
-        el.classList.add('landing');
-        gsap.delayedCall(at + flyIn.duration, () => el.classList.remove('landing'));
-    }
+    // a plain block's size before travel measures it; the clunk after
+    // travel, which stops the block's tweens when it starts
+    if (!reduced) el.classList.add('landing');
     travel(el, from, { wiggle: wrongThere ? wiggle : null, at, m: flyIn, hop: false, z: 10 });
+    if (!reduced) clunk(el, at + flyIn.duration);
 }
 
 // Move `el` from where `fromEl` is (a slot or a bench spot) to where the
@@ -336,6 +346,48 @@ function travel(el, fromEl, { wiggle, at, m, hop, z }) {
         tl.to(el, { x: 0, y: 0, rotation: rot, scale: 1, duration: m.duration, ease: m.ease }, at);
     }
     restoreAfter(el, at + m.duration, 'position,zIndex');
+}
+
+// --- A letter locks (BACKLOG B-211) ---
+
+// The slots whose letter is locked now and was not at the last render
+// (`prevPlaced`): a locked slot that was not locked, or held another
+// block. Pure. The given letter of easy is locked from the word's first
+// render, so it never shows up here.
+export function newlyLocked(prevPlaced, placed) {
+    const fresh = [];
+    placed.forEach((p, i) => {
+        const was = prevPlaced[i];
+        if (p && p.locked && !(was && was.locked && was.tileId === p.tileId)) fresh.push(i);
+    });
+    return fresh;
+}
+
+// A letter that locks is pressed into its slot, from `at` seconds: drawn
+// as a placed block (class `landing`, game.css) it sinks to m.scale in
+// m.press (ease-in, the hit); at the hit its locked look comes on, sunk
+// and smaller, and it comes up from where the press left it to its
+// locked size by m.duration (ease-out). Reduced motion: no press; the
+// locked look is on at once and the letter dips in opacity. Nothing to
+// clear: it ends at scale 1, the CSS render.
+function clunk(el, at) {
+    if (!el) return;
+    const m = motionFor('clunk', reducedMotion());
+    if (m.duration === 0) {
+        el.classList.remove('landing');
+        if (m.fade > 0) dip(el, m.fade);
+        return;
+    }
+    el.classList.add('landing');
+    gsap.to(el, { scale: m.scale, duration: m.press, ease: 'power2.in', delay: at });
+    gsap.delayedCall(at + m.press, () => {
+        const placed = el.offsetWidth;
+        el.classList.remove('landing');
+        const locked = el.offsetWidth;
+        const from = locked ? (m.scale * placed) / locked : m.scale;
+        // not lazy: drawn at `from` in this very frame, not the next
+        gsap.fromTo(el, { scale: from }, { scale: 1, duration: m.duration - m.press, ease: m.ease, lazy: false });
+    });
 }
 
 // --- Reset lever ---
