@@ -1,7 +1,7 @@
 // main.js — wiring: theme selection, the level picker, round flow, the
 // console controls (check dome, reset lever, speaker), the header's mute
-// toggle and the play screen's back button, the kid-idle timer for the
-// robot, screen renders.
+// toggle and the play screen's back button, the kid-idle timer and the
+// dome-nudge timer for the robot and his voice's frames, screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -9,13 +9,13 @@ import { renderCard } from './card.js';
 import { returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
-import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
-import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
+import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
 import { LEVELS, loadLevel, saveLevel, streakAfter, levelUpFor } from './level.js';
 import { pickRound, makeWord } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
@@ -131,6 +131,7 @@ async function startRound({ name, dataUrl }) {
         roundsStarted: state.roundsStarted + 1,
         lastInput: performance.now(),
         idleBeat: null,
+        nudges: 0,
         startingRound: false,
     });
     armIdle();
@@ -207,8 +208,10 @@ function onCheck(extra = {}) {
         // newSticker is true only if the book did not have the word yet.
         results[round.index].newSticker = addSticker(state.theme, current.word);
         setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, ...extra });
+        armNudge();
     } else if (lives - 1 <= 0) {
         setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
+        armNudge();
     } else {
         // The miss that leaves one bulb lit also gives one letter, on
         // every level (BACKLOG B-206, drag.js giveHint): in the same
@@ -252,6 +255,7 @@ function onNext(extra = {}) {
             streak: streakAfter(state.streak, round.level, stars),
             speaking: false,
             idleBeat: null,
+            nudges: 0,
             ...extra,
         });
     } else {
@@ -262,6 +266,7 @@ function onNext(extra = {}) {
             speaking: false,
             lastInput: performance.now(),
             idleBeat: null,
+            nudges: 0,
             ...extra,
         });
         armIdle();
@@ -295,6 +300,27 @@ function armIdle() {
         else setState({ idleBeat: 'sunk' });
     };
     setTimeout(tick, IDLE_MS);
+}
+
+// --- The robot's nudge toward the dome (BACKLOG B-212, character.js) ---
+
+// Armed when the word is answered (onCheck: correct or revealed), when
+// the dome starts to mean "next": if it is not pressed within
+// NUDGE_MS.first, one more `nudges` (the robot points at it, character.js
+// domeNudge), and again every NUDGE_MS.every (character.js nudgeWait). It
+// ends when the word or the screen changes or the dome is pressed;
+// nothing is kept outside state: the word it belongs to lives in the
+// timer's own closure, as armIdle's does.
+function armNudge() {
+    const word = wordKey(state);
+    const tick = () => {
+        if (wordKey(state) !== word || nudgeWait(state) === null) return;
+        setState({ nudges: state.nudges + 1 });
+        const next = nudgeWait(state);
+        if (next !== null) setTimeout(tick, next);
+    };
+    const wait = nudgeWait(state);
+    if (wait !== null) setTimeout(tick, wait);
 }
 
 // --- Round-end screen ---
@@ -420,6 +446,7 @@ function onThemes() {
         pressed: null,
         speaking: false,
         idleBeat: null,
+        nudges: 0,
     });
 }
 
@@ -488,6 +515,11 @@ subscribe(renderGallery);
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 subscribe(renderMute);
 subscribe(renderSound);       // the robot's clips (character.js's table) and the mute
+
+// Every frame, the robot shows his voice (BACKLOG B-210): audio.js's
+// analyser samples of the clip he is saying, or null, to character.js.
+// Render input only, never state.
+gsap.ticker.add(() => renderTalk(voiceWave()));
 
 $('check-btn').addEventListener('click', onDome);
 $('reset-btn').addEventListener('click', onLever);

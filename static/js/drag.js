@@ -7,6 +7,7 @@
 import { state, setState } from './state.js';
 import { motionFor } from './motion.js';
 import { levelRules } from './level.js';
+import { followBlock } from './character.js';
 
 const draggables = new Map();   // tile element -> Draggable instance
 
@@ -44,11 +45,18 @@ export function makeDraggable(el) {
             document.body.classList.add('dragging-active');
             pickUp(this.target);
         },
+        // The robot's eyes and head follow the block while it is dragged
+        // (BACKLOG B-210, character.js followBlock): its centre on screen,
+        // passed on as it moves, never kept.
+        onDrag() {
+            followBlock(centre(this.target));
+        },
         // Fires on every release, before onDragEnd and before onClick.
         onRelease() {
             this.target.classList.remove('gsap-dragging');
             document.body.classList.remove('dragging-active');
             putDown(this.target);
+            followBlock(null);
         },
         onDragEnd() {
             dropTile(this.target);

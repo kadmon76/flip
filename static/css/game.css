@@ -40,6 +40,7 @@
     --brass-hi: color-mix(in srgb, var(--brass) 85%, #fff);
     --brass-dark-lo: color-mix(in srgb, var(--brass-dark) 85%, #000);
     --teal-lo: color-mix(in srgb, var(--teal) 85%, #000);
+    --teal-glow-hi: color-mix(in srgb, var(--teal-glow) 85%, #fff);   /* the robot's cap glow and sparks */
     --amber-hi: color-mix(in srgb, var(--amber) 85%, #fff);
     --amber-deep-lo: color-mix(in srgb, var(--amber-deep) 85%, #000);
     --bulb-off-hi: color-mix(in srgb, var(--bulb-off) 85%, #fff);
@@ -53,6 +54,13 @@
     --shadow-deep: color-mix(in srgb, var(--bench-deep) 75%, transparent);
     --glow-teal: color-mix(in srgb, var(--teal-glow) 35%, transparent);
     --glow-amber: color-mix(in srgb, var(--amber) 60%, transparent);
+    /* the next-word dome's light (B-212): its halo, strongest at the
+       dome, and the shine on its glass */
+    --glow-next-core: var(--amber-hi);
+    --glow-next: color-mix(in srgb, var(--amber) 75%, transparent);
+    --glow-next-edge: color-mix(in srgb, var(--amber-deep) 35%, transparent);
+    --shine-next: color-mix(in srgb, var(--amber) 90%, transparent);
+    --shine-next-edge: color-mix(in srgb, var(--amber) 45%, transparent);
     --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
     /* TV static on a wrong check: light and dark noise lines */
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
@@ -838,32 +846,39 @@ body[data-screen="play"] .play-back-btn {
     }
 }
 
-/* A locked letter (BACKLOG B-204: the first letter given on easy; B-205:
-   a right letter the lever kept after a wrong check on easy; card.js
-   sets class `locked` on its slot): drawn as placed, with a small lit
-   edge, a thin line of lamp light (the lit bulbs' amber) round the block
-   where it meets the slot's rim and a soft glow on the brass, as if the
-   machine holds it. It never lifts or moves (drag.js keeps it disabled),
-   so it has no hand cursor. */
+/* A locked letter (BACKLOG B-211; card.js sets class `locked` on its slot
+   from the slot's `locked` flag, one look for all: B-204 the first letter
+   given on easy, B-205 a right letter the lever kept after a wrong check
+   on easy, B-206 the robot's letter on the second miss). It never lifts
+   or moves (drag.js keeps it disabled), so it has no hand cursor. */
 .letter-box.locked > .draggable-letter {
-    box-shadow:
-        inset -2px -3px 0 var(--cream-lo),
-        inset 1px 1px 0 var(--cream-hi),
-        1px 2px 3px var(--shadow-deep),
-        0 0 0 2px var(--amber),
-        0 0 6px 2px var(--glow-amber);
     cursor: default;
 }
 
-/* The robot's letter on the second miss (BACKLOG B-206) is locked the
-   same way; feedback.js gives it class `landing` while it flies into its
-   slot, so the lit edge comes on (the 120ms box-shadow transition above)
-   as it lands, not before. */
-.letter-box.locked > .draggable-letter.landing {
+/* The locked look: a brass plate riveted into the slot, part of the
+   machine. Brass face (the rail's metal) with the letter stamped in ink,
+   a brass rivet in each corner, and sunk: smaller than the slot, so the
+   hole's dark rim shows round it, its top shaded by the rim and no
+   shadow of its own. feedback.js gives the block class `landing` while
+   it is pressed in (the clunk) or flies in (the robot's letter), which
+   draws it as a placed block until the hit. */
+.letter-box.locked > .draggable-letter:not(.landing) {
+    --rivet: radial-gradient(circle at 40% 35%, var(--amber-hi) 0 0.6px, var(--brass-hi) 1.2px, var(--brass-dark) 2.3px, transparent 2.9px);
+    width: 86%;
+    height: 86%;
+    font-size: 25px;
+    border-radius: 5px;
+    color: var(--ink);
+    text-shadow: 0 1px 0 var(--brass-hi);
+    background:
+        var(--rivet) left 2px top 2px / 6px 6px no-repeat,
+        var(--rivet) right 2px top 2px / 6px 6px no-repeat,
+        var(--rivet) left 2px bottom 2px / 6px 6px no-repeat,
+        var(--rivet) right 2px bottom 2px / 6px 6px no-repeat,
+        linear-gradient(150deg, var(--brass-hi) 0%, var(--brass) 55%, var(--brass-dark) 100%);
     box-shadow:
-        inset -2px -3px 0 var(--cream-lo),
-        inset 1px 1px 0 var(--cream-hi),
-        1px 2px 3px var(--shadow-deep);
+        inset 0 3px 3px var(--shadow-deep),
+        inset -1px -2px 0 var(--brass-dark-lo);
 }
 
 body.dragging-active {
@@ -876,12 +891,18 @@ body.dragging-active {
 /* console.png pinned to the bottom of the safe area as the last item of
    the play column, inset 4px from each side of the safe area (324px at
    360 wide, so ~58px tall) and centred, so its lower corners clear the
-   frame's rounded inner corners (DESIGN "Layout", issue #30). Above the
-   bench and the rail in z-order by coming after them; no z-index on
-   purpose: one would make the console a stacking context and lift the
-   robot inside it (.robot, z-index -1) above the bench blocks. */
+   frame's rounded inner corners (DESIGN "Layout", issue #30). No
+   z-index on purpose: one would make the console a stacking context and
+   lift the robot inside it above the bench blocks. Inside it, in
+   #screen-play's stacking context: the robot's body and head (.robot,
+   z-index -2), the console image (-1), his hands (.robot-hands, -1,
+   after the image), the next-word dome's halo (::after, -1, last; B-212),
+   then the rail, the bench blocks and the controls (BACKLOG B-210). The
+   bench never reaches the console (4px apart). */
 #screen-play .console {
     --console-w: calc(var(--scene-w) - 36px);
+    --rpx: calc(var(--console-w) / 324);   /* 1px at the 324px console of a 360 wide screen */
+    --ppx: calc(var(--rpx) * 0.24);        /* one puppet px (the robot, character.js SCALE) */
     position: relative;
     flex: 0 0 auto;
     align-self: center;
@@ -892,6 +913,7 @@ body.dragging-active {
 
 .console-body {
     position: absolute;
+    z-index: -1;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -1028,77 +1050,303 @@ body.dragging-active {
     }
 }
 
-/* --- Robot (CHARACTER.md, BACKLOG B-115) --- */
+/* check dome `next` (BACKLOG B-212): after a correct answer or a reveal
+   a press goes to the next word, and the dome says so far louder than
+   the calm `ready` pulse before a check. The lit dome blinks on and off
+   (1.2s a blink: lit 480ms, out in 156ms, dark 408ms, back in 156ms);
+   while it is on, its glass shines (#check-btn::after, a pale amber
+   light over the glass) and its light spills past the brass rim onto
+   the console and the bench (.console::after, below). Dark, only an
+   ember of the lit glass is left (0.2). Both are light, not objects:
+   they draw nothing at rest and take no taps. The ready pulse above has
+   neither, so before a check the dome stays calm. Reduced motion: lit,
+   shining and glowing, steadily. */
+#check-btn.is-next .dome-ready {
+    opacity: 1;
+    animation: dome-next 1.2s ease-in-out infinite;
+}
 
-/* He stands behind the console's left third with his head and shoulders
-   (75px) above it. .robot is a window inside .console, from 130px above
-   the console down to its opaque bottom edge (95%), that clips him when
-   he sinks. z-index -1 puts it in #screen-play's stacking context
-   (isolation) right above the lab picture and below everything else:
-   the rail, the bench blocks (on 7-10 letter words his pop-up reaches
-   under the second row, BACKLOG B-115) and the console with its
-   controls. Sizes are in --rpx, 1px at the 324px console of a 360 wide
-   screen, so he scales with the console. */
-#screen-play .robot {
-    --rpx: calc(var(--console-w) / 324);
-    --s: calc(var(--rpx) * 120 / 330);   /* one sprite px: 330px sprites drawn 120px tall */
+#check-btn::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    width: 64%;
+    height: 82%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(closest-side at 46% 42%, var(--shine-next) 0%, var(--shine-next) 25%, var(--shine-next-edge) 70%, transparent 100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The halo: an amber light 2.4x the dome's width (radius --rx) and
+   2.15x its height (--ry), centred on its glass (42% down the sprite;
+   the dome's centre and size are #check-btn's --cx, --cy and --w) and
+   brightest just outside the rim. Its box starts --rx left of and --ry
+   above the glass, with the light's centre at (--rx, --ry) in it, and
+   ends at the play screen's right and bottom edges (the console is
+   inset 18px from the column's sides, and #screen-play's padding-bottom
+   is 22px below it): the light would reach past them (to x 381, y 741
+   at 360x740), off the screen, and a box out there would make the page
+   scroll, sideways and down (B-212, review fix). Inside the screen it
+   is the same light (the gradient is not resized; only its dithering
+   differs, by at most 4/255). It is part of the console's z-order, not
+   the button's: z-index -1 after the console image, so it lights the
+   console's plate and the bench but is drawn under the rail, the bench
+   blocks (on a 10-letter word on hard the third row lies right above
+   the dome, and an extra letter may lie there) and the controls, and
+   it never reaches the robot's hands (it starts right of the speaker).
+   Shown while the dome is `next` (`:has()`, inside the browser floor),
+   blinking in step with it. */
+#screen-play .console::after {
+    --rx: calc(var(--console-w) * 0.254 * 1.2);
+    --ry: calc(var(--console-w) * 0.254 * 169 / 240 * 1.075);
+    content: '';
     position: absolute;
     z-index: -1;
+    left: calc(81.5% - var(--rx));
+    top: calc(41% - var(--console-w) * 0.254 * 169 / 240 * 0.08 - var(--ry));
+    right: calc((var(--console-w) - var(--scene-w)) / 2);
+    bottom: -22px;
+    background: radial-gradient(var(--rx) var(--ry) at var(--rx) var(--ry), var(--glow-next-core) 0%, var(--glow-next-core) 36%, var(--glow-next) 54%, var(--glow-next-edge) 76%, transparent 100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+#check-btn.is-next::after,
+#screen-play .console:has(#check-btn.is-next)::after {
+    opacity: 1;
+    animation: dome-next-light 1.2s ease-in-out infinite;
+}
+
+@keyframes dome-next {
+    0%,
+    40% {
+        opacity: 1;
+    }
+    53%,
+    87% {
+        opacity: 0.2;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes dome-next-light {
+    0%,
+    40% {
+        opacity: 1;
+    }
+    53%,
+    87% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #check-btn.is-next .dome-ready,
+    #check-btn.is-next::after,
+    #screen-play .console:has(#check-btn.is-next)::after {
+        animation: none;
+    }
+}
+
+/* --- Robot (CHARACTER.md, BACKLOG B-115, B-210) --- */
+
+/* He is a puppet of parts on one 505x505 canvas of "puppet px"
+   (static/images/ui/robot/, design/reference/robot-puppet.html); one
+   puppet px is --ppx (0.24px at 360 wide, character.js SCALE), so the
+   canvas is 121px and his 318 puppet px above the console's top edge
+   (puppet y 374) are the ~75px of head and body above the console's left
+   third that DESIGN keeps clear of the bench blocks. His visor's centre
+   (puppet x 266) is 72.6px from the console's left edge, where v5 has it.
+   Two layers, placed alike (the canvas's left and top below):
+   - .robot, his body and head: a window inside .console, from 130px
+     above the console down to its opaque bottom edge (95%), that clips
+     him when he sinks. z-index -2 puts it in #screen-play's stacking
+     context (isolation) right above the lab picture and below everything
+     else: the console image (-1), the rail, the bench blocks (on 7-10
+     letter words the top of his pop-up passes under the second row,
+     BACKLOG B-115) and the controls.
+   - .robot-hands, his mittens: over the console image (-1, after it),
+     so they stay in view resting on its edge, and still under the rail,
+     the bench blocks and the controls (z auto), which they never cover.
+   Every part inside is a canvas-sized layer (.part), so character.js
+   moves them in % of the canvas (puppet px) and the turning points below
+   are in % of it. One contact shadow per layer. */
+#screen-play .robot,
+#screen-play .robot-hands {
+    pointer-events: none;
+}
+
+#screen-play .robot {
+    position: absolute;
+    z-index: -2;
     left: 0;
     top: calc(-130 * var(--rpx));
     bottom: 5%;
     width: calc(160 * var(--rpx));
     overflow: hidden;
-    pointer-events: none;
 }
 
-/* The layer character.js slides up and down (yPercent of its height); at
-   rest the sprite's top is 75px above the console. One contact shadow.
-   The speakerLocked head-shake (BACKLOG B-203) turns it about his neck:
-   the visor centre's column (72.6px, below) where the console's top edge
-   crosses him at rest (75px down), so his head swings and his shoulders
-   stay at the edge. */
-.robot-body {
+#screen-play .puppet,
+#screen-play .robot-hands {
     position: absolute;
-    left: 0;
-    right: 0;
-    top: calc((130 - 75) * var(--rpx));
-    height: calc(120 * var(--rpx));
-    transform-origin: calc(72.6 * var(--rpx)) calc(75 * var(--rpx));
+    left: calc(72.6 * var(--rpx) - 266 * var(--ppx));
+    width: calc(505 * var(--ppx));
+    height: calc(505 * var(--ppx));
     filter: drop-shadow(2px 3px 3px var(--shadow-contact));
 }
 
-/* One image per pose, all 330px tall at the same scale; each is placed
-   so its visor centre (--vx, in sprite px) is 72.6px from the console's
-   left edge, where v5 has it, so his head stays put when the pose
-   changes. --sw is the sprite's width in px. character.js puts class
-   is-<pose> on .robot and the rules below show that image. */
-.robot-body img {
+#screen-play .puppet {
+    top: calc(130 * var(--rpx) - 374 * var(--ppx));
+}
+
+#screen-play .robot-hands {
+    z-index: -1;
+    top: calc(-374 * var(--ppx));
+}
+
+.puppet .part,
+.puppet .pup-in,
+.puppet .pup-float,
+.robot-hands .part {
     position: absolute;
-    top: 0;
+    inset: 0;
+}
+
+.puppet img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
     height: 100%;
-    width: calc(var(--sw) * var(--s));
-    left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.puppet .visor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+/* turning points (character.js PIVOT): the head about its neck, the body
+   breathes from its base, each eyebrow about its middle */
+.robot-head {
+    transform-origin: calc(100% * 241 / 505) calc(100% * 262 / 505);
+}
+
+.robot-torso {
+    transform-origin: calc(100% * 241 / 505) calc(100% * 420 / 505);
+}
+
+.brow-L {
+    transform-origin: calc(100% * 230 / 505) calc(100% * 126 / 505);
+}
+
+.brow-R,
+.brow-R .brow-float {
+    transform-origin: calc(100% * 308 / 505) calc(100% * 136 / 505);
+}
+
+/* the visor's light: eyes, the happy arcs and the scope mouth glow in
+   the TV's teal; the cap's glow and sparks (talking, 3 in a row) in it
+   lightened */
+.visor-eye .ball {
+    fill: var(--teal-glow);
+}
+
+.visor-eye .arc,
+.visor .scope {
+    fill: none;
+    stroke: var(--teal-glow);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.visor-eye .arc {
+    stroke-width: 13;
+}
+
+.visor .scope {
+    stroke-width: 8;
+}
+
+.visor .sparks path {
+    fill: none;
+    stroke: var(--teal-glow-hi);
+    stroke-width: 7;
+    stroke-linecap: round;
+}
+
+.visor .cap-flash {
+    opacity: 0;
+}
+
+.visor .cap-hi {
+    stop-color: var(--teal-glow-hi);
+    stop-opacity: 1;
+}
+
+.visor .cap-mid {
+    stop-color: var(--teal-glow);
+    stop-opacity: 0.55;
+}
+
+.visor .cap-lo {
+    stop-color: var(--teal-glow);
+    stop-opacity: 0;
+}
+
+/* Each hand's layer sits at its rest point (character.js REST) and
+   turns about it; every mitten shape is stacked there, centred, at its
+   width (HAND_SHAPES), the left hand's mirrored except rest; class `on`
+   shows one. */
+.hand-L {
+    --hx: calc(100% * 134 / 505);
+    --hy: calc(100% * 338 / 505);
+}
+
+.hand-R {
+    --hx: calc(100% * 350 / 505);
+    --hy: calc(100% * 346 / 505);
+}
+
+.robot-hands .hand {
+    transform-origin: var(--hx) var(--hy);
+}
+
+.robot-hands img {
+    position: absolute;
+    left: var(--hx);
+    top: var(--hy);
+    height: auto;
+    transform: translate(-50%, -50%);
     opacity: 0;
     user-select: none;
     -webkit-user-drag: none;
 }
 
-.robot-body .robot-idle { --sw: 276; --vx: 150; }
-.robot-body .robot-thinking { --sw: 252; --vx: 149; }
-.robot-body .robot-confused { --sw: 269; --vx: 132; }
-.robot-body .robot-excited { --sw: 334; --vx: 164; }
-.robot-body .robot-happy { --sw: 282; --vx: 148; }
-.robot-body .robot-oops { --sw: 282; --vx: 144; }
+.robot-hands img.mirror {
+    transform: translate(-50%, -50%) scaleX(-1);
+}
 
-.robot.is-idle .robot-idle,
-.robot.is-thinking .robot-thinking,
-.robot.is-confused .robot-confused,
-.robot.is-excited .robot-excited,
-.robot.is-happy .robot-happy,
-.robot.is-oops .robot-oops {
+.robot-hands img.on {
     opacity: 1;
 }
+
+.robot-hands .shape-rest { width: calc(100% * 86 / 505); }
+.robot-hands .shape-wave { width: calc(100% * 83 / 505); }
+.robot-hands .shape-point { width: calc(100% * 101 / 505); }
+.robot-hands .shape-ball { width: calc(100% * 72 / 505); }
+.robot-hands .shape-palm { width: calc(100% * 103 / 505); }
 
 /* --- Round-end screen (interim, DESIGN "Other screens (interim)") --- */
 

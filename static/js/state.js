@@ -69,6 +69,13 @@ export const state = {
     // IDLE_MS pass without input, 'sunk' from then (he has sunk) until the
     // kid's next input, 'over' after it (he popped back up).
     idleBeat: null,
+    // Times the robot has nudged toward the dome on the current word
+    // (BACKLOG B-212): once the word is answered (correct or revealed, the
+    // dome means "next") and the dome is not pressed, main.js's nudge
+    // timer adds one after character.js NUDGE_MS.first and then every
+    // NUDGE_MS.every; each one more is his domeNudge moment. 0 on a new
+    // word.
+    nudges: 0,
 };
 
 const subscribers = [];

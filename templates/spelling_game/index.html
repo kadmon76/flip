@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=21">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=24">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -114,23 +114,102 @@
              assets; controls.js shows one of them from state (class
              is-<state> on the button). aria-labels are for screen readers
              only, never shown.
-             The robot (CHARACTER.md, BACKLOG B-115) stands behind the
-             console's left third: .robot is drawn under the console, the
-             rail and the bench blocks (game.css), one image per pose;
-             character.js shows one (class is-<pose>) and slides
-             .robot-body up and down. -->
+             The robot (CHARACTER.md, BACKLOG B-115, B-210) stands behind
+             the console's left third, a puppet of parts on one 505x505
+             canvas (static/images/ui/robot/): .robot holds his body and
+             head (with the eyebrows and the visor's code-drawn eyes, scope
+             mouth and cap sparks in SVG) and is drawn under the console,
+             the rail and the bench blocks; .robot-hands holds his two
+             mittens (every shape stacked, one shown) in a layer over the
+             console's top edge, still under the controls and the blocks
+             (game.css). character.js moves the parts. -->
         <div class="console">
-            <div class="robot is-idle" aria-hidden="true">
-                <div class="robot-body">
-                    <img class="robot-idle" src="{% static 'images/ui/robot-idle.png' %}" alt="" />
-                    <img class="robot-thinking" src="{% static 'images/ui/robot-thinking.png' %}" alt="" />
-                    <img class="robot-confused" src="{% static 'images/ui/robot-confused.png' %}" alt="" />
-                    <img class="robot-excited" src="{% static 'images/ui/robot-excited.png' %}" alt="" />
-                    <img class="robot-happy" src="{% static 'images/ui/robot-happy.png' %}" alt="" />
-                    <img class="robot-oops" src="{% static 'images/ui/robot-oops.png' %}" alt="" />
+            <div class="robot eyes-idle brows-calm hands-rest" data-head="0" aria-hidden="true">
+                <div class="puppet">
+                    <div class="pup-in">
+                        <div class="pup-float">
+                            <div class="part robot-torso"><img src="{% static 'images/ui/robot/body.png' %}" alt="" /></div>
+                            <div class="part robot-head">
+                                <img src="{% static 'images/ui/robot/head.png' %}" alt="" />
+                                <svg class="visor" viewBox="0 0 1264 1264" aria-hidden="true">
+                                    <defs>
+                                        <filter id="robot-glow" x="-60%" y="-60%" width="220%" height="220%">
+                                            <feGaussianBlur stdDeviation="9" result="b" />
+                                            <feMerge><feMergeNode in="b" /><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                        </filter>
+                                        <clipPath id="robot-visor"><ellipse cx="666" cy="464" rx="194" ry="116" transform="rotate(10 666 464)" /></clipPath>
+                                        <radialGradient id="robot-cap-glow"><stop class="cap-hi" offset="0" /><stop class="cap-mid" offset=".5" /><stop class="cap-lo" offset="1" /></radialGradient>
+                                    </defs>
+                                    <g class="cap" opacity="0">
+                                        <ellipse cx="722" cy="186" rx="110" ry="60" fill="url(#robot-cap-glow)" />
+                                        <g class="sparks" filter="url(#robot-glow)">
+                                            <path d="M700 170 l-14 -40 l16 -6 l-12 -36" />
+                                            <path d="M735 168 l10 -44 l-16 -4 l12 -34" />
+                                            <path d="M760 178 l30 -28 l-12 -10 l26 -24" />
+                                        </g>
+                                    </g>
+                                    <g class="cap-flash">
+                                        <ellipse cx="722" cy="186" rx="110" ry="60" fill="url(#robot-cap-glow)" />
+                                        <g class="sparks" filter="url(#robot-glow)">
+                                            <path d="M700 170 l-14 -40 l16 -6 l-12 -36" />
+                                            <path d="M735 168 l10 -44 l-16 -4 l12 -34" />
+                                            <path d="M760 178 l30 -28 l-12 -10 l26 -24" />
+                                        </g>
+                                    </g>
+                                    <g clip-path="url(#robot-visor)">
+                                        <g filter="url(#robot-glow)">
+                                            <g class="visor-eyes">
+                                                <g class="visor-eye visor-eye-L" transform="translate(590 452)">
+                                                    <ellipse class="ball" rx="34" ry="48" />
+                                                    <path class="arc" d="M-30 10 Q0 -28 30 10" opacity="0" />
+                                                </g>
+                                                <g class="visor-eye visor-eye-R" transform="translate(748 480)">
+                                                    <ellipse class="ball" rx="30" ry="42" />
+                                                    <path class="arc" d="M-26 10 Q0 -24 26 10" opacity="0" />
+                                                </g>
+                                            </g>
+                                            <g transform="rotate(10 666 464)">
+                                                <path class="scope" d="M556 548 L776 548" opacity=".28" />
+                                            </g>
+                                        </g>
+                                    </g>
+                                </svg>
+                                <div class="part brow brow-L"><div class="part brow-float"><img src="{% static 'images/ui/robot/browL.png' %}" alt="" /></div></div>
+                                <div class="part brow brow-R"><div class="part brow-float"><img src="{% static 'images/ui/robot/browR.png' %}" alt="" /></div></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <img class="console-body" src="{% static 'images/ui/console.png' %}" alt="" />
+            <div class="robot-hands" aria-hidden="true">
+                <div class="part hands-in">
+                    <div class="part hands-float">
+                        <div class="part hand hand-L">
+                            <div class="part hand-drift">
+                                <div class="part hand-flip">
+                                    <img class="shape-rest on" data-shape="rest" src="{% static 'images/ui/robot/hand-restL.png' %}" alt="" />
+                                    <img class="shape-wave mirror" data-shape="wave" src="{% static 'images/ui/robot/hand-wave.png' %}" alt="" />
+                                    <img class="shape-point mirror" data-shape="point" src="{% static 'images/ui/robot/hand-point.png' %}" alt="" />
+                                    <img class="shape-ball mirror" data-shape="ball" src="{% static 'images/ui/robot/hand-ball.png' %}" alt="" />
+                                    <img class="shape-palm mirror" data-shape="palm" src="{% static 'images/ui/robot/hand-palm.png' %}" alt="" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="part hand hand-R">
+                            <div class="part hand-drift">
+                                <div class="part hand-flip">
+                                    <img class="shape-rest on" data-shape="rest" src="{% static 'images/ui/robot/hand-restR.png' %}" alt="" />
+                                    <img class="shape-wave" data-shape="wave" src="{% static 'images/ui/robot/hand-wave.png' %}" alt="" />
+                                    <img class="shape-point" data-shape="point" src="{% static 'images/ui/robot/hand-point.png' %}" alt="" />
+                                    <img class="shape-ball" data-shape="ball" src="{% static 'images/ui/robot/hand-ball.png' %}" alt="" />
+                                    <img class="shape-palm" data-shape="palm" src="{% static 'images/ui/robot/hand-palm.png' %}" alt="" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <button id="reset-btn" class="ctl" type="button" aria-label="Reset">
                 <span class="sprite">
                     <img class="lever-up" src="{% static 'images/ui/lever-up.png' %}" alt="" />

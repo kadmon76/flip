@@ -1048,9 +1048,11 @@ class ControlsTests(TestCase):
                          [None, 'off'])
 
     def test_after_correct_or_reveal_the_dome_is_next(self):
+        # BACKLOG B-212: its own state, 'next' (the blink), not the ready
+        # pulse of a check
         self.assertEqual(
             self.run_node("out(['correct', 'revealed'].map((s) => [c.domeAction(cur(s, 'cat')), c.domeState(cur(s, 'cat'), null)]));"),
-            [['next', 'ready'], ['next', 'ready']],
+            [['next', 'next'], ['next', 'next']],
         )
 
     def test_no_word_no_action(self):
@@ -1218,42 +1220,115 @@ class CharacterTests(TestCase):
         return json.loads(result.stdout)
 
     def test_the_table_is_the_moment_map(self):
-        steps = lambda *s: [{'pose': p, 'move': m} for p, m in s]
-        self.assertEqual(self.run_node("out(c.MOMENTS);"), {
-            'roundStart': {'steps': steps(('idle', 'pop')), 'sound': None},
-            'picture': {'steps': steps(('thinking', 'none')), 'sound': None},
-            'blockPlaced': {'steps': steps(('idle', 'none')), 'sound': 'swipe'},
-            'blockReturned': {'steps': steps(('idle', 'none')), 'sound': None},
-            'filledEarly': {'steps': steps(('excited', 'none')), 'sound': 'swipe'},
-            'filled': {'steps': steps(('idle', 'none')), 'sound': 'swipe'},
-            'kidIdle': {'steps': steps(('thinking', 'none'), ('thinking', 'sink')), 'sound': None},
-            'wake': {'steps': steps(('idle', 'pop')), 'sound': None},
-            'wrong': {'steps': steps(('confused', 'none')), 'sound': 'error'},
-            'wrongPeek': {'steps': steps(('confused', 'peek')), 'sound': 'error'},
-            'thirdMiss': {'steps': steps(('oops', 'none'), ('happy', 'none')), 'sound': 'error'},
-            'correct': {'steps': steps(('excited', 'pop')), 'sound': 'correct'},
-            'streak': {'steps': steps(('excited', 'doublePop')), 'sound': 'correct'},
-            'roundEndGood': {'steps': steps(('happy', 'none')), 'sound': 'tada'},
-            'roundEnd': {'steps': steps(('idle', 'none')), 'sound': 'tada'},
-            'speakerLocked': {'steps': steps(('confused', 'shake')), 'sound': 'locked'},
-            'hintGiven': {'steps': steps(('happy', 'smallPop')), 'sound': None},
+        # BACKLOG B-210: the puppet's moments as in
+        # design/reference/robot-puppet.html (its "Game moments"), each
+        # step at its time (the reference's waits added up), and the clip
+        # per moment as before (B-108)
+        LP = [{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'calm', 'hands': 'rest', 'look': [-26, 22]},
+              {'at': 0.6, 'look': [0, 0]}]
+        steps = lambda m: self.run_node(f"out(c.MOMENTS.{m}.steps);")
+        variants = lambda m: self.run_node(f"out(c.MOMENTS.{m}.variants);")
+        self.assertEqual(steps('roundStart'), [
+            {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'up', 'hands': 'wave', 'pop': 1},
+            {'at': 0.6, 'brows': 'calm', 'hands': 'rest'}])
+        self.assertEqual(variants('picture'), {
+            'surprise': {'chance': 1 / 3, 'steps': [
+                {'at': 0, 'sink': 0, 'head': -10, 'look': [0, -22], 'eyes': 'wide', 'brows': 'up', 'hands': 'gasp', 'pop': 1},
+                {'at': 1.4, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+            'giggle': {'chance': 1 / 3, 'steps': [
+                {'at': 0, 'sink': 0, 'head': -8, 'look': [0, -22], 'eyes': 'happy', 'brows': 'happy', 'hands': 'giggle'},
+                {'at': 0.2, 'fx': 'giggle'},
+                {'at': 1.8, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+            'shock': {'chance': 1 / 3, 'steps': [
+                {'at': 0, 'sink': 0, 'head': -12, 'look': [0, -24], 'eyes': 'dots', 'brows': 'worried', 'hands': 'shock', 'pop': 1},
+                {'at': 0.5, 'eyes': 'wide'},
+                {'at': 1.9, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
         })
+        for m in ('blockPlaced', 'blockReturned', 'filled'):
+            self.assertEqual(steps(m), LP, m)
+        point = {'at': 0, 'sink': 0, 'head': 6, 'eyes': 'wide', 'brows': 'up', 'hands': 'point', 'look': [26, 22]}
+        self.assertEqual(variants('filledEarly'), {
+            'point': {'chance': 0.6, 'steps': [point]},
+            'excited': {'chance': 0.4, 'steps': [{**point, 'pop': 2}, {'at': 0.3, 'fx': 'wag'}, {'at': 0.6, 'fx': 'browJump'}]},
+        })
+        self.assertEqual(steps('kidIdle'), [
+            {'at': 0, 'sink': 0, 'head': -6, 'eyes': 'squint', 'brows': 'frown', 'hands': 'chin'},
+            {'at': 0.9, 'hands': 'rest', 'sink': 150}, {'at': 1.4, 'peek': True}])
+        self.assertEqual(steps('wake'), [
+            {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'wide', 'brows': 'up', 'hands': 'rest', 'pop': 1},
+            {'at': 0.5, 'eyes': 'idle', 'brows': 'calm'}])
+        self.assertEqual(steps('wrong'), [
+            {'at': 0, 'sink': 0, 'head': 6, 'eyes': 'confused', 'brows': 'puzzled', 'hands': 'shrug', 'shake': True},
+            {'at': 1.8, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0}])
+        self.assertEqual(steps('wrongPeek'), [
+            {'at': 0, 'head': 4, 'eyes': 'confused', 'brows': 'worried', 'sink': 104, 'look': [-24, -6]},
+            {'at': 0.5, 'look': [24, -6]}, {'at': 1.4, 'fx': 'shiver'}, {'at': 2, 'look': [0, -10]},
+            {'at': 2.5, 'sink': 0, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]}])
+        self.assertEqual(steps('thirdMiss'), [
+            {'at': 0, 'sink': 0, 'head': -3, 'eyes': 'dots', 'brows': 'worried', 'hands': 'cover'},
+            {'at': 0.9, 'hands': 'rest', 'eyes': 'happy', 'brows': 'happy', 'head': 5}])
+        self.assertEqual(steps('correct'), [
+            {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'happy', 'brows': 'up', 'hands': 'pump', 'pop': 1},
+            {'at': 0.3, 'fx': 'pump'}, {'at': 1.7, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm'}])
+        self.assertEqual(steps('streak'), [
+            {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'happy', 'brows': 'up', 'hands': 'pump2', 'pop': 2},
+            {'at': 0.25, 'fx': 'pump2'}, {'at': 1.85, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm'}])
+        self.assertEqual(steps('roundEndGood'), [
+            {'at': 0, 'sink': 0, 'head': 5, 'eyes': 'happy', 'brows': 'happy', 'hands': 'clap'},
+            {'at': 0.3, 'fx': 'clap'}, {'at': 2.5, 'hands': 'rest'}])
+        # 0-1 stars: his rest pose, never sad
+        self.assertEqual(steps('roundEnd'), [{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'calm', 'hands': 'rest'}])
+        self.assertEqual(steps('speakerLocked'), [
+            {'at': 0, 'sink': 0, 'eyes': 'idle', 'brows': 'frown', 'hands': 'shrug', 'shake': True},
+            {'at': 1.6, 'hands': 'rest', 'brows': 'calm'}])
+        # his letter on the second miss (B-206): glad, a small pop, pointing up at it
+        self.assertEqual(steps('hintGiven'), [
+            {'at': 0, 'sink': 0, 'head': 0, 'look': [0, 0], 'eyes': 'happy', 'brows': 'happy', 'hands': 'pointUp', 'pop': 'small'},
+            {'at': 1.2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm'}])
+        # his nudge toward the dome on an answered word (B-212): the
+        # pointing of "All slots filled", a pop, the finger wagging, rest
+        self.assertEqual(steps('domeNudge'), [
+            {**point, 'pop': 1}, {'at': 0.3, 'fx': 'wag'},
+            {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]}])
+        self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
+            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
+            'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
+            'domeNudge'])
+        # the idle peek: up to his eyes, looks left, right and ahead, sinks again
+        self.assertEqual(self.run_node("out(c.PEEK);"), {'wait': 1.6, 'every': 4.8, 'steps': [
+            {'at': 0, 'sink': 104, 'look': [-26, -8], 'brows': 'up'}, {'at': 0.9, 'look': [26, -8]},
+            {'at': 1.6, 'look': [0, -10]}, {'at': 2.2, 'sink': 150, 'brows': 'calm'}]})
 
-    def test_every_pose_is_an_image_and_every_move_exists(self):
-        poses, moves, used = self.run_node(
-            "out([c.POSES, Object.keys(c.MOVES), Object.values(c.MOMENTS).flatMap((m) => m.steps)]);")
-        for p in poses:
-            self.assertTrue((self.UI / f'robot-{p}.png').exists(), p)
-        for step in used:
-            self.assertIn(step['pose'], poses)
-            self.assertIn(step['move'], moves)
+    def test_every_part_a_step_names_exists(self):
+        # every eyes / brows / hands / fx / pop a step names is in its
+        # table, and every hand shape is an image on disk
+        steps, tables = self.run_node(
+            "const all = Object.keys(c.MOMENTS).flatMap((m) => c.variantsOf(m).flatMap((v) => v.steps)).concat(c.PEEK.steps);"
+            "out([all, { eyes: Object.keys(c.EYES), brows: Object.keys(c.BROWS), hands: Object.keys(c.HANDS), fx: Object.keys(c.FX),"
+            " files: Object.keys(c.HANDS).flatMap((h) => ['L', 'R'].map((s) => c.handPose(h)[s].file)) }]);")
+        keys = {'at', 'sink', 'head', 'eyes', 'brows', 'hands', 'look', 'pop', 'shake', 'fx', 'peek'}
+        for step in steps:
+            self.assertLessEqual(set(step), keys, step)
+            for part in ('eyes', 'brows', 'hands', 'fx'):
+                if part in step:
+                    self.assertIn(step[part], tables[part], step)
+            if 'pop' in step:
+                self.assertIn(step['pop'], (1, 2, 'small'), step)
+        for f in set(tables['files']):
+            self.assertTrue((self.UI / 'robot' / f).exists(), f)
+        for f in ('body.png', 'head.png', 'browL.png', 'browR.png'):
+            self.assertTrue((self.UI / 'robot' / f).exists(), f)
 
     def test_round_start_pops_him_up_then_the_picture_makes_him_think(self):
         self.assertEqual(self.run_node(
             "out([moments(theme, st()), moments({ ...st(), screen: 'round-end' }, st({ roundsStarted: 2 })),"
-            " moments(st(), st({ roundsStarted: 2 })), c.stepsFor(['roundStart', 'picture'])]);"), [
+            " moments(st(), st({ roundsStarted: 2 })), c.scriptFor(['roundStart', 'picture'], { picture: 'surprise' })]);"), [
             ['roundStart', 'picture'], ['roundStart', 'picture'], ['roundStart', 'picture'],
-            [{'pose': 'idle', 'move': 'pop'}, {'pose': 'thinking', 'move': 'none'}],
+            # he waves and pops up, then (in place of his hands' return to
+            # rest) the picture: surprised, looking up at the TV
+            [{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'up', 'hands': 'wave', 'pop': 1},
+             {'at': 0.6, 'sink': 0, 'head': -10, 'look': [0, -22], 'eyes': 'wide', 'brows': 'up', 'hands': 'gasp', 'pop': 1},
+             {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
         ])
 
     def test_next_word_is_a_new_picture(self):
@@ -1274,8 +1349,11 @@ class CharacterTests(TestCase):
             " moments(st({ roundsStarted: 2, current: cur('playing', 'ca-') }), st({ roundsStarted: 2, current: cur('playing', 'cat') })),"
             " moments(st({ roundsStarted: 3, current: cur('playing', 'ca-') }), st({ roundsStarted: 3, current: cur('playing', 'cat') }))]);"),
             [['blockPlaced'], ['blockReturned'], ['blockReturned'], ['filledEarly'], ['filledEarly'], ['filled']])
-        self.assertEqual(self.run_node("out([c.stepsFor(['blockPlaced']), c.stepsFor(['blockReturned'])]);"),
-                         [[{'pose': 'idle', 'move': 'none'}]] * 2)
+        # both are the reference's "Letter placed": rest pose, a glance
+        # down at the block, then ahead
+        self.assertEqual(self.run_node("out([c.stepsOf('blockPlaced'), c.stepsOf('blockReturned')]);"),
+                         [[{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'calm', 'hands': 'rest', 'look': [-26, 22]},
+                           {'at': 0.6, 'look': [0, 0]}]] * 2)
 
     def test_a_block_into_a_slot_is_placed_one_leaving_only_is_returned(self):
         # BACKLOG B-108: the swipe moment is a block going into a slot (a
@@ -1310,7 +1388,7 @@ class CharacterTests(TestCase):
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
-            'speakerLocked': ['locked'], 'hintGiven': [],
+            'speakerLocked': ['locked'], 'hintGiven': [], 'domeNudge': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
@@ -1342,8 +1420,9 @@ class CharacterTests(TestCase):
     def test_idle_sinks_him_once_and_input_pops_him_back(self):
         self.assertEqual(self.run_node(
             "out([moments(st(), st({ idleBeat: 'sunk' })), moments(st({ idleBeat: 'sunk' }), st({ idleBeat: 'over' })),"
-            " c.stepsFor(['kidIdle']).map((s) => s.pose + '/' + s.move), c.stepsFor(['wake'])]);"),
-            [['kidIdle'], ['wake'], ['thinking/none', 'thinking/sink'], [{'pose': 'idle', 'move': 'pop'}]])
+            " c.stepsOf('kidIdle').map((s) => [s.at, s.hands || null, 'sink' in s ? s.sink : null, !!s.peek]), c.stepsOf('wake')[0]]);"),
+            [['kidIdle'], ['wake'], [[0, 'chin', 0, False], [0.9, 'rest', 150, False], [1.4, None, None, True]],
+             {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'wide', 'brows': 'up', 'hands': 'rest', 'pop': 1}])
 
     def test_round_end_happy_or_idle_never_sad(self):
         self.assertEqual(self.run_node(
@@ -1373,10 +1452,10 @@ class CharacterTests(TestCase):
             " moments(st({ lockedTaps: 4, current: cur('playing', 'ca-') }), st({ lockedTaps: 5, current: cur('playing', 'ca-') })),"
             " moments(st({ idleBeat: 'sunk', lockedTaps: 1 }), st({ idleBeat: 'over', lockedTaps: 1 })),"
             " moments(st({ idleBeat: 'over', lockedTaps: 1 }), st({ idleBeat: 'over', lockedTaps: 2 })),"
-            " c.stepsFor(['speakerLocked']), c.soundsFor(['speakerLocked']),"
+            " c.stepsOf('speakerLocked').map((s) => [s.hands, !!s.shake]), c.soundsFor(['speakerLocked']),"
             " c.snapshot(st({ lockedTaps: 7 })).lockedTaps, c.snapshot(st()).lockedTaps, c.NONE.lockedTaps]);"),
             [['speakerLocked'], ['speakerLocked'], [], [], ['speakerLocked'], ['speakerLocked'],
-             ['wake'], ['speakerLocked'], [{'pose': 'confused', 'move': 'shake'}], ['locked'], 7, 0, 0])
+             ['wake'], ['speakerLocked'], [['shrug', True], ['rest', False]], ['locked'], 7, 0, 0])
 
     def test_a_new_word_or_round_wins_over_the_tap_count(self):
         # the count runs over the session; a new picture or round start is
@@ -1389,23 +1468,16 @@ class CharacterTests(TestCase):
             " moments({ ...theme, lockedTaps: 2 }, { ...theme, lockedTaps: 3 })]);"),
             [['picture'], ['roundStart', 'picture'], []])
 
-    def test_the_head_shake_is_small_and_short(self):
-        # his head and shoulders swing 4.5° each side of upright about the
-        # neck (the 9° of design/reference/robot-puppet.html's shake,
-        # centred), 90ms a swing, sine in-out, 540ms in all; he stays at
-        # rest height and ends upright. Reduced motion: no turn at all.
-        shake = self.run_node("out(c.MOVES.shake);")
-        self.assertEqual([s['rotation'] for s in shake], [4.5, -4.5, 4.5, -4.5, 4.5, 0])
-        self.assertEqual({s['y'] for s in shake}, {0})
-        self.assertEqual({s['duration'] for s in shake}, {0.09})
-        self.assertEqual({s['ease'] for s in shake}, {'sine.inOut'})
-        self.assertAlmostEqual(sum(s['duration'] for s in shake), 0.54)
-        self.assertEqual(self.run_node("out(c.moveFor('shake', true));"), [{'y': 0, 'duration': 0, 'ease': 'none'}])
-        # no other move turns him
-        moves = self.run_node("out(c.MOVES);")
-        for name, segs in moves.items():
-            if name != 'shake':
-                self.assertFalse(any('rotation' in s for s in segs), name)
+    def test_the_head_shake_is_the_references(self):
+        # design/reference/robot-puppet.html shake(): the head turns 9° from
+        # its pose and back, 90ms a swing, sine in-out, three times
+        # (yoyo, repeat 5: 540ms), then settles on its pose in 150ms; the
+        # body stays. Wrong and speaker locked shake it (with the shrug).
+        self.assertEqual(self.run_node("out(c.TIMING.shake);"),
+                         {'turn': 9, 'duration': 0.09, 'repeat': 5, 'ease': 'sine.inOut', 'settle': 0.15})
+        self.assertEqual(self.run_node(
+            "out(Object.keys(c.MOMENTS).filter((m) => c.variantsOf(m).some((v) => v.steps.some((s) => s.shake))));"),
+            ['wrong', 'speakerLocked'])
 
     def test_back_to_themes_is_no_moment_and_a_new_round_starts_fresh(self):
         # BACKLOG B-201: the play screen's back button (main.js onPlayBack
@@ -1426,37 +1498,69 @@ class CharacterTests(TestCase):
         ])
 
     def test_changes_are_at_least_300ms_apart(self):
+        # CHARACTER "Presence": never more than one change per 300ms. A new
+        # moment's first step waits until CHANGE_MS after his last change;
+        # within every moment (and the idle peek) the steps that change his
+        # pose are at least that far apart (glances and flourishes come
+        # between them)
         self.assertEqual(self.run_node(
-            "out([c.CHANGE_MS, c.stepDelays(1, Infinity), c.stepDelays(2, 1000), c.stepDelays(2, 100), c.stepDelays(1, 0)]);"),
-            [300, [0], [0, 300], [200, 500], [300]])
+            "out([c.CHANGE_MS, c.startDelay(Infinity), c.startDelay(1000), c.startDelay(100), c.startDelay(0),"
+            " c.isChange({ at: 0, look: [1, 1] }), c.isChange({ at: 0, fx: 'pump' }), c.isChange({ at: 0, sink: 0 })]);"),
+            [300, 0, 0, 200, 300, False, False, True])
+        scripts = self.run_node(
+            "out(Object.keys(c.MOMENTS).flatMap((m) => c.variantsOf(m).map((v) => v.steps)).concat([c.PEEK.steps])"
+            ".map((steps) => steps.filter(c.isChange).map((s) => s.at)));")
+        for times in scripts:
+            for a, b in zip(times, times[1:]):
+                self.assertGreaterEqual(round(b - a, 3), 0.3, times)
+            self.assertEqual(times[0], 0, times)
+        # the peek round ends before the next one starts
+        self.assertGreater(self.run_node("out(c.PEEK.every - c.PEEK.steps[c.PEEK.steps.length - 1].at);"), 0.3)
 
     def test_moves(self):
-        moves = self.run_node("out(c.MOVES);")
-        total = lambda m: sum(s['duration'] for s in m)
-        # pop: rises ~20px in 180ms, ease-out, then settles back
-        self.assertEqual(moves['pop'][0], {'y': -20, 'duration': 0.18, 'ease': 'power2.out'})
-        self.assertEqual(moves['pop'][-1]['y'], 0)
-        self.assertLessEqual(total(moves['pop']), 0.3)
-        self.assertEqual(moves['doublePop'], moves['pop'] * 2)
-        # sink: 400ms, down until only the top of his head shows (14 of 75px)
-        self.assertEqual([(s['y'], s['duration']) for s in moves['sink']], [(61, 0.4)])
-        # peek: only the eyes above the edge for 600ms, then normal
-        self.assertEqual([s['y'] for s in moves['peek']], [18, 18, 0])
-        self.assertEqual(moves['peek'][1]['duration'], 0.6)
-        # a vertical slide only, except the speakerLocked head-shake (BACKLOG
-        # B-203), which also turns him about the neck; everything but the
-        # sink ends at rest
-        for name, segs in moves.items():
-            keys = {'y', 'duration', 'ease', 'rotation'} if name == 'shake' else {'y', 'duration', 'ease'}
-            self.assertEqual(set(k for s in segs for k in s), keys, name)
-            self.assertNotIn('back', ' '.join(s['ease'] for s in segs), name)
-            if name != 'sink':
-                self.assertEqual(segs[-1]['y'], 0, name)
+        # the reference's pop (body up 26 puppet px in 180ms, down in
+        # 140ms; hands up 30 a beat later and trailing 10 down), sink
+        # (400ms; hands hidden past 40 down; sunk past 60) and the pose
+        # tweens' times and eases
+        self.assertEqual(self.run_node("out(c.TIMING);"), {
+            'hands': {'duration': 0.35, 'ease': 'back.out(1.5)', 'lag': 0.04},
+            'eyes': {'duration': 0.25, 'ease': 'back.out(1.4)'},
+            'brows': {'duration': 0.3, 'ease': 'back.out(2)'},
+            'head': {'duration': 0.4, 'ease': 'back.out(1.5)'},
+            'look': {'duration': 0.25, 'ease': 'power2.out'},
+            'sink': {'duration': 0.4, 'ease': 'power2.out', 'hands': 0.3, 'hideHands': 40, 'sunk': 60},
+            'pop': {
+                'body': {'y': -26, 'up': 0.18, 'down': 0.14},
+                'hands': {'y': -30, 'delay': 0.04, 'up': 0.2, 'down': 0.18},
+                'trail': {'y': 10, 'delay': 0.05, 'down': 0.12, 'back': 0.3, 'ease': 'back.out(3)'},
+                'small': 0.5,
+            },
+            'shake': {'turn': 9, 'duration': 0.09, 'repeat': 5, 'ease': 'sine.inOut', 'settle': 0.15},
+        })
+        # the idle sink and the peeks go down far enough to hide his
+        # hands; every sink in a moment ends with him back up (0) except
+        # the idle one, which the peek and the wake undo
+        self.assertEqual(self.run_node(
+            "out(Object.keys(c.MOMENTS).map((m) => [m, c.variantsOf(m).flatMap((v) => v.steps).filter((s) => 'sink' in s).map((s) => s.sink)])"
+            ".filter(([, s]) => s.some((v) => v)));"),
+            [['kidIdle', [0, 150]], ['wrongPeek', [104, 0]]])
+        # puppet px as a share of the 505px canvas (the parts' xPercent / yPercent)
+        self.assertEqual(self.run_node("out([c.CANVAS, c.EDGE, c.SCALE, c.pct(505), c.pct(-26), c.pct(0)]);"),
+                         [505, 374, 0.24, 100, -5.1485, 0])
 
-    def test_reduced_motion_swaps_poses_only(self):
-        self.assertEqual(self.run_node("out(Object.keys(c.MOVES).map((k) => c.moveFor(k, true)));"),
-                         [[{'y': 0, 'duration': 0, 'ease': 'none'}]] * 7)
-        self.assertEqual(self.run_node("out(c.moveFor('pop', false));"), self.run_node("out(c.MOVES.pop);"))
+    def test_reduced_motion_is_pose_and_shape_changes_only(self):
+        # BACKLOG B-210: no floating, bobbing or hops: a step loses its pop
+        # and head-shake (the render plays every change instantly and
+        # starts no ambient loop), a flourish keeps only its light (the
+        # cap's flash), nothing else
+        self.assertEqual(self.run_node(
+            "out([c.reducedStep(c.stepsOf('correct')[0]), c.reducedStep(c.stepsOf('wrong')[0]), c.reducedStep({ at: 0.3, fx: 'pump' }),"
+            " Object.keys(c.FX).map((f) => [f, c.fxFor(f, true).map((t) => t.part)]), c.fxFor('pump', false).length]);"),
+            [{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'happy', 'brows': 'up', 'hands': 'pump'},
+             {'at': 0, 'sink': 0, 'head': 6, 'eyes': 'confused', 'brows': 'puzzled', 'hands': 'shrug'},
+             {'at': 0.3, 'fx': 'pump'},
+             [['giggle', []], ['wag', []], ['browJump', []], ['shiver', []], ['pump', []], ['pump2', ['capFlash']], ['clap', []]],
+             1])
 
     def test_idle_wait_is_10s_from_the_last_input_once_per_word(self):
         self.assertEqual(self.run_node(
@@ -1466,6 +1570,485 @@ class CharacterTests(TestCase):
             " c.idleWait({ ...st(), screen: 'round-end' }, 50000), c.idleWait(theme, 50000)]);"),
             [10000, 10000, 3000, 0, 0, None, None, None, None])
 
+
+
+class PuppetTests(TestCase):
+    """static/js/character.js, the robot as a puppet (BACKLOG B-210): the
+    parts' tables, poses per moment, the drag aim and the talking effects
+    are the numbers of the approved prototype
+    design/reference/robot-puppet.html, ported as they are; read from the
+    prototype itself where they are plain data."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'character.js'
+    REF = ROOT / 'design' / 'reference' / 'robot-puppet.html'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        script = (
+            f"const c = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def ref(self):
+        return self.REF.read_text()
+
+    def ref_literal(self, name):
+        """The object literal `const <name> = {...};` of the prototype,
+        evaluated by node."""
+        m = re.search(r'const ' + name + r' = (\{.*?\});\n', self.ref(), flags=re.S)
+        self.assertIsNotNone(m, name)
+        result = subprocess.run(['node', '-e', f'console.log(JSON.stringify({m.group(1)}))'],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_hand_poses_eyes_brows_and_rest_are_the_prototypes(self):
+        ours = self.run_node("out([c.HANDS, c.EYES, c.BROWS, c.REST]);")
+        self.assertEqual(ours, [self.ref_literal('H'), self.ref_literal('EYES'), self.ref_literal('BROWS'), self.ref_literal('REST')])
+        # the head turns about (241, 262) (the prototype's HEAD), the body
+        # breathes from (241, 420), the brows turn about their middles
+        for snippet in ("const HEAD = '241px 262px';", "transformOrigin:'241px 420px'",
+                        "transformOrigin:'230px 126px'", "transformOrigin:'308px 136px'"):
+            self.assertTrue(snippet in self.ref(), snippet)
+        self.assertEqual(self.run_node("out(c.PIVOT);"),
+                         {'head': [241, 262], 'body': [241, 420], 'browL': [230, 126], 'browR': [308, 136]})
+
+    def test_hand_shapes_are_the_prototypes_images(self):
+        # the left hand uses the right-hand shapes mirrored, except rest;
+        # widths are the <img width> of the prototype (2x images)
+        ref = self.ref()
+        for shape, width, left, mirror in (('rest', 86, 'hand-restL.png', False), ('wave', 83, 'hand-wave.png', True),
+                                           ('point', 101, 'hand-point.png', True), ('ball', 72, 'hand-ball.png', True),
+                                           ('palm', 103, 'hand-palm.png', True)):
+            on = ' class="on"' if shape == 'rest' else ''
+            img = f'data-s="{shape}"{on} alt="" src="../../static/images/ui/robot/{left}" width="{width}"'
+            self.assertTrue(img + (' class="mir"' if mirror else '') + '>' in ref, shape)
+        self.assertEqual(self.run_node("out(c.HAND_SHAPES);"), {
+            'rest': {'L': 'restL', 'R': 'restR', 'width': 86}, 'wave': {'L': 'wave', 'R': 'wave', 'width': 83},
+            'point': {'L': 'point', 'R': 'point', 'width': 101}, 'ball': {'L': 'ball', 'R': 'ball', 'width': 72},
+            'palm': {'L': 'palm', 'R': 'palm', 'width': 103}})
+
+    def test_hand_pose_lookup(self):
+        # a pose as moves of each hand's layer from its rest point
+        self.assertEqual(self.run_node("out([c.handPose('rest'), c.handPose('point').R, c.handPose('shrug').L]);"), [
+            {'L': {'x': 16, 'y': 2, 'rotation': -8, 'shape': 'rest', 'file': 'hand-restL.png', 'width': 86, 'mirror': False},
+             'R': {'x': -16, 'y': -2, 'rotation': 8, 'shape': 'rest', 'file': 'hand-restR.png', 'width': 86, 'mirror': False}},
+            {'x': 48, 'y': -28, 'rotation': 32, 'shape': 'point', 'file': 'hand-point.png', 'width': 101, 'mirror': False},
+            {'x': -30, 'y': -46, 'rotation': -10, 'shape': 'palm', 'file': 'hand-palm.png', 'width': 103, 'mirror': True},
+        ])
+        self.assertIn('unknown hand pose', self.run_node("try { c.handPose('salute'); out('no'); } catch (e) { out(e.message); }"))
+
+    def test_hand_pose_per_moment(self):
+        # the hands each moment's first step takes (the reference's hands()
+        # call per moment; hintGiven points up at his letter)
+        self.assertEqual(self.run_node(
+            "out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.variantsOf(m).map((v) => v.steps[0].hands || null)])));"), {
+            'roundStart': ['wave'], 'picture': ['gasp', 'giggle', 'shock'], 'blockPlaced': ['rest'], 'blockReturned': ['rest'],
+            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'], 'wrong': ['shrug'],
+            'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
+            'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'domeNudge': ['point']})
+
+    def test_the_hands_hide_before_they_sink_and_show_after_they_rise(self):
+        # BACKLOG B-210 review: going below hideHands (40) the hands vanish
+        # at once, then slide; coming back they slide hidden, then fade in
+        # (0.3s each); reduced motion: the same order, instant
+        self.assertEqual(self.run_node("out([c.handsSink(150, false), c.handsSink(104, false), c.handsSink(0, false), c.handsSink(0, true), c.handsSink(150, true)]);"), [
+            [{'set': {'opacity': 0}}, {'to': {'y': 150}, 'duration': 0.3, 'delay': 0}],
+            [{'set': {'opacity': 0}}, {'to': {'y': 104}, 'duration': 0.3, 'delay': 0}],
+            [{'to': {'y': 0}, 'duration': 0.3, 'delay': 0}, {'to': {'opacity': 1}, 'duration': 0.3, 'delay': 0.3}],
+            [{'to': {'y': 0}, 'duration': 0, 'delay': 0}, {'to': {'opacity': 1}, 'duration': 0, 'delay': 0}],
+            [{'set': {'opacity': 0}}, {'to': {'y': 150}, 'duration': 0, 'delay': 0}],
+        ])
+
+    def test_eye_and_brow_lookup(self):
+        self.assertEqual(self.run_node("out([c.eyeShape('idle'), c.eyeShape('happy'), c.eyeShape('confused'), c.browPose('worried')]);"), [
+            {'L': {'rx': 34, 'ry': 48}, 'R': {'rx': 30, 'ry': 42}, 'arc': False},
+            {'L': {'rx': 34, 'ry': 48}, 'R': {'rx': 30, 'ry': 42}, 'arc': True},
+            {'L': {'rx': 40, 'ry': 54}, 'R': {'rx': 14, 'ry': 16}, 'arc': False},
+            {'L': {'y': -12, 'rotation': -10}, 'R': {'y': -12, 'rotation': 10}},
+        ])
+
+    def test_motion_numbers_are_the_prototypes(self):
+        # each number of the tables next to the prototype line it comes from
+        ref = self.ref()
+        ours = self.run_node("out({ T: c.TIMING, A: c.AMBIENT, F: c.FX, P: c.PEEK, AIM: c.AIM, TALK: c.TALK });")
+        T, A, F, AIM, TALK = ours['T'], ours['A'], ours['F'], ours['AIM'], ours['TALK']
+        pairs = [
+            ("gsap.to(['#pupF','#handsF'], { y:-6, duration:1.7, ...T });", A['float'] == {'y': -6, 'duration': 1.7}),
+            ("gsap.to('#body', { scaleY:1.012, scaleX:.996, duration:1.3,", A['breathe'] == {'scaleY': 1.012, 'scaleX': 0.996, 'duration': 1.3}),
+            ("gsap.to('#handL .float', { y:-8, x:3, duration:1.5, ...T, delay:.35 });", A['handL'] == {'y': -8, 'x': 3, 'duration': 1.5, 'delay': 0.35}),
+            ("gsap.to('#handR .float', { y:-10, x:-3, duration:1.8, ...T, delay:.6 });", A['handR'] == {'y': -10, 'x': -3, 'duration': 1.8, 'delay': 0.6}),
+            ("gsap.to('#browL .bf', { y:-3, duration:1.9, ...T });", A['browL'] == {'y': -3, 'duration': 1.9}),
+            ("gsap.to('#browR .bf', { y:-3, rotation:2, duration:2.3, ...T, delay:.5,", A['browR'] == {'y': -3, 'rotation': 2, 'duration': 2.3, 'delay': 0.5}),
+            ("y:'-=9', duration:.18, yoyo:true, repeat:1, repeatDelay:.5", A['browSolo']['lift'] == {'y': -9, 'duration': 0.18, 'hold': 0.5}),
+            ("rotation:'+=7', duration:.09, yoyo:true, repeat:3", A['browSolo']['wiggle'] == {'rotation': 7, 'duration': 0.09, 'repeat': 3}),
+            ("gsap.delayedCall(2.5 + Math.random()*3.5, browSolo);", A['browSolo']['every'] == [2.5, 3.5]),
+            ("scaleY:.08, duration:.07, ease:'power1.in'", (A['blink']['scaleY'], A['blink']['close']) == (0.08, 0.07)),
+            ("{ scaleY:1, duration:.1, ease:'power1.out' }", A['blink']['open'] == 0.1),
+            ("if (Math.random()<.2) gsap.delayedCall(.25,", (A['blink']['twice'], A['blink']['gap']) == (0.2, 0.25)),
+            ("gsap.delayedCall(2.2 + Math.random()*3, blink);", A['blink']['every'] == [2.2, 3]),
+            ("look((Math.random()-.5)*34, (Math.random()-.5)*18);", (A['wander']['x'], A['wander']['y']) == (34, 18)),
+            ("gsap.delayedCall(1.6+Math.random()*2.4, wander);", A['wander']['every'] == [1.6, 2.4]),
+            ("function hands(name, d=.35)", T['hands']['duration'] == 0.35),
+            ("ease:'back.out(1.5)', delay:k==='L'?0:.04", (T['hands']['ease'], T['hands']['lag']) == ('back.out(1.5)', 0.04)),
+            ("function eyes(name, d=.25)", T['eyes']['duration'] == 0.25),
+            ("duration:reduce?0:.3, ease:'back.out(2)'", T['brows'] == {'duration': 0.3, 'ease': 'back.out(2)'}),
+            ("function head(r, d=.4){ state.head = r; gsap.to('#head', { rotation:r, duration:reduce?0:d, ease:'back.out(1.5)'", T['head'] == {'duration': 0.4, 'ease': 'back.out(1.5)'}),
+            ("gsap.to('#eyes', { x, y, duration:.25, ease:'power2.out' })", T['look'] == {'duration': 0.25, 'ease': 'power2.out'}),
+            ("tl.to('#pupIn', { y:-26, duration:.18, ease:'power2.out' }).to('#pupIn', { y:0, duration:.14, ease:'power2.in' })", T['pop']['body'] == {'y': -26, 'up': 0.18, 'down': 0.14}),
+            ("gsap.timeline({ delay:.04 }).to('#handsIn', { y:-30, duration:.2, ease:'power2.out' }).to('#handsIn', { y:0, duration:.18, ease:'power2.in' })", T['pop']['hands'] == {'y': -30, 'delay': 0.04, 'up': 0.2, 'down': 0.18}),
+            ("gsap.timeline({ delay:.05 }).to('.hand .flip', { y:10, duration:.12 }).to('.hand .flip', { y:0, duration:.3, ease:'back.out(3)' })", T['pop']['trail'] == {'y': 10, 'delay': 0.05, 'down': 0.12, 'back': 0.3, 'ease': 'back.out(3)'}),
+            ("gsap.to('#pupIn', { y:px, duration:reduce?0:.4, ease:'power2.out' })", (T['sink']['duration'], T['sink']['ease']) == (0.4, 'power2.out')),
+            ("opacity: (px > 40 && !keepHands) ? 0 : 1, duration:reduce?0:.3", (T['sink']['hideHands'], T['sink']['hands']) == (40, 0.3)),
+            ("state.sunk = px > 60;", T['sink']['sunk'] == 60),
+            ("rotation:state.head+9, duration:.09, yoyo:true, repeat:5, ease:'sine.inOut'", T['shake'] == {'turn': 9, 'duration': 0.09, 'repeat': 5, 'ease': 'sine.inOut', 'settle': 0.15}),
+            ("head(state.head,.15)", T['shake']['settle'] == 0.15),
+            # the peek timeline: its first round 1.6s in, its last call at 2.2s, then 2.6s
+            # until the next round, so a round every 2.2 + 2.6 = 4.8s
+            ("repeat:-1, delay:1.6, repeatDelay:2.6", (ours['P']['wait'], round(ours['P']['every'] - ours['P']['steps'][-1]['at'], 3)) == (1.6, 2.6)),
+            ("sink(150); brows('calm'); }, null, 2.2);", ours['P']['steps'][-1]['at'] == 2.2 and ours['P']['every'] == 4.8),
+            ("gsap.to('#head',{ rotation:'+=4', duration:.08, yoyo:true, repeat:7,", F['giggle'][0] == {'part': 'head', 'to': {'rotation': '+=4'}, 'duration': 0.08, 'yoyo': True, 'repeat': 7}),
+            ("gsap.to('#handR .flip',{ x:12, duration:.12, yoyo:true, repeat:7 })", F['wag'][0] == {'part': 'flipR', 'to': {'x': 12}, 'duration': 0.12, 'yoyo': True, 'repeat': 7}),
+            ("gsap.to(['#browL .bf','#browR .bf'],{ y:'-=8', duration:.12, yoyo:true, repeat:5 })", F['browJump'][0] == {'part': 'browFloat', 'to': {'y': '-=8'}, 'duration': 0.12, 'yoyo': True, 'repeat': 5}),
+            ("gsap.to('#pupIn',{ x:3, duration:.05, yoyo:true, repeat:7 })", F['shiver'][0] == {'part': 'pupIn', 'to': {'x': 3}, 'duration': 0.05, 'yoyo': True, 'repeat': 7}),
+            ("gsap.to('#handR .flip',{ y:-26, duration:.14, yoyo:true, repeat:3, ease:'power2.out' })", F['pump'][0] == {'part': 'flipR', 'to': {'y': -26}, 'duration': 0.14, 'yoyo': True, 'repeat': 3, 'ease': 'power2.out'}),
+            ("gsap.to('#handL .flip',{ y:-28, duration:.14, yoyo:true, repeat:5, ease:'power2.out' }); gsap.to('#handR .flip',{ y:-28, duration:.14, yoyo:true, repeat:5, ease:'power2.out', delay:.14 });", F['pump2'][:2] == [
+                {'part': 'flipL', 'to': {'y': -28}, 'duration': 0.14, 'yoyo': True, 'repeat': 5, 'ease': 'power2.out'},
+                {'part': 'flipR', 'to': {'y': -28}, 'duration': 0.14, 'yoyo': True, 'repeat': 5, 'ease': 'power2.out', 'delay': 0.14}]),
+            ("gsap.fromTo('#cap',{ opacity:1 },{ opacity:0, duration:.9 })", F['pump2'][2] == {'part': 'capFlash', 'from': {'opacity': 1}, 'to': {'opacity': 0}, 'duration': 0.9, 'light': True}),
+            ("{ x:(i)=>i?-10:10, duration:.13, yoyo:true, repeat:7 }", F['clap'] == [
+                {'part': 'flipL', 'to': {'x': 10}, 'duration': 0.13, 'yoyo': True, 'repeat': 7},
+                {'part': 'flipR', 'to': {'x': -10}, 'duration': 0.13, 'yoyo': True, 'repeat': 7}]),
+            ("const dx = p.clientX-(r.left+r.width*.53), dy = p.clientY-(r.top+r.height*.37)", AIM['from'] == [0.53, 0.37]),
+            ("look(dx/len*Math.min(30,len/5), dy/len*Math.min(18,len/7));", (AIM['x'], AIM['xPer'], AIM['y'], AIM['yPer']) == (30, 5, 18, 7)),
+            ("Math.max(-8,Math.min(8,dx/25)), duration:.3", (AIM['turn'], AIM['turnPer'], AIM['duration']) == (8, 25, 0.3)),
+            ("level += ((Math.min(1,rms*4)) - level) * 0.35;", (TALK['gain'], TALK['attack']) == (4, 0.35)),
+            ("if (fx.scope && level > .02 && analyser){", TALK['quiet'] == 0.02),
+            ("const n = 44;", TALK['scope']['points'] == 44),
+            ("const x = 556 + i*(220/n);", (TALK['scope']['x0'], TALK['scope']['x1']) == (556, 776)),
+            ("(548 + v*190*Math.sin(Math.PI*i/n))", (TALK['scope']['y'], TALK['scope']['amp']) == (548, 190)),
+            ("(0.55 + level*0.45)", (TALK['scope']['base'], TALK['scope']['span']) == (0.55, 0.45)),
+            ("scope.setAttribute('opacity', fx.scope ? '.28' : '0')", TALK['scope']['rest'] == 0.28),
+            ("scale: fx.eyes ? 1 + level*0.22 : 1", TALK['eyes'] == 0.22),
+            ("Math.min(1, level*1.6)", TALK['cap'] == 1.6),
+            ("if (fx.cap && level > .45) gsap.set('#sparks', { rotation:(Math.random()-.5)*20, svgOrigin:'722 186', opacity:Math.random()<.6?1:0 });",
+             TALK['sparks'] == {'above': 0.45, 'turn': 20, 'show': 0.6, 'origin': '722 186'}),
+            ("const target = talking ? -level*12 : 0; browUp += (target - browUp)*0.3;", TALK['brows'] == {'lift': 12, 'ease': 0.3}),
+            ("level > .5 && t - lastPeak > 220", (TALK['nod']['above'], TALK['nod']['gap']) == (0.5, 220)),
+            ("rotation: state.head + nodSign*3, y:-4, duration:.1, yoyo:true, repeat:1", (TALK['nod']['turn'], TALK['nod']['y'], TALK['nod']['duration']) == (3, -4, 0.1)),
+        ]
+        for snippet, same in pairs:
+            self.assertTrue(snippet in ref, snippet)    # the prototype says so
+            self.assertTrue(same, snippet)              # and so does the table
+
+    def test_variants_are_picked_by_chance(self):
+        # new picture: surprise, giggle or shock, a third each; all slots
+        # filled: the extra-excited version about 4 in 10 times
+        self.assertEqual(self.run_node(
+            "out([[0, 0.3, 0.34, 0.6, 0.67, 0.99].map((r) => c.pickVariant('picture', r)),"
+            " [0, 0.59, 0.6, 0.99].map((r) => c.pickVariant('filledEarly', r)), c.pickVariant('correct', 0.5),"
+            " c.variantsOf('picture').map((v) => v.name), c.stepsOf('filledEarly', 'excited')[0].pop, c.stepsOf('filledEarly')[0].pop || null]);"),
+            [['surprise', 'surprise', 'giggle', 'giggle', 'shock', 'shock'], ['point', 'point', 'excited', 'excited'], 'only',
+             ['surprise', 'giggle', 'shock'], 2, None])
+
+    def test_the_second_miss_happy_pop_comes_when_his_peek_is_over(self):
+        # CHARACTER "Moment map" (B-206): his letter's happy, small pop
+        # when the peek ends, in place of the peek's own return
+        self.assertEqual(self.run_node("out(c.scriptFor(['wrongPeek', 'hintGiven']).map((s) => [s.at, s.eyes || null, s.pop || null]));"),
+                         [[0, 'confused', None], [0.5, None, None], [1.4, None, None], [2, None, None],
+                          [2.5, 'happy', 'small'], [3.7, 'idle', None]])
+        # a moment of one step followed by another keeps it (300ms apart)
+        self.assertEqual(self.run_node("out(c.scriptFor(['roundEnd', 'wake']).map((s) => s.at));"), [0, 0.3, 0.8])
+        self.assertEqual(self.run_node("out(c.scriptFor(['correct']).map((s) => s.at));"), [0, 0.3, 1.7])
+
+    def test_eyes_and_head_aim_at_the_dragged_block(self):
+        # further away looks further, up to 30 / 18 visor units; the head
+        # turns dx / 25 degrees, at most 8
+        self.assertEqual(self.run_node(
+            "out([c.aimAt(0, 0), c.aimAt(500, 0), c.aimAt(-50, 0), c.aimAt(0, 70), c.aimAt(0, -500), c.aimAt(300, 400)]);"), [
+            {'look': [0, 0], 'turn': 0}, {'look': [30, 0], 'turn': 8}, {'look': [-10, 0], 'turn': -2},
+            {'look': [0, 10], 'turn': 0}, {'look': [0, -18], 'turn': 0}, {'look': [18, 14.4], 'turn': 8}])
+
+    def test_loudness_and_its_smoothing(self):
+        # rms of the byte samples (128 = silence); the level moves 35% of
+        # the way to min(1, rms * 4) each frame, up and down
+        res = self.run_node(
+            "const sq = (a) => Array.from({ length: 512 }, (_, i) => (i % 2 ? 128 + a : 128 - a));"
+            "let l = 0; const up = []; for (let i = 0; i < 4; i++) { l = c.smoothLevel(l, c.loudness(sq(32))); up.push(l); }"
+            "const down = []; for (let i = 0; i < 3; i++) { l = c.smoothLevel(l, 0); down.push(l); }"
+            "out([c.loudness(null), c.loudness(sq(0)), c.loudness(sq(32)), c.loudness(sq(128)), up, down,"
+            " c.smoothLevel(0, 1), c.smoothLevel(1, 1), c.smoothLevel(0.5, 0.05)]);")
+        self.assertEqual(res[:4], [0, 0, 0.25, 1])
+        level, want = 0, []
+        for target in (1, 1, 1, 1, 0, 0, 0):            # rms 0.25 * 4 = 1, then silence
+            level += (target - level) * 0.35
+            want.append(level)
+        for got, exp in zip(res[4] + res[5], want):
+            self.assertAlmostEqual(got, exp)
+        self.assertAlmostEqual(want[0], 0.35)
+        self.assertAlmostEqual(want[4], 0.534, places=3)
+        self.assertEqual(res[6:8], [0.35, 1])
+        self.assertAlmostEqual(res[8], 0.5 + (0.2 - 0.5) * 0.35)
+
+    def test_the_four_talking_effects_follow_the_level(self):
+        # scope: the waveform across the visor when louder than 0.02,
+        # brighter with the level; flat and faint (0.28) when quiet or
+        # silent. Eyes 1 + 0.22 * level, cap min(1, 1.6 * level), sparks
+        # past 0.45; the brows ride up to 12 puppet px, easing 30% a frame;
+        # a nod on a peak past 0.5, at most every 220ms.
+        res = self.run_node(
+            "const w = Array.from({ length: 512 }, (_, i) => 128 + Math.round(100 * Math.sin(i / 8)));"
+            "const loud = c.scopeLine(w, 0.8);"
+            "out([c.scopeLine(null, 0.8), c.scopeLine(w, 0.01), loud.opacity, loud.d.split('L').length, loud.d.slice(0, 12),"
+            " c.talkLights(0), c.talkLights(0.5), c.talkLights(1), c.talkLights(0.4).sparks,"
+            " c.browRide(0, 1, true), c.browRide(-3.6, 1, true), c.browRide(-3.6, 0, false), c.browRide(-3.6, 1, false),"
+            " c.nodDue(0.6, 1000, 700), c.nodDue(0.6, 1000, 800), c.nodDue(0.5, 1000, 0)]);")
+        flat = {'d': 'M556 548 L776 548', 'opacity': 0.28}
+        self.assertEqual(res[0], flat)
+        self.assertEqual(res[1], flat)
+        self.assertEqual(res[2], 0.91)
+        self.assertEqual(res[3], 45)                     # 44 segments across the visor
+        self.assertEqual(res[4], 'M556.0 548.0')        # starts on the line (sin 0)
+        self.assertEqual(res[5:9], [{'eyes': 1, 'cap': 0, 'sparks': False}, {'eyes': 1.11, 'cap': 0.8, 'sparks': True},
+                                    {'eyes': 1.22, 'cap': 1, 'sparks': True}, False])
+        self.assertAlmostEqual(res[9], -3.6)
+        self.assertAlmostEqual(res[10], -6.12)
+        self.assertAlmostEqual(res[11], -2.52)
+        self.assertAlmostEqual(res[12], -2.52)          # not talking: back down, whatever the level
+        self.assertEqual(res[13:], [True, False, False])
+
+
+class PuppetRenderTests(TestCase):
+    """character.js's render part with stand-ins for the DOM and GSAP
+    (BACKLOG B-210): the ambient life starts when he comes on screen and
+    stops when he leaves; under prefers-reduced-motion only pose and shape
+    changes, no floating, bobbing or hops; the talking frames draw while
+    he talks and nothing once he is quiet; the eyes and head follow a
+    dragged block and come back on release. main.js and drag.js feed it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'character.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, reduced=False):
+        # Every element the module looks up is a stand-in named by its
+        # selector path; gsap calls are logged as [call, target names, vars].
+        script = (
+            "const els = new Map(); const log = [];"
+            "const mk = (name) => { const cls = new Set(); const attrs = {};"
+            " const el = { name, dataset: {}, isConnected: true, attrs,"
+            "  classList: { add: (...c) => c.forEach((x) => cls.add(x)), remove: (...c) => c.forEach((x) => cls.delete(x)),"
+            "   toggle: (x, on) => ((on === undefined ? !cls.has(x) : on) ? cls.add(x) : cls.delete(x)), contains: (x) => cls.has(x),"
+            "   [Symbol.iterator]: () => [...cls][Symbol.iterator]() },"
+            "  setAttribute: (k, v) => { attrs[k] = v; }, getAttribute: (k) => attrs[k],"
+            "  getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),"
+            "  querySelector: (sel) => get(name + ' ' + sel),"
+            "  querySelectorAll: (sel) => (sel === 'img' ? ['rest', 'wave', 'point', 'ball', 'palm'].map((sh) => { const i = get(name + ' img.' + sh); i.dataset.shape = sh; return i; })"
+            "   : [get(name + ' ' + sel + ' #1'), get(name + ' ' + sel + ' #2')]) };"
+            " return el; };"
+            "const get = (k) => { if (!els.has(k)) els.set(k, mk(k)); return els.get(k); };"
+            "const nm = (t) => (Array.isArray(t) ? t.map(nm).join(' & ') : t && t.name ? t.name.replace('#screen-play ', '') : String(t));"
+            "const tl = () => { const t = { to(el, v) { log.push(['tl.to', nm(el), v]); return t; } }; return t; };"
+            "globalThis.document = { querySelector: (sel) => get(sel) };"
+            f"globalThis.window = {{ matchMedia: () => ({{ matches: {'true' if reduced else 'false'} }}) }};"
+            "globalThis.gsap = { to: (el, v) => log.push(['to', nm(el), v]), set: (el, v) => log.push(['set', nm(el), v]),"
+            " fromTo: (el, a, b) => log.push(['fromTo', nm(el), a, b]), timeline: (o) => { log.push(['timeline', nm(o && o.delay)]); return tl(); },"
+            " delayedCall: (t, fn, args) => log.push(['delayedCall', t, fn.name, args || null]),"
+            " killTweensOf: (x) => log.push(['kill', typeof x === 'function' ? x.name : 'parts']) };"
+            f"const c = await import('{self.MODULE.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status: 'playing', placed: put('---') }, ...o });"
+            "const theme = { screen: 'theme', roundsStarted: 0, idleBeat: null, lives: 3, lockedTaps: 0,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: null, placed: [] } };"
+            "const robot = () => get('#screen-play .robot');"
+            "const take = () => log.splice(0, log.length);"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_ambient_life_runs_while_he_is_on_screen(self):
+        # Math.random pinned: no double blink (a 20% chance) in the log
+        res = self.run_node(
+            "Math.random = () => 0.5;"
+            "c.renderRobot(theme); const offScreen = take();"
+            "c.renderRobot(st()); const on = take();"
+            "c.renderRobot(st()); const again = take();"
+            "c.renderRobot({ ...st(), screen: 'round-end', round: { index: 4, size: 5, results: [] } }); const off = take();"
+            "out({ offScreen, loops: on.filter((e) => e[0] === 'to' && e[2].repeat === -1).map((e) => e[1]),"
+            " calls: on.filter((e) => e[0] === 'delayedCall').map((e) => e[2]),"
+            " pops: on.filter((e) => e[0] === 'timeline').map((e) => e[1]), again,"
+            " killed: off.filter((e) => e[0] === 'kill').map((e) => e[1]), cls: [...robot().classList].sort() });")
+        self.assertEqual(res['offScreen'], [])
+        # float (body and hands together), breathing, the two hands'
+        # drift, the two eyebrows' bob
+        self.assertEqual(res['loops'], [
+            '.robot .pup-float & .robot-hands .hands-float', '.robot .robot-torso',
+            '.robot-hands .hand-L .hand-drift', '.robot-hands .hand-R .hand-drift',
+            '.robot .brow-L .brow-float', '.robot .brow-R .brow-float'])
+        # blink, wander, an eyebrow's solo; the round start's later step and the picture's
+        self.assertEqual(res['calls'][:3], ['blink', 'wander', 'browSolo'])
+        self.assertEqual(set(res['calls'][3:]), {'applyStep'})
+        # his pop: body, hands (0.04s later), the hands' trail (0.05s); and a blink
+        self.assertEqual(sorted(res['pops']), ['0.04', '0.05', 'undefined', 'undefined'])
+        self.assertEqual(res['again'], [])        # a re-render plays nothing
+        for fn in ('applyStep', 'peekOnce', 'blink', 'blinkOnce', 'wander', 'browSolo', 'parts'):
+            self.assertIn(fn, res['killed'])
+        self.assertNotIn('is-sunk', res['cls'])
+
+    def test_reduced_motion_is_pose_and_shape_changes_only(self):
+        res = self.run_node(
+            "c.renderRobot(theme); c.renderRobot(st()); const on = take();"
+            "c.renderRobot(st({ current: { word: 'cat', status: 'correct', placed: put('cat') },"
+            " round: { index: 0, size: 5, results: [{ correct: true }] } })); const correct = take();"
+            "c.renderRobot(st({ current: { word: 'cat', status: 'correct', placed: put('cat') }, lockedTaps: 1,"
+            " round: { index: 0, size: 5, results: [{ correct: true }] } })); const locked = take();"
+            "const all = on.concat(correct, locked);"
+            "out({ loops: all.filter((e) => e[2] && e[2].repeat === -1).length, timelines: all.filter((e) => e[0] === 'timeline').length,"
+            " moving: all.filter((e) => e[0] === 'to' && e[2].duration > 0).map((e) => e[1]),"
+            " calls: all.filter((e) => e[0] === 'delayedCall').map((e) => e[2]),"
+            " heads: all.filter((e) => e[0] === 'to' && e[1] === '.robot .robot-head').map((e) => e[2]) });", reduced=True)
+        self.assertEqual(res['loops'], 0)         # no float, breathing, drift or bob
+        self.assertEqual(res['timelines'], 0)     # no pop (nor blink)
+        # every change is instant (only the eyes' glance would keep its
+        # 250ms, the reference's look())
+        self.assertLessEqual(set(res['moving']), {'.robot .visor-eyes'})
+        self.assertEqual(set(res['calls']), {'applyStep'})   # no blink, wander or brow solo
+        # the head turns to its pose at once and never shakes (no yoyo)
+        self.assertTrue(res['heads'])
+        for h in res['heads']:
+            self.assertEqual(h['duration'], 0)
+            self.assertNotIn('yoyo', h)
+
+    def test_talking_frames(self):
+        res = self.run_node(
+            "c.renderRobot(theme); c.renderRobot(st()); take();"
+            "const scope = get('#screen-play .robot .scope'), cap = get('#screen-play .robot .cap');"
+            "c.renderTalk(null); const quiet = take();"
+            "const loud = new Uint8Array(512).map((_, i) => (i % 2 ? 255 : 1));"
+            "for (let i = 0; i < 6; i++) c.renderTalk(loud);"
+            "const talking = take(); const drawn = [scope.attrs.opacity, cap.attrs.opacity, scope.attrs.d.split('L').length];"
+            "for (let i = 0; i < 60; i++) c.renderTalk(null);"
+            "const settled = [scope.attrs.d, scope.attrs.opacity, cap.attrs.opacity]; take(); c.renderTalk(null); const still = take();"
+            "c.renderRobot({ ...st(), screen: 'round-end', round: { index: 4, size: 5, results: [] } }); take();"
+            "scope.attrs.d = 'x'; c.renderTalk(loud); const offScreen = [take().filter((e) => e[0] === 'set').length, scope.attrs.d];"
+            "out({ quiet, drawn, sets: [...new Set(talking.filter((e) => e[0] === 'set').map((e) => e[1]))].sort(),"
+            " eyes: talking.filter((e) => e[0] === 'set' && e[1].includes('ball')).map((e) => e[2].scale).pop(),"
+            " nods: talking.filter((e) => e[0] === 'to' && e[1] === '.robot .robot-head').map((e) => [e[2].yoyo, e[2].repeat, e[2].duration]),"
+            " settled, still, offScreen });")
+        self.assertEqual(res['quiet'], [])        # quiet and drawn so: nothing to do
+        self.assertGreater(float(res['drawn'][0]), 0.9)   # the scope bright
+        self.assertEqual(res['drawn'][1], '1')             # the cap fully lit
+        self.assertEqual(res['drawn'][2], 45)     # the waveform across the visor
+        self.assertEqual(res['sets'], ['.robot .brow-float img #1 & .robot .brow-float img #2', '.robot .cap .sparks',
+                                       '.robot .visor-eye .ball #1 & .robot .visor-eye .ball #2'])
+        self.assertGreater(res['eyes'], 1.2)
+        self.assertEqual(res['nods'], [[True, 1, 0.1]])   # one bob in 6 frames (peaks at most every 220ms)
+        self.assertEqual(res['settled'], ['M556 548 L776 548', '0.28', '0'])
+        self.assertEqual(res['still'], [])
+        self.assertEqual(res['offScreen'], [0, 'x'])
+
+    def test_eyes_and_head_follow_a_dragged_block(self):
+        res = self.run_node(
+            "c.renderRobot(theme); c.followBlock({ x: 600, y: 37 }); const offScreen = take();"
+            "c.renderRobot(st()); take(); robot().dataset.head = '-4';"
+            "c.followBlock({ x: 553, y: 37 }); const drag = take(); const following = robot().classList.contains('is-following');"
+            "c.followBlock(null); const drop = take(); c.followBlock(null); const twice = take();"
+            "out({ offScreen, drag: drag.map((e) => [e[1], e[2]]), following, drop: drop.map((e) => [e[1], e[2]]), twice,"
+            " after: robot().classList.contains('is-following') });")
+        self.assertEqual(res['offScreen'], [])
+        # the block is 500px right of his head (53, 37): eyes right as far
+        # as they go, head turned the most, 8°, from its pose (-4°)
+        self.assertEqual(res['drag'], [['.robot .visor-eyes', {'x': 30, 'y': 0, 'duration': 0.25, 'ease': 'power2.out'}],
+                                       ['.robot .robot-head', {'rotation': 4, 'duration': 0.3, 'overwrite': 'auto'}]])
+        self.assertTrue(res['following'])
+        self.assertEqual(res['drop'], [['.robot .visor-eyes', {'x': 0, 'y': 0, 'duration': 0.25, 'ease': 'power2.out'}],
+                                       ['.robot .robot-head', {'rotation': -4, 'duration': 0.4, 'ease': 'back.out(1.5)'}]])
+        self.assertEqual(res['twice'], [])
+        self.assertFalse(res['after'])
+
+    def test_the_hands_vanish_before_he_sinks_and_return_after_he_rises(self):
+        # kidIdle's sink: the hands' layer is hidden at once (set) and only
+        # then slides down; on the wake it slides up hidden and only then
+        # fades in. Steps are run by hand (delayedCall recorded).
+        script = (
+            "c.renderRobot(theme); c.renderRobot(st()); take();"
+            "const due = []; globalThis.gsap.delayedCall = (t, fn, args) => due.push([fn, args]);"
+            "const run = (pick) => { const [fn, args] = due.find(([, a]) => a && pick(a[0])); take(); fn(...args);"
+            " return take().filter((e) => e[1] === '.robot-hands .hands-in' && (e[0] === 'set' || e[0] === 'to')).map((e) => [e[0], e[2]]); };"
+            "c.renderRobot(st({ idleBeat: 'sunk' })); const down = run((s) => s.sink === 150);"
+            "due.length = 0; c.renderRobot(st({ idleBeat: 'over' })); const up = run((s) => s.sink === 0);"
+            "out({ down, up });")
+        res = self.run_node(script)
+        self.assertEqual(res['down'], [['set', {'opacity': 0}], ['to', {'yPercent': 29.703, 'duration': 0.3, 'delay': 0, 'ease': 'power2.out'}]])
+        self.assertEqual(res['up'], [['to', {'yPercent': 0, 'duration': 0.3, 'delay': 0, 'ease': 'power2.out'}],
+                                     ['to', {'opacity': 1, 'duration': 0.3, 'delay': 0.3, 'ease': 'power2.out'}]])
+        # a fade still waiting from the rise is dropped before they hide
+        code = re.sub(r'/\*.*?\*/|//[^\n]*', '', self.MODULE.read_text(), flags=re.S)
+        body = code[code.index('function sink('):code.index('function shake(')]
+        self.assertLess(body.index("gsap.killTweensOf(d.handsIn, 'opacity');"), body.index('handsSink(px, reduced)'))
+        # reduced motion: the same order, instant
+        res = self.run_node(script, reduced=True)
+        self.assertEqual(res['down'], [['set', {'opacity': 0}], ['to', {'yPercent': 29.703, 'duration': 0, 'delay': 0, 'ease': 'power2.out'}]])
+        self.assertEqual(res['up'], [['to', {'yPercent': 0, 'duration': 0, 'delay': 0, 'ease': 'power2.out'}],
+                                     ['to', {'opacity': 1, 'duration': 0, 'delay': 0, 'ease': 'power2.out'}]])
+
+    def test_under_reduced_motion_the_head_follows_at_once(self):
+        res = self.run_node(
+            "c.renderRobot(theme); c.renderRobot(st()); take(); robot().dataset.head = '0';"
+            "c.followBlock({ x: 553, y: 37 }); const drag = take(); c.followBlock(null); const drop = take();"
+            "out([drag.filter((e) => e[1] === '.robot .robot-head').map((e) => e[2].duration),"
+            " drop.filter((e) => e[1] === '.robot .robot-head').map((e) => e[2].duration)]);", reduced=True)
+        self.assertEqual(res, [[0], [0]])
+
+    def test_a_nudge_points_him_at_the_dome(self):
+        # BACKLOG B-212: one more state.nudges on the answered word plays
+        # domeNudge (its steps after the moment before, 300ms after his last
+        # change); a re-render with the same count plays nothing
+        res = self.run_node(
+            "const done = (n) => st({ nudges: n, round: { index: 0, size: 5, results: [{ correct: true }] },"
+            " current: { word: 'cat', status: 'correct', placed: put('cat') } });"
+            "c.renderRobot(done(0)); take();"
+            "c.renderRobot(done(1)); const one = take();"
+            "c.renderRobot(done(1)); const again = take();"
+            "out({ steps: one.filter((e) => e[0] === 'delayedCall' && e[2] === 'applyStep').map((e) => [e[1], e[3][0]]),"
+            " dropped: one.filter((e) => e[0] === 'kill').map((e) => e[1]), again });")
+        self.assertEqual([s['hands'] for _, s in res['steps'] if 'hands' in s], ['point', 'rest'])
+        self.assertEqual(res['steps'][0][1]['look'], [26, 22])
+        self.assertTrue(any(s.get('fx') == 'wag' for _, s in res['steps']))
+        self.assertIn('applyStep', res['dropped'])
+        self.assertEqual(res['again'], [])
+
+    def test_wiring(self):
+        js = self.ROOT / 'static' / 'js'
+        code = lambda f: re.sub(r'/\*.*?\*/|//[^\n]*', '', (js / f).read_text(), flags=re.S)
+        main, drag = code('main.js'), code('drag.js')
+        # every frame, the analyser's samples (or null) to the robot
+        self.assertIn('gsap.ticker.add(() => renderTalk(voiceWave()));', main)
+        self.assertIn("import { followBlock } from './character.js';", drag)
+        on_drag = drag[drag.index('onDrag()'):drag.index('onRelease()')]
+        self.assertIn('followBlock(centre(this.target));', on_drag)
+        on_release = drag[drag.index('onRelease()'):drag.index('onDragEnd()')]
+        self.assertIn('followBlock(null);', on_release)
+        # the follow point and the talking level never reach state
+        for f in ('drag.js', 'character.js', 'main.js', 'audio.js'):
+            for word in ('setState({ follow', 'setState({ pointer', 'setState({ talk', 'setState({ voice', 'setState({ wave'):
+                self.assertFalse(word in code(f), (f, word))
+        self.assertFalse('setState' in code('character.js'))
 
 
 class AudioTests(TestCase):
@@ -1750,6 +2333,60 @@ class AudioTests(TestCase):
             "out(res);"),
             [[True, 0, []]] * 4)
 
+    def test_his_voice_passes_an_analyser_and_the_swipe_does_not(self):
+        # BACKLOG B-210: on the first gesture the context gets one
+        # AnalyserNode (FFT 1024) on its way out; his clips (the voice
+        # channel) play into it, the swipe straight out. voiceWave() is
+        # the analyser's 512 samples while one of his clips plays, null
+        # otherwise: before the gesture, with only the swipe, after the
+        # clip, and while muted (nothing plays).
+        res = self.run_node(
+            "const analysers = [];"
+            "AudioContext.prototype.createAnalyser = function () { const n = { kind: 'analyser', fftSize: 2048, to: null,"
+            " connect(t) { n.to = t; }, getByteTimeDomainData(a) { a.fill(200); n.reads = (n.reads || 0) + 1; } }; analysers.push(n); return n; };"
+            "const cbs = AudioContext.prototype.createBufferSource;"
+            "AudioContext.prototype.createBufferSource = function () { const s = cbs.call(this); s.connect = (t) => { s.to = t; }; return s; };"
+            "const before = a.voiceWave();"
+            "await ready(); S.setState({ muted: false, speaking: false });"
+            "const an = analysers[0], ctx = ctxs[0];"
+            "const silent = a.voiceWave();"
+            "a.play('swipe'); const swipe = sources[sources.length - 1]; const swipeOnly = a.voiceWave();"
+            "a.play('error'); const err = sources[sources.length - 1]; const w = a.voiceWave();"
+            "const during = [w && w.length, w && w[0], w && w[511]];"
+            "err.onended(); const after = a.voiceWave();"
+            "a.play('locked'); const locked = sources[sources.length - 1].to === an;"
+            "S.setState({ muted: true }); [...sources].forEach((x) => x.onended && x.onended());"
+            "a.play('correct'); const muted = a.voiceWave();"
+            "out([before, analysers.length, an.fftSize, an.to === ctx.destination, swipe.to === ctx.destination, err.to === an,"
+            " silent, swipeOnly, during, after, locked, muted, a.ANALYSER]);")
+        self.assertEqual(res, [None, 1, 1024, True, True, True, None, None, [512, 200, 200], None, True, None,
+                               {'fftSize': 1024, 'samples': 512}])
+
+    def test_without_an_analyser_he_still_speaks(self):
+        # a browser without createAnalyser: his clips go straight out, he
+        # just does not show them
+        self.assertEqual(self.run_node(
+            "const cbs = AudioContext.prototype.createBufferSource;"
+            "AudioContext.prototype.createBufferSource = function () { const s = cbs.call(this); s.connect = (t) => { s.to = t; }; return s; };"
+            "await ready(); S.setState({ muted: false, speaking: false });"
+            "a.play('error'); const err = sources[sources.length - 1];"
+            "out([err.to === ctxs[0].destination, kinds(), a.voiceWave()]);"),
+            [True, ['error'], None])
+
+    def test_the_target_word_is_not_his_voice_clip(self):
+        # the word stays an <audio> element straight out (never through
+        # the context: it must play whatever the context's state), so the
+        # analyser never hears it
+        code = re.sub(r'/\*.*?\*/|//[^\n]*', '', self.MODULE.read_text(), flags=re.S)
+        self.assertNotIn('createMediaElementSource', code)
+        self.assertNotIn('captureStream', code)
+        self.assertEqual(self.run_node(
+            "AudioContext.prototype.createAnalyser = function () { return { connect() {}, getByteTimeDomainData(x) { x.fill(9); } }; };"
+            "await ready(); S.setState({ muted: false, speaking: true });"
+            "a.speakWord('/static/sounds/themes/animals/cat.mp3', () => {});"
+            "out([made.length > 0, a.voiceWave()]);"),
+            [True, None])
+
     def test_nothing_else_constructs_audio(self):
         # BACKLOG B-108: audio.js is the only place sounds play; no other
         # module in static/js makes an Audio element, an AudioContext or an
@@ -1884,144 +2521,291 @@ class MuteToggleTests(TestCase):
         self.assertIn('saveMuted(muted);', main)
 
 class RobotLayoutTests(TestCase):
-    """The robot behind the console (BACKLOG B-115, DESIGN "Layout",
-    CHARACTER "Presence"): inside .console, drawn below the console, the
-    rail and the bench blocks; head and shoulders (75px) above the
-    console's left third; words of up to six letters leave room for his
-    20px pop-up, longer ones put blocks over him (z-order)."""
+    """The robot behind the console (BACKLOG B-115, B-210, DESIGN "Layout",
+    CHARACTER "Presence", CLAUDE.md's robot rule): a puppet of parts on one
+    505x505 canvas, in two layers inside .console. His body and head are
+    drawn under the console, the rail and the bench blocks, with ~75px of
+    him above the console's left third; his hands are drawn over the
+    console's top edge, resting on it, still under the controls and the
+    blocks, and never over a control's tap area or a bench block."""
 
     ROOT = Path(__file__).resolve().parent.parent
     CSS = ROOT / 'static' / 'css' / 'game.css'
     UI = ROOT / 'static' / 'images' / 'ui'
     LAYOUT = ROOT / 'static' / 'js' / 'layout.js'
+    CHARACTER = ROOT / 'static' / 'js' / 'character.js'
 
     def css(self):
         return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
 
     def rule(self, selector):
-        return re.search(re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        # the rule whose whole selector this is (not one line of a list)
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
 
-    def test_robot_is_inside_the_console_with_every_pose(self):
+    def test_the_puppet_is_in_the_console_in_two_layers(self):
         html = self.client.get('/').content.decode()
-        console = html.index('<div class="console">')
-        robot = html.index('<div class="robot')
-        self.assertLess(console, robot)
-        self.assertLess(robot, html.index('class="console-body"'))
-        for pose in ('idle', 'thinking', 'confused', 'excited', 'happy', 'oops'):
-            self.assertIn(f'/static/images/ui/robot-{pose}.png', html[robot:html.index('class="console-body"')], pose)
+        console = html[html.index('<div class="console">'):html.index('id="reset-btn"')]
+        robot = console.index('<div class="robot ')
+        body = console.index('class="console-body"')
+        hands = console.index('<div class="robot-hands"')
+        self.assertLess(robot, body)          # body and head under the console image
+        self.assertLess(body, hands)          # hands over it
+        pup, mitts = console[robot:body], console[hands:]
+        for part in ('body.png', 'head.png', 'browL.png', 'browR.png'):
+            self.assertIn(f'/static/images/ui/robot/{part}', pup, part)
+        # the eyes, scope mouth and cap sparks are code (SVG) in the visor
+        for part in ('<svg class="visor" viewBox="0 0 1264 1264"', 'clip-path="url(#robot-visor)"',
+                     '<clipPath id="robot-visor"><ellipse cx="666" cy="464" rx="194" ry="116" transform="rotate(10 666 464)" />',
+                     'class="visor-eye visor-eye-L" transform="translate(590 452)"', '<ellipse class="ball" rx="34" ry="48" />',
+                     'class="visor-eye visor-eye-R" transform="translate(748 480)"', '<ellipse class="ball" rx="30" ry="42" />',
+                     '<path class="scope" d="M556 548 L776 548" opacity=".28" />', '<g class="cap" opacity="0">', '<g class="cap-flash">'):
+            self.assertIn(part, pup, part)
+        self.assertLess(pup.index('head.png'), pup.index('<svg'))       # visor over the head,
+        self.assertLess(pup.index('</svg>'), pup.index('browL.png'))    # eyebrows over the visor
+        # each hand stacks every shape; the left hand mirrors all but rest
+        left = mitts[mitts.index('hand-L'):mitts.index('hand-R')]
+        right = mitts[mitts.index('hand-R'):]
+        self.assertEqual(re.findall(r'class="shape-(\w+)( on)?( mirror)?" data-shape="\1" src="/static/images/ui/robot/hand-(\w+)\.png"', left),
+                         [('rest', ' on', '', 'restL'), ('wave', '', ' mirror', 'wave'), ('point', '', ' mirror', 'point'),
+                          ('ball', '', ' mirror', 'ball'), ('palm', '', ' mirror', 'palm')])
+        self.assertEqual(re.findall(r'class="shape-(\w+)( on)?( mirror)?" data-shape="\1" src="/static/images/ui/robot/hand-(\w+)\.png"', right),
+                         [('rest', ' on', '', 'restR'), ('wave', '', '', 'wave'), ('point', '', '', 'point'),
+                          ('ball', '', '', 'ball'), ('palm', '', '', 'palm')])
+        # the six still poses are no longer drawn (they stay on disk)
+        self.assertNotIn('images/ui/robot-', html)
+        for pose in ('idle', 'thinking', 'confused', 'excited', 'happy', 'oops', 'hero'):
+            self.assertTrue((self.UI / f'robot-{pose}.png').exists(), pose)
 
-    def test_robot_is_drawn_below_the_console_rail_and_blocks(self):
-        # z-index -1 inside #screen-play's stacking context: above the lab
-        # picture, below every block, the rail and the console. The console
-        # must not be a stacking context of its own, or he would be lifted
-        # above the bench with it.
+    def test_body_under_everything_hands_over_the_console_image_only(self):
+        # In #screen-play's stacking context (isolation): .robot at -2, the
+        # console image at -1, .robot-hands at -1 after it, then the rail,
+        # the bench blocks and the controls (z auto). The console must not
+        # be a stacking context of its own, or he would be lifted with it.
         self.assertIn('isolation: isolate;', self.rule('#screen-play'))
         robot = self.rule('#screen-play .robot')
-        self.assertIn('z-index: -1;', robot)
-        self.assertIn('pointer-events: none;', robot)
-        self.assertIn('overflow: hidden;', robot)
+        for decl in ('z-index: -2;', 'overflow: hidden;', 'position: absolute;'):
+            self.assertIn(decl, robot)
+        self.assertIn('z-index: -1;', self.rule('#screen-play .robot-hands'))
+        self.assertIn('z-index: -1;', self.rule('.console-body'))
+        self.assertIn('pointer-events: none;', self.rule('#screen-play .robot,\n#screen-play .robot-hands'))
         console = self.rule('#screen-play .console')
         for prop in ('z-index', 'transform', 'filter', 'opacity', 'isolation', 'will-change', 'contain'):
-            self.assertNotIn(prop, console, prop)
-        for sel in ('.letter-boxes', '.letter-tray', '.block-spot', '.draggable-letter'):
+            self.assertNotIn(prop + ':', console, prop)
+        for sel in ('.letter-boxes', '.letter-tray', '.block-spot', '.draggable-letter', '.ctl'):
             self.assertNotRegex(self.rule(sel), r'z-index:\s*-', sel)
 
-    def geometry(self):
-        """Per pose (sprite width, visor centre x) from game.css, and the
-        numbers the CSS places him with (checked to be there)."""
-        css = self.css()
-        for decl in ('--s: calc(var(--rpx) * 120 / 330);', 'top: calc((130 - 75) * var(--rpx));',
-                     'height: calc(120 * var(--rpx));', 'left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));',
-                     '--rpx: calc(var(--console-w) / 324);', 'bottom: 5%;'):
-            self.assertIn(decl, css)
-        poses = dict((p, (int(w), int(v))) for p, w, v in re.findall(
-            r'\.robot-body \.robot-(\w+)\s*{\s*--sw:\s*(\d+);\s*--vx:\s*(\d+);\s*}', css))
-        self.assertEqual(set(poses), {'idle', 'thinking', 'confused', 'excited', 'happy', 'oops'})
-        return poses
+    def test_the_css_places_the_canvas_by_character_js(self):
+        # one puppet px is SCALE (0.24) of --rpx; the canvas is 505 of them;
+        # its visor centre (puppet x 266) is 72.6px from the console's left
+        # edge (v5) and puppet y 374 (EDGE) is the console's top; the
+        # turning points, the hands' rest points and the mitten widths are
+        # character.js's
+        c = subprocess.run(['node', '--input-type=module', '-e',
+                            f"const c = await import('{self.CHARACTER.as_uri()}');"
+                            "console.log(JSON.stringify([c.SCALE, c.EDGE, c.CANVAS, c.PIVOT, c.REST, c.HAND_SHAPES]));"],
+                           capture_output=True, text=True, timeout=20)
+        self.assertEqual(c.returncode, 0, c.stderr)
+        scale, edge, canvas, pivot, rest, shapes = json.loads(c.stdout)
+        console = self.rule('#screen-play .console')
+        self.assertIn('--rpx: calc(var(--console-w) / 324);', console)
+        self.assertIn(f'--ppx: calc(var(--rpx) * {scale});', console)
+        both = self.rule('#screen-play .puppet,\n#screen-play .robot-hands')
+        for decl in ('left: calc(72.6 * var(--rpx) - 266 * var(--ppx));', f'width: calc({canvas} * var(--ppx));',
+                     f'height: calc({canvas} * var(--ppx));', 'filter: drop-shadow(2px 3px 3px var(--shadow-contact));'):
+            self.assertIn(decl, both)
+        self.assertIn(f'top: calc(130 * var(--rpx) - {edge} * var(--ppx));', self.rule('#screen-play .puppet'))
+        self.assertIn(f'top: calc(-{edge} * var(--ppx));', self.rule('#screen-play .robot-hands'))
+        self.assertIn('top: calc(-130 * var(--rpx));', self.rule('#screen-play .robot'))
+        at = lambda x, y: f'calc(100% * {x} / {canvas}) calc(100% * {y} / {canvas})'
+        self.assertIn(f'transform-origin: {at(*pivot["head"])};', self.rule('.robot-head'))
+        self.assertIn(f'transform-origin: {at(*pivot["body"])};', self.rule('.robot-torso'))
+        self.assertIn(f'transform-origin: {at(*pivot["browL"])};', self.rule('.brow-L'))
+        self.assertIn(f'transform-origin: {at(*pivot["browR"])};', self.rule('.brow-R,\n.brow-R .brow-float'))
+        for side in ('L', 'R'):
+            hand = self.rule(f'.hand-{side}')
+            self.assertIn(f'--hx: calc(100% * {rest[side]["x"]} / {canvas});', hand)
+            self.assertIn(f'--hy: calc(100% * {rest[side]["y"]} / {canvas});', hand)
+        for name, shape in shapes.items():
+            self.assertIn(f'.robot-hands .shape-{name} {{ width: calc(100% * {shape["width"]} / {canvas}); }}', self.CSS.read_text())
 
-    def test_head_and_shoulders_show_and_short_words_leave_room_for_the_pop(self):
-        # At 360x740: the console is 324px wide at x 18 (TenLetterFitTests),
-        # top 659.7. Each pose is 120px tall, its top 75px above the
-        # console, its visor centre 72.6px right of the console's left
-        # edge. Checked on the sprites' pixels (alpha >= 50%), above the
-        # console only (below it he is hidden):
-        # - he shows down to the console edge (no gap: head and shoulders)
-        #   and stays inside his clip window (x 18-178) and the console's
-        #   left half;
-        # - at rest he is clear of every block of every word (1-10
-        #   letters) and of the rail;
-        # - at the top of a pop (20px up) he is clear of every block of a
-        #   1-6 letter word and of the rail of any word; 7-10 letter words
-        #   do reach him, which is why he is drawn under the blocks.
-        # Also on hard (B-207), where a word of n letters has n + 2 blocks
-        # (keys 'h1'-'h10'): clear at rest, and at the top of a pop only
-        # the second row of a 7-10 letter word passes over him.
+    def test_he_fits_beside_the_bench_and_his_hands_clear_the_controls(self):
+        # At 360x740 (console 324px at x 18, top 659.7; TenLetterFitTests),
+        # the puppet's pixels (alpha >= 50%) at its scale:
+        # - at rest (idle, with his float, his hands' drift and his
+        #   eyebrows at their highest) about 75px of him shows above the
+        #   console (76px at the top of his float), he is inside his window
+        #   and the console's left third, clear of every block of every
+        #   word (1-10 letters, also with hard's two extras) and of the
+        #   rail;
+        # - at the top of his pop only the second block row of a 7-10
+        #   letter word passes over him (he is drawn under the blocks);
+        # - his hands rest on the console's edge, and in every hand pose
+        #   (and at rest even at the bottom of the pop's trail) they are
+        #   clear of the lever's, the speaker's and the dome's tap areas
+        #   (48x48 at least) and of every bench block.
         if shutil.which('node') is None:
             self.skipTest('node not installed')
-        poses = self.geometry()
         fit = TenLetterFitTests()
         left, top, cw, ch = fit.console_box()
         bench = fit.W - 2 * fit.SIDE
         rail_top = 0.445 * fit.W * 2739 / 1264
+        taps = {}
+        for name, sel in (('lever', '#reset-btn'), ('speaker', '#speak-btn'), ('dome', '#check-btn')):
+            r = self.rule(sel)
+            cx = float(re.search(r'--cx: ([\d.]+)%;', r).group(1)) / 100
+            cy = float(re.search(r'--cy: ([\d.]+)%;', r).group(1)) / 100
+            w = cw * float(re.search(r'--w: calc\(var\(--console-w\) \* ([\d.]+)\);', r).group(1))
+            ar = re.search(r'--ar: calc\((\d+) / (\d+)\);', r)
+            h = w * int(ar.group(1)) / int(ar.group(2))
+            tw, th = max(48, w), max(48, h)
+            x, y = left + cx * cw, top + cy * ch
+            taps[name] = [x - tw / 2, y - th / 2, x + tw / 2, y + th / 2]
         script = TenLetterFitTests.PNG_ALPHA_JS + f"""
             import {{ slotLayout, blockLayout }} from '{self.LAYOUT.as_uri()}';
-            const poses = {json.dumps(poses)}, UI = {json.dumps(str(self.UI))};
+            const c = await import('{self.CHARACTER.as_uri()}');
+            const D = {json.dumps(str(self.UI / 'robot'))} + '/';
             const L = {left}, TOP = {top}, BENCH = {bench}, RAIL = {rail_top}, SIDE = {fit.SIDE}, GAP = {fit.GAP}, TILT = {fit.TILT};
-            const s = 120 / 330, out = {{}};
+            const TAPS = {json.dumps(taps)};
+            const K = c.SCALE, VX = L + 72.6;
+            const X = (px) => VX + (px - 266) * K, Y = (py) => TOP + (py - c.EDGE) * K;
             const words = [];
-            for (let n = 1; n <= 10; n++) {{
-                for (const extras of [0, 2]) {{
-                    const sl = slotLayout(n, BENCH), bl = blockLayout(n + extras, BENCH);
-                    const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap;
-                    const benchTop = railBottom + GAP;
-                    const row = (p) => Math.round(p.y / (bl.size + 10));
-                    words.push({{ n: extras ? 'h' + n : n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
-                        SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT, row(p)]) }});
+            for (let n = 1; n <= 10; n++) for (const extras of [0, 2]) {{
+                const sl = slotLayout(n, BENCH), bl = blockLayout(n + extras, BENCH);
+                const railBottom = RAIL + 2 * sl.pad + sl.rows * sl.size + (sl.rows - 1) * sl.gap, benchTop = railBottom + GAP;
+                words.push({{ n: extras ? 'h' + n : '' + n, railBottom, blocks: bl.spots.map((p) => [SIDE + p.x - TILT, benchTop + p.y - TILT,
+                    SIDE + p.x + bl.size + TILT, benchTop + p.y + bl.size + TILT, Math.round(p.y / (bl.size + 10))]) }});
+            }}
+            const hits = (x, y) => words.map((w) => [w.n, w.blocks.filter(([a, b, cc, d]) => x >= a && x <= cc && y >= b && y <= d)]).filter(([, h]) => h.length);
+            const inBox = (x, y, b) => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
+            const img = {{}};
+            for (const f of ['body', 'head', 'browL', 'browR', 'hand-restL', 'hand-restR', 'hand-wave', 'hand-point', 'hand-ball', 'hand-palm'])
+                img[f] = alphaOf(D + f + '.png');
+            // canvas parts, lifted by `up` puppet px (float, brows)
+            const solid = (f, px, py) => px >= 0 && py >= 0 && px < 505 && py < 505 && img[f].at(px, py) >= 128;
+            // the mitten of hand `side` in pose `p` (target centre, turn, shape), shifted by (dx, dy)
+            const mitten = (side, p, dx, dy, px, py) => {{
+                const file = 'hand-' + c.HAND_SHAPES[p.s][side], im = img[file], k = im.w / c.HAND_SHAPES[p.s].width;
+                const a = -p.r * Math.PI / 180, ox = px - (p.x + dx), oy = py - (p.y + dy);
+                let ix = ox * Math.cos(a) - oy * Math.sin(a); const iy = ox * Math.sin(a) + oy * Math.cos(a);
+                if (side === 'L' && p.s !== 'rest') ix = -ix;
+                const u = ix * k + im.w / 2, v = iy * k + im.h / 2;
+                return u >= 0 && v >= 0 && u < im.w && v < im.h && im.at(u, v) >= 128;
+            }};
+            const A = c.AMBIENT, F = -A.float.y;
+            const out = {{ top: Infinity, minX: Infinity, maxX: -Infinity, lowest: -Infinity, rail: 0, rest: {{}}, pop: {{}}, popRows: {{}},
+                          hands: {{}}, restBottom: -Infinity, trailBottom: -Infinity }};
+            const step = 0.5;
+            for (let py = 0; py < 505; py += step) for (let px = 0; px < 505; px += step) {{
+                const lifts = [0, F];   // at rest and at the top of his float
+                let him = false;
+                for (const up of lifts) {{
+                    const y = py + up;
+                    if (solid('body', px, y) || solid('head', px, y) || solid('browL', px, y + 12) || solid('browR', px, y + 12)) him = true;
+                    for (const side of ['L', 'R']) {{
+                        const d = side === 'L' ? A.handL : A.handR;
+                        if (mitten(side, c.HANDS.rest[side], up ? d.x : 0, up ? d.y - F : 0, px, py)) him = true;
+                    }}
+                }}
+                if (!him) continue;
+                const x = X(px), y = Y(py);
+                if (y >= TOP) continue;
+                out.top = Math.min(out.top, y); out.minX = Math.min(out.minX, x); out.maxX = Math.max(out.maxX, x); out.lowest = Math.max(out.lowest, y);
+                for (const [at, yy] of [['rest', y], ['pop', y + c.TIMING.pop.body.y * K]]) for (const w of words) {{
+                    if (yy < w.railBottom) out.rail++;
+                    const h = w.blocks.filter(([a, b, cc, d]) => x >= a && x <= cc && yy >= b && yy <= d);
+                    if (h.length) out[at][w.n] = (out[at][w.n] || 0) + 1;
+                    if (at === 'pop') for (const blk of h) out.popRows[blk[4]] = true;
                 }}
             }}
-            for (const [pose, [sw, vx]] of Object.entries(poses)) {{
-                const img = alphaOf(UI + '/robot-' + pose + '.png');
-                const x0 = L + 72.6 - vx * s;
-                const r = {{ minX: Infinity, maxX: -Infinity, lowest: -Infinity, rest: {{}}, pop: {{}}, popRows: {{}}, rail: 0 }};
-                for (let sy = 0; sy < img.h; sy++) {{
-                    for (let sx = 0; sx < img.w; sx++) {{
-                        if (img.at(sx, sy) < 128) continue;
-                        const x = x0 + (sx + 0.5) * s, yRest = TOP - 75 + (sy + 0.5) * s;
-                        if (yRest >= TOP) continue;
-                        r.minX = Math.min(r.minX, x); r.maxX = Math.max(r.maxX, x); r.lowest = Math.max(r.lowest, yRest);
-                        for (const [at, y] of [['rest', yRest], ['pop', yRest - 20]]) {{
-                            for (const w of words) {{
-                                if (y < w.railBottom) r.rail++;
-                                const hit = w.blocks.filter(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
-                                if (hit.length) r[at][w.n] = (r[at][w.n] || 0) + 1;
-                                if (at === 'pop') for (const blk of hit) r.popRows[blk[4]] = true;
+            // every hand pose at its target; the rest pose also at the bottom of the pop's trail
+            for (const [name, pose] of Object.entries(c.HANDS)) {{
+                const r = {{ taps: [], blocks: [] }};
+                for (const side of ['L', 'R']) {{
+                    const p = pose[side];
+                    for (let py = p.y - 70; py < p.y + 70; py += step) for (let px = p.x - 70; px < p.x + 70; px += step) {{
+                        for (const dy of name === 'rest' ? [0, c.TIMING.pop.trail.y] : [0]) {{
+                            if (!mitten(side, p, 0, dy, px, py)) continue;
+                            const x = X(px), y = Y(py);
+                            for (const [t, b] of Object.entries(TAPS)) if (inBox(x, y, b) && !r.taps.includes(t)) r.taps.push(t);
+                            for (const [n] of hits(x, y)) if (!r.blocks.includes(n)) r.blocks.push(n);
+                            if (name === 'rest') {{
+                                if (dy === 0) out.restBottom = Math.max(out.restBottom, y);
+                                else out.trailBottom = Math.max(out.trailBottom, y);
                             }}
                         }}
                     }}
                 }}
-                out[pose] = r;
+                out.hands[name] = r;
+            }}
+            // how far down the resting hands can be and still clear every tap area (puppet px)
+            let clear = 0;
+            for (let dy = 0; dy <= 80; dy += 0.5) {{
+                let hit = false;
+                for (const side of ['L', 'R']) {{
+                    const p = c.HANDS.rest[side];
+                    for (let py = p.y - 70; py < p.y + 70 && !hit; py += 1) for (let px = p.x - 70; px < p.x + 70 && !hit; px += 1)
+                        if (mitten(side, p, 0, dy, px, py) && Object.values(TAPS).some((b) => inBox(X(px), Y(py), b))) hit = true;
+                }}
+                if (hit) break;
+                clear = dy;
+            }}
+            out.clear = clear;
+            // every sink a moment or the idle peek uses, from every one to every
+            // other: the hands' layer (c.handsSink), sampled every 5ms; where it
+            // is visible (opacity > 0) it must be no lower than `clear`
+            const used = Object.keys(c.MOMENTS).flatMap((m) => c.variantsOf(m).flatMap((v) => v.steps)).concat(c.PEEK.steps);
+            const sinks = [...new Set(used.filter((st) => 'sink' in st).map((st) => st.sink))].sort((a, b) => a - b);
+            out.sinks = sinks; out.shown = [];
+            for (const reduced of [false, true]) for (const from of sinks) for (const to of sinks) {{
+                const plan = c.handsSink(to, reduced);
+                const value = (prop, start, t) => {{
+                    let v = start;
+                    for (const tw of plan) {{
+                        if (tw.set && prop in tw.set) v = tw.set[prop];
+                        if (tw.to && prop in tw.to) {{
+                            if (t >= tw.delay + tw.duration) v = tw.to[prop];
+                            else if (t > tw.delay) v = v + (tw.to[prop] - v) * (t - tw.delay) / tw.duration;
+                        }}
+                    }}
+                    return v;
+                }};
+                for (let t = 0; t <= 1; t += 0.005) {{
+                    const y = value('y', from, t), o = value('opacity', from > c.TIMING.sink.hideHands ? 0 : 1, t);
+                    if (o > 0 && y > clear) out.shown.push([reduced, from, to, +t.toFixed(3), +y.toFixed(1), +o.toFixed(2)]);
+                }}
             }}
             console.log(JSON.stringify(out));
         """
-        result = subprocess.run(['node', '--input-type=module', '-e', script],
-                                capture_output=True, text=True, timeout=60)
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stderr)
-        for pose, r in json.loads(result.stdout).items():
-            self.assertGreater(r['lowest'], top - 1, pose)                  # shows down to the console edge
-            self.assertGreaterEqual(r['minX'], left, pose)                   # inside the clip window
-            self.assertLessEqual(r['maxX'], left + 160, pose)
-            self.assertLessEqual(r['maxX'], left + cw / 2, pose)              # the console's left half
-            self.assertEqual(r['rail'], 0, pose)                              # never reaches the rail
-            self.assertEqual(r['rest'], {}, pose)                             # at rest, clear of all blocks
-            for n in range(1, 7):
-                self.assertNotIn(str(n), r['pop'], (pose, n))                # room for the pop-up
-                self.assertNotIn(f'h{n}', r['pop'], (pose, n))               # also with hard's extras
-            self.assertEqual(list(r['popRows']), ['1'], pose)                 # only the second row
-        # the reason for the z-order: the second row of a 7-10 letter word
-        # is in the way of the pop-up
-        pops = json.loads(result.stdout)['idle']['pop']
-        self.assertEqual(sorted((k for k in pops if not k.startswith('h')), key=int), ['7', '8', '9', '10'])
-        self.assertEqual(sorted((k for k in pops if k.startswith('h')), key=lambda k: int(k[1:])), ['h7', 'h8', 'h9', 'h10'])
+        r = json.loads(result.stdout)
+        self.assertGreater(r['lowest'], top - 1)                 # he shows down to the console edge
+        self.assertGreaterEqual(top - r['top'], 70)              # ~75px of him above it
+        self.assertLessEqual(top - r['top'], 77)
+        self.assertGreaterEqual(r['minX'], left)                 # inside his window (x 18-178)
+        self.assertLessEqual(r['maxX'], left + 160)
+        self.assertLessEqual(r['maxX'], left + cw / 3)           # the console's left third
+        self.assertEqual(r['rail'], 0)                           # never reaches the rail
+        self.assertEqual(r['rest'], {})                          # at rest, clear of all blocks
+        for n in range(1, 7):
+            self.assertNotIn(str(n), r['pop'], n)                # room for the pop-up
+            self.assertNotIn(f'h{n}', r['pop'], n)
+        self.assertEqual(list(r['popRows']), ['1'])              # only the second row
+        self.assertEqual(sorted((k for k in r['pop'] if not k.startswith('h')), key=int), ['7', '8', '9', '10'])
+        # the hands rest on the console's edge, over it by a few px, above
+        # the lever's tap area even at the bottom of the pop's trail
+        self.assertGreater(r['restBottom'], top)
+        self.assertLess(r['trailBottom'], taps['lever'][1])
+        for name, hand in r['hands'].items():
+            self.assertEqual(hand, {'taps': [], 'blocks': []}, name)
+        # ... and while he sinks and rises (BACKLOG B-210 review): the
+        # resting hands clear the tap areas down to `clear` puppet px (the
+        # pop's trail stays within it); lower than that they are hidden at
+        # every moment of every sink and rise a moment uses
+        self.assertGreaterEqual(r['clear'], 10)
+        self.assertLess(r['clear'], 40)
+        self.assertEqual(r['sinks'], [0, 104, 150])
+        self.assertEqual(r['shown'], [])
 
 
 class PlayBackTests(TestCase):
@@ -2364,14 +3148,12 @@ class SpeakerPerLevelTests(TestCase):
         self.assertNotIn('lock', speaker)
 
     def test_the_head_shake_turns_him_about_his_neck(self):
-        # the visor centre's column (72.6px) at the console's edge (75px
-        # below the sprite's top at rest): his head swings, his shoulders
-        # stay at the edge
-        self.assertIn('transform-origin: calc(72.6 * var(--rpx)) calc(75 * var(--rpx));', self.css_rule('.robot-body'))
-        self.assertIn('left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));', self.css_rule('.robot-body img'))
-        self.assertIn('top: calc((130 - 75) * var(--rpx));', self.css_rule('.robot-body'))
-        # every segment sets the turn, so no other move leaves him tilted
-        self.assertIn('rotation: s.rotation || 0', self.code('character.js'))
+        # BACKLOG B-210: the puppet's head turns about its neck, (241, 262)
+        # on the 505 canvas (character.js PIVOT.head); the body stays. The
+        # shake ends with the head back on its pose.
+        self.assertIn('transform-origin: calc(100% * 241 / 505) calc(100% * 262 / 505);', self.css_rule('.robot-head'))
+        self.assertIn('PIVOT = { head: [241, 262]', self.code('character.js'))
+        self.assertIn('onComplete: () => setHead(d, headTurn(d), s.settle, false)', self.code('character.js'))
 
 
 class EasyStartTests(TestCase):
@@ -2640,13 +3422,11 @@ class EasyStartTests(TestCase):
     def test_the_locked_look(self):
         css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
         rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter\s*{([^}]*)}', css).group(1)
-        # drawn as placed (the placed block's clay edges), plus a thin lit
-        # edge and a soft glow in palette tokens, and no hand cursor
-        self.assertIn('inset -2px -3px 0 var(--cream-lo),', rule)
-        self.assertIn('1px 2px 3px var(--shadow-deep),', rule)
-        self.assertIn('0 0 0 2px var(--amber),', rule)
-        self.assertIn('0 0 6px 2px var(--glow-amber);', rule)
+        # it never lifts, so no hand cursor; the look itself (the riveted
+        # brass plate that replaced B-204's amber edge) is BACKLOG B-211's,
+        # checked in LockedLookTests
         self.assertIn('cursor: default;', rule)
+        self.assertIn('\n.letter-box.locked > .draggable-letter:not(.landing) {', css)
 
 
 class LeverTests(TestCase):
@@ -3017,35 +3797,28 @@ class HintTests(TestCase):
             "out([m(checked, hinted), m(hinted, hinted), m(st(3, 'playing', [['a', 't0'], ['c', 't1'], ['t', 't2']]),"
             " st(2, 'wrong', [['a', 't0'], ['c', 't1'], ['t', 't2']])), m(hinted, filled), m(filled, reveal),"
             " R.snapshot(hinted).hint, R.snapshot(checked).hint, R.NONE.hint,"
-            " R.stepsFor(['wrongPeek', 'hintGiven']), R.soundsFor(['wrongPeek', 'hintGiven'])]);")
+            " R.scriptFor(['wrongPeek', 'hintGiven']).filter(R.isChange).map((s) => [s.at, s.eyes || null, 'sink' in s ? s.sink : null, s.pop || null]),"
+            " R.soundsFor(['wrongPeek', 'hintGiven'])]);")
         self.assertEqual(res, [
             ['wrongPeek', 'hintGiven'], [], ['wrong'], ['filled'], ['thirdMiss'], 0, -1, -1,
-            [{'pose': 'confused', 'move': 'peek'}, {'pose': 'happy', 'move': 'smallPop'}], ['error'],
+            # confused, ducked to his eyes; then happy, up with a small pop
+            [[0, 'confused', 104, None], [2.5, 'happy', 0, 'small'], [3.7, 'idle', None, None]], ['error'],
         ])
 
     def test_his_pop_waits_for_the_peek_and_is_small(self):
-        # CHARACTER "Presence": the peek keeps only his eyes above the
-        # edge for 600ms, and changes are at least 300ms apart; the next
-        # step waits for a step's move to end, so hintGiven comes when the
-        # peek is over (950ms). Every other run of steps keeps 300ms.
+        # CHARACTER "Moment map": his happy pop comes when the peek is
+        # over. The puppet's peek (BACKLOG B-210, the reference's "Wrong
+        # (peek)") ducks to his eyes, looks left and right, shivers and
+        # comes back at 2.5s: the hintGiven step takes the place of that
+        # return. The pop is the pop at half height, same timing; under
+        # reduced motion no pop at all.
         res = self.run_node(
-            "const lasts = (ms, red) => R.stepsFor(ms).map((s) => R.moveMs(s.move, red));"
-            "const two = ['wrongPeek', 'hintGiven'];"
-            "out([R.moveMs('peek', false), R.moveMs('peek', true), R.moveMs('smallPop', false), R.moveMs('pop', false),"
-            " R.stepDelays(2, Infinity, lasts(two, false)), R.stepDelays(2, 100, lasts(two, false)),"
-            " R.stepDelays(2, Infinity, lasts(two, true)),"
-            " [['kidIdle'], ['thirdMiss'], ['roundStart', 'picture']].map((ms) =>"
-            "   JSON.stringify(R.stepDelays(R.stepsFor(ms).length, Infinity, lasts(ms, false))) === JSON.stringify(R.stepDelays(R.stepsFor(ms).length, Infinity))),"
-            " R.MOVES.smallPop, R.MOVES.pop]);")
-        peek, peek_reduced, small, pop, delays, delays_soon, delays_reduced, others, small_pop, full_pop = res
-        self.assertEqual([peek, peek_reduced, small, pop], [950, 0, 300, 300])
-        self.assertEqual(delays, [0, 950])
-        self.assertEqual(delays_soon, [200, 1150])
-        self.assertEqual(delays_reduced, [0, 300])
-        self.assertEqual(others, [True, True, True])
-        # the small pop is the pop at half the height, same timing
-        self.assertEqual([s['y'] for s in small_pop], [p['y'] / 2 for p in full_pop])
-        self.assertEqual([(s['duration'], s['ease']) for s in small_pop], [(p['duration'], p['ease']) for p in full_pop])
+            "const script = R.scriptFor(['wrongPeek', 'hintGiven']);"
+            "const peek = R.stepsOf('wrongPeek');"
+            "out([peek[peek.length - 1].at, script.find((s) => s.eyes === 'happy').at, script.filter((s) => s.at === 2.5).length,"
+            " R.TIMING.pop.small, R.stepsOf('hintGiven')[0].pop, 'pop' in R.reducedStep(R.stepsOf('hintGiven')[0]),"
+            " R.scriptFor(['wrong']).map((s) => s.at), R.startDelay(Infinity), R.startDelay(100)]);")
+        self.assertEqual(res, [2.5, 2.5, 1, 0.5, 'small', False, [0, 1.8], 0, 200])
 
     # --- the motion (feedback.js, with stand-ins for the DOM and GSAP) ---
 
@@ -3129,14 +3902,19 @@ class HintTests(TestCase):
         self.assertEqual([e[2]['x'] for e in o[1:5]], [46, 58, 46, 52])
         self.assertEqual(o[5], ['tl.to', 'o', {'x': 0, 'y': 0, 'rotation': 0, 'scale': 1, 'duration': 0.3,
                                                'ease': 'back.out(1.4)'}, 0.6])
-        self.assertEqual(len(r) + len(o), 14)
-        # its locked edge lights as it lands (class `landing` until 0.9s);
-        # everything set is put back by then
+        # as it lands (0.9s) it clunks into the slot (BACKLOG B-211): it
+        # is pressed in, and at the hit (0.99s) its locked look comes on
+        # (class `landing` until then) and it comes up to its locked size
+        self.assertEqual(o[6], ['to', 'o', {'scale': 0.8, 'duration': 0.09, 'ease': 'power2.in', 'delay': 0.9}])
+        self.assertEqual(len(r) + len(o), 15)
         self.assertTrue(landing)
         self.assertFalse(landed)
-        self.assertEqual(sorted(e[1] for e in log if e[0] == 'later'), [0.6, 0.9, 0.9])
+        self.assertEqual(sorted(e[1] for e in log if e[0] == 'later'), [0.6, 0.9, 0.99])
+        # everything set is put back by then (the clunk ends at scale 1)
         self.assertEqual(cleared, [['set', 'r', {'clearProps': 'position,zIndex'}],
-                                   ['set', 'o', {'clearProps': 'position,zIndex'}]])
+                                   ['set', 'o', {'clearProps': 'position,zIndex'}],
+                                   ['fromTo', 'o', {'scale': 0.8},
+                                    {'scale': 1, 'duration': 0.11, 'ease': 'power2.out', 'lazy': False}]])
         # a re-render in the same state starts nothing
         self.assertEqual(again, 0)
 
@@ -3198,10 +3976,13 @@ class HintTests(TestCase):
 
     def test_the_landing_look(self):
         css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
-        rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter\.landing\s*{([^}]*)}', css).group(1)
-        # drawn as a placed block, without the lit edge until it lands
-        self.assertIn('1px 2px 3px var(--shadow-deep);', rule)
-        self.assertNotIn('amber', rule)
+        # drawn as a placed block until it lands: the locked look (BACKLOG
+        # B-211) leaves out a block with class `landing`, so the placed
+        # block's rule draws it and no override is needed
+        self.assertIn('\n.letter-box.locked > .draggable-letter:not(.landing) {', css)
+        self.assertNotRegex(css, r'\.letter-box\.locked > \.draggable-letter\.landing\s*{')
+        placed = re.search(r'\n\.letter-box > \.draggable-letter\s*{([^}]*)}', css).group(1)
+        self.assertIn('1px 2px 3px var(--shadow-deep);', placed)
         # the CSS cache-buster was bumped for this look (later items bump it again)
         html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
         self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 20)
@@ -4095,3 +4876,582 @@ class LevelUpTests(TestCase):
         self.assertIn("if (state.screen !== 'round-end' || state.startingRound) return;", self.function('onLevelUp'))
         for name in ('onPlayAgain', 'onThemes', 'onNext', 'onLevelUp', 'onLevel', 'onPlayBack'):
             self.assertNotIn('startingRound:', self.function(name), name)
+
+
+class LockedLookTests(TestCase):
+    """Locked letters you can see at a glance (BACKLOG B-211). One look for
+    every locked letter (easy's given letter, the right letters the easy
+    lever keeps, the robot's letter), keyed only on the slot's `locked`
+    flag (card.js class `locked`): a brass plate riveted into the slot,
+    sunk below the rim (game.css), in place of B-204's amber edge. A letter
+    that locks clunks into its slot (feedback.js): the lever's at once,
+    the robot's as it lands (HintTests). `newlyLocked` and the clunk run
+    through node with stand-ins for the DOM and GSAP, the motion spec
+    through motion.js; the look and the wiring are checked in the
+    source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    FAKE_DOM = """
+        const log = [];
+        const later = [];
+        const id = (el) => (Array.isArray(el) ? el.map((e) => e.id) : el.id);
+        const timeline = () => {
+            const t = {};
+            for (const k of ['to', 'fromTo', 'set']) t[k] = (el) => { log.push(['tl.' + k, id(el)]); return t; };
+            return t;
+        };
+        globalThis.gsap = {
+            set(el, v) { log.push(['set', id(el), v]); },
+            to(el, v) { log.push(['to', id(el), v]); },
+            fromTo(el, a, b) { log.push(['fromTo', id(el), a, b]); },
+            timeline,
+            killTweensOf() {},
+            getProperty(el) { return el.rot || 0; },
+            delayedCall(s, fn) { log.push(['later', s]); later.push(fn); },
+        };
+        let reduced = false;
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        const cls = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c) }; };
+        // a block: `w` px as rendered; a block in a slot is 46px while it
+        // has class `landing` (drawn as a placed block) and 40px drawn locked
+        const el = (name, x, y, w) => {
+            const e = { id: name, classList: cls(), parentNode: null,
+                getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) };
+            Object.defineProperty(e, 'offsetWidth', { get: () => (e.classList.contains('landing') ? 46 : w) });
+            return e;
+        };
+        const rect = (name, x, y, w) => ({ id: name, getBoundingClientRect: () => ({ left: x, top: y, width: w, height: w }) });
+        const boxes = [0, 1, 2, 3, 4].map((i) => rect('box' + i, 20 + i * 52, 100, 46));
+        const spots = [0, 1, 2, 3].map((i) => rect('spot' + i, 20 + i * 60, 200, 52));
+        const tiles = {};
+        globalThis.document = {
+            getElementById: (name) => (name === 'letter-boxes' ? { id: 'rail', children: boxes } : name === 'letter-tray' ? { children: spots } : null),
+            querySelector: (sel) => { const m = /data-tile-id="([^"]+)"/.exec(sel); return m ? tiles[m[1]] || null : null; },
+            querySelectorAll: () => [],
+        };
+        const F = await import('FEEDBACK');
+        const D = await import('DRAG');
+        // "horse" on easy: h given (locked in slot 1, no bench spot),
+        // checked as "hosre" (o and e right, s and r wrong), one bulb out
+        const tray = [{ id: 'h', letter: 'h', used: true, given: true }].concat(
+            ['s', 'r', 'o', 'e'].map((t) => ({ id: t, letter: t, used: true })));
+        const P = (letters, locked = 'h') => letters.split('').map((ch) => (ch === '_' ? null
+            : { letter: ch, tileId: ch, ...(locked.includes(ch) ? { locked: true } : {}) }));
+        const wrong = { screen: 'play', lives: 2, pressed: null, round: { index: 0 },
+            current: { word: 'horse', status: 'wrong', tray, placed: P('hosre') } };
+        // where the render put them: h, o, e in slots 1, 2, 5; s, r on the bench
+        tiles.h = el('h', 23, 103, 40); tiles.o = el('o', 75, 103, 40); tiles.e = el('e', 231, 103, 40);
+        tiles.s = el('s', 20, 200, 52); tiles.r = el('r', 80, 200, 52);
+        tiles.h.parentNode = boxes[0]; tiles.o.parentNode = boxes[1]; tiles.e.parentNode = boxes[4];
+        const mine = (e) => ['h', 'o', 'e'].includes(e[1]);
+        const clunks = () => log.filter((e) => e[0] === 'to' && e[2].scale === 0.8).map((e) => e[1]);
+    """
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v, (k, x) => (typeof x === 'number' ? Math.round(x * 1e4) / 1e4 : x)));"
+            + self.FAKE_DOM.replace('FEEDBACK', (self.JS / 'feedback.js').as_uri())
+                           .replace('DRAG', (self.JS / 'drag.js').as_uri())
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    # --- which letters just locked (pure) ---
+
+    def test_newly_locked_is_the_slots_locked_since_the_last_render(self):
+        hinted = [{'letter': 'h', 'tileId': 'h'}, {'letter': 'o', 'tileId': 'o', 'locked': True, 'hint': True},
+                  None, {'letter': 's', 'tileId': 's'}, {'letter': 'e', 'tileId': 'e'}]
+        res = self.run_node(
+            "const before = P('hosre'); const copy = JSON.stringify(before);"
+            f"const hinted = {json.dumps(hinted)};"
+            "out([F.newlyLocked([], []), F.newlyLocked(before, P('ho__e', 'hoe')), F.newlyLocked(P('ho__e', 'hoe'), P('ho__e', 'hoe')),"
+            " F.newlyLocked(P('ho__e', 'hoe'), P('h____')), F.newlyLocked(P('hrose', ''), hinted),"
+            " F.newlyLocked([{ letter: 'o', tileId: 'o1', locked: true }], [{ letter: 'o', tileId: 'o2', locked: true }]),"
+            " F.newlyLocked(P('hosre', ''), P('hosre', '')), JSON.stringify(before) === copy]);")
+        self.assertEqual(res, [
+            [],
+            [1, 4],     # the lever kept o and e (the given h was locked already)
+            [],         # a re-render
+            [],         # a start-over pull unlocks; nothing locks
+            [1],        # the robot's letter
+            [0],        # a slot locked with another block
+            [],         # nothing locked
+            True,       # inputs untouched
+        ])
+
+    # --- the clunk (feedback.js) ---
+
+    def test_the_letters_the_lever_keeps_clunk_into_their_slots(self):
+        placed, before, landing, landed, hit, laters, again = self.run_node(
+            "const pulled = { ...wrong, pressed: 'lever', current: D.returnAll(wrong.current, 'easy') };"
+            "F.renderFeedback(wrong); F.renderFeedback(pulled);"
+            "const n = log.length; const landing = ['h', 'o', 'e'].map((k) => tiles[k].classList.contains('landing'));"
+            "later.forEach((fn) => fn());"
+            "const landed = ['h', 'o', 'e'].map((k) => tiles[k].classList.contains('landing'));"
+            "const hit = log.slice(n).filter(mine); const m = log.length;"
+            "F.renderFeedback(pulled);"
+            "out([pulled.current.placed, log.slice(0, n).filter(mine), landing, landed, hit,"
+            " log.slice(0, n).filter((e) => e[0] === 'later' && e[1] === 0.09).length, log.length - m]);")
+        # easy, right after a wrong check: o and e stay and lock, s and r go
+        self.assertEqual(placed, [{'letter': 'h', 'tileId': 'h', 'locked': True}, {'letter': 'o', 'tileId': 'o', 'locked': True},
+                                  None, None, {'letter': 'e', 'tileId': 'e', 'locked': True}])
+        # o and e are drawn as placed blocks and pressed in at once (90ms,
+        # ease-in); the given h, locked from the start, does nothing
+        press = {'scale': 0.8, 'duration': 0.09, 'ease': 'power2.in', 'delay': 0}
+        self.assertEqual(before, [['to', 'o', press], ['to', 'e', press]])
+        self.assertEqual(landing, [False, True, True])
+        self.assertEqual(laters, 2)
+        # at the hit their locked look comes on (40px) and they come up from
+        # where the press left them (0.8 of 46px) to their locked size
+        self.assertEqual(landed, [False, False, False])
+        up = {'scale': 1, 'duration': 0.11, 'ease': 'power2.out', 'lazy': False}
+        self.assertEqual(hit, [['fromTo', 'o', {'scale': 0.92}, up], ['fromTo', 'e', {'scale': 0.92}, up]])
+        # a re-render in the same state starts nothing
+        self.assertEqual(again, 0)
+
+    def test_reduced_motion_dips_them_instead(self):
+        mine, landing = self.run_node(
+            "reduced = true; const pulled = { ...wrong, pressed: 'lever', current: D.returnAll(wrong.current, 'easy') };"
+            "F.renderFeedback(wrong); F.renderFeedback(pulled);"
+            "out([log.filter(mine), ['o', 'e'].map((k) => tiles[k].classList.contains('landing'))]);")
+        dip = [{'opacity': 0.4}, {'opacity': 1, 'duration': 0.2, 'ease': 'power1.out'}]
+        self.assertEqual(mine, [['fromTo', 'o', *dip], ['fromTo', 'e', *dip]])
+        self.assertEqual(landing, [False, False])
+
+    def test_nothing_clunks_when_nothing_locks(self):
+        res = self.run_node(
+            "const out1 = [];"
+            # normal: the lever sends every letter but the given one back
+            "F.renderFeedback(wrong); F.renderFeedback({ ...wrong, pressed: 'lever', current: D.returnAll(wrong.current, 'normal') });"
+            "out1.push(clunks());"
+            # a new word starts with its given letter locked: no clunk
+            "const start = { ...wrong, round: { index: 1 }, current: { ...wrong.current, status: 'playing', placed: P('h____') } };"
+            "F.renderFeedback({ ...start, screen: 'theme' }); F.renderFeedback(start); out1.push(clunks());"
+            # a block placed, a correct check, a start-over pull on easy
+            "F.renderFeedback({ ...start, current: { ...start.current, placed: P('ho___') } });"
+            "F.renderFeedback({ ...start, current: { ...start.current, status: 'correct', placed: P('horse') } });"
+            "F.renderFeedback({ ...start, pressed: 'lever', current: D.returnAll({ ...start.current, placed: P('horse') }, 'easy') });"
+            "out1.push(clunks()); out(out1);")
+        self.assertEqual(res, [[], [], []])
+
+    # --- the motion spec ---
+
+    def test_the_clunk_spec(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (f"import {{ motionFor }} from '{(self.JS / 'motion.js').as_uri()}';"
+                  "console.log(JSON.stringify([motionFor('clunk', false), motionFor('clunk', true)]));")
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        m, still = json.loads(result.stdout)
+        # DESIGN "Motion": 120-300ms; a press in (ease-in to the hit), then
+        # ease-out, no back.out overshoot
+        self.assertEqual(m, {'duration': 0.2, 'ease': 'power2.out', 'scale': 0.8, 'press': 0.09, 'fade': 0.2})
+        self.assertTrue(0.12 <= m['duration'] <= 0.3)
+        self.assertLess(m['press'], m['duration'])
+        self.assertNotIn('back', m['ease'])
+        # reduced motion: no press, an opacity fade
+        self.assertEqual(still, {'duration': 0, 'ease': 'none', 'scale': 1, 'fade': 0.2})
+
+    # --- the look (game.css) ---
+
+    def test_the_locked_look_is_a_riveted_brass_plate_sunk_into_the_slot(self):
+        css = self.css()
+        rule = re.search(r'\n\.letter-box\.locked > \.draggable-letter:not\(\.landing\)\s*{([^}]*)}', css).group(1)
+        # material: a brass face, the letter in ink
+        self.assertIn('linear-gradient(150deg, var(--brass-hi) 0%, var(--brass) 55%, var(--brass-dark) 100%);', rule)
+        self.assertIn('color: var(--ink);', rule)
+        # a rivet in each corner
+        self.assertIn('--rivet: radial-gradient(', rule)
+        self.assertEqual(rule.count('var(--rivet) '), 4)
+        for corner in ('left 2px top 2px', 'right 2px top 2px', 'left 2px bottom 2px', 'right 2px bottom 2px'):
+            self.assertIn(f'var(--rivet) {corner} / 6px 6px no-repeat', rule)
+        # sunk: smaller than the slot, shaded from the rim, no shadow of its own
+        self.assertIn('width: 86%;', rule)
+        self.assertIn('height: 86%;', rule)
+        shadow = re.search(r'box-shadow:([^;]*);', rule).group(1)
+        layers = [s.strip() for s in shadow.split(',')]
+        self.assertEqual(layers, ['inset 0 3px 3px var(--shadow-deep)', 'inset -1px -2px 0 var(--brass-dark-lo)'])
+        # B-204's amber edge is gone; palette tokens only
+        self.assertNotIn('amber)', rule.replace('var(--amber-hi)', ''))
+        self.assertNotIn('#', rule)
+        self.assertNotIn('rgb', rule)
+        # only these two rules draw a locked letter: the look keys on the
+        # slot's class alone
+        self.assertEqual(re.findall(r'\n([^\n{]*\.letter-box\.locked[^\n{]*){', css),
+                         ['.letter-box.locked > .draggable-letter ', '.letter-box.locked > .draggable-letter:not(.landing) '])
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 23)
+
+    # --- wiring ---
+
+    def test_the_look_keys_on_the_flag_and_the_clunk_on_the_transition(self):
+        # one look for every locked letter: card.js sets the class from the
+        # slot's flag (drag.js isLocked), and nothing else sets it
+        self.assertIn("boxes[i].classList.toggle('locked', isLocked(slot));", self.code('card.js'))
+        self.assertIn('return !!(slot && slot.locked);', self.function('isLocked', 'drag.js'))
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name in ('card.js', 'gallery.js'):
+                continue
+            self.assertNotRegex(self.code(f.name), r"classList\.(add|toggle)\('locked'", f.name)
+        # feedback.js: the letters that locked since the last render clunk,
+        # the robot's when it lands (after its travel, which stops its tweens)
+        render = self.function('renderFeedback', 'feedback.js')
+        self.assertIn('newlyLocked(prev.placed, now.placed)', render)
+        self.assertIn('.filter((i) => !now.placed[i].hint)', render)
+        self.assertIn('.forEach((i) => clunk(tileEl(now.placed[i].tileId), 0));', render)
+        hint = self.function('hintIn', 'feedback.js')
+        self.assertLess(hint.index("if (!reduced) el.classList.add('landing');"), hint.index('travel(el, from,'))
+        self.assertLess(hint.index('travel(el, from,'), hint.index('if (!reduced) clunk(el, at + flyIn.duration);'))
+        # pure, and the clunk never touches state
+        for name in ('newlyLocked', 'clunk'):
+            body = self.function(name, 'feedback.js')
+            for word in ('state.', 'setState'):
+                self.assertNotIn(word, body, (name, word))
+        for word in ('document', 'window', 'gsap'):
+            self.assertNotIn(word, self.function('newlyLocked', 'feedback.js'))
+
+
+class NextDomeTests(TestCase):
+    """Next-word dome you can't miss (BACKLOG B-212). After a correct
+    answer or a reveal the check dome has a state of its own, `next`
+    (controls.js domeState), which game.css draws as a blink: the lit dome
+    on and off (1.2s a blink, holding lit and holding at an ember), its
+    glass shining and an amber halo reaching past its rim while it is on.
+    The `ready` pulse before a check stays as it was: slower, never dark,
+    no light layers. Reduced motion: lit, shining and glowing, steadily.
+    If the dome is not pressed, the robot nudges toward it (character.js
+    domeNudge: pointing at it, a pop, the finger wagging) 4s after the
+    answer and then every 8s (nudgeWait; main.js armNudge counts them in
+    state.nudges); on an answered word the kid-idle beat no longer
+    comes."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        # st(...) is a play-screen state on the word "cat", checked
+        # correct (round 1, three lives, no nudge yet) with overrides
+        script = (
+            f"const c = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const cur = (status, placed = 'cat') => ({ word: 'cat', status, placed: put(placed) });"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0,"
+            " nudges: 0, pressed: null, round: { index: 0, size: 5, results: [{ word: 'cat', correct: true }] },"
+            " current: cur('correct'), ...o });"
+            "const moments = (a, b) => c.momentsFor(c.snapshot(a), c.snapshot(b));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def block(self, css, head):
+        # the body of the first block opened by `head`, braces matched
+        start = css.index(head)
+        i = css.index('{', start) + 1
+        depth = 1
+        j = i
+        while depth:
+            depth += {'{': 1, '}': -1}.get(css[j], 0)
+            j += 1
+        return css[i:j - 1]
+
+    def rule(self, css, selector):
+        m = re.search(r'(?:^|})\s*' + re.escape(selector) + r'\s*{([^}]*)}', css)
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    def frames(self, css, name):
+        # keyframe stops as [(percent, opacity)], sorted
+        body = self.block(css, f'@keyframes {name} ')
+        stops = []
+        for sel, decl in re.findall(r'([^{}]+){([^}]*)}', body):
+            value = float(re.search(r'opacity:\s*([\d.]+)', decl).group(1))
+            for s in sel.split(','):
+                s = s.strip()
+                stops.append((0.0 if s == 'from' else 100.0 if s == 'to' else float(s.rstrip('%')), value))
+        return sorted(stops)
+
+    # --- the dome's state ---
+
+    def test_the_dome_is_next_after_a_correct_answer_or_a_reveal(self):
+        res = self.run_node(
+            "out([['playing', '---'], ['playing', 'ca-'], ['playing', 'cat'], ['wrong', 'tac'], ['correct', 'cat'], ['revealed', 'cat']]"
+            ".map(([s, p]) => [C.domeAction(cur(s, p)), C.domeState(cur(s, p), null), C.domeState(cur(s, p), 'dome')]));")
+        self.assertEqual(res, [
+            [None, 'off', 'pressed'], [None, 'off', 'pressed'], ['check', 'ready', 'pressed'],
+            [None, 'off', 'pressed'], ['next', 'next', 'pressed'], ['next', 'next', 'pressed']])
+        # the render shows it as class is-next (one state class at a time)
+        controls = self.code('controls.js')
+        self.assertIn("dome: ['off', 'ready', 'next', 'pressed'],", controls)
+        self.assertIn("show(dome, 'dome', domeState(current, pressed));", controls)
+
+    # --- the blink (game.css) ---
+
+    def test_the_next_dome_blinks_on_and_off_in_a_light_past_its_rim(self):
+        css = self.css()
+        self.assertIn('animation: dome-next 1.2s ease-in-out infinite;', self.rule(css, '#check-btn.is-next .dome-ready'))
+        self.assertIn('opacity: 1;', self.rule(css, '#check-btn.is-next .dome-ready'))
+        # on and off with a hold at each: lit for 40% (480ms), out, dark
+        # for 34% at an ember (0.2), back; each change 156ms, inside
+        # DESIGN "Motion"'s 120-300ms; not `alternate` (a rhythm, not a
+        # swing back and forth)
+        dome = self.frames(css, 'dome-next')
+        light = self.frames(css, 'dome-next-light')
+        self.assertEqual(dome, [(0, 1), (40, 1), (53, 0.2), (87, 0.2), (100, 1)])
+        self.assertEqual(light, [(0, 1), (40, 1), (53, 0), (87, 0), (100, 1)])
+        for (a, _), (b, _) in zip(dome, dome[1:]):
+            if b - a < 30:
+                self.assertTrue(120 <= (b - a) / 100 * 1200 <= 300, (a, b))
+        # the light, two layers: the shine over the glass (the button's
+        # ::after) and the halo (the console's ::after); off at rest and on
+        # no other state, no taps, shown and blinking in step with the dome
+        # only while it is `next`
+        shine = self.rule(css, '#check-btn::after')
+        halo = self.rule(css, '#screen-play .console::after')
+        for rule in (shine, halo):
+            for decl in ("content: '';", 'position: absolute;', 'opacity: 0;', 'pointer-events: none;'):
+                self.assertIn(decl, rule)
+        on = self.rule(css, '#check-btn.is-next::after,\n#screen-play .console:has(#check-btn.is-next)::after')
+        self.assertIn('opacity: 1;', on)
+        self.assertIn('animation: dome-next-light 1.2s ease-in-out infinite;', on)
+        shown = [sel for sel in re.findall(r'(?:^|})\s*([^{}]*::(?:before|after)[^{}]*){([^}]*)}', css)
+                 if 'opacity: 1;' in sel[1] and ('check-btn' in sel[0] or '.console' in sel[0])]
+        self.assertTrue(shown)
+        for sel, _ in shown:
+            for part in sel.split(','):
+                self.assertIn('#check-btn.is-next', part, sel)
+        self.assertNotIn('#check-btn::before', css)
+        # the halo: centred on the dome's glass (the dome's centre, --cx /
+        # --cy, moved up to 42% of its sprite), 2.4x its width, so it
+        # reaches past the brass rim; in the console's z-order after the
+        # console image (-1): under the rail, the bench blocks and the
+        # controls, which are z auto. The shine: inside the glass.
+        dome = self.rule(css, '#check-btn')
+        for decl in ('--cx: 81.5%;', '--cy: 41%;', '--w: calc(var(--console-w) * 0.254);', '--ar: calc(169 / 240);'):
+            self.assertIn(decl, dome)
+        for decl in ('--rx: calc(var(--console-w) * 0.254 * 1.2);', '--ry: calc(var(--console-w) * 0.254 * 169 / 240 * 1.075);',
+                     'z-index: -1;', 'left: calc(81.5% - var(--rx));',
+                     'top: calc(41% - var(--console-w) * 0.254 * 169 / 240 * 0.08 - var(--ry));',
+                     'radial-gradient(var(--rx) var(--ry) at var(--rx) var(--ry), var(--glow-next-core)'):
+            self.assertIn(decl, halo)
+        self.assertIn('z-index: -1;', self.rule(css, '.console-body'))
+        self.assertLess(int(re.search(r'width: (\d+)%;', shine).group(1)), 100)
+        self.assertIn('var(--shine-next)', shine)
+        root = self.block(css, ':root')
+        self.assertIn('--glow-next-core: var(--amber-hi);', root)
+        for token in ('--glow-next:', '--glow-next-edge:', '--shine-next:', '--shine-next-edge:'):
+            self.assertRegex(root, re.escape(token) + r' color-mix\(in srgb, var\(--amber(-deep)?\) \d+%, transparent\);')
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 24)
+
+    def test_the_halo_adds_no_scroll_area(self):
+        # B-212 review fix: a positioned box adds scroll area even at
+        # opacity 0, and nothing above the play screen clips overflow. The
+        # light (radius rx, ry about the glass) would reach past the
+        # screen's right and bottom edges, so the halo's box is not the
+        # light's: it starts rx left of and ry above the glass and ends at
+        # #screen-play's own right and bottom edges (the console is inset
+        # (scene-w - console-w) / 2 from the sides, and #screen-play's
+        # padding-bottom is below it); the gradient keeps its size and
+        # centre with explicit radii and an `at` position. Measured in the
+        # browser: scrollWidth / scrollHeight equal the window at 360x740,
+        # 390x844, 412x915, 360x640 and 1024x740 (the screenshot runs
+        # assert it).
+        css = self.css()
+        halo = self.rule(css, '#screen-play .console::after')
+        self.assertIn('right: calc((var(--console-w) - var(--scene-w)) / 2);', halo)
+        self.assertIn('bottom: -22px;', halo)
+        for decl in ('width:', 'height:', 'transform:', 'closest-side'):
+            self.assertNotIn(decl, halo)
+        self.assertIn('--console-w: calc(var(--scene-w) - 36px);', self.rule(css, '#screen-play .console'))
+        self.assertIn('align-self: center;', self.rule(css, '#screen-play .console'))
+        screen = self.rule(css, '#screen-play')
+        padding_bottom = int(re.search(r'padding: calc\(var\(--bg-h\) \* 0\.445\) 14px (\d+)px;', screen).group(1))
+        self.assertNotIn('padding-bottom', screen)
+        # the box's bottom is the screen's: as far below the console (the
+        # last item, pinned to the bottom) as #screen-play's padding
+        self.assertEqual(int(re.search(r'bottom: -(\d+)px;', halo).group(1)), padding_bottom)
+        # in px, at the phone widths (the column is min(width, 480)): the
+        # box starts inside the screen, right of the speaker, and ends at
+        # the screen's right edge, though the light reaches past it
+        for width in (360, 390, 412, 480, 1024):
+            scene = min(width, 480)
+            console = scene - 36                        # --console-w
+            inset = (scene - console) / 2               # align-self: center
+            dome = console * 0.254                      # #check-btn --w
+            glass = inset + console * 0.815             # --cx
+            rx = dome * 1.2                             # --rx
+            box_left = glass - rx                       # left: calc(81.5% - var(--rx))
+            box_right = inset + console - (console - scene) / 2   # right: calc((console-w - scene-w) / 2)
+            self.assertGreater(box_left, inset + console * 0.361 + 24, width)   # right of the speaker's tap area
+            self.assertEqual(box_right, scene, width)                           # the screen's right edge
+            self.assertGreater(glass + rx, scene, width)                        # the light alone would overflow
+
+    def test_the_ready_pulse_before_a_check_stays_calmer(self):
+        css = self.css()
+        # as B-114 made it: 0.45 <-> 1, 1.2s each way, never dark, no light
+        self.assertIn('animation: dome-ready 1.2s ease-in-out infinite alternate;', self.rule(css, '#check-btn.is-ready .dome-ready'))
+        ready = self.frames(css, 'dome-ready')
+        self.assertEqual(ready, [(0, 0.45), (100, 1)])
+        self.assertNotIn('is-ready::', css)
+        # the blink is twice as quick (1.2s a blink against 2.4s there and
+        # back), goes far lower, and only it has the light
+        next_low = min(v for _, v in self.frames(css, 'dome-next'))
+        self.assertLess(next_low, min(v for _, v in ready))
+
+        def cycle(selector, name):
+            m = re.search(rf'animation: {name} ([\d.]+)s ease-in-out infinite( alternate)?;', self.rule(css, selector))
+            return float(m.group(1)) * (2 if m.group(2) else 1)
+        self.assertEqual(cycle('#check-btn.is-ready .dome-ready', 'dome-ready'), 2.4)
+        self.assertEqual(cycle('#check-btn.is-next .dome-ready', 'dome-next'), 1.2)
+
+    def test_reduced_motion_glows_steadily(self):
+        css = self.css()
+        blocks = [self.block(css[m.start():], '@media (prefers-reduced-motion: reduce)')
+                  for m in re.finditer(r'@media \(prefers-reduced-motion: reduce\)', css)]
+        steady = [b for b in blocks if '#check-btn.is-next .dome-ready' in b]
+        self.assertEqual(len(steady), 1)
+        rule = steady[0]
+        for sel in ('#check-btn.is-next .dome-ready', '#check-btn.is-next::after', '#screen-play .console:has(#check-btn.is-next)::after'):
+            self.assertIn(sel, rule)
+        self.assertIn('animation: none;', rule)
+        # with no animation they stay at their lit values: dome lit, light on
+        self.assertIn('opacity: 1;', self.rule(css, '#check-btn.is-next .dome-ready'))
+        self.assertIn('opacity: 1;', self.rule(css, '#check-btn.is-next::after,\n#screen-play .console:has(#check-btn.is-next)::after'))
+
+    # --- the robot's nudge (character.js) ---
+
+    def test_nudge_wait_is_4s_after_the_answer_then_8s(self):
+        self.assertEqual(self.run_node(
+            "out([c.NUDGE_MS, c.nudgeWait(st()), c.nudgeWait(st({ nudges: 1 })), c.nudgeWait(st({ nudges: 6 })),"
+            " c.nudgeWait(st({ current: cur('revealed'), lives: 0 })),"
+            " c.nudgeWait(st({ current: cur('playing', 'cat') })), c.nudgeWait(st({ current: cur('playing', 'ca-') })),"
+            " c.nudgeWait(st({ current: cur('wrong', 'tac'), lives: 2 })), c.nudgeWait(st({ pressed: 'dome' })),"
+            " c.nudgeWait(st({ screen: 'round-end' })), c.nudgeWait(st({ screen: 'theme', current: { word: null, placed: [] } }))]);"),
+            [{'first': 4000, 'every': 8000}, 4000, 8000, 8000, 4000, None, None, None, None, None, None])
+
+    def test_nudges_come_at_4_12_20_and_28s_and_stop_with_the_word(self):
+        # main.js armNudge's loop on a clock: wait nudgeWait, one more
+        # nudge, again until it gives null (the dome pressed, the next word
+        # or another screen)
+        res = self.run_node(
+            "const run = (s, stopAt, change) => { const times = []; let t = 0; let w = c.nudgeWait(s);"
+            " while (w !== null && t + w <= 30000) { t += w; if (t >= stopAt) s = change(s); if (c.nudgeWait(s) === null) break;"
+            " s = { ...s, nudges: s.nudges + 1 }; times.push(t); w = c.nudgeWait(s); } return times; };"
+            "out([run(st(), Infinity, (s) => s), run(st(), 10000, (s) => ({ ...s, pressed: 'dome' })),"
+            " run(st(), 15000, (s) => ({ ...s, screen: 'theme', current: { word: null, placed: [] } }))]);")
+        self.assertEqual(res, [[4000, 12000, 20000, 28000], [4000], [4000, 12000]])
+
+    def test_each_nudge_is_his_dome_nudge_moment(self):
+        five = "{ index: 4, size: 5, results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) }"
+        self.assertEqual(self.run_node(
+            "out([moments(st({ current: cur('playing', 'cat') }), st()), moments(st(), st({ nudges: 1 })),"
+            " moments(st({ nudges: 1 }), st({ nudges: 2 })), moments(st({ nudges: 2 }), st({ nudges: 2 })),"
+            " moments(st({ current: cur('revealed'), lives: 0 }), st({ current: cur('revealed'), lives: 0, nudges: 1 })),"
+            " moments(st({ nudges: 3 }), st({ nudges: 0, round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] },"
+            "  current: { ...cur('playing', '---'), word: 'dog' } })),"
+            f" moments(st({{ nudges: 2, round: {five} }}), {{ ...st({{ round: {five} }}), screen: 'round-end' }}),"
+            " c.snapshot(st({ nudges: 2 })).nudges, c.snapshot({ ...st({ nudges: 2 }), screen: 'theme', current: { word: null, placed: [] } }).nudges,"
+            " c.snapshot({ ...st(), nudges: undefined }).nudges, c.NONE.nudges, c.soundsFor(['domeNudge'])]);"),
+            [['correct'], ['domeNudge'], ['domeNudge'], [], ['domeNudge'], ['picture'], ['roundEndGood'], 2, 0, 0, 0, []])
+
+    def test_he_points_at_the_dome_wags_and_comes_back_to_rest(self):
+        steps, point, ends, wag, reduced = self.run_node(
+            "out([c.stepsOf('domeNudge'), c.stepsOf('filledEarly', 'point')[0],"
+            " ['correct', 'streak', 'thirdMiss'].map((m) => Math.max(...c.stepsOf(m).map((s) => s.at))),"
+            " c.fxFor('wag', false), [c.reducedStep(c.stepsOf('domeNudge')[0]), c.fxFor('wag', true)]]);")
+        # the pose CHARACTER.md names "point (at the dome)", as "All slots
+        # filled" has it: eyes wide, eyebrows up, the head turned and the
+        # eyes looking toward the dome; and a pop
+        self.assertEqual(steps[0], {**point, 'pop': 1})
+        self.assertEqual(steps[0]['hands'], 'point')
+        # the pointing finger wags at it (the flourish of "All slots
+        # filled" extra excited), then his rest pose, eyes ahead
+        self.assertEqual(steps[1], {'at': 0.3, 'fx': 'wag'})
+        self.assertEqual(wag[0]['part'], 'flipR')
+        self.assertEqual(steps[-1], {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]})
+        # over before the next nudge, and the moments that answer a word
+        # are over before the first one
+        self.assertLess(steps[-1]['at'] * 1000, 8000)
+        self.assertTrue(all(t * 1000 < 4000 for t in ends), ends)
+        # reduced motion: the pose only, no pop and no wag
+        self.assertEqual(reduced, [{k: v for k, v in point.items()}, []])
+
+    def test_no_idle_beat_on_an_answered_word(self):
+        # the nudges are what a kid who does not go on gets; while the word
+        # is open the idle beat comes as before
+        self.assertEqual(self.run_node(
+            "out([c.idleWait(st({ current: cur('playing', 'ca-'), lastInput: 1000 }), 1000),"
+            " c.idleWait(st({ current: cur('wrong', 'tac'), lives: 2, lastInput: 1000 }), 5000),"
+            " c.idleWait(st({ lastInput: 1000 }), 50000), c.idleWait(st({ current: cur('revealed'), lives: 0, lastInput: 1000 }), 50000)]);"),
+            [10000, 6000, None, None])
+
+    # --- wiring (main.js, state.js) ---
+
+    def test_main_counts_the_nudges_and_nothing_else_does(self):
+        self.assertRegex((self.JS / 'state.js').read_text(), r'\n    nudges: 0,')
+        main = self.code('main.js')
+        self.assertIn("import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';", main)
+        arm = self.function('armNudge')
+        self.assertIn('const word = wordKey(state);', arm)
+        self.assertIn('if (wordKey(state) !== word || nudgeWait(state) === null) return;', arm)
+        self.assertIn('setState({ nudges: state.nudges + 1 });', arm)
+        self.assertIn('if (next !== null) setTimeout(tick, next);', arm)
+        self.assertIn('if (wait !== null) setTimeout(tick, wait);', arm)
+        # armed right after the setState that answers the word: correct or
+        # revealed, not a miss with lives left
+        check = self.function('onCheck')
+        self.assertEqual(check.count('armNudge();'), 2)
+        correct = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
+        reveal = check[check.index('} else if (lives - 1 <= 0) {'):check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5)]
+        for branch in (correct, reveal):
+            self.assertLess(branch.index('setState('), branch.index('armNudge();'))
+        miss = check[check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5):]
+        self.assertNotIn('armNudge', miss)
+        # back to 0 on every new word, the round end and the theme screen
+        for name, n in (('startRound', 1), ('onNext', 2), ('onThemes', 1)):
+            self.assertEqual(self.function(name).count('nudges: 0,'), n, name)
+        self.assertEqual(len(re.findall(r'\bnudges:', main)), 5)
+        # only main.js writes it; character.js reads it and never sets state
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'main.js':
+                self.assertNotRegex(self.code(f.name), r'setState\([^)]*nudges', f.name)
+        self.assertNotIn('setState', self.code('character.js'))

@@ -328,7 +328,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - CHARACTER.md "Poses" and "Moment map" are updated to the puppet (parts, hand shapes, the moments above); the robot rule in CLAUDE.md "Project-specific rules" is updated for the hands-over-the-edge layer.
   - Pure parts (moment table, pose lookup, hand pose per moment, the loudness smoothing) get a Django test through `node`.
   - Screenshots: one per moment at 360x740 (`robot-<moment>.png`), plus `robot-talking.png` mid-clip and `robot-peek.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/63
 
 ### B-211 Locked letters you can see at a glance
 - why: on easy, letters that stay put (the given first letter, right letters after the lever, the robot's hint letter) must look clearly different from letters the kid can move. B-204's thin amber edge on the brass bar is invisible at phone size (human, 2026-10-15, on #52).
@@ -340,7 +340,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - Pick the look yourself: try 2–3 options, keep the clearest, put the others' screenshots in the PR. Don't ask the human.
   - DESIGN.md "Controls and states" records the chosen look.
   - Screenshots: `locked-easy-start.png`, `locked-after-lever.png` (locked and movable letters side by side). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/63
 
 ### B-212 Next-word dome you can't miss
 - why: after a correct word the kid must see at once that the dome means "go on". In the 2026-10-15 preview playtest its blink was too weak to notice (also raised 2026-10-13). This is about being noticed, not the overall look; the bolder restyle comes later.
@@ -350,7 +350,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - The "all slots filled" ready pulse before a check stays calmer than the next-word blink, so the two read differently.
   - `prefers-reduced-motion`: a steady strong glow instead of blinking.
   - Screenshots: `dome-next-on.png`, `dome-next-off.png` (both blink phases), `dome-robot-nudge.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/63
 
 ## Later / not now
 - Design bump: the overall look feels mellow and restrained; make it bolder across all screens, worked out in Claude Design first (human, 2026-10-15).
@@ -371,7 +371,6 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 - Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
 - Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
 - `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
-- The robot's eyes don't follow a moving block (CHARACTER "Block placed: idle (eyes follow)"): the eyes are drawn into the pose sprites, so this needs separate eye layers from the human (B-115).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
 - Replace the placeholder voice lines and game sounds (prototype clips) with new ones that fit the lab look; the human will provide them.
 - Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).

@@ -24,6 +24,10 @@
 //   another (`stagger`), landing like a snap into a slot.
 // - `hop`: after the reset lever the placed blocks hop `height` px up and
 //   back down onto their start spots, `stagger` apart.
+// - `clunk`: a letter that locks (BACKLOG B-211: the lever on easy, the
+//   robot's letter as it lands) is pressed into its slot: it sinks to
+//   `scale` of a placed block in `press`, then comes up to its locked
+//   size by `duration`.
 export const MOTION = {
     pickup: { duration: 0.12, ease: 'power2.out', scale: 1.08 },
     snap: { duration: 0.2, ease: 'back.out(1.4)', scale: 1 },
@@ -38,6 +42,7 @@ export const MOTION = {
     flash: { duration: 0.2, ease: 'power2.out', scale: 1, fade: 0.2 },
     flyIn: { duration: 0.3, ease: 'back.out(1.4)', scale: 1, stagger: 0.12, fade: 0.2 },
     hop: { duration: 0.3, ease: 'power2.out', scale: 1, stagger: 0.03, height: 16, fade: 0.2 },
+    clunk: { duration: 0.2, ease: 'power2.out', scale: 0.8, press: 0.09, fade: 0.2 },
 };
 
 // Spec for one motion. With `reduced` (prefers-reduced-motion) every
