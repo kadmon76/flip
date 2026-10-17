@@ -72,6 +72,10 @@ export const FILES = {
 // anything.
 export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx', locked: 'voice' };
 
+// The analyser on the robot's voice (design/reference/robot-puppet.html):
+// its FFT size and the samples of the waveform read each frame.
+export const ANALYSER = { fftSize: 1024, samples: 512 };
+
 // A user gesture unlocks playback (see unlock): events that count
 // as a user activation in Chrome and as a user gesture in Safari.
 export const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown'];
@@ -126,7 +130,10 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 // gesture creates one AudioContext, opens its output and decodes the
 // clips into memory; play() then starts a decoded buffer at once.
 // The target word stays an <audio> element (speakWord): one file per
-// word, started by the kid's own tap on the speaker.
+// word, started by the kid's own tap on the speaker. It is not routed
+// through the AudioContext (no MediaElementSource), so it plays however
+// the context is (suspended, interrupted, iOS 16's silent switch) and the
+// robot's analyser never hears it (BACKLOG B-210).
 //
 // Audio engine handles, not game state (CLAUDE.md "audio.js"): no other
 // module reads them and nothing decides game logic from them.
@@ -134,6 +141,13 @@ let ctx = null;             // the AudioContext, made on the first gesture
 const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
 const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
 const live = new Set();     // pooled sources now playing: { src, kind }
+// The robot's voice (the voice channel) plays through an AnalyserNode on
+// its way out, so he can show it (BACKLOG B-210: character.js
+// renderTalk, which main.js hands voiceWave() every frame). The swipe
+// goes straight out. `wave` is the scratch array the analyser's samples
+// are copied into.
+let analyser = null;
+const wave = new Uint8Array(ANALYSER.samples);
 
 // Handle to the word clip now playing (an HTMLAudioElement), or null. It
 // is not game state and not a DOM cache: audio.js keeps it so a new tap or
@@ -190,6 +204,13 @@ function unlock() {
             ctx = new AC();
         } catch (e) {
             return;
+        }
+        try {
+            analyser = ctx.createAnalyser();
+            analyser.fftSize = ANALYSER.fftSize;
+            analyser.connect(ctx.destination);
+        } catch (e) {
+            analyser = null;        // no analyser: his voice goes straight out, he just does not show it
         }
         decodeAll();
     }
@@ -258,7 +279,7 @@ export function play(kind) {
         }
         const src = ctx.createBufferSource();
         src.buffer = ready[pickIndex(ready.length)];
-        src.connect(ctx.destination);
+        src.connect(CHANNEL[kind] === 'voice' && analyser ? analyser : ctx.destination);
         const entry = { src, kind };
         live.add(entry);
         src.onended = () => live.delete(entry);
@@ -266,6 +287,22 @@ export function play(kind) {
     } catch (e) {
         // stay silent, no console error
     }
+}
+
+// This frame's samples of the robot's voice (bytes, 128 = silence), or
+// null while none of his clips plays (also while muted: nothing plays).
+// main.js passes it to character.js renderTalk every frame; the array is
+// refilled on each call. The target word is not his voice clip and does
+// not pass the analyser (see speakWord).
+export function voiceWave() {
+    if (!analyser) return null;
+    let talking = false;
+    for (const entry of live) {
+        if (CHANNEL[entry.kind] === 'voice') talking = true;
+    }
+    if (!talking) return null;
+    analyser.getByteTimeDomainData(wave);
+    return wave;
 }
 
 // Play the word clip at `url`; `onEnd` runs once when it ends or fails to

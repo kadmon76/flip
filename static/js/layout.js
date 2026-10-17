@@ -29,9 +29,10 @@ export const TRAY_PAD = 4;          // room above and below for nudges and tilt
 // his head and shoulders showing above it. At 360x740 only a word with a
 // third row of blocks (9-10 letters) reaches down beside him, so rows from
 // the third on are centred in the part of the bench right of ROBOT_ZONE
-// (a fraction of the bench width; his head ends at about 36%). No block
-// of such a row starts left of ROBOT_REACH: his widest pose (excited, a
-// hand out) reaches about 42% of the bench at that height.
+// (a fraction of the bench width; his head ends at about 31%). No block
+// of such a row starts left of ROBOT_REACH: his widest hand pose (arms
+// out, the puppet of BACKLOG B-210) reaches about 37% of the bench at
+// that height.
 export const ROBOT_ZONE = 0.4;
 export const ROBOT_REACH = 0.44;
 

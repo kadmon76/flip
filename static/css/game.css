@@ -40,6 +40,7 @@
     --brass-hi: color-mix(in srgb, var(--brass) 85%, #fff);
     --brass-dark-lo: color-mix(in srgb, var(--brass-dark) 85%, #000);
     --teal-lo: color-mix(in srgb, var(--teal) 85%, #000);
+    --teal-glow-hi: color-mix(in srgb, var(--teal-glow) 85%, #fff);   /* the robot's cap glow and sparks */
     --amber-hi: color-mix(in srgb, var(--amber) 85%, #fff);
     --amber-deep-lo: color-mix(in srgb, var(--amber-deep) 85%, #000);
     --bulb-off-hi: color-mix(in srgb, var(--bulb-off) 85%, #fff);
@@ -876,12 +877,17 @@ body.dragging-active {
 /* console.png pinned to the bottom of the safe area as the last item of
    the play column, inset 4px from each side of the safe area (324px at
    360 wide, so ~58px tall) and centred, so its lower corners clear the
-   frame's rounded inner corners (DESIGN "Layout", issue #30). Above the
-   bench and the rail in z-order by coming after them; no z-index on
-   purpose: one would make the console a stacking context and lift the
-   robot inside it (.robot, z-index -1) above the bench blocks. */
+   frame's rounded inner corners (DESIGN "Layout", issue #30). No
+   z-index on purpose: one would make the console a stacking context and
+   lift the robot inside it above the bench blocks. Inside it, in
+   #screen-play's stacking context: the robot's body and head (.robot,
+   z-index -2), the console image (-1), his hands (.robot-hands, -1,
+   after the image), then the rail, the bench blocks and the controls
+   (BACKLOG B-210). The bench never reaches the console (4px apart). */
 #screen-play .console {
     --console-w: calc(var(--scene-w) - 36px);
+    --rpx: calc(var(--console-w) / 324);   /* 1px at the 324px console of a 360 wide screen */
+    --ppx: calc(var(--rpx) * 0.24);        /* one puppet px (the robot, character.js SCALE) */
     position: relative;
     flex: 0 0 auto;
     align-self: center;
@@ -892,6 +898,7 @@ body.dragging-active {
 
 .console-body {
     position: absolute;
+    z-index: -1;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -1028,77 +1035,197 @@ body.dragging-active {
     }
 }
 
-/* --- Robot (CHARACTER.md, BACKLOG B-115) --- */
+/* --- Robot (CHARACTER.md, BACKLOG B-115, B-210) --- */
 
-/* He stands behind the console's left third with his head and shoulders
-   (75px) above it. .robot is a window inside .console, from 130px above
-   the console down to its opaque bottom edge (95%), that clips him when
-   he sinks. z-index -1 puts it in #screen-play's stacking context
-   (isolation) right above the lab picture and below everything else:
-   the rail, the bench blocks (on 7-10 letter words his pop-up reaches
-   under the second row, BACKLOG B-115) and the console with its
-   controls. Sizes are in --rpx, 1px at the 324px console of a 360 wide
-   screen, so he scales with the console. */
+/* He is a puppet of parts on one 505x505 canvas of "puppet px"
+   (static/images/ui/robot/, design/reference/robot-puppet.html); one
+   puppet px is --ppx (0.24px at 360 wide, character.js SCALE), so the
+   canvas is 121px and his 318 puppet px above the console's top edge
+   (puppet y 374) are the ~75px of head and body above the console's left
+   third that DESIGN keeps clear of the bench blocks. His visor's centre
+   (puppet x 266) is 72.6px from the console's left edge, where v5 has it.
+   Two layers, placed alike (the canvas's left and top below):
+   - .robot, his body and head: a window inside .console, from 130px
+     above the console down to its opaque bottom edge (95%), that clips
+     him when he sinks. z-index -2 puts it in #screen-play's stacking
+     context (isolation) right above the lab picture and below everything
+     else: the console image (-1), the rail, the bench blocks (on 7-10
+     letter words the top of his pop-up passes under the second row,
+     BACKLOG B-115) and the controls.
+   - .robot-hands, his mittens: over the console image (-1, after it),
+     so they stay in view resting on its edge, and still under the rail,
+     the bench blocks and the controls (z auto), which they never cover.
+   Every part inside is a canvas-sized layer (.part), so character.js
+   moves them in % of the canvas (puppet px) and the turning points below
+   are in % of it. One contact shadow per layer. */
+#screen-play .robot,
+#screen-play .robot-hands {
+    pointer-events: none;
+}
+
 #screen-play .robot {
-    --rpx: calc(var(--console-w) / 324);
-    --s: calc(var(--rpx) * 120 / 330);   /* one sprite px: 330px sprites drawn 120px tall */
     position: absolute;
-    z-index: -1;
+    z-index: -2;
     left: 0;
     top: calc(-130 * var(--rpx));
     bottom: 5%;
     width: calc(160 * var(--rpx));
     overflow: hidden;
-    pointer-events: none;
 }
 
-/* The layer character.js slides up and down (yPercent of its height); at
-   rest the sprite's top is 75px above the console. One contact shadow.
-   The speakerLocked head-shake (BACKLOG B-203) turns it about his neck:
-   the visor centre's column (72.6px, below) where the console's top edge
-   crosses him at rest (75px down), so his head swings and his shoulders
-   stay at the edge. */
-.robot-body {
+#screen-play .puppet,
+#screen-play .robot-hands {
     position: absolute;
-    left: 0;
-    right: 0;
-    top: calc((130 - 75) * var(--rpx));
-    height: calc(120 * var(--rpx));
-    transform-origin: calc(72.6 * var(--rpx)) calc(75 * var(--rpx));
+    left: calc(72.6 * var(--rpx) - 266 * var(--ppx));
+    width: calc(505 * var(--ppx));
+    height: calc(505 * var(--ppx));
     filter: drop-shadow(2px 3px 3px var(--shadow-contact));
 }
 
-/* One image per pose, all 330px tall at the same scale; each is placed
-   so its visor centre (--vx, in sprite px) is 72.6px from the console's
-   left edge, where v5 has it, so his head stays put when the pose
-   changes. --sw is the sprite's width in px. character.js puts class
-   is-<pose> on .robot and the rules below show that image. */
-.robot-body img {
+#screen-play .puppet {
+    top: calc(130 * var(--rpx) - 374 * var(--ppx));
+}
+
+#screen-play .robot-hands {
+    z-index: -1;
+    top: calc(-374 * var(--ppx));
+}
+
+.puppet .part,
+.puppet .pup-in,
+.puppet .pup-float,
+.robot-hands .part {
     position: absolute;
-    top: 0;
+    inset: 0;
+}
+
+.puppet img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
     height: 100%;
-    width: calc(var(--sw) * var(--s));
-    left: calc(72.6 * var(--rpx) - var(--vx) * var(--s));
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.puppet .visor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+/* turning points (character.js PIVOT): the head about its neck, the body
+   breathes from its base, each eyebrow about its middle */
+.robot-head {
+    transform-origin: calc(100% * 241 / 505) calc(100% * 262 / 505);
+}
+
+.robot-torso {
+    transform-origin: calc(100% * 241 / 505) calc(100% * 420 / 505);
+}
+
+.brow-L {
+    transform-origin: calc(100% * 230 / 505) calc(100% * 126 / 505);
+}
+
+.brow-R,
+.brow-R .brow-float {
+    transform-origin: calc(100% * 308 / 505) calc(100% * 136 / 505);
+}
+
+/* the visor's light: eyes, the happy arcs and the scope mouth glow in
+   the TV's teal; the cap's glow and sparks (talking, 3 in a row) in it
+   lightened */
+.visor-eye .ball {
+    fill: var(--teal-glow);
+}
+
+.visor-eye .arc,
+.visor .scope {
+    fill: none;
+    stroke: var(--teal-glow);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.visor-eye .arc {
+    stroke-width: 13;
+}
+
+.visor .scope {
+    stroke-width: 8;
+}
+
+.visor .sparks path {
+    fill: none;
+    stroke: var(--teal-glow-hi);
+    stroke-width: 7;
+    stroke-linecap: round;
+}
+
+.visor .cap-flash {
+    opacity: 0;
+}
+
+.visor .cap-hi {
+    stop-color: var(--teal-glow-hi);
+    stop-opacity: 1;
+}
+
+.visor .cap-mid {
+    stop-color: var(--teal-glow);
+    stop-opacity: 0.55;
+}
+
+.visor .cap-lo {
+    stop-color: var(--teal-glow);
+    stop-opacity: 0;
+}
+
+/* Each hand's layer sits at its rest point (character.js REST) and
+   turns about it; every mitten shape is stacked there, centred, at its
+   width (HAND_SHAPES), the left hand's mirrored except rest; class `on`
+   shows one. */
+.hand-L {
+    --hx: calc(100% * 134 / 505);
+    --hy: calc(100% * 338 / 505);
+}
+
+.hand-R {
+    --hx: calc(100% * 350 / 505);
+    --hy: calc(100% * 346 / 505);
+}
+
+.robot-hands .hand {
+    transform-origin: var(--hx) var(--hy);
+}
+
+.robot-hands img {
+    position: absolute;
+    left: var(--hx);
+    top: var(--hy);
+    height: auto;
+    transform: translate(-50%, -50%);
     opacity: 0;
     user-select: none;
     -webkit-user-drag: none;
 }
 
-.robot-body .robot-idle { --sw: 276; --vx: 150; }
-.robot-body .robot-thinking { --sw: 252; --vx: 149; }
-.robot-body .robot-confused { --sw: 269; --vx: 132; }
-.robot-body .robot-excited { --sw: 334; --vx: 164; }
-.robot-body .robot-happy { --sw: 282; --vx: 148; }
-.robot-body .robot-oops { --sw: 282; --vx: 144; }
+.robot-hands img.mirror {
+    transform: translate(-50%, -50%) scaleX(-1);
+}
 
-.robot.is-idle .robot-idle,
-.robot.is-thinking .robot-thinking,
-.robot.is-confused .robot-confused,
-.robot.is-excited .robot-excited,
-.robot.is-happy .robot-happy,
-.robot.is-oops .robot-oops {
+.robot-hands img.on {
     opacity: 1;
 }
+
+.robot-hands .shape-rest { width: calc(100% * 86 / 505); }
+.robot-hands .shape-wave { width: calc(100% * 83 / 505); }
+.robot-hands .shape-point { width: calc(100% * 101 / 505); }
+.robot-hands .shape-ball { width: calc(100% * 72 / 505); }
+.robot-hands .shape-palm { width: calc(100% * 103 / 505); }
 
 /* --- Round-end screen (interim, DESIGN "Other screens (interim)") --- */
 

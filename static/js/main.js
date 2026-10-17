@@ -1,7 +1,7 @@
 // main.js — wiring: theme selection, the level picker, round flow, the
 // console controls (check dome, reset lever, speaker), the header's mute
 // toggle and the play screen's back button, the kid-idle timer for the
-// robot, screen renders.
+// robot and his voice's frames, screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -9,13 +9,13 @@ import { renderCard } from './card.js';
 import { returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
-import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
-import { renderRobot, idleWait, wordKey, IDLE_MS } from './character.js';
+import { renderRobot, renderTalk, idleWait, wordKey, IDLE_MS } from './character.js';
 import { LEVELS, loadLevel, saveLevel, streakAfter, levelUpFor } from './level.js';
 import { pickRound, makeWord } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
@@ -488,6 +488,11 @@ subscribe(renderGallery);
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 subscribe(renderMute);
 subscribe(renderSound);       // the robot's clips (character.js's table) and the mute
+
+// Every frame, the robot shows his voice (BACKLOG B-210): audio.js's
+// analyser samples of the clip he is saying, or null, to character.js.
+// Render input only, never state.
+gsap.ticker.add(() => renderTalk(voiceWave()));
 
 $('check-btn').addEventListener('click', onDome);
 $('reset-btn').addEventListener('click', onLever);

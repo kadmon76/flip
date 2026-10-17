@@ -262,8 +262,9 @@ function benchSpot(current, tileId) {
 // wiggle there with the other wrong blocks (wiggleWrong); then the one
 // that was in the way hops back onto its bench spot (the lever's hop,
 // over his letter still waiting where it was) and, once it is down, his
-// letter flies into the slot (the reveal's fly-in), landing about when
-// the robot, done peeking, pops up happy (character.js hintGiven). Until
+// letter flies into the slot (the reveal's fly-in), landing while the
+// robot still peeks; he pops up happy when his peek is over (2.5s, the
+// puppet's peek, BACKLOG B-210; character.js hintGiven). Until
 // it lands it has class `landing`, so its locked edge (game.css) lights
 // as it lands. Reduced motion: no wiggle and no flight; the two fade in
 // where they now are, one after the other.
