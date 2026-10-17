@@ -328,7 +328,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - CHARACTER.md "Poses" and "Moment map" are updated to the puppet (parts, hand shapes, the moments above); the robot rule in CLAUDE.md "Project-specific rules" is updated for the hands-over-the-edge layer.
   - Pure parts (moment table, pose lookup, hand pose per moment, the loudness smoothing) get a Django test through `node`.
   - Screenshots: one per moment at 360x740 (`robot-<moment>.png`), plus `robot-talking.png` mid-clip and `robot-peek.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/63
 
 ### B-211 Locked letters you can see at a glance
 - why: on easy, letters that stay put (the given first letter, right letters after the lever, the robot's hint letter) must look clearly different from letters the kid can move. B-204's thin amber edge on the brass bar is invisible at phone size (human, 2026-10-15, on #52).
@@ -340,7 +340,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - Pick the look yourself: try 2–3 options, keep the clearest, put the others' screenshots in the PR. Don't ask the human.
   - DESIGN.md "Controls and states" records the chosen look.
   - Screenshots: `locked-easy-start.png`, `locked-after-lever.png` (locked and movable letters side by side). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/63
 
 ### B-212 Next-word dome you can't miss
 - why: after a correct word the kid must see at once that the dome means "go on". In the 2026-10-15 preview playtest its blink was too weak to notice (also raised 2026-10-13). This is about being noticed, not the overall look; the bolder restyle comes later.
@@ -350,7 +350,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - The "all slots filled" ready pulse before a check stays calmer than the next-word blink, so the two read differently.
   - `prefers-reduced-motion`: a steady strong glow instead of blinking.
   - Screenshots: `dome-next-on.png`, `dome-next-off.png` (both blink phases), `dome-robot-nudge.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/63
 
 ## Later / not now
 - Design bump: the overall look feels mellow and restrained; make it bolder across all screens, worked out in Claude Design first (human, 2026-10-15).
