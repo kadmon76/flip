@@ -1048,9 +1048,11 @@ class ControlsTests(TestCase):
                          [None, 'off'])
 
     def test_after_correct_or_reveal_the_dome_is_next(self):
+        # BACKLOG B-212: its own state, 'next' (the blink), not the ready
+        # pulse of a check
         self.assertEqual(
             self.run_node("out(['correct', 'revealed'].map((s) => [c.domeAction(cur(s, 'cat')), c.domeState(cur(s, 'cat'), null)]));"),
-            [['next', 'ready'], ['next', 'ready']],
+            [['next', 'next'], ['next', 'next']],
         )
 
     def test_no_word_no_action(self):
@@ -1283,9 +1285,15 @@ class CharacterTests(TestCase):
         self.assertEqual(steps('hintGiven'), [
             {'at': 0, 'sink': 0, 'head': 0, 'look': [0, 0], 'eyes': 'happy', 'brows': 'happy', 'hands': 'pointUp', 'pop': 'small'},
             {'at': 1.2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm'}])
+        # his nudge toward the dome on an answered word (B-212): the
+        # pointing of "All slots filled", a pop, the finger wagging, rest
+        self.assertEqual(steps('domeNudge'), [
+            {**point, 'pop': 1}, {'at': 0.3, 'fx': 'wag'},
+            {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]}])
         self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
             'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
-            'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven'])
+            'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
+            'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
         self.assertEqual(self.run_node("out(c.PEEK);"), {'wait': 1.6, 'every': 4.8, 'steps': [
             {'at': 0, 'sink': 104, 'look': [-26, -8], 'brows': 'up'}, {'at': 0.9, 'look': [26, -8]},
@@ -1380,7 +1388,7 @@ class CharacterTests(TestCase):
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
-            'speakerLocked': ['locked'], 'hintGiven': [],
+            'speakerLocked': ['locked'], 'hintGiven': [], 'domeNudge': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
@@ -1646,7 +1654,7 @@ class PuppetTests(TestCase):
             'roundStart': ['wave'], 'picture': ['gasp', 'giggle', 'shock'], 'blockPlaced': ['rest'], 'blockReturned': ['rest'],
             'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
-            'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp']})
+            'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'domeNudge': ['point']})
 
     def test_the_hands_hide_before_they_sink_and_show_after_they_rise(self):
         # BACKLOG B-210 review: going below hideHands (40) the hands vanish
@@ -2006,6 +2014,24 @@ class PuppetRenderTests(TestCase):
             "out([drag.filter((e) => e[1] === '.robot .robot-head').map((e) => e[2].duration),"
             " drop.filter((e) => e[1] === '.robot .robot-head').map((e) => e[2].duration)]);", reduced=True)
         self.assertEqual(res, [[0], [0]])
+
+    def test_a_nudge_points_him_at_the_dome(self):
+        # BACKLOG B-212: one more state.nudges on the answered word plays
+        # domeNudge (its steps after the moment before, 300ms after his last
+        # change); a re-render with the same count plays nothing
+        res = self.run_node(
+            "const done = (n) => st({ nudges: n, round: { index: 0, size: 5, results: [{ correct: true }] },"
+            " current: { word: 'cat', status: 'correct', placed: put('cat') } });"
+            "c.renderRobot(done(0)); take();"
+            "c.renderRobot(done(1)); const one = take();"
+            "c.renderRobot(done(1)); const again = take();"
+            "out({ steps: one.filter((e) => e[0] === 'delayedCall' && e[2] === 'applyStep').map((e) => [e[1], e[3][0]]),"
+            " dropped: one.filter((e) => e[0] === 'kill').map((e) => e[1]), again });")
+        self.assertEqual([s['hands'] for _, s in res['steps'] if 'hands' in s], ['point', 'rest'])
+        self.assertEqual(res['steps'][0][1]['look'], [26, 22])
+        self.assertTrue(any(s.get('fx') == 'wag' for _, s in res['steps']))
+        self.assertIn('applyStep', res['dropped'])
+        self.assertEqual(res['again'], [])
 
     def test_wiring(self):
         js = self.ROOT / 'static' / 'js'
@@ -5102,3 +5128,330 @@ class LockedLookTests(TestCase):
                 self.assertNotIn(word, body, (name, word))
         for word in ('document', 'window', 'gsap'):
             self.assertNotIn(word, self.function('newlyLocked', 'feedback.js'))
+
+
+class NextDomeTests(TestCase):
+    """Next-word dome you can't miss (BACKLOG B-212). After a correct
+    answer or a reveal the check dome has a state of its own, `next`
+    (controls.js domeState), which game.css draws as a blink: the lit dome
+    on and off (1.2s a blink, holding lit and holding at an ember), its
+    glass shining and an amber halo reaching past its rim while it is on.
+    The `ready` pulse before a check stays as it was: slower, never dark,
+    no light layers. Reduced motion: lit, shining and glowing, steadily.
+    If the dome is not pressed, the robot nudges toward it (character.js
+    domeNudge: pointing at it, a pop, the finger wagging) 4s after the
+    answer and then every 8s (nudgeWait; main.js armNudge counts them in
+    state.nudges); on an answered word the kid-idle beat no longer
+    comes."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        # st(...) is a play-screen state on the word "cat", checked
+        # correct (round 1, three lives, no nudge yet) with overrides
+        script = (
+            f"const c = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const cur = (status, placed = 'cat') => ({ word: 'cat', status, placed: put(placed) });"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0,"
+            " nudges: 0, pressed: null, round: { index: 0, size: 5, results: [{ word: 'cat', correct: true }] },"
+            " current: cur('correct'), ...o });"
+            "const moments = (a, b) => c.momentsFor(c.snapshot(a), c.snapshot(b));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def block(self, css, head):
+        # the body of the first block opened by `head`, braces matched
+        start = css.index(head)
+        i = css.index('{', start) + 1
+        depth = 1
+        j = i
+        while depth:
+            depth += {'{': 1, '}': -1}.get(css[j], 0)
+            j += 1
+        return css[i:j - 1]
+
+    def rule(self, css, selector):
+        m = re.search(r'(?:^|})\s*' + re.escape(selector) + r'\s*{([^}]*)}', css)
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    def frames(self, css, name):
+        # keyframe stops as [(percent, opacity)], sorted
+        body = self.block(css, f'@keyframes {name} ')
+        stops = []
+        for sel, decl in re.findall(r'([^{}]+){([^}]*)}', body):
+            value = float(re.search(r'opacity:\s*([\d.]+)', decl).group(1))
+            for s in sel.split(','):
+                s = s.strip()
+                stops.append((0.0 if s == 'from' else 100.0 if s == 'to' else float(s.rstrip('%')), value))
+        return sorted(stops)
+
+    # --- the dome's state ---
+
+    def test_the_dome_is_next_after_a_correct_answer_or_a_reveal(self):
+        res = self.run_node(
+            "out([['playing', '---'], ['playing', 'ca-'], ['playing', 'cat'], ['wrong', 'tac'], ['correct', 'cat'], ['revealed', 'cat']]"
+            ".map(([s, p]) => [C.domeAction(cur(s, p)), C.domeState(cur(s, p), null), C.domeState(cur(s, p), 'dome')]));")
+        self.assertEqual(res, [
+            [None, 'off', 'pressed'], [None, 'off', 'pressed'], ['check', 'ready', 'pressed'],
+            [None, 'off', 'pressed'], ['next', 'next', 'pressed'], ['next', 'next', 'pressed']])
+        # the render shows it as class is-next (one state class at a time)
+        controls = self.code('controls.js')
+        self.assertIn("dome: ['off', 'ready', 'next', 'pressed'],", controls)
+        self.assertIn("show(dome, 'dome', domeState(current, pressed));", controls)
+
+    # --- the blink (game.css) ---
+
+    def test_the_next_dome_blinks_on_and_off_in_a_light_past_its_rim(self):
+        css = self.css()
+        self.assertIn('animation: dome-next 1.2s ease-in-out infinite;', self.rule(css, '#check-btn.is-next .dome-ready'))
+        self.assertIn('opacity: 1;', self.rule(css, '#check-btn.is-next .dome-ready'))
+        # on and off with a hold at each: lit for 40% (480ms), out, dark
+        # for 34% at an ember (0.2), back; each change 156ms, inside
+        # DESIGN "Motion"'s 120-300ms; not `alternate` (a rhythm, not a
+        # swing back and forth)
+        dome = self.frames(css, 'dome-next')
+        light = self.frames(css, 'dome-next-light')
+        self.assertEqual(dome, [(0, 1), (40, 1), (53, 0.2), (87, 0.2), (100, 1)])
+        self.assertEqual(light, [(0, 1), (40, 1), (53, 0), (87, 0), (100, 1)])
+        for (a, _), (b, _) in zip(dome, dome[1:]):
+            if b - a < 30:
+                self.assertTrue(120 <= (b - a) / 100 * 1200 <= 300, (a, b))
+        # the light, two layers: the shine over the glass (the button's
+        # ::after) and the halo (the console's ::after); off at rest and on
+        # no other state, no taps, shown and blinking in step with the dome
+        # only while it is `next`
+        shine = self.rule(css, '#check-btn::after')
+        halo = self.rule(css, '#screen-play .console::after')
+        for rule in (shine, halo):
+            for decl in ("content: '';", 'position: absolute;', 'opacity: 0;', 'pointer-events: none;'):
+                self.assertIn(decl, rule)
+        on = self.rule(css, '#check-btn.is-next::after,\n#screen-play .console:has(#check-btn.is-next)::after')
+        self.assertIn('opacity: 1;', on)
+        self.assertIn('animation: dome-next-light 1.2s ease-in-out infinite;', on)
+        shown = [sel for sel in re.findall(r'(?:^|})\s*([^{}]*::(?:before|after)[^{}]*){([^}]*)}', css)
+                 if 'opacity: 1;' in sel[1] and ('check-btn' in sel[0] or '.console' in sel[0])]
+        self.assertTrue(shown)
+        for sel, _ in shown:
+            for part in sel.split(','):
+                self.assertIn('#check-btn.is-next', part, sel)
+        self.assertNotIn('#check-btn::before', css)
+        # the halo: centred on the dome's glass (the dome's centre, --cx /
+        # --cy, moved up to 42% of its sprite), 2.4x its width, so it
+        # reaches past the brass rim; in the console's z-order after the
+        # console image (-1): under the rail, the bench blocks and the
+        # controls, which are z auto. The shine: inside the glass.
+        dome = self.rule(css, '#check-btn')
+        for decl in ('--cx: 81.5%;', '--cy: 41%;', '--w: calc(var(--console-w) * 0.254);', '--ar: calc(169 / 240);'):
+            self.assertIn(decl, dome)
+        for decl in ('--rx: calc(var(--console-w) * 0.254 * 1.2);', '--ry: calc(var(--console-w) * 0.254 * 169 / 240 * 1.075);',
+                     'z-index: -1;', 'left: calc(81.5% - var(--rx));',
+                     'top: calc(41% - var(--console-w) * 0.254 * 169 / 240 * 0.08 - var(--ry));',
+                     'radial-gradient(var(--rx) var(--ry) at var(--rx) var(--ry), var(--glow-next-core)'):
+            self.assertIn(decl, halo)
+        self.assertIn('z-index: -1;', self.rule(css, '.console-body'))
+        self.assertLess(int(re.search(r'width: (\d+)%;', shine).group(1)), 100)
+        self.assertIn('var(--shine-next)', shine)
+        root = self.block(css, ':root')
+        self.assertIn('--glow-next-core: var(--amber-hi);', root)
+        for token in ('--glow-next:', '--glow-next-edge:', '--shine-next:', '--shine-next-edge:'):
+            self.assertRegex(root, re.escape(token) + r' color-mix\(in srgb, var\(--amber(-deep)?\) \d+%, transparent\);')
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 24)
+
+    def test_the_halo_adds_no_scroll_area(self):
+        # B-212 review fix: a positioned box adds scroll area even at
+        # opacity 0, and nothing above the play screen clips overflow. The
+        # light (radius rx, ry about the glass) would reach past the
+        # screen's right and bottom edges, so the halo's box is not the
+        # light's: it starts rx left of and ry above the glass and ends at
+        # #screen-play's own right and bottom edges (the console is inset
+        # (scene-w - console-w) / 2 from the sides, and #screen-play's
+        # padding-bottom is below it); the gradient keeps its size and
+        # centre with explicit radii and an `at` position. Measured in the
+        # browser: scrollWidth / scrollHeight equal the window at 360x740,
+        # 390x844, 412x915, 360x640 and 1024x740 (the screenshot runs
+        # assert it).
+        css = self.css()
+        halo = self.rule(css, '#screen-play .console::after')
+        self.assertIn('right: calc((var(--console-w) - var(--scene-w)) / 2);', halo)
+        self.assertIn('bottom: -22px;', halo)
+        for decl in ('width:', 'height:', 'transform:', 'closest-side'):
+            self.assertNotIn(decl, halo)
+        self.assertIn('--console-w: calc(var(--scene-w) - 36px);', self.rule(css, '#screen-play .console'))
+        self.assertIn('align-self: center;', self.rule(css, '#screen-play .console'))
+        screen = self.rule(css, '#screen-play')
+        padding_bottom = int(re.search(r'padding: calc\(var\(--bg-h\) \* 0\.445\) 14px (\d+)px;', screen).group(1))
+        self.assertNotIn('padding-bottom', screen)
+        # the box's bottom is the screen's: as far below the console (the
+        # last item, pinned to the bottom) as #screen-play's padding
+        self.assertEqual(int(re.search(r'bottom: -(\d+)px;', halo).group(1)), padding_bottom)
+        # in px, at the phone widths (the column is min(width, 480)): the
+        # box starts inside the screen, right of the speaker, and ends at
+        # the screen's right edge, though the light reaches past it
+        for width in (360, 390, 412, 480, 1024):
+            scene = min(width, 480)
+            console = scene - 36                        # --console-w
+            inset = (scene - console) / 2               # align-self: center
+            dome = console * 0.254                      # #check-btn --w
+            glass = inset + console * 0.815             # --cx
+            rx = dome * 1.2                             # --rx
+            box_left = glass - rx                       # left: calc(81.5% - var(--rx))
+            box_right = inset + console - (console - scene) / 2   # right: calc((console-w - scene-w) / 2)
+            self.assertGreater(box_left, inset + console * 0.361 + 24, width)   # right of the speaker's tap area
+            self.assertEqual(box_right, scene, width)                           # the screen's right edge
+            self.assertGreater(glass + rx, scene, width)                        # the light alone would overflow
+
+    def test_the_ready_pulse_before_a_check_stays_calmer(self):
+        css = self.css()
+        # as B-114 made it: 0.45 <-> 1, 1.2s each way, never dark, no light
+        self.assertIn('animation: dome-ready 1.2s ease-in-out infinite alternate;', self.rule(css, '#check-btn.is-ready .dome-ready'))
+        ready = self.frames(css, 'dome-ready')
+        self.assertEqual(ready, [(0, 0.45), (100, 1)])
+        self.assertNotIn('is-ready::', css)
+        # the blink is twice as quick (1.2s a blink against 2.4s there and
+        # back), goes far lower, and only it has the light
+        next_low = min(v for _, v in self.frames(css, 'dome-next'))
+        self.assertLess(next_low, min(v for _, v in ready))
+
+        def cycle(selector, name):
+            m = re.search(rf'animation: {name} ([\d.]+)s ease-in-out infinite( alternate)?;', self.rule(css, selector))
+            return float(m.group(1)) * (2 if m.group(2) else 1)
+        self.assertEqual(cycle('#check-btn.is-ready .dome-ready', 'dome-ready'), 2.4)
+        self.assertEqual(cycle('#check-btn.is-next .dome-ready', 'dome-next'), 1.2)
+
+    def test_reduced_motion_glows_steadily(self):
+        css = self.css()
+        blocks = [self.block(css[m.start():], '@media (prefers-reduced-motion: reduce)')
+                  for m in re.finditer(r'@media \(prefers-reduced-motion: reduce\)', css)]
+        steady = [b for b in blocks if '#check-btn.is-next .dome-ready' in b]
+        self.assertEqual(len(steady), 1)
+        rule = steady[0]
+        for sel in ('#check-btn.is-next .dome-ready', '#check-btn.is-next::after', '#screen-play .console:has(#check-btn.is-next)::after'):
+            self.assertIn(sel, rule)
+        self.assertIn('animation: none;', rule)
+        # with no animation they stay at their lit values: dome lit, light on
+        self.assertIn('opacity: 1;', self.rule(css, '#check-btn.is-next .dome-ready'))
+        self.assertIn('opacity: 1;', self.rule(css, '#check-btn.is-next::after,\n#screen-play .console:has(#check-btn.is-next)::after'))
+
+    # --- the robot's nudge (character.js) ---
+
+    def test_nudge_wait_is_4s_after_the_answer_then_8s(self):
+        self.assertEqual(self.run_node(
+            "out([c.NUDGE_MS, c.nudgeWait(st()), c.nudgeWait(st({ nudges: 1 })), c.nudgeWait(st({ nudges: 6 })),"
+            " c.nudgeWait(st({ current: cur('revealed'), lives: 0 })),"
+            " c.nudgeWait(st({ current: cur('playing', 'cat') })), c.nudgeWait(st({ current: cur('playing', 'ca-') })),"
+            " c.nudgeWait(st({ current: cur('wrong', 'tac'), lives: 2 })), c.nudgeWait(st({ pressed: 'dome' })),"
+            " c.nudgeWait(st({ screen: 'round-end' })), c.nudgeWait(st({ screen: 'theme', current: { word: null, placed: [] } }))]);"),
+            [{'first': 4000, 'every': 8000}, 4000, 8000, 8000, 4000, None, None, None, None, None, None])
+
+    def test_nudges_come_at_4_12_20_and_28s_and_stop_with_the_word(self):
+        # main.js armNudge's loop on a clock: wait nudgeWait, one more
+        # nudge, again until it gives null (the dome pressed, the next word
+        # or another screen)
+        res = self.run_node(
+            "const run = (s, stopAt, change) => { const times = []; let t = 0; let w = c.nudgeWait(s);"
+            " while (w !== null && t + w <= 30000) { t += w; if (t >= stopAt) s = change(s); if (c.nudgeWait(s) === null) break;"
+            " s = { ...s, nudges: s.nudges + 1 }; times.push(t); w = c.nudgeWait(s); } return times; };"
+            "out([run(st(), Infinity, (s) => s), run(st(), 10000, (s) => ({ ...s, pressed: 'dome' })),"
+            " run(st(), 15000, (s) => ({ ...s, screen: 'theme', current: { word: null, placed: [] } }))]);")
+        self.assertEqual(res, [[4000, 12000, 20000, 28000], [4000], [4000, 12000]])
+
+    def test_each_nudge_is_his_dome_nudge_moment(self):
+        five = "{ index: 4, size: 5, results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) }"
+        self.assertEqual(self.run_node(
+            "out([moments(st({ current: cur('playing', 'cat') }), st()), moments(st(), st({ nudges: 1 })),"
+            " moments(st({ nudges: 1 }), st({ nudges: 2 })), moments(st({ nudges: 2 }), st({ nudges: 2 })),"
+            " moments(st({ current: cur('revealed'), lives: 0 }), st({ current: cur('revealed'), lives: 0, nudges: 1 })),"
+            " moments(st({ nudges: 3 }), st({ nudges: 0, round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] },"
+            "  current: { ...cur('playing', '---'), word: 'dog' } })),"
+            f" moments(st({{ nudges: 2, round: {five} }}), {{ ...st({{ round: {five} }}), screen: 'round-end' }}),"
+            " c.snapshot(st({ nudges: 2 })).nudges, c.snapshot({ ...st({ nudges: 2 }), screen: 'theme', current: { word: null, placed: [] } }).nudges,"
+            " c.snapshot({ ...st(), nudges: undefined }).nudges, c.NONE.nudges, c.soundsFor(['domeNudge'])]);"),
+            [['correct'], ['domeNudge'], ['domeNudge'], [], ['domeNudge'], ['picture'], ['roundEndGood'], 2, 0, 0, 0, []])
+
+    def test_he_points_at_the_dome_wags_and_comes_back_to_rest(self):
+        steps, point, ends, wag, reduced = self.run_node(
+            "out([c.stepsOf('domeNudge'), c.stepsOf('filledEarly', 'point')[0],"
+            " ['correct', 'streak', 'thirdMiss'].map((m) => Math.max(...c.stepsOf(m).map((s) => s.at))),"
+            " c.fxFor('wag', false), [c.reducedStep(c.stepsOf('domeNudge')[0]), c.fxFor('wag', true)]]);")
+        # the pose CHARACTER.md names "point (at the dome)", as "All slots
+        # filled" has it: eyes wide, eyebrows up, the head turned and the
+        # eyes looking toward the dome; and a pop
+        self.assertEqual(steps[0], {**point, 'pop': 1})
+        self.assertEqual(steps[0]['hands'], 'point')
+        # the pointing finger wags at it (the flourish of "All slots
+        # filled" extra excited), then his rest pose, eyes ahead
+        self.assertEqual(steps[1], {'at': 0.3, 'fx': 'wag'})
+        self.assertEqual(wag[0]['part'], 'flipR')
+        self.assertEqual(steps[-1], {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]})
+        # over before the next nudge, and the moments that answer a word
+        # are over before the first one
+        self.assertLess(steps[-1]['at'] * 1000, 8000)
+        self.assertTrue(all(t * 1000 < 4000 for t in ends), ends)
+        # reduced motion: the pose only, no pop and no wag
+        self.assertEqual(reduced, [{k: v for k, v in point.items()}, []])
+
+    def test_no_idle_beat_on_an_answered_word(self):
+        # the nudges are what a kid who does not go on gets; while the word
+        # is open the idle beat comes as before
+        self.assertEqual(self.run_node(
+            "out([c.idleWait(st({ current: cur('playing', 'ca-'), lastInput: 1000 }), 1000),"
+            " c.idleWait(st({ current: cur('wrong', 'tac'), lives: 2, lastInput: 1000 }), 5000),"
+            " c.idleWait(st({ lastInput: 1000 }), 50000), c.idleWait(st({ current: cur('revealed'), lives: 0, lastInput: 1000 }), 50000)]);"),
+            [10000, 6000, None, None])
+
+    # --- wiring (main.js, state.js) ---
+
+    def test_main_counts_the_nudges_and_nothing_else_does(self):
+        self.assertRegex((self.JS / 'state.js').read_text(), r'\n    nudges: 0,')
+        main = self.code('main.js')
+        self.assertIn("import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';", main)
+        arm = self.function('armNudge')
+        self.assertIn('const word = wordKey(state);', arm)
+        self.assertIn('if (wordKey(state) !== word || nudgeWait(state) === null) return;', arm)
+        self.assertIn('setState({ nudges: state.nudges + 1 });', arm)
+        self.assertIn('if (next !== null) setTimeout(tick, next);', arm)
+        self.assertIn('if (wait !== null) setTimeout(tick, wait);', arm)
+        # armed right after the setState that answers the word: correct or
+        # revealed, not a miss with lives left
+        check = self.function('onCheck')
+        self.assertEqual(check.count('armNudge();'), 2)
+        correct = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
+        reveal = check[check.index('} else if (lives - 1 <= 0) {'):check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5)]
+        for branch in (correct, reveal):
+            self.assertLess(branch.index('setState('), branch.index('armNudge();'))
+        miss = check[check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5):]
+        self.assertNotIn('armNudge', miss)
+        # back to 0 on every new word, the round end and the theme screen
+        for name, n in (('startRound', 1), ('onNext', 2), ('onThemes', 1)):
+            self.assertEqual(self.function(name).count('nudges: 0,'), n, name)
+        self.assertEqual(len(re.findall(r'\bnudges:', main)), 5)
+        # only main.js writes it; character.js reads it and never sets state
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'main.js':
+                self.assertNotRegex(self.code(f.name), r'setState\([^)]*nudges', f.name)
+        self.assertNotIn('setState', self.code('character.js'))

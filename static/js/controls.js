@@ -24,11 +24,15 @@ export function domeAction(current) {
     return null;
 }
 
-// The dome's image: 'pressed' while held, 'ready' (glow pulsing) when a
-// press would do something, 'off' otherwise.
+// The dome's image: 'pressed' while held; 'ready' (glow pulsing slowly)
+// when a press would check; 'next' (lit, blinking on and off in a glow
+// that reaches past its rim, BACKLOG B-212) when a press goes to the next
+// word, after a correct answer or a reveal; 'off' otherwise.
 export function domeState(current, pressed) {
     if (pressed === 'dome') return 'pressed';
-    return domeAction(current) ? 'ready' : 'off';
+    const action = domeAction(current);
+    if (action === 'next') return 'next';
+    return action ? 'ready' : 'off';
 }
 
 // The lever works while blocks can still move (not after a correct answer
@@ -63,7 +67,7 @@ export function speakerAction(current, level) {
 // --- Render ---
 
 const STATES = {
-    dome: ['off', 'ready', 'pressed'],
+    dome: ['off', 'ready', 'next', 'pressed'],
     lever: ['up', 'down'],
     speaker: ['off', 'on', 'cap'],
 };

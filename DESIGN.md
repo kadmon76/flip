@@ -98,7 +98,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   filled. When all slots are filled: `ready`, glow pulsing slowly
   (opacity 0.45↔1, 1.2s each way, ease-in-out, infinite) until pressed or a block is
   taken out. Press: `pressed` for 120ms, then the result. After a correct
-  answer or a reveal, it returns to `ready` pulse and pressing it goes to
+  answer or a reveal it is `next`: the lit dome blinks on and off (1.2s a blink: lit 480ms, an ember at 0.2 for 408ms, 156ms changes) and, while lit, its glass shines and an amber halo spills past its rim onto the console and the bench, under the blocks (B-212); pressing it goes to
   the next word (the dome is both check and next). After a wrong check it
   stays `off` until a block moves (drag, tap or the reset lever), or until the robot's second-miss letter completes the word (hard, B-207), when it is `ready` at once.
 - **Reset lever** (`#reset-btn`): tap → `lever-down` for 250ms, rail shakes
@@ -122,7 +122,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   robot: Correct moment (CHARACTER.md).
 - Never block input for more than 300ms. `prefers-reduced-motion`:
   replace motion with opacity fades; the dome glows steadily instead of
-  pulsing.
+  pulsing or blinking (`next` keeps its lit look, shine and halo).
 
 ## Motion
 Calm-tactile, 120–300ms, ease-out; small overshoot `back.out(1.4)` only for

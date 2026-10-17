@@ -54,6 +54,13 @@
     --shadow-deep: color-mix(in srgb, var(--bench-deep) 75%, transparent);
     --glow-teal: color-mix(in srgb, var(--teal-glow) 35%, transparent);
     --glow-amber: color-mix(in srgb, var(--amber) 60%, transparent);
+    /* the next-word dome's light (B-212): its halo, strongest at the
+       dome, and the shine on its glass */
+    --glow-next-core: var(--amber-hi);
+    --glow-next: color-mix(in srgb, var(--amber) 75%, transparent);
+    --glow-next-edge: color-mix(in srgb, var(--amber-deep) 35%, transparent);
+    --shine-next: color-mix(in srgb, var(--amber) 90%, transparent);
+    --shine-next-edge: color-mix(in srgb, var(--amber) 45%, transparent);
     --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
     /* TV static on a wrong check: light and dark noise lines */
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
@@ -889,8 +896,9 @@ body.dragging-active {
    lift the robot inside it above the bench blocks. Inside it, in
    #screen-play's stacking context: the robot's body and head (.robot,
    z-index -2), the console image (-1), his hands (.robot-hands, -1,
-   after the image), then the rail, the bench blocks and the controls
-   (BACKLOG B-210). The bench never reaches the console (4px apart). */
+   after the image), the next-word dome's halo (::after, -1, last; B-212),
+   then the rail, the bench blocks and the controls (BACKLOG B-210). The
+   bench never reaches the console (4px apart). */
 #screen-play .console {
     --console-w: calc(var(--scene-w) - 36px);
     --rpx: calc(var(--console-w) / 324);   /* 1px at the 324px console of a 360 wide screen */
@@ -1038,6 +1046,112 @@ body.dragging-active {
 
 @media (prefers-reduced-motion: reduce) {
     #check-btn.is-ready .dome-ready {
+        animation: none;
+    }
+}
+
+/* check dome `next` (BACKLOG B-212): after a correct answer or a reveal
+   a press goes to the next word, and the dome says so far louder than
+   the calm `ready` pulse before a check. The lit dome blinks on and off
+   (1.2s a blink: lit 480ms, out in 156ms, dark 408ms, back in 156ms);
+   while it is on, its glass shines (#check-btn::after, a pale amber
+   light over the glass) and its light spills past the brass rim onto
+   the console and the bench (.console::after, below). Dark, only an
+   ember of the lit glass is left (0.2). Both are light, not objects:
+   they draw nothing at rest and take no taps. The ready pulse above has
+   neither, so before a check the dome stays calm. Reduced motion: lit,
+   shining and glowing, steadily. */
+#check-btn.is-next .dome-ready {
+    opacity: 1;
+    animation: dome-next 1.2s ease-in-out infinite;
+}
+
+#check-btn::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    width: 64%;
+    height: 82%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(closest-side at 46% 42%, var(--shine-next) 0%, var(--shine-next) 25%, var(--shine-next-edge) 70%, transparent 100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The halo: an amber light 2.4x the dome's width (radius --rx) and
+   2.15x its height (--ry), centred on its glass (42% down the sprite;
+   the dome's centre and size are #check-btn's --cx, --cy and --w) and
+   brightest just outside the rim. Its box starts --rx left of and --ry
+   above the glass, with the light's centre at (--rx, --ry) in it, and
+   ends at the play screen's right and bottom edges (the console is
+   inset 18px from the column's sides, and #screen-play's padding-bottom
+   is 22px below it): the light would reach past them (to x 381, y 741
+   at 360x740), off the screen, and a box out there would make the page
+   scroll, sideways and down (B-212, review fix). Inside the screen it
+   is the same light (the gradient is not resized; only its dithering
+   differs, by at most 4/255). It is part of the console's z-order, not
+   the button's: z-index -1 after the console image, so it lights the
+   console's plate and the bench but is drawn under the rail, the bench
+   blocks (on a 10-letter word on hard the third row lies right above
+   the dome, and an extra letter may lie there) and the controls, and
+   it never reaches the robot's hands (it starts right of the speaker).
+   Shown while the dome is `next` (`:has()`, inside the browser floor),
+   blinking in step with it. */
+#screen-play .console::after {
+    --rx: calc(var(--console-w) * 0.254 * 1.2);
+    --ry: calc(var(--console-w) * 0.254 * 169 / 240 * 1.075);
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: calc(81.5% - var(--rx));
+    top: calc(41% - var(--console-w) * 0.254 * 169 / 240 * 0.08 - var(--ry));
+    right: calc((var(--console-w) - var(--scene-w)) / 2);
+    bottom: -22px;
+    background: radial-gradient(var(--rx) var(--ry) at var(--rx) var(--ry), var(--glow-next-core) 0%, var(--glow-next-core) 36%, var(--glow-next) 54%, var(--glow-next-edge) 76%, transparent 100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+#check-btn.is-next::after,
+#screen-play .console:has(#check-btn.is-next)::after {
+    opacity: 1;
+    animation: dome-next-light 1.2s ease-in-out infinite;
+}
+
+@keyframes dome-next {
+    0%,
+    40% {
+        opacity: 1;
+    }
+    53%,
+    87% {
+        opacity: 0.2;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes dome-next-light {
+    0%,
+    40% {
+        opacity: 1;
+    }
+    53%,
+    87% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #check-btn.is-next .dome-ready,
+    #check-btn.is-next::after,
+    #screen-play .console:has(#check-btn.is-next)::after {
         animation: none;
     }
 }

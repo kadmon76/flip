@@ -20,6 +20,7 @@
 // talking effects below).
 
 import { starsFor } from './score.js';
+import { domeAction } from './controls.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -186,7 +187,11 @@ export const FX = {
 // is "Letter placed" too, and hintGiven (his letter on the second miss,
 // B-206: glad, not a win) is happy, a small pop and pointing up at his
 // letter on the rail, when his peek is over (scriptFor). "wake" is the
-// kid's next action after the idle sink.
+// kid's next action after the idle sink. domeNudge (BACKLOG B-212: the
+// word is answered and the dome, which now means "next", has not been
+// pressed for a while) is the reference's "All slots filled" pointing at
+// the dome, with a pop and the pointing finger wagging, then his rest
+// pose; no clip (none of the existing ones says "go on").
 const LETTER_PLACED = [
     { at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest', look: [-26, 22] },
     { at: 0.6, look: [0, 0] },
@@ -326,6 +331,14 @@ export const MOMENTS = {
         ],
         sound: null,
     },
+    domeNudge: {
+        steps: [
+            { at: 0, sink: 0, head: 6, eyes: 'wide', brows: 'up', hands: 'point', look: [26, 22], pop: 1 },
+            { at: 0.3, fx: 'wag' },
+            { at: 2, hands: 'rest', eyes: 'idle', brows: 'calm', head: 0, look: [0, 0] },
+        ],
+        sound: null,
+    },
 };
 
 // The kid-idle peek (kidIdle's `peek` step): PEEK.wait seconds after it,
@@ -345,6 +358,10 @@ export const PEEK = {
 
 export const CHANGE_MS = 300;     // never more than one change per 300ms
 export const IDLE_MS = 10000;     // kid idle 10s -> thinking, then sink
+// The word answered and the dome not pressed: he nudges toward it this
+// long after the answer, then again this often (BACKLOG B-212: "after
+// about 4 seconds", "at most every 8 seconds").
+export const NUDGE_MS = { first: 4000, every: 8000 };
 export const EARLY_ROUNDS = 2;    // he points at the dome in the first 2 rounds
 export const STREAK = 3;          // 3 correct in a row -> double pop
 
@@ -616,6 +633,8 @@ export function snapshot(state) {
         lockedTaps: state.lockedTaps || 0,
         // the slot holding his second-miss letter (BACKLOG B-206), or -1
         hint: onWord ? current.placed.findIndex((p) => !!p && !!p.hint) : -1,
+        // his nudges toward the dome on this word (BACKLOG B-212)
+        nudges: onWord ? state.nudges || 0 : 0,
         streak: onWord ? streakOf(results, round.index) : 0,
         stars: screen === 'round-end' ? starsFor(results.filter((r) => r && r.correct).length, round.size) : null,
     };
@@ -642,6 +661,8 @@ export function momentsFor(prev, now) {
     }
     // One more tap on the speaker while it holds the word back.
     if (now.lockedTaps !== prev.lockedTaps) return ['speakerLocked'];
+    // One more nudge toward the dome on the answered word (B-212).
+    if (now.nudges > prev.nudges) return ['domeNudge'];
     if (now.idleBeat !== prev.idleBeat) {
         if (now.idleBeat === 'sunk') return ['kidIdle'];
         if (prev.idleBeat === 'sunk') return ['wake'];
@@ -670,15 +691,31 @@ export function soundsFor(moments) {
 
 // Ms until the kid has been idle IDLE_MS on this word (0 = now), counted
 // from `state.lastInput`; null when the idle beat cannot come (not on a
-// word, or it already came for this word: once per word).
+// word, or it already came for this word: once per word, or the word is
+// answered: then the dome means "next" and his nudges toward it, below,
+// are what a kid who does not go on gets, BACKLOG B-212).
 export function idleWait(state, now) {
     if (state.screen !== 'play' || !state.current.word || state.idleBeat !== null) return null;
+    if (domeAction(state.current) === 'next') return null;
     return Math.max(0, state.lastInput + IDLE_MS - now);
+}
+
+// Ms until his next nudge toward the dome (BACKLOG B-212): while the dome
+// means "next" (the word answered, correct or revealed) and is not being
+// pressed, NUDGE_MS.first after the answer and then every
+// NUDGE_MS.every (`state.nudges` counts the ones already made); null when
+// none can come (off the play screen, not on an answered word, or the
+// dome just pressed: the next word is coming). main.js's nudge timer
+// waits this long and then adds one to `state.nudges`.
+export function nudgeWait(state) {
+    if (state.screen !== 'play' || state.pressed === 'dome') return null;
+    if (domeAction(state.current) !== 'next') return null;
+    return state.nudges > 0 ? NUDGE_MS.every : NUDGE_MS.first;
 }
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, nudges: 0, streak: 0, stars: null };
 
 // --- Render ---
 
