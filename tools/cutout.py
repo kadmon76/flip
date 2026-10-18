@@ -6,7 +6,11 @@ that touch the picture's border as background; everything else is the subject.
 The plate is the original with the subject painted out from the surrounding
 background, plus grain matched to the background.
 
-usage: python3 tools/cutout.py <in.png> <out_dir> <word> [--debug]
+With --mask, the subject's transparency comes from that mask instead (a
+grey PNG the size of the picture, white = subject), e.g. from Canva's
+background removal keyed out with keyalpha.py; the plate uses the same mask.
+
+usage: python3 tools/cutout.py <in.png> <out_dir> <word> [--mask mask.png] [--debug]
 writes <word>.webp, <word>-subject.webp (with alpha), <word>-plate.webp
 
 Offline tool for the picture batch, not part of the app: the server never
@@ -79,9 +83,14 @@ def plate_from(img, subj):
     model = prof[idx]
     # extend the visible deviation from the model softly into the hole
     resid = (sm - model) * known[..., None]
-    num = cv2.GaussianBlur(resid, (0, 0), 25)
-    den = cv2.GaussianBlur(known.astype(np.float32), (0, 0), 25)[..., None] + 1e-3
-    fill = model + np.clip(num / den, -25, 25)
+    def extend(sigma):
+        num = cv2.GaussianBlur(resid, (0, 0), sigma)
+        den = cv2.GaussianBlur(known.astype(np.float32), (0, 0), sigma)[..., None] + 1e-3
+        return np.clip(num / den, -25, 25)
+    # fine estimate near the hole's edge (so the seam does not show), broad one deeper in
+    depth = cv2.distanceTransform(hole.astype(np.uint8), cv2.DIST_L2, 5)[..., None]
+    wt = np.exp(-depth / 12.0)
+    fill = model + wt * extend(6) + (1 - wt) * extend(25)
     grain_src = (f - sm)[known]
     std = float(np.clip(grain_src.std(), 2, 10))
     noise = np.random.default_rng(7).normal(0, std, (h, w)).astype(np.float32)
@@ -93,15 +102,24 @@ def plate_from(img, subj):
 def main():
     src, out_dir, word = sys.argv[1:4]
     debug = '--debug' in sys.argv
+    mask_path = sys.argv[sys.argv.index('--mask') + 1] if '--mask' in sys.argv else None
     os.makedirs(out_dir, exist_ok=True)
     bgr = cv2.imread(src, cv2.IMREAD_COLOR)
     img = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    subj, bg = masks(img)
-    # soft edge: alpha from a slightly grown mask, feathered 1px
-    grown = cv2.dilate(subj.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(np.float32)
-    alpha = cv2.GaussianBlur(grown, (0, 0), 0.8)
-    alpha = np.clip(alpha * 255, 0, 255).astype(np.uint8)
-    plate = plate_from(img, subj)
+    if mask_path:
+        alpha = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        assert alpha.shape == img.shape[:2], (alpha.shape, img.shape)
+        subj = alpha > 127
+        # the plate paints out everything with any visible coverage
+        hole = alpha > 12
+    else:
+        subj, bg = masks(img)
+        # soft edge: alpha from a slightly grown mask, feathered 1px
+        grown = cv2.dilate(subj.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(np.float32)
+        alpha = cv2.GaussianBlur(grown, (0, 0), 0.8)
+        alpha = np.clip(alpha * 255, 0, 255).astype(np.uint8)
+        hole = subj
+    plate = plate_from(img, hole)
     rgba = np.dstack([img, alpha])
     ys, xs = np.nonzero(subj)
     box = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())] if len(xs) else [0, 0, 0, 0]
@@ -110,7 +128,7 @@ def main():
     w(f'{word}.webp', img, cv2.COLOR_RGB2BGR)
     w(f'{word}-subject.webp', rgba, cv2.COLOR_RGBA2BGRA)
     w(f'{word}-plate.webp', plate, cv2.COLOR_RGB2BGR)
-    info = {'word': word, 'subject_fraction': round(float(subj.mean()), 3), 'box': box,
+    info = {'word': word, 'mask': 'canva' if mask_path else 'smooth', 'subject_fraction': round(float(subj.mean()), 3), 'box': box,
             'touches_edge': bool(subj[0].any() or subj[-1].any() or subj[:, 0].any() or subj[:, -1].any())}
     if debug:
         dbg = img.copy(); dbg[~subj] = (dbg[~subj] * 0.25).astype(np.uint8)
