@@ -928,5 +928,5 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - chose: on the play screen a new word picture fills the whole TV tube (`object-fit: cover`, 4:3 in a ~1.37 screen, a little trimmed top and bottom, the subject stays inside the middle 70%), picked by `#screen-play .card img[src*="/images/words/"]`; the old square pictures keep the contained look. The `[src]` rule goes once every word has a new picture.
 - considered: holding the switch until the new words have voice (nothing would change in the game for days); switching only `image` (the motion item would then wait for another data PR).
 - screenshots: `.agent/screenshots/new-word-pictures/` (tools/shot.mjs, 360x740): theme screen, play screen for both themes, sticker book, and a before/after sheet.
-- tests: 303, passing; `manage.py check` clean.
+- tests: 303, passing; `manage.py check` clean. The game.css cache-buster goes to `?v=25` so phones load the new rule.
 - reversible: yes (data and one CSS rule).
