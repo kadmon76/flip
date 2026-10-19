@@ -8,6 +8,7 @@ import { state, setState } from './state.js';
 import { motionFor } from './motion.js';
 import { levelRules } from './level.js';
 import { followBlock } from './character.js';
+import { slotLayout, dropsIn } from './layout.js';
 
 const draggables = new Map();   // tile element -> Draggable instance
 
@@ -167,13 +168,19 @@ function dropTile(el) {
     springBack(el);
 }
 
-// Index of the box whose centre is closest to the tile's, among boxes the
-// tile overlaps by at least half of either area. Boxes can be smaller than
-// tiles (long words), so a tile may overlap two boxes; nearest centre wins.
-// A locked slot takes nothing, so it is not a target: a block dropped
-// across it and the next slot goes into the next one.
+// Index of the box whose centre is closest to the tile's, among the
+// boxes the tile lands in: it covers half of the smaller of the two with
+// the box's drop area (layout.js dropsIn). That area is the box itself,
+// or on a 7-8 letter word, whose slots are smaller (36-46px), the box
+// grown to the rail's full height and halfway into the gaps (slotLayout
+// `hit`; BACKLOG B-213). Boxes are smaller than tiles, so a tile may
+// land in two; nearest centre wins. A locked slot takes nothing, so it
+// is not a target: a block dropped across it and the next slot goes into
+// the next one.
 function nearestHitBox(el) {
-    const boxes = document.querySelectorAll('#letter-boxes .letter-box');
+    const rail = document.getElementById('letter-boxes');
+    const boxes = rail.querySelectorAll('.letter-box');
+    const { hit } = slotLayout(state.current.placed.length, rail.clientWidth, state.current.break);
     const t = el.getBoundingClientRect();
     const cx = t.left + t.width / 2;
     const cy = t.top + t.height / 2;
@@ -181,8 +188,8 @@ function nearestHitBox(el) {
     let bestDist = Infinity;
     boxes.forEach((box, i) => {
         if (isLocked(state.current.placed[i])) return;
-        if (!Draggable.hitTest(el, box, '50%')) return;
         const b = box.getBoundingClientRect();
+        if (!dropsIn(t, b, hit)) return;
         const dist = Math.hypot(b.left + b.width / 2 - cx, b.top + b.height / 2 - cy);
         if (dist < bestDist) {
             best = i;

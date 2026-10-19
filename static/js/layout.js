@@ -3,13 +3,32 @@
 // through node. The numbers live here only; card.js hands them to the CSS
 // as custom properties.
 
-// Slot rail: 46px slots, 6px apart, 8px of brass around them. At most six
-// slots on a row (DESIGN: "Six slots fit one row; 7+ letters wrap into two
-// even rows"); a rail too narrow for six holds as many as fit.
+// Slot rail (DESIGN "Layout", BACKLOG B-213): 8px of brass around the
+// slots. A word breaks as rarely as possible, and where it breaks the
+// break teaches something:
+//   - 1-6 letters: one row of 46px slots, 6px apart.
+//   - 7-8 letters (up to ONE_ROW_MAX): one row, never broken, even when
+//     the word's data has a `break`. The slots shrink to the largest
+//     whole px that fits the rail, never below MIN_SLOT, SMALL_GAP apart
+//     (41px for 7 letters and 36px for 8 at 360 wide, never above 46px).
+//     The letter in such a slot is SLOT_FONT of its size, and its tap and
+//     drop area (`hit`, px past the slot on each side) reaches the rail's
+//     top and bottom edges and halfway into the gaps.
+//   - 9-10 letters: two rows of 46px slots, 6px apart, split at the
+//     word's `break` (the letters on the first row: heli | copter), each
+//     row centred; without a usable one, at half (round.js makeWord warns).
+// A rail too narrow for its rung (under 360 wide; the 480px column fits
+// every rung) holds as many 46px slots as fit on a row, in rows as even
+// as possible.
 export const SLOT = 46;
 export const SLOT_GAP = 6;
 export const RAIL_PAD = 8;
 export const SLOTS_PER_ROW = 6;
+export const ONE_ROW_MAX = 8;
+export const MIN_SLOT = 36;
+export const SMALL_GAP = 4;
+export const SLOT_FONT = 0.58;
+export const FONT = 28;             // the letter in a 46px slot
 
 // Letter blocks: 52px clay blocks lying on the bench under the rail, in
 // loose staggered rows of at most four (DESIGN "Layout"; the one
@@ -44,17 +63,98 @@ const NUDGE_X = [0, 3, -2, 2, -3, 1, -1, 3, -2, 2];
 const NUDGE_Y = [2, -2, 3, 0, -3, 2, 1, -2, 3, -1];
 const NUDGE_MAX = 3;
 
-// Slot grid for a word of `count` letters on a rail `railWidth` px wide
-// (outer width, padding included): one row when it fits six or fewer,
-// otherwise rows as even as possible (7 -> 4 + 3, 10 -> 5 + 5).
-export function slotLayout(count, railWidth) {
-    const base = { size: SLOT, gap: SLOT_GAP, pad: RAIL_PAD };
-    if (count <= 0) return { ...base, cols: 1, rows: 0 };
+// Whether `brk` (a word entry's `break`) can split a word of `count`
+// letters: a whole number of letters on the first row, at least one on
+// each row.
+export function isBreak(brk, count) {
+    return Number.isInteger(brk) && brk >= 1 && brk < count;
+}
+
+// The slots of a word of `count` letters on a rail `railWidth` px wide
+// (outer width, padding included), `brk` being the word's `break` (the
+// ladder above). { size, gap, pad, font, hit: { x, y }, cols, rows,
+// split, cells, joints }: the slot size, gap and rail padding, the
+// letter's font size in a slot, how far a slot's tap and drop area
+// reaches past it (0 for 46px slots), the longest row and the number of
+// rows, the letters on each row, each slot's place in the rail's grid
+// ({ row, col }: the grid has two columns per slot of the longest row,
+// a slot spans two from `col`, so a row with one slot fewer is shifted
+// by one column, half a slot, and every row is centred), and the brass
+// joint of a broken word ({ at, side }: the end of every row but the
+// last and the start of every row but the first; card.js draws them).
+export function slotLayout(count, railWidth, brk) {
+    if (count <= 0) {
+        return { size: SLOT, gap: SLOT_GAP, pad: RAIL_PAD, font: FONT, hit: { x: 0, y: 0 }, cols: 1, rows: 0, split: [], cells: [], joints: [] };
+    }
     const inner = railWidth - 2 * RAIL_PAD;
+    const across = (n, size, gap) => n * size + (n - 1) * gap;
+    const rail = (split, size, gap) => {
+        const cols = Math.max(...split);
+        const small = size < SLOT;
+        const cells = [];
+        const joints = [];
+        split.forEach((n, r) => {
+            for (let c = 0; c < n; c++) cells.push({ row: r + 1, col: cols - n + 2 * c + 1 });
+            if (r > 0) joints.push({ at: cells.length - n, side: 'start' });
+            if (r < split.length - 1) joints.push({ at: cells.length - 1, side: 'end' });
+        });
+        return {
+            size,
+            gap,
+            pad: RAIL_PAD,
+            font: small ? Math.round(size * SLOT_FONT) : FONT,
+            hit: small ? { x: gap / 2, y: RAIL_PAD } : { x: 0, y: 0 },
+            cols,
+            rows: split.length,
+            split,
+            cells,
+            joints,
+        };
+    };
+    if (count <= SLOTS_PER_ROW && across(count, SLOT, SLOT_GAP) <= inner) return rail([count], SLOT, SLOT_GAP);
+    if (count > SLOTS_PER_ROW && count <= ONE_ROW_MAX) {
+        const size = Math.min(SLOT, Math.floor((inner - (count - 1) * SMALL_GAP) / count));
+        if (size >= MIN_SLOT) return rail([count], size, SMALL_GAP);
+    }
+    if (count > ONE_ROW_MAX) {
+        const first = isBreak(brk, count) ? brk : Math.ceil(count / 2);
+        const split = [first, count - first];
+        if (across(Math.max(...split), SLOT, SLOT_GAP) <= inner) return rail(split, SLOT, SLOT_GAP);
+    }
+    // narrower than its rung: rows as even as possible of what fits
     const fit = Math.floor((inner + SLOT_GAP) / (SLOT + SLOT_GAP));
     const perRow = Math.max(1, Math.min(SLOTS_PER_ROW, fit));
     const rows = Math.ceil(count / perRow);
-    return { ...base, cols: Math.ceil(count / rows), rows };
+    const cols = Math.ceil(count / rows);
+    const split = [];
+    for (let left = count; left > 0; left -= cols) split.push(Math.min(cols, left));
+    return rail(split, SLOT, SLOT_GAP);
+}
+
+// The tap and drop area of a slot drawn at `rect` (a screen rectangle:
+// left, top, width, height), `hit` being slotLayout's: the slot grown by
+// hit.x on the left and right and hit.y above and below.
+export function slotArea(rect, hit) {
+    const left = rect.left - hit.x;
+    const top = rect.top - hit.y;
+    const width = rect.width + 2 * hit.x;
+    const height = rect.height + 2 * hit.y;
+    return { left, top, width, height, right: left + width, bottom: top + height };
+}
+
+// Whether a block dropped at screen rectangle `block` lands in the slot
+// at `slot` (drag.js; the nearest of the slots it lands in wins): it
+// covers at least half of the smaller of the two, the block or the slot,
+// with the slot's drop area (slotArea). With hit 0 (46px slots) that is
+// GSAP's Draggable.hitTest(block, slot, '50%'); a smaller slot's area
+// reaches the rail's edges, so a block let go over the brass round it
+// still lands (BACKLOG B-213).
+export function dropsIn(block, slot, hit) {
+    const area = slotArea(slot, hit);
+    const w = Math.min(block.left + block.width, area.right) - Math.max(block.left, area.left);
+    const h = Math.min(block.top + block.height, area.bottom) - Math.max(block.top, area.top);
+    if (w <= 0 || h <= 0) return false;
+    return w * h >= 0.5 * Math.min(block.width * block.height, slot.width * slot.height);
 }
 
 // Hard puts two extra letters on the bench (BACKLOG B-207), so a

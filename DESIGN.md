@@ -57,8 +57,19 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
 - **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
   lives bulbs. Right: split-flap counter "2 / 5".
 - **Slot rail:** brass, full safe width, directly below the machine
-  (~y 347–413). Slots 46x46px, gap 6px, rail padding 8px. Six slots fit
-  one row; 7+ letters wrap into two even rows.
+  (~y 347–413), rail padding 8px. A word breaks as rarely as possible
+  (BACKLOG B-213): 1–6 letters, one row of 46x46px slots, gap 6px; 7–8
+  letters, one row, never broken (a `break` in the word's data is
+  ignored), the slots shrunk to the largest size that fits, never below
+  36px (41px for 7, 36px for 8 at 360 wide), gap 4px, the letter in a
+  slot ~0.58 of its size, a slot's tap and drop area the rail's full
+  height (~52px); 9–10 letters, two rows of 46px slots split at the
+  word's `break` (the letters on the first row: heli | copter), not by
+  even halves, each row centred, with a small brass joint at the end of
+  the first row and the start of the second that glows once (~600ms,
+  steady under reduced motion) as the word appears; only a 9–10 letter
+  word without a `break` falls back to the even split, with a console
+  warning.
 - **Letter blocks:** cream clay blocks lying on the bench below the rail,
   52px min, slightly rotated (±4°), in loose staggered rows (max 4 per
   row; on hard a 10-letter word's 12 blocks put five on the first row in a play column narrower than 462px, that is on every phone, and a third row of three starts right of the robot's reach, B-207). Lowercase by default.

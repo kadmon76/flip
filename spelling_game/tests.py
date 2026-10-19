@@ -188,9 +188,14 @@ class GameCssPaletteTests(TestCase):
 
 
 class SlotLayoutTests(TestCase):
-    """static/js/layout.js slotLayout(): 46px slots, 6px apart, 8px rail
-    padding; six slots fit one row, 7+ letters wrap into two even rows
-    (DESIGN.md "Layout", BACKLOG B-113)."""
+    """static/js/layout.js slotLayout(): 8px of brass round the slots and
+    the ladder of BACKLOG B-213 (DESIGN.md "Layout"): 1-6 letters one row
+    of 46px slots 6px apart; 7-8 letters one row, never broken, the slots
+    shrunk to the largest whole px that fits (never under 36px), 4px
+    apart, the letter 0.58 of the slot and the tap and drop area reaching
+    the rail's edges; 9-10 letters two rows of 46px split at the word's
+    `break`, each row centred, at half without one. A rail narrower than
+    360 wide holds what fits, in rows as even as possible (B-113)."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
     RAIL = 332   # 360px phone minus the frame's 14px safe area on each side
@@ -199,10 +204,10 @@ class SlotLayoutTests(TestCase):
         if shutil.which('node') is None:
             self.skipTest('node not installed')
 
-    def layout(self, count, width=RAIL):
+    def node(self, expr):
         script = (
-            f"import {{ slotLayout }} from '{self.MODULE.as_uri()}';"
-            f"console.log(JSON.stringify(slotLayout({count}, {width})));"
+            f"import * as L from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify({expr}));"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
@@ -211,35 +216,149 @@ class SlotLayoutTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
+    def layout(self, count, width=RAIL, brk=None):
+        return self.node(f"L.slotLayout({count}, {width}, {json.dumps(brk)})")
+
+    @staticmethod
+    def xs(l, width):
+        """Each slot's left edge in the rail (px from its outer left edge):
+        the grid has two columns per slot of the longest row, each
+        (size - gap) / 2 wide, `gap` apart, centred inside the padding."""
+        half = (l['size'] - l['gap']) / 2
+        grid = 2 * l['cols'] * half + (2 * l['cols'] - 1) * l['gap']
+        left = l['pad'] + (width - 2 * l['pad'] - grid) / 2
+        return [left + (c['col'] - 1) * (half + l['gap']) for c in l['cells']]
+
     def test_slot_size_gap_and_padding(self):
-        self.assertEqual(self.layout(4), {'size': 46, 'gap': 6, 'pad': 8, 'cols': 4, 'rows': 1})
+        self.assertEqual(self.layout(4), {
+            'size': 46, 'gap': 6, 'pad': 8, 'font': 28, 'hit': {'x': 0, 'y': 0}, 'cols': 4, 'rows': 1, 'split': [4],
+            'cells': [{'row': 1, 'col': 1}, {'row': 1, 'col': 3}, {'row': 1, 'col': 5}, {'row': 1, 'col': 7}], 'joints': []})
 
     def test_up_to_six_letters_fit_one_row_at_phone_width(self):
         for n in range(1, 7):
-            self.assertEqual((self.layout(n)['cols'], self.layout(n)['rows']), (n, 1), n)
+            l = self.layout(n)
+            self.assertEqual((l['size'], l['gap'], l['cols'], l['rows'], l['split'], l['joints']), (46, 6, n, 1, [n], []), n)
 
-    def test_seven_to_ten_letters_wrap_into_two_even_rows(self):
-        self.assertEqual((self.layout(7)['cols'], self.layout(7)['rows']), (4, 2))    # 4 + 3
-        self.assertEqual((self.layout(8)['cols'], self.layout(8)['rows']), (4, 2))    # 4 + 4
-        self.assertEqual((self.layout(9)['cols'], self.layout(9)['rows']), (5, 2))    # 5 + 4
-        self.assertEqual((self.layout(10)['cols'], self.layout(10)['rows']), (5, 2))  # 5 + 5
+    def test_seven_and_eight_letters_shrink_into_one_row(self):
+        # 41px for 7 letters and 36px for 8 at 360 wide, 4px apart, a
+        # letter of 0.58 of the slot, the tap and drop area out to the
+        # rail's edges (8px of padding) and halfway into the gaps
+        seven, eight = self.layout(7), self.layout(8)
+        self.assertEqual((seven['size'], seven['gap'], seven['font'], seven['hit']), (41, 4, 24, {'x': 2, 'y': 8}))
+        self.assertEqual((eight['size'], eight['gap'], eight['font'], eight['hit']), (36, 4, 21, {'x': 2, 'y': 8}))
+        inner = self.RAIL - 16
+        for l, n in ((seven, 7), (eight, 8)):
+            self.assertEqual((l['rows'], l['split'], l['joints']), (1, [n], []))
+            # the largest whole size that fits
+            self.assertLessEqual(n * l['size'] + (n - 1) * 4, inner)
+            self.assertGreater(n * (l['size'] + 1) + (n - 1) * 4, inner)
+            # the tap area covers the rail's full height: about 52px
+            self.assertEqual(l['size'] + 2 * l['hit']['y'], l['size'] + 2 * l['pad'])
+        self.assertEqual(eight['size'] + 2 * eight['hit']['y'], 52)
 
-    def test_seven_letters_wrap_on_a_wide_rail_too(self):
-        # 480px column: seven would fit, but the rail holds six to a row.
-        self.assertEqual(self.layout(6, 452)['rows'], 1)
-        self.assertEqual((self.layout(7, 452)['cols'], self.layout(7, 452)['rows']), (4, 2))
+    def test_seven_and_eight_letters_never_break_even_with_a_break(self):
+        # scooter 4, bicycle 2 in the content; an 8-letter word likewise
+        for n, brk in ((7, 4), (7, 2), (8, 4), (8, 3)):
+            l = self.layout(n, brk=brk)
+            self.assertEqual((l['rows'], l['split'], l['joints']), (1, [n], []), (n, brk))
+            self.assertEqual(l, self.layout(n), (n, brk))
+
+    def test_the_slots_never_shrink_under_36px_nor_grow_over_46px(self):
+        # a 480px column (452px rail): 7 and 8 fit at 46px, still 4px apart
+        for n in (7, 8):
+            l = self.layout(n, 452)
+            self.assertEqual((l['size'], l['gap'], l['font'], l['hit'], l['rows']), (46, 4, 28, {'x': 0, 'y': 0}, 1), n)
+        # 412 and 375 wide phones: one row in between
+        for width in (384, 347):
+            for n in (7, 8):
+                l = self.layout(n, width)
+                self.assertTrue(36 <= l['size'] <= 46, (n, width, l['size']))
+                self.assertEqual(l['rows'], 1)
+        # under 360 wide 8 slots of 36px no longer fit: two even rows of
+        # 46px, as many as fit on a row
+        l = self.layout(8, 300)
+        self.assertEqual((l['size'], l['split']), (46, [4, 4]))
+
+    def test_nine_and_ten_letters_split_at_the_break(self):
+        # the content's words: helicopter 4 (heli | copter), submarine 3
+        # (sub | marine), motorbike 5 (motor | bike); 46px slots, 6px apart
+        for n, brk, split in ((10, 4, [4, 6]), (9, 3, [3, 6]), (9, 5, [5, 4]), (10, 6, [6, 4]), (10, 5, [5, 5])):
+            l = self.layout(n, brk=brk)
+            self.assertEqual((l['size'], l['gap'], l['font'], l['hit'], l['rows'], l['split']),
+                             (46, 6, 28, {'x': 0, 'y': 0}, 2, split), (n, brk))
+            self.assertEqual([c['row'] for c in l['cells']], [1] * split[0] + [2] * split[1])
+            # the joint: the end of the first row and the start of the second
+            self.assertEqual(l['joints'], [{'at': brk - 1, 'side': 'end'}, {'at': brk, 'side': 'start'}])
+
+    def test_each_row_is_centred(self):
+        for n, brk in ((10, 4), (9, 3), (9, 5), (10, None), (9, None), (8, None), (7, None), (5, None)):
+            for width in (self.RAIL, 452):
+                l = self.layout(n, width, brk)
+                xs, k = self.xs(l, width), 0
+                for count in l['split']:
+                    row = xs[k:k + count]
+                    k += count
+                    left, right = row[0], width - (row[-1] + l['size'])
+                    self.assertAlmostEqual(left, right, msg=(n, brk, width))
+                    # slots `gap` apart on the row
+                    self.assertTrue(all(abs(b - a - l['size'] - l['gap']) < 1e-9 for a, b in zip(row, row[1:])), (n, brk, row))
+
+    def test_without_a_usable_break_nine_and_ten_split_at_half(self):
+        # round.js makeWord warns about a missing break; the rail falls
+        # back to the even split, never by a break that cannot split it
+        for brk in (None, 0, 10, 11, -2, 2.5, '4'):
+            self.assertEqual(self.layout(10, brk=brk)['split'], [5, 5], brk)
+            self.assertEqual(self.layout(9, brk=brk if brk != 10 else 9)['split'], [5, 4], brk)
+        # a break whose row would not fit the rail: also at half
+        self.assertEqual(self.layout(10, brk=1)['split'], [5, 5])
+        self.assertEqual(self.node("[L.isBreak(4, 10), L.isBreak(9, 10), L.isBreak(10, 10), L.isBreak(0, 9), L.isBreak(2.5, 9), L.isBreak('3', 9), L.isBreak(null, 9)]"),
+                         [True, True, False, False, False, False, False])
 
     def test_every_row_fits_the_rail(self):
         for n in range(1, 11):
-            l = self.layout(n)
-            self.assertLessEqual(l['cols'] * 46 + (l['cols'] - 1) * 6 + 2 * 8, self.RAIL, n)
+            for brk in [None] + list(range(1, n)):
+                l = self.layout(n, brk=brk)
+                self.assertLessEqual(max(l['split']) * l['size'] + (max(l['split']) - 1) * l['gap'] + 2 * 8, self.RAIL, (n, brk))
+                self.assertEqual(sum(l['split']), n)
+                self.assertEqual(len(l['cells']), n)
+                self.assertLessEqual(l['rows'], 2)
 
     def test_narrow_rail_holds_what_fits(self):
-        # 280px rail: 264px inside, five 46px slots with 6px gaps.
-        self.assertEqual((self.layout(6, 280)['cols'], self.layout(6, 280)['rows']), (3, 2))
+        # 280px rail: 264px inside, five 46px slots with 6px gaps
+        l = self.layout(6, 280)
+        self.assertEqual((l['cols'], l['rows'], l['split']), (3, 2, [3, 3]))
+        self.assertEqual(l['joints'], [{'at': 2, 'side': 'end'}, {'at': 3, 'side': 'start'}])
 
     def test_zero_letters_is_safe(self):
-        self.assertEqual(self.layout(0), {'size': 46, 'gap': 6, 'pad': 8, 'cols': 1, 'rows': 0})
+        self.assertEqual(self.layout(0), {'size': 46, 'gap': 6, 'pad': 8, 'font': 28, 'hit': {'x': 0, 'y': 0},
+                                          'cols': 1, 'rows': 0, 'split': [], 'cells': [], 'joints': []})
+
+    def test_a_slots_drop_area(self):
+        # slotArea grows a slot by `hit`; dropsIn is GSAP's hitTest(block,
+        # slot, '50%') for 46px slots (half of the smaller of the two),
+        # and on a small slot the area reaching the rail's edges only adds
+        # to it: a block let go over the brass round the slot lands
+        res = self.node(
+            "(() => {"
+            " const r = (left, top, w, h = w) => ({ left, top, width: w, height: h });"
+            " const slot = r(100, 100, 36), hit = { x: 2, y: 8 }, none = { x: 0, y: 0 };"
+            " const big = r(100, 100, 46);"
+            " return ["
+            "  L.slotArea(slot, hit),"
+            # 46px slot: half of the slot's area (1058px²) or not
+            "  L.dropsIn(r(100 - 3, 100 + 23, 56), big, none), L.dropsIn(r(100 - 3, 100 + 26, 56), big, none),"
+            # 36px slot, the block's centre 32px below the slot's: 14px x 36 of the
+            # slot (504px², under half of 1296) but 22px x 40 of its area (880px²)
+            "  L.dropsIn(r(90, 122, 56), slot, none), L.dropsIn(r(90, 122, 56), slot, hit),"
+            # touching, or beside the area: never
+            "  L.dropsIn(r(138, 100, 56), slot, hit), L.dropsIn(r(100, 144, 56), slot, hit),"
+            # the area never makes it stricter: a corner overlap that lands on
+            # the slot (26px x 26) lands on its area (28 x 34) too
+            "  L.dropsIn(r(110, 110, 56), slot, none), L.dropsIn(r(110, 110, 56), slot, hit),"
+            " ];"
+            "})()")
+        self.assertEqual(res[0], {'left': 98, 'top': 92, 'width': 40, 'height': 52, 'right': 138, 'bottom': 144})
+        self.assertEqual(res[1:], [True, False, False, True, False, False, True, True])
 
 
 class BlockLayoutTests(TestCase):
@@ -784,7 +903,10 @@ class TenLetterFitTests(TestCase):
     width is read from game.css), the dome as placed in game.css, the
     robot as in the v5 reference (92px wide, left edge at 7.4% of the
     console, 75px above it; the brass cap is the top 10px). The console's
-    lower corners also clear the frame's rounded inner corners."""
+    lower corners also clear the frame's rounded inner corners. Since
+    BACKLOG B-213 a 7-8 letter word is one row of smaller slots and a 9-10
+    letter word two rows split at its `break` (every split whose rows fit
+    is checked), with the brass joint on the rail."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
     CSS = Path(__file__).resolve().parent.parent / 'static' / 'css' / 'game.css'
@@ -814,11 +936,11 @@ class TenLetterFitTests(TestCase):
         self.assertEqual(left, self.SIDE + 4)
         self.assertAlmostEqual(top + ch, self.H - self.BOTTOM)
 
-    def layouts(self, count):
+    def layouts(self, count, brk=None):
         bench = self.W - 2 * self.SIDE
         script = (
             f"import {{ slotLayout, blockLayout }} from '{self.MODULE.as_uri()}';"
-            f"console.log(JSON.stringify([slotLayout({count}, {bench}), blockLayout({count}, {bench})]));"
+            f"console.log(JSON.stringify([slotLayout({count}, {bench}, {json.dumps(brk)}), blockLayout({count}, {bench})]));"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
@@ -851,18 +973,62 @@ class TenLetterFitTests(TestCase):
         zones, console_top = self.keep_out()
         rail_top = 0.445 * self.W * 2739 / 1264
         for n in range(1, 11):
-            for extras in (0, 2):
-                slots, _ = self.layouts(n)
-                _, blocks = self.layouts(n + extras)
-                rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
-                bench_top = rail_top + rail_h + self.GAP
-                # the column fits the screen: the console is not pushed down
-                self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, (n, extras))
-                for s in blocks['spots']:
-                    x, y = self.SIDE + s['x'], bench_top + s['y']
-                    box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
-                    for name, zone in zones.items():
-                        self.assertFalse(self.overlap(box, zone), (n, extras, name, box, zone))
+            # 9-10 letters: every break whose rows fit, and none
+            for brk in [None] + ([b for b in range(3, n - 2)] if n > 8 else []):
+                for extras in (0, 2):
+                    slots, _ = self.layouts(n, brk)
+                    _, blocks = self.layouts(n + extras)
+                    rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
+                    bench_top = rail_top + rail_h + self.GAP
+                    # the column fits the screen: the console is not pushed down
+                    self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, (n, brk, extras))
+                    for s in blocks['spots']:
+                        x, y = self.SIDE + s['x'], bench_top + s['y']
+                        box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
+                        for name, zone in zones.items():
+                            self.assertFalse(self.overlap(box, zone), (n, brk, extras, name, box, zone))
+
+    def test_long_words_rail_heights(self):
+        # BACKLOG B-213 at 360 wide: one row of 41px (7 letters) or 36px
+        # (8) slots makes the rail 57 or 52px tall (62 for 1-6 letters);
+        # two rows of 46px for 9-10 letters, 114px, whatever the break
+        def rail_h(n, brk=None):
+            sl, _ = self.layouts(n, brk)
+            return 2 * sl['pad'] + sl['rows'] * sl['size'] + (sl['rows'] - 1) * sl['gap']
+        self.assertEqual([rail_h(n) for n in range(1, 11)], [62] * 6 + [57, 52, 114, 114])
+        self.assertEqual({rail_h(10, b) for b in (4, 5, 6)} | {rail_h(9, b) for b in (3, 4, 5, 6)}, {114})
+
+    def test_the_brass_joint_stays_on_the_rail(self):
+        # each half of the joint (game.css .rail-joint: `width`, 1px off
+        # its slot) lies inside the rail's 8px padding or the free brass
+        # beside a row, never on another slot and never past the rail's
+        # edge, for every split whose rows fit, at 360 and 480 wide
+        css = re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+        joint = re.search(r'\n\.rail-joint\s*{(.*?)}', css, flags=re.S).group(1)
+        jw = float(re.search(r'\n\s*width:\s*([\d.]+)px;', joint).group(1))
+        jh = float(re.search(r'\n\s*height:\s*([\d.]+)px;', joint).group(1))
+        self.assertIn('pointer-events: none;', joint)
+        off = float(re.search(r'\n\.rail-joint\.end\s*{[^}]*left: calc\(100% \+ ([\d.]+)px\);', css).group(1))
+        self.assertIn(f'right: calc(100% + {off:g}px);', re.search(r'\n\.rail-joint\.start\s*{([^}]*)}', css).group(1))
+        for width in (self.W - 2 * self.SIDE, 452):
+            for n in (9, 10):
+                for brk in [None] + list(range(3, n - 2)):
+                    sl = json.loads(subprocess.run(
+                        ['node', '--input-type=module', '-e',
+                         f"import {{ slotLayout }} from '{self.MODULE.as_uri()}';"
+                         f"console.log(JSON.stringify(slotLayout({n}, {width}, {json.dumps(brk)})));"],
+                        capture_output=True, text=True, timeout=20).stdout)
+                    xs = SlotLayoutTests.xs(sl, width)
+                    self.assertLessEqual(jh, sl['size'])
+                    for j in sl['joints']:
+                        x = xs[j['at']]
+                        a, b = (x + sl['size'] + off, x + sl['size'] + off + jw) if j['side'] == 'end' else (x - off - jw, x - off)
+                        self.assertGreaterEqual(a, 2, (width, n, brk, j))              # inside the rail, 2px of brass to spare
+                        self.assertLessEqual(b, width - 2, (width, n, brk, j))
+                        row = sl['cells'][j['at']]['row']
+                        for k, c in enumerate(sl['cells']):                            # clear of the other slots on its row
+                            if c['row'] == row and k != j['at']:
+                                self.assertFalse(a < xs[k] + sl['size'] and xs[k] < b, (width, n, brk, j, k))
 
     # Decodes an 8-bit RGBA, non-interlaced PNG with node's zlib and
     # returns its alpha channel (the two scene images are that format).
@@ -2637,8 +2803,10 @@ class RobotLayoutTests(TestCase):
         #   and the console's left third, clear of every block of every
         #   word (1-10 letters, also with hard's two extras) and of the
         #   rail;
-        # - at the top of his pop only the second block row of a 7-10
-        #   letter word passes over him (he is drawn under the blocks);
+        # - at the top of his pop only the second block row of a 9-10
+        #   letter word passes over him (he is drawn under the blocks;
+        #   7-8 letter words did too until BACKLOG B-213 put their slots
+        #   on one row);
         # - his hands rest on the console's edge, and in every hand pose
         #   (and at rest even at the bottom of the pop's trail) they are
         #   clear of the lever's, the speaker's and the dome's tap areas
@@ -2791,7 +2959,9 @@ class RobotLayoutTests(TestCase):
             self.assertNotIn(str(n), r['pop'], n)                # room for the pop-up
             self.assertNotIn(f'h{n}', r['pop'], n)
         self.assertEqual(list(r['popRows']), ['1'])              # only the second row
-        self.assertEqual(sorted((k for k in r['pop'] if not k.startswith('h')), key=int), ['7', '8', '9', '10'])
+        # of a 9-10 letter word: since BACKLOG B-213 a 7-8 letter word is
+        # one row of slots, so its bench lies higher, clear of his pop too
+        self.assertEqual(sorted((k for k in r['pop'] if not k.startswith('h')), key=int), ['9', '10'])
         # the hands rest on the console's edge, over it by a few px, above
         # the lever's tap area even at the bottom of the pop's trail
         self.assertGreater(r['restBottom'], top)
@@ -5455,3 +5625,306 @@ class NextDomeTests(TestCase):
             if f.name != 'main.js':
                 self.assertNotRegex(self.code(f.name), r'setState\([^)]*nudges', f.name)
         self.assertNotIn('setState', self.code('character.js'))
+
+
+class LongWordTests(TestCase):
+    """Long words (BACKLOG B-213): 7-8 letters stay on one row of smaller
+    slots, 9-10 letters break into two rows of 46px at the word's `break`
+    with a brass joint at the break that glows once as the word appears.
+    round.js makeWord carries the `break` (and warns when a 9-10 letter
+    word has none), main.js reads it from the data, card.js lays the
+    slots and the joint out from layout.js slotLayout (run here with a
+    stand-in DOM), drag.js drops into a small slot's whole area,
+    feedback.js glows the joint (stand-ins for GSAP and the DOM), and
+    game.css draws it. The sizes themselves are SlotLayoutTests' and the
+    fit at 360x740 TenLetterFitTests'."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    # --- the data: round.js makeWord, main.js ---
+
+    def test_make_word_carries_the_break_and_warns_without_one(self):
+        res = self.run_node(
+            "const warned = []; console.warn = (m) => warned.push(m);"
+            "let seq = 0; const newId = () => `t${++seq}`;"
+            "const make = (e) => { warned.length = 0; const cur = R.makeWord(e, 'normal', newId); return [cur.break, warned.length]; };"
+            "out([make({ word: 'helicopter', break: 4 }), make({ word: 'submarine', break: 3 }), make({ word: 'motorbike', break: 5 }),"
+            # 7-8 letters: the break is carried (the rail ignores it), nothing to warn about
+            "     make({ word: 'scooter', break: 4 }), make({ word: 'airplane' }), make({ word: 'duck' }),"
+            # 9-10 letters without a usable break: null, and one warning naming the word
+            "     make({ word: 'helicopter' }), make({ word: 'submarine', break: 9 }), make({ word: 'motorbike', break: '5' }),"
+            "     make({ word: 'helicopter', break: 0 }), make({ word: 'helicopter', break: 4.5 })]);")
+        self.assertEqual(res, [[4, 0], [3, 0], [5, 0], [4, 0], [None, 0], [None, 0], [None, 1], [None, 1], [None, 1], [None, 1], [None, 1]])
+
+    def test_make_word_warning_names_the_word(self):
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            "R.makeWord({ word: 'submarine' }, 'hard', () => 'x');"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('flip: "submarine" has 9 letters and no break', result.stderr)
+
+    def test_every_long_content_word_has_a_break_that_fits(self):
+        # the theme data carries `break` for its 9-10 letter words (the
+        # content batch), and each row of the split fits a 360 wide rail
+        # (six 46px slots); `break` on a shorter word is allowed and unused
+        long_words = 0
+        for f in sorted((self.ROOT / 'static' / 'data').glob('*.json')):
+            for word, entry in json.loads(f.read_text()).items():
+                if len(word) > 8:
+                    long_words += 1
+                    brk = entry.get('break')
+                    self.assertIsInstance(brk, int, (f.name, word))
+                    self.assertTrue(1 <= brk < len(word), (f.name, word, brk))
+                    self.assertLessEqual(max(brk, len(word) - brk), 6, (f.name, word, brk))
+        self.assertGreaterEqual(long_words, 3)
+
+    def test_main_reads_the_break_from_the_data(self):
+        start = self.function('startRound', 'main.js')
+        self.assertIn('.map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));', start)
+        self.assertIn('current: makeWord(words[0], level, newTileId),', start)
+        self.assertIn('        break: null,', (self.JS / 'state.js').read_text())
+        self.assertIn('break: brk,', self.function('makeWord', 'round.js'))
+
+    # --- card.js: the rail, with a stand-in DOM ---
+
+    FAKE_DOM = """
+        class El {
+            constructor(tag) {
+                this.tag = tag; this.children = []; this.parentNode = null; this.dataset = {}; this.attrs = {};
+                this.cls = new Set(); this.clientWidth = 0; this.textContent = '';
+                this.style = { setProperty(k, v) { this[k] = String(v); } };
+                this.classList = {
+                    toggle: (c, on) => { if (on === undefined ? !this.cls.has(c) : on) this.cls.add(c); else this.cls.delete(c); },
+                    add: (c) => this.cls.add(c), remove: (c) => this.cls.delete(c), contains: (c) => this.cls.has(c),
+                };
+            }
+            set className(v) { this.cls = new Set(v.split(' ').filter(Boolean)); }
+            get className() { return [...this.cls].join(' '); }
+            set innerHTML(v) { this.children.forEach((c) => { c.parentNode = null; }); this.children = []; }
+            get firstChild() { return this.children[0] || null; }
+            appendChild(c) { if (c.parentNode) c.remove(); c.parentNode = this; this.children.push(c); return c; }
+            insertBefore(c, ref) {
+                if (c.parentNode) c.remove(); c.parentNode = this;
+                const i = ref ? this.children.indexOf(ref) : -1;
+                if (i < 0) this.children.push(c); else this.children.splice(i, 0, c);
+                return c;
+            }
+            remove() { const p = this.parentNode; if (!p) return; p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; }
+            setAttribute(k, v) { this.attrs[k] = String(v); }
+            getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+            addEventListener() {}
+            querySelectorAll(sel) { return sel === '.rail-joint' ? this.children.filter((c) => c.cls.has('rail-joint')) : []; }
+            querySelector(sel) {
+                const m = /^\\.rail-joint\\[data-side="(\\w+)"\\]$/.exec(sel);
+                return m ? this.children.find((c) => c.cls.has('rail-joint') && c.dataset.side === m[1]) || null : null;
+            }
+        }
+        const els = { 'play-image': new El('img'), 'word-counter': new El('p'), 'letter-boxes': new El('div'), 'letter-tray': new El('div') };
+        els['letter-boxes'].clientWidth = 332;
+        els['letter-tray'].clientWidth = 332;
+        globalThis.document = { getElementById: (id) => els[id] || null, querySelectorAll: () => [], createElement: (t) => new El(t) };
+        globalThis.gsap = { set() {} };
+        globalThis.Draggable = { create() { return [{ on: true, enabled(v) { if (v === undefined) return this.on; this.on = v; return this; }, kill() {} }]; } };
+    """
+
+    def render(self, body):
+        return self.run_node(
+            f"const C = await import('{(self.JS / 'card.js').as_uri()}');"
+            "let seq = 0; const newId = () => `t${++seq}`;"
+            "const rail = els['letter-boxes'];"
+            "const view = () => ({ vars: ['--slot-size', '--slot-gap', '--slot-font', '--hit-x', '--hit-y', '--cols'].map((k) => rail.style[k]),"
+            "  boxes: rail.children.map((b) => [b.style.gridRow, b.style.gridColumn, b.children.map((c) => c.cls.has('rail-joint') ? c.className : 'tile')]) });"
+            "const show = (entry, level = 'normal') => { const current = R.makeWord(entry, level, newId);"
+            "  C.renderCard({ screen: 'play', lives: 3, round: { index: 0, size: 5 }, current }); return current; };"
+            + body,
+            prelude=self.FAKE_DOM,
+        )
+
+    def test_card_lays_a_broken_word_out_in_two_centred_rows_with_the_joint(self):
+        heli, sub = self.render(
+            "const cur = show({ word: 'helicopter', break: 4 }); const a = view();"
+            "show({ word: 'submarine', break: 3 }); out([a, view()]);")
+        self.assertEqual(heli['vars'], ['46px', '6px', '28px', '0px', '0px', '12'])
+        # heli | copter: four slots on the first row (one slot in from the
+        # left of the six-slot grid), six on the second
+        self.assertEqual([b[:2] for b in heli['boxes']],
+                         [['1', '3 / span 2'], ['1', '5 / span 2'], ['1', '7 / span 2'], ['1', '9 / span 2'],
+                          ['2', '1 / span 2'], ['2', '3 / span 2'], ['2', '5 / span 2'], ['2', '7 / span 2'],
+                          ['2', '9 / span 2'], ['2', '11 / span 2']])
+        self.assertEqual([b[2] for b in heli['boxes']], [[], [], [], ['rail-joint end'], ['rail-joint start'], [], [], [], [], []])
+        # sub | marine
+        self.assertEqual([b[0] for b in sub['boxes']], ['1'] * 3 + ['2'] * 6)
+        self.assertEqual([b[2] for b in sub['boxes']], [[], [], ['rail-joint end'], ['rail-joint start'], [], [], [], [], []])
+
+    def test_card_moves_the_joint_when_the_next_word_breaks_elsewhere(self):
+        # submarine then motorbike: nine slots both, so the slots are kept,
+        # but the rows and the joint follow the new break (motor | bike);
+        # then a word on one row has no joint at all
+        moto, air, scooter = self.render(
+            "show({ word: 'submarine', break: 3 }); const kept = rail.children[0];"
+            "show({ word: 'motorbike', break: 5 }); const a = view(); a.kept = rail.children[0] === kept;"
+            "show({ word: 'airplane' }); const b = view();"
+            "show({ word: 'scooter', break: 4 }, 'easy'); out([a, b, view()]);")
+        self.assertTrue(moto['kept'])
+        self.assertEqual([b[:2] for b in moto['boxes']],
+                         [['1', '1 / span 2'], ['1', '3 / span 2'], ['1', '5 / span 2'], ['1', '7 / span 2'], ['1', '9 / span 2'],
+                          ['2', '2 / span 2'], ['2', '4 / span 2'], ['2', '6 / span 2'], ['2', '8 / span 2']])
+        self.assertEqual([b[2] for b in moto['boxes']], [[], [], [], [], ['rail-joint end'], ['rail-joint start'], [], [], []])
+        self.assertEqual(moto['vars'][-1], '10')
+        # 8 letters: one row of 36px slots, 4px apart, a 21px letter, the
+        # tap area 2px into each gap and 8px up and down to the rail's edges
+        self.assertEqual(air['vars'], ['36px', '4px', '21px', '2px', '8px', '16'])
+        self.assertEqual({b[0] for b in air['boxes']}, {'1'})
+        self.assertEqual([b[2] for b in air['boxes']], [[]] * 8)
+        # 7 letters, its break unused; on easy the given s is in its slot
+        self.assertEqual(scooter['vars'], ['41px', '4px', '24px', '2px', '8px', '14'])
+        self.assertEqual([b[2] for b in scooter['boxes']], [['tile']] + [[]] * 6)
+
+    def test_card_keeps_a_placed_block_in_front_of_the_joint(self):
+        # feedback.js reads a filled slot's block as its first child
+        boxes = self.render(
+            "const cur = show({ word: 'helicopter', break: 4 });"
+            "const t = cur.tray.find((x) => x.letter === 'i');"
+            "const placed = [...cur.placed]; placed[3] = { letter: 'i', tileId: t.id };"
+            "const next = { ...cur, placed, tray: cur.tray.map((x) => (x.id === t.id ? { ...x, used: true } : x)) };"
+            "C.renderCard({ screen: 'play', lives: 3, round: { index: 0, size: 5 }, current: next });"
+            "out(view().boxes.map((b) => b[2]));")
+        self.assertEqual(boxes[3], ['tile', 'rail-joint end'])
+        self.assertEqual(boxes[4], ['rail-joint start'])
+
+    # --- drag.js: a small slot's drop area ---
+
+    def test_drag_drops_into_the_slots_whole_area(self):
+        near = self.function('nearestHitBox', 'drag.js')
+        self.assertIn("import { slotLayout, dropsIn } from './layout.js';", self.code('drag.js'))
+        self.assertIn('const { hit } = slotLayout(state.current.placed.length, rail.clientWidth, state.current.break);', near)
+        self.assertIn('if (!dropsIn(t, b, hit)) return;', near)
+        self.assertNotIn('hitTest', near)
+
+    # --- feedback.js: the joint glows once ---
+
+    def glow(self, body):
+        return self.run_node(
+            "const log = []; let reduced = false;"
+            "globalThis.window = { matchMedia: () => ({ matches: reduced }) };"
+            "globalThis.gsap = { set() {}, to() {}, timeline() { const t = { to() { return t; }, set() { return t; } }; return t; },"
+            " killTweensOf(t) { log.push(['kill', t.length]); }, delayedCall() {}, getProperty() { return 0; },"
+            " fromTo(t, a, b) { log.push(['fromTo', t.map((j) => j.side), a, { ...b, onComplete: typeof b.onComplete }]); b.onComplete && b.onComplete(); } };"
+            "const joint = (side) => { const props = { '--joint-glow': '1' }; return { side, props, style: { removeProperty: (k) => delete props[k] } }; };"
+            "let joints = [];"
+            "globalThis.document = { getElementById: () => ({ children: [] }), querySelector: () => null,"
+            " querySelectorAll: (sel) => (sel === '#letter-boxes .rail-joint' ? joints : []) };"
+            f"const F = await import('{(self.JS / 'feedback.js').as_uri()}');"
+            "const at = (index, word) => ({ screen: 'play', lives: 3, pressed: null, round: { index },"
+            " current: { word, status: 'playing', tray: [], placed: Array(word.length).fill(null) } });"
+            + body)
+
+    def test_the_joint_glows_once_when_a_broken_word_appears(self):
+        log, left = self.glow(
+            "joints = [joint('end'), joint('start')];"
+            "F.renderFeedback(at(0, 'helicopter'));"
+            # a re-render of the same word, then a move on it: no glow again
+            "F.renderFeedback(at(0, 'helicopter')); F.renderFeedback(at(0, 'helicopter'));"
+            "out([log, joints.map((j) => j.props)]);")
+        self.assertEqual(log, [['kill', 2], ['fromTo', ['end', 'start'], {'--joint-glow': 0},
+                                {'--joint-glow': 1, 'duration': 0.3, 'ease': 'power1.inOut', 'yoyo': True, 'repeat': 1,
+                                 'onComplete': 'function'}]])
+        # when it is over the inline value goes: the CSS rest look stays
+        self.assertEqual(left, [{}, {}])
+
+    def test_the_next_broken_word_glows_again_and_a_word_on_one_row_never(self):
+        log = self.glow(
+            "F.renderFeedback(at(0, 'duck')); F.renderFeedback(at(1, 'scooter'));"   # no joint in the DOM
+            "joints = [joint('end'), joint('start')];"
+            "F.renderFeedback(at(2, 'submarine')); F.renderFeedback(at(3, 'motorbike'));"
+            "joints = [];"
+            "F.renderFeedback({ screen: 'round-end', round: { index: 4 }, current: { word: 'motorbike' } });"
+            "out(log.filter((e) => e[0] === 'fromTo').length);")
+        self.assertEqual(log, 2)
+
+    def test_reduced_motion_keeps_the_joint_steady(self):
+        log = self.glow(
+            "reduced = true; joints = [joint('end'), joint('start')];"
+            "F.renderFeedback(at(0, 'helicopter')); out([log, joints.map((j) => j.props)]);")
+        self.assertEqual(log, [[], [{'--joint-glow': '1'}, {'--joint-glow': '1'}]])
+        m = json.loads(subprocess.run(
+            ['node', '--input-type=module', '-e',
+             f"import {{ motionFor }} from '{(self.JS / 'motion.js').as_uri()}';"
+             "console.log(JSON.stringify([motionFor('jointGlow', false), motionFor('jointGlow', true)]));"],
+            capture_output=True, text=True, timeout=20).stdout)
+        self.assertEqual(m, [{'duration': 0.6, 'ease': 'power1.inOut', 'scale': 1}, {'duration': 0, 'ease': 'none', 'scale': 1}])
+
+    # --- game.css ---
+
+    def test_the_rail_grid_and_the_slot_letter(self):
+        rail = self.rule('.letter-boxes')
+        self.assertIn('grid-template-columns: repeat(var(--cols), calc((var(--slot-size) - var(--slot-gap)) / 2));', rail)
+        self.assertIn('justify-content: center;', rail)
+        for decl in ('--slot-font: 28px;', '--hit-x: 0px;', '--hit-y: 0px;'):
+            self.assertIn(decl, rail)
+        self.assertIn('position: relative;', self.rule('.letter-box'))
+        placed = self.rule('.letter-box > .draggable-letter')
+        self.assertIn('font-size: var(--slot-font);', placed)
+        self.assertIn('position: relative;', placed)
+        # a placed letter's tap area: the rail's full height in a small slot
+        area = self.rule('.letter-box > .draggable-letter::before')
+        for decl in ("content: '';", 'position: absolute;', 'top: calc(-1 * var(--hit-y));', 'bottom: calc(-1 * var(--hit-y));',
+                     'left: calc(-1 * var(--hit-x));', 'right: calc(-1 * var(--hit-x));'):
+            self.assertIn(decl, area)
+        # a locked letter (B-211) as large as the letters round it in a small slot
+        self.assertIn('font-size: min(25px, var(--slot-font));', self.rule('.letter-box.locked > .draggable-letter:not(.landing)'))
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 26)
+
+    def test_the_joint_is_one_small_rule_set_in_the_palette(self):
+        css = self.css()
+        sets = re.findall(r'\n([^\n{]*\.rail-joint[^\n{]*){', css)
+        self.assertEqual([s.strip() for s in sets], ['.rail-joint', '.rail-joint.end', '.rail-joint.start', '.rail-joint::after'])
+        body = ''.join(self.rule(s.strip()) for s in sets)
+        for colour in ('var(--brass)', 'var(--brass-dark)', 'var(--cream)'):
+            self.assertIn(colour, body)
+        self.assertNotIn('#', body)
+        self.assertNotIn('rgb', body)
+        joint = self.rule('.rail-joint')
+        self.assertIn('--joint-glow: 0;', joint)
+        self.assertIn('pointer-events: none;', joint)
+        self.assertIn('calc(var(--joint-glow) * 12px)', joint)
+        self.assertIn('opacity: var(--joint-glow);', self.rule('.rail-joint::after'))
+        # no other module draws or moves it
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name not in ('card.js', 'feedback.js'):
+                self.assertNotIn('rail-joint', self.code(f.name), f.name)

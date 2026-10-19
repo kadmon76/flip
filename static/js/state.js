@@ -5,7 +5,7 @@ export const state = {
     screen: 'theme',            // 'theme' | 'play' | 'round-end' | 'gallery'
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }] }] from themes.json and the data files; image is the first word's
     theme: null,
-    words: [],                  // [{ word, image, audio }] for the current round
+    words: [],                  // [{ word, image, audio, break }] for the current round
     // results[i] = { word, correct }; level is the level the round is
     // played at, copied from `level` when a theme is tapped (startRound)
     // and fixed for the round (null while no round is in play); the
@@ -33,6 +33,10 @@ export const state = {
         word: null,
         image: null,
         audio: null,            // the word's audio file from the content JSON, or none
+        // the letters on the first slot row of a 9-10 letter word (its
+        // `break` in the content JSON; round.js makeWord, layout.js
+        // slotLayout, BACKLOG B-213), or null
+        break: null,
         // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord; a right letter the lever kept after a wrong check on easy, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
         placed: [],
         // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: the easy first letter's block, which has no bench spot; extra: on hard, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable

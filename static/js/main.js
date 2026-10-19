@@ -116,8 +116,10 @@ async function startRound({ name, dataUrl }) {
     // starts with its first letter given (round.js, BACKLOG B-204). Up to
     // two of the words this theme's earlier rounds missed come back, in
     // random places (round.js pickRound, missed.js; BACKLOG B-208).
+    // A long word's `break` (BACKLOG B-213) says where its slots go to a
+    // second row (round.js makeWord, layout.js slotLayout).
     const words = pickRound(data, ROUND_SIZE, level, missedWords(name))
-        .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
+        .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
     stopWord();
     setState({
         theme: name,
