@@ -598,8 +598,12 @@ body[data-screen="play"] .play-back-btn {
 
 /* TV screen (x 28-70%, y 16.4-30.5% of the picture): the word picture
    inside, masked to the screen's rounded corners, on the teal tube with a
-   soft teal glow. Content pictures are square with their own backdrop, so
-   the picture is shown whole (contained) rather than cropped. */
+   soft teal glow. The old content pictures are square with their own
+   backdrop, so they are shown whole (contained) rather than cropped. The
+   new word pictures (static/images/words/, 4:3 on teal, subject in the
+   middle 70%) fill the whole tube, trimmed a little top and bottom
+   (claude/flip-picture-style.md "Where the picture lives"). The [src]
+   rule goes once every word has a new picture. */
 #screen-play .card {
     position: absolute;
     left: 28%;
@@ -624,6 +628,14 @@ body[data-screen="play"] .play-back-btn {
     border-radius: calc(8 * var(--u));
     user-select: none;
     -webkit-user-drag: none;
+}
+
+#screen-play .card img[src*="/images/words/"] {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    object-fit: cover;
+    border-radius: 0;
 }
 
 /* faint scanlines over the whole tube and the teal glow at its edges */
