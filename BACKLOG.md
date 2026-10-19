@@ -352,7 +352,49 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
   - Screenshots: `dome-next-on.png`, `dome-next-off.png` (both blink phases), `dome-robot-nudge.png`. Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/63
 
+## M3 — Long words and a TV that tunes in
+Decided by the human on 2026-10-16 (long words) and 2026-10-18 (TV motion, prototype v3).
+Content (the word list, word pictures, voice) is made in chat sessions and lands in its own PRs. The theme files under `static/data/` are written by that content batch from the word list, never by an agent; content stays read-only here.
+Build order: long words → TV tune-in → picture life and win (written as an item once the theme data carries each word's `motion` fields).
+
+### B-213 Long words: one row up to 8 letters, chunk break for 9–10
+- why: splitting a long word in an arbitrary place ("helic / opter") hides the word's shape, which is the thing being learned. Words should break as rarely as possible, and when they must, the break should teach something: a compound word's parts or a syllable chunk. Decided by the human 2026-10-16.
+- acceptance:
+  - Slot sizes by word length (in `layout.js`, `slotLayout`):
+    - 1–6 letters: unchanged, 46px slots, 6px gap, one row.
+    - 7–8 letters: one row, no break, even when the word entry has a `break` field. Slots shrink to the largest size that fits the rail, never below 36px (about 40px for 7 letters, 36px for 8 at 360 wide), gap 4px. Letters inside the slots scale with them (about 0.58 of the slot size).
+    - 9–10 letters: two rows at full 46px, split at the word entry's `break` (the number of letters on the first row), never by even halves. Each row is centred.
+  - Bench blocks stay 52px for every word length. Only the slots change size.
+  - Small slots stay easy to use: at 36–40px a slot's tap and drop area covers the full rail height (about 52px tall), so tapping a placed letter to send it back still works for a kid's finger. Drop snapping still picks the nearest slot.
+  - Data: `break` comes from the word data format (the content batch writes it; e.g. `helicopter` 4 = heli | copter, `submarine` 3 = sub | marine, `motorbike` 5 = motor | bike). A 9–10 letter word with no `break` falls back to the even split and logs a console warning. If the theme data doesn't carry `break` yet when this runs, the tests and screenshots use a test entry that does; don't edit the theme files.
+  - Brass joint: when a word breaks, a small brass joint sits at the end of the first row and the start of the second, showing it is one word in two chunks. It is drawn in code in DESIGN.md's palette (brass, brass-dark, cream). Its exact look is provisional; the human may restyle it later in Claude Design, so keep it in one small, easily replaced component. When a broken word appears, the joint glows once (about 600ms; a steady state under `prefers-reduced-motion`).
+  - Locked letters (B-211) and the second-miss hint letter (B-206) stay clearly visible in 36px slots.
+  - Layout fit: at 360x740 every word of 1–10 letters still fits without overlap with the console, dome and robot, including hard mode's 2 extra letters (B-207). Extend the layout tests for the new sizes and the split rows.
+  - DESIGN.md "Layout" slot rail line is updated to this ladder (replacing "Six slots fit one row; 7+ letters wrap into two even rows"), with a DECISIONS entry.
+  - Screenshots: `long-7-scooter.png`, `long-8-letters.png` (any 8-letter test word), `long-10-helicopter.png`, `long-9-motorbike.png`, `long-10-hard-extras.png`. Checklist passes.
+- status:
+
+### B-214 TV tune-in on every new word
+- why: the TV is an old analog set, so each new word should tune in like changing the channel. It makes every new picture a small event and sets up the funny picture motion that comes next. Approved by the human on 2026-10-18 (prototype v3).
+- reference: `design/reference/tv-motion.html` is the approved prototype. Serve the repo root over http (e.g. `python3 -m http.server`) and open `/design/reference/tv-motion.html`. Its layer 1 "TV" (`tuneIn`, `hiss`, `ambientRoll`, the `.tune` canvas and `.roll` bar) is the spec: port its numbers and drawing, don't reinvent them. Its layers 2 and 3 (life, win), its bat and taxi pictures and its page layout are for a later item; leave them out.
+- acceptance:
+  - On every new word (the round's first word and each next word), the TV plays the tune-in for about 1 second: fine streaky snow, a dark sync bar rolling down, the word's picture rolling vertically and tearing sideways, slowing, then locking still. Drawn in code over the picture, inside the TV screen's rounded mask and under its scanlines and glow (DESIGN.md "TV screen").
+  - A short hiss with a channel click plays with it, made in code (Web Audio, no sound file), started through `audio.js` (the only place sounds play) and silent when muted.
+  - After the lock, the TV stays alive but quiet: a faint bar rolls past every 6–11 seconds, and a rare 90ms dim flicker. Nothing that pulls the eye from the letters.
+  - Never blocks input: the kid can drag and place letters while the TV tunes in.
+  - The robot's "Picture shown" moment (CHARACTER.md) starts as the picture locks, not during the snow.
+  - The wrong-check static flicker (DESIGN.md "Feedback", 150ms) still works; it may reuse the new snow drawing.
+  - Works with today's pictures and with the new `.webp` word pictures under `static/images/words/` (4:3, teal background).
+  - `prefers-reduced-motion`: a 250ms fade in instead of the snow and roll; no ambient bar or flicker.
+  - Performance: the drawing loop runs only during the tune-in and stops at the lock; nothing animates while the play screen is hidden. Smooth on a mid-range Android phone.
+  - Architecture: the tune-in is one-shot motion keyed on the word changing (a transition, like `feedback.js`'s TV static); the CLAUDE.md architecture list names where it lives. No state outside `state.js`.
+  - DESIGN.md records the tune-in and the ambient bar next to the TV screen line.
+  - Screenshots: `tv-tune-snow.png` (early in the tune-in), `tv-tune-roll.png` (picture rolling), `tv-locked.png`. Checklist passes.
+- status:
+
 ## Later / not now
+- Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
+- Picture life and win motion (layers 2 and 3 of `design/reference/tv-motion.html`): becomes a backlog item once the theme data carries each word's `motion` fields (subject, plate, idle, pivot, win).
 - Design bump: the overall look feels mellow and restrained; make it bolder across all screens, worked out in Claude Design first (human, 2026-10-15).
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
 - Visual mascot on the theme, round-end and sticker book screens (no corner is reserved since B-116; CHARACTER.md "Poses": robot-hero on the theme screen); character text lines on screens.
