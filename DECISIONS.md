@@ -920,3 +920,13 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - chose: both tools are offline. Their packages (numpy, opencv-python-headless, scipy) stay out of `requirements.txt`, since the server never runs them.
 - considered: the own outline finder for every picture (first try: the style's dry-brush texture near the subject reads as part of it, so every cutout carried a band of background and some a large patch, e.g. the tractor's dust); keeping the cutouts only in Canva (the game needs files it can serve).
 - reversible: yes (new files only).
+
+## 2026-10-19 — The old words switch to the new word pictures (data-files step, first part)
+- chose: `static/data/animals.json` and `static/data/transportation.json` are rewritten in the word data format (project doc `claude/flip-word-data-format.md`) for the words that already have a new picture and a voice clip: 24 words (animals 12, transport 12). Each entry has `stage`, `break` (long words), `difficulty`, `image` (the new `.webp`), `audio` (the old clip, unchanged), `hebrew` and `motion` (`subject`, `plate`, `idle`, `pivot`, `win`), with values from the project's word list v2. Words are ordered by stage, then word-list order, so each theme's first word (its theme card) is a stage-1 word: cat, bus.
+- chose: `difficulty` keeps each word's value from today instead of the format's "derived from the stage", so the easy level picks the same words as before and the B-204 / B-208 tests that read the real data stay as they are. It goes when stage rounds replace the levels.
+- chose: `deer` leaves the animals file (dropped from the word list). `duck` keeps its old picture and has no `motion` until its new picture lands (Canva's filter blocked it twice); the old picture files stay until every word of the theme has a new one.
+- chose: on the play screen a new word picture fills the whole TV tube (`object-fit: cover`, 4:3 in a ~1.37 screen, a little trimmed top and bottom, the subject stays inside the middle 70%), picked by `#screen-play .card img[src*="/images/words/"]`; the old square pictures keep the contained look. The `[src]` rule goes once every word has a new picture.
+- considered: holding the switch until the new words have voice (nothing would change in the game for days); switching only `image` (the motion item would then wait for another data PR).
+- screenshots: `.agent/screenshots/new-word-pictures/` (tools/shot.mjs, 360x740): theme screen, play screen for both themes, sticker book, and a before/after sheet.
+- tests: 303, passing; `manage.py check` clean. The game.css cache-buster goes to `?v=25` so phones load the new rule.
+- reversible: yes (data and one CSS rule).

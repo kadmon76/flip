@@ -1,16 +1,177 @@
 {
-    "duck": { "image": "/static/images/animals/duck.svg", "audio": "/static/sounds/themes/animals/duck.mp3", "difficulty": "easy" },
-    "rabbit": { "image": "/static/images/animals/rabbit.svg", "audio": "/static/sounds/themes/animals/rabbit.mp3", "difficulty": "medium" },
-    "horse": { "image": "/static/images/animals/horse.svg", "audio": "/static/sounds/themes/animals/horse.mp3", "difficulty": "medium" },
-    "mouse": { "image": "/static/images/animals/mouse.svg", "audio": "/static/sounds/themes/animals/mouse.mp3", "difficulty": "medium" },
-    "deer": { "image": "/static/images/animals/deer.svg", "audio": "/static/sounds/themes/animals/deer.mp3", "difficulty": "medium" },
-    "wolf": { "image": "/static/images/animals/wolf.svg", "audio": "/static/sounds/themes/animals/wolf.mp3", "difficulty": "medium" },
-    "bear": { "image": "/static/images/animals/bear.svg", "audio": "/static/sounds/themes/animals/bear.mp3", "difficulty": "medium" },
-    "tiger": { "image": "/static/images/animals/tiger.svg", "audio": "/static/sounds/themes/animals/tiger.mp3", "difficulty": "hard" },
-    "lion": { "image": "/static/images/animals/lion.svg", "audio": "/static/sounds/themes/animals/lion.mp3", "difficulty": "hard" },
-    "dog": { "image": "/static/images/animals/dog.svg", "audio": "/static/sounds/themes/animals/dog.mp3", "difficulty": "easy" },
-    "cat": { "image": "/static/images/animals/cat.svg", "audio": "/static/sounds/themes/animals/cat.mp3", "difficulty": "easy" },
-    "fish": { "image": "/static/images/animals/fish.svg", "audio": "/static/sounds/themes/animals/fish.mp3", "difficulty": "easy" },
-    "bird": { "image": "/static/images/animals/bird.svg", "audio": "/static/sounds/themes/animals/bird.mp3", "difficulty": "easy" },
-    "frog": { "image": "/static/images/animals/frog.svg", "audio": "/static/sounds/themes/animals/frog.mp3", "difficulty": "easy" }
+    "cat": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/animals/cat.webp",
+        "audio": "/static/sounds/themes/animals/cat.mp3",
+        "hebrew": "חתול",
+        "motion": {
+            "subject": "/static/images/words/animals/cat-subject.webp",
+            "plate": "/static/images/words/animals/cat-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "cheer"
+        }
+    },
+    "dog": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/animals/dog.webp",
+        "audio": "/static/sounds/themes/animals/dog.mp3",
+        "hebrew": "כלב",
+        "motion": {
+            "subject": "/static/images/words/animals/dog-subject.webp",
+            "plate": "/static/images/words/animals/dog-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "frog": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/animals/frog.webp",
+        "audio": "/static/sounds/themes/animals/frog.mp3",
+        "hebrew": "צפרדע",
+        "motion": {
+            "subject": "/static/images/words/animals/frog-subject.webp",
+            "plate": "/static/images/words/animals/frog-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "fish": {
+        "stage": 3,
+        "difficulty": "easy",
+        "image": "/static/images/words/animals/fish.webp",
+        "audio": "/static/sounds/themes/animals/fish.mp3",
+        "hebrew": "דג",
+        "motion": {
+            "subject": "/static/images/words/animals/fish-subject.webp",
+            "plate": "/static/images/words/animals/fish-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "splash"
+        }
+    },
+    "duck": {
+        "stage": 3,
+        "difficulty": "easy",
+        "image": "/static/images/animals/duck.svg",
+        "audio": "/static/sounds/themes/animals/duck.mp3",
+        "hebrew": "ברווז"
+    },
+    "bird": {
+        "stage": 4,
+        "difficulty": "easy",
+        "image": "/static/images/words/animals/bird.webp",
+        "audio": "/static/sounds/themes/animals/bird.mp3",
+        "hebrew": "ציפור",
+        "motion": {
+            "subject": "/static/images/words/animals/bird-subject.webp",
+            "plate": "/static/images/words/animals/bird-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "lion": {
+        "stage": 4,
+        "difficulty": "hard",
+        "image": "/static/images/words/animals/lion.webp",
+        "audio": "/static/sounds/themes/animals/lion.mp3",
+        "hebrew": "אריה",
+        "motion": {
+            "subject": "/static/images/words/animals/lion-subject.webp",
+            "plate": "/static/images/words/animals/lion-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "cheer"
+        }
+    },
+    "horse": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/animals/horse.webp",
+        "audio": "/static/sounds/themes/animals/horse.mp3",
+        "hebrew": "סוס",
+        "motion": {
+            "subject": "/static/images/words/animals/horse-subject.webp",
+            "plate": "/static/images/words/animals/horse-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "tiger": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/animals/tiger.webp",
+        "audio": "/static/sounds/themes/animals/tiger.mp3",
+        "hebrew": "טיגריס",
+        "motion": {
+            "subject": "/static/images/words/animals/tiger-subject.webp",
+            "plate": "/static/images/words/animals/tiger-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "rabbit": {
+        "stage": 5,
+        "difficulty": "medium",
+        "image": "/static/images/words/animals/rabbit.webp",
+        "audio": "/static/sounds/themes/animals/rabbit.mp3",
+        "hebrew": "ארנב",
+        "motion": {
+            "subject": "/static/images/words/animals/rabbit-subject.webp",
+            "plate": "/static/images/words/animals/rabbit-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "mouse": {
+        "stage": 5,
+        "difficulty": "medium",
+        "image": "/static/images/words/animals/mouse.webp",
+        "audio": "/static/sounds/themes/animals/mouse.mp3",
+        "hebrew": "עכבר",
+        "motion": {
+            "subject": "/static/images/words/animals/mouse-subject.webp",
+            "plate": "/static/images/words/animals/mouse-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "bear": {
+        "stage": 5,
+        "difficulty": "medium",
+        "image": "/static/images/words/animals/bear.webp",
+        "audio": "/static/sounds/themes/animals/bear.mp3",
+        "hebrew": "דוב",
+        "motion": {
+            "subject": "/static/images/words/animals/bear-subject.webp",
+            "plate": "/static/images/words/animals/bear-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "wolf": {
+        "stage": 5,
+        "difficulty": "medium",
+        "image": "/static/images/words/animals/wolf.webp",
+        "audio": "/static/sounds/themes/animals/wolf.mp3",
+        "hebrew": "זאב",
+        "motion": {
+            "subject": "/static/images/words/animals/wolf-subject.webp",
+            "plate": "/static/images/words/animals/wolf-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "cheer"
+        }
+    }
 }
