@@ -163,4 +163,4 @@ Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" i
 - No English on screen except the target word and the logo; numbers ok.
 - Only palette colours; fonts as above.
 - Tap targets ≥48px (slots may be 46px).
-- Nothing clipped, overlapping, or scrolling sideways at 360px.
+- Nothing clipped, overlapping, or scrolling sideways at 360px (on the play screen `document.documentElement.scrollWidth` equals the viewport width and `scrollHeight` its height; a positioned glow box past the column edge adds scroll, a `box-shadow` does not).

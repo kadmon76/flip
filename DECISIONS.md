@@ -930,3 +930,11 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - screenshots: `.agent/screenshots/new-word-pictures/` (tools/shot.mjs, 360x740): theme screen, play screen for both themes, sticker book, and a before/after sheet.
 - tests: 303, passing; `manage.py check` clean. The game.css cache-buster goes to `?v=25` so phones load the new rule.
 - reversible: yes (data and one CSS rule).
+
+## 2026-10-20 — Rule suggestions from the B-211 review applied (issue #61; consumed at the start of batch run 20261020-0200)
+- chose: the human answered #61 "A apply, B apply" on 2026-10-17. B-211 shipped with the default (skip both) in PR #63, which is merged, so the answer is consumed now. Applied verbatim to CLAUDE.md "Frontend architecture", the feedback.js bullet, after "and never mutates state.": (A) "`newlyLocked(prevPlaced, placed)` is pure (no DOM, no GSAP); a Django test runs it through `node`."; (B) "It may put the motion-only class `landing` on a block (the robot's letter in flight, a letter during its clunk) and always removes it by the end of that motion; game.css reads it, no script does." Checked against main: feedback.js exports `newlyLocked` and adds and removes `landing` as described.
+- reversible: yes (doc lines).
+
+## 2026-10-20 — Rule suggestions from the B-212 review applied (issue #62; consumed at the start of batch run 20261020-0200)
+- chose: the human answered #62 "A apply, B apply, C apply, D apply, E apply" on 2026-10-17. B-212 shipped with the default (skip all five) in PR #63, which is merged, so the answer is consumed now. Applied verbatim: (A) CHARACTER.md "Moment map": a "Dome nudge" row after "All slots filled"; (B) CHARACTER.md "Moment map", "Kid idle 10s", How often: "once per word, while the word is open (an answered word gets the dome nudge instead)"; (C) BACKLOG.md "Later / not now": a dome-aimed point pose for the robot's dome nudge, tuned on `design/reference/robot-puppet.html` with the human; (D) BACKLOG.md "Later / not now": `tools/shot.mjs` `--reduced-motion` and `--step-timeout <ms>`; (E) DESIGN.md "Screen checklist": the 360px line now asks that on the play screen `scrollWidth` equals the viewport width and `scrollHeight` its height. #60 I (B-210's similar shot.mjs line) is still open and not touched.
+- reversible: yes (doc lines).

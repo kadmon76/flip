@@ -418,3 +418,5 @@ Build order: long words → TV tune-in → picture life and win (written as an i
 - Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
 - Robot voice lines for the puppet's moments (the ~60-line ElevenLabs pool): the reference page `design/reference/robot-puppet.html` shows the line each moment wants (e.g. surprised "Ooh! What is THAT?", smirky "Take your time… I'll just… wait here."); the human will generate them.
+- A dome-aimed point pose for the robot's dome nudge (B-212 reuses `point`, turned 32° down, while the dome is ~13° down from his hand at 360); tune it on `design/reference/robot-puppet.html` with the human.
+- `tools/shot.mjs`: a `--reduced-motion` flag (`Emulation.setEmulatedMedia`) and a `--step-timeout <ms>` option, so reduced-motion shots and long real-flow runs don't need a throwaway copy (B-210, B-211, B-212 used one).
