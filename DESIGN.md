@@ -54,6 +54,24 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
 - **TV screen** (in % of the background image): x 28%–70%, y 16.4%–30.5%.
   The word picture sits inside, masked to the screen's rounded corners,
   with faint scanlines and a soft teal glow.
+- **TV tune-in** (BACKLOG B-214; `design/reference/tv-motion.html` layer 1,
+  its numbers): on every new word (the round's first and each next one)
+  the TV tunes in for ~1s, drawn in code on a canvas over the picture,
+  inside the screen's mask and under its scanlines and glow: fine streaky
+  snow (the prototype's cool grey grain), a dark sync bar rolling down,
+  the picture rolling vertically (a black gap between frames) and tearing
+  sideways from 230ms, slowing, locked still by 760ms; the snow is gone by
+  930ms and at 1s the canvas fades off the picture (120ms). A short hiss
+  with a channel click, made in code (Web Audio, `audio.js`), plays with
+  it; silent when muted. A picture still loading keeps the snow going (2s
+  at most). Input is never blocked. The robot's "Picture shown" comes at
+  the lock.
+- **TV after the lock:** alive but quiet: a faint cream bar (22% of the
+  screen tall, opacity 0.07) rolls down the screen in 1.7s every 6–11s,
+  and with half of them the screen dims to 0.92 for 90ms. Nothing while
+  the play screen is hidden. Reduced motion: the picture fades in over
+  250ms instead of the snow and roll (no hiss), then locks; no bar, no
+  flicker.
 - **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
   lives bulbs. Right: split-flap counter "2 / 5".
 - **Slot rail:** brass, full safe width, directly below the machine
@@ -147,7 +165,7 @@ block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays the error clip only). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. The swipe is an effect and may overlap anything. Muted: nothing
+dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and a tap on the held-back speaker (B-203) still gets the robot's head-shake, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)

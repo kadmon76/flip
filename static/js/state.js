@@ -80,6 +80,11 @@ export const state = {
     // NUDGE_MS.every; each one more is his domeNudge moment. 0 on a new
     // word.
     nudges: 0,
+    // The TV has tuned in to the current word's picture (BACKLOG B-214):
+    // false on a new word, while tv.js's tune-in runs; true once its
+    // picture has locked (main.js onTuned, told by tv.js). The robot's
+    // "Picture shown" moment plays on the change (character.js).
+    tuned: false,
 };
 
 const subscribers = [];

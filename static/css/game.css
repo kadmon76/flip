@@ -62,6 +62,8 @@
     --shine-next: color-mix(in srgb, var(--amber) 90%, transparent);
     --shine-next-edge: color-mix(in srgb, var(--amber) 45%, transparent);
     --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
+    /* the faint light bar that rolls down the TV after the tune-in (B-214) */
+    --tv-roll: color-mix(in srgb, var(--cream) 50%, transparent);
     /* TV static on a wrong check: light and dark noise lines */
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
     --static-dark: color-mix(in srgb, var(--ink) 55%, transparent);
@@ -653,6 +655,34 @@ body[data-screen="play"] .play-back-btn {
         var(--scanline) calc(3 * var(--u))
     );
     box-shadow: inset 0 0 calc(14 * var(--u)) var(--glow-teal);
+}
+
+/* The tune-in on a new word (BACKLOG B-214, tv.js): a canvas over the
+   picture, drawn in code for about a second (snow, the sync bar, the
+   picture rolling in), then faded off the locked picture; and the faint
+   light bar that rolls down the screen every 6-11s after it (tv.js moves
+   it, from above the screen to below). Both sit under the static, the
+   flash and the scanlines, are invisible at rest and take no taps. */
+#screen-play .tv-tune,
+#screen-play .tv-roll {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+}
+
+#screen-play .tv-tune {
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+#screen-play .tv-roll {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 22%;
+    background: linear-gradient(to bottom, transparent, var(--tv-roll), transparent);
 }
 
 /* Wrong check: static over the picture, fine light and dark noise lines

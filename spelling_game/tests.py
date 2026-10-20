@@ -1486,10 +1486,15 @@ class CharacterTests(TestCase):
             self.assertTrue((self.UI / 'robot' / f).exists(), f)
 
     def test_round_start_pops_him_up_then_the_picture_makes_him_think(self):
+        # BACKLOG B-214: a new round's wave comes at once; the picture when
+        # the TV has tuned in to it (state.tuned, about a second later). A
+        # round whose word came already tuned would have both, the picture
+        # in place of his hands' return to rest.
         self.assertEqual(self.run_node(
             "out([moments(theme, st()), moments({ ...st(), screen: 'round-end' }, st({ roundsStarted: 2 })),"
-            " moments(st(), st({ roundsStarted: 2 })), c.scriptFor(['roundStart', 'picture'], { picture: 'surprise' })]);"), [
-            ['roundStart', 'picture'], ['roundStart', 'picture'], ['roundStart', 'picture'],
+            " moments(st(), st({ roundsStarted: 2 })), moments(st(), st({ tuned: true })),"
+            " moments(theme, st({ tuned: true })), c.scriptFor(['roundStart', 'picture'], { picture: 'surprise' })]);"), [
+            ['roundStart'], ['roundStart'], ['roundStart'], ['picture'], ['roundStart', 'picture'],
             # he waves and pops up, then (in place of his hands' return to
             # rest) the picture: surprised, looking up at the TV
             [{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'up', 'hands': 'wave', 'pop': 1},
@@ -1497,11 +1502,19 @@ class CharacterTests(TestCase):
              {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
         ])
 
-    def test_next_word_is_a_new_picture(self):
+    def test_next_word_is_a_new_picture_once_the_tv_has_tuned_in(self):
+        # BACKLOG B-214: the next word comes with the TV's tune-in (snow) and
+        # he does nothing yet; "Picture shown" comes when it locks (tuned),
+        # once: a re-render, a block moved after it, or the next word
+        # coming untuned does not play it again
         self.assertEqual(self.run_node(
-            "out(moments(st({ current: cur('correct', 'cat') }),"
-            " st({ round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })));"),
-            ['picture'])
+            "const next = { round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } };"
+            "out([moments(st({ current: cur('correct', 'cat'), tuned: true }), st(next)),"
+            " moments(st(next), st({ ...next, tuned: true })), moments(st({ ...next, tuned: true }), st({ ...next, tuned: true })),"
+            " moments(st({ ...next, tuned: true }), st({ ...next, tuned: true, current: { ...cur('playing', 'd--'), word: 'dog' } })),"
+            " c.snapshot(st({ tuned: true })).tuned, c.snapshot(st()).tuned, c.NONE.tuned,"
+            " c.snapshot({ ...theme, tuned: true }).tuned, c.soundsFor(moments(st(next), st({ ...next, tuned: true })))]);"),
+            [[], ['picture'], [], ['blockPlaced'], True, False, False, False, []])
 
     def test_blocks_moving_and_the_slots_filling(self):
         # a block into a slot -> blockPlaced, back to the bench ->
@@ -1624,15 +1637,15 @@ class CharacterTests(TestCase):
              ['wake'], ['speakerLocked'], [['shrug', True], ['rest', False]], ['locked'], 7, 0, 0])
 
     def test_a_new_word_or_round_wins_over_the_tap_count(self):
-        # the count runs over the session; a new picture or round start is
-        # what the robot plays when the word changed, and off the play
-        # screen nothing
+        # the count runs over the session; when the word changed the robot
+        # plays a round start, or nothing until the TV has tuned in to the
+        # new picture (B-214), and off the play screen nothing
         self.assertEqual(self.run_node(
             "out([moments(st({ lockedTaps: 2, current: cur('correct', 'cat') }),"
             " st({ lockedTaps: 2, round: { index: 1, size: 5, results: [{ correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })),"
             " moments({ ...theme, lockedTaps: 2 }, st({ roundsStarted: 2, lockedTaps: 2 })),"
             " moments({ ...theme, lockedTaps: 2 }, { ...theme, lockedTaps: 3 })]);"),
-            [['picture'], ['roundStart', 'picture'], []])
+            [[], ['roundStart'], []])
 
     def test_the_head_shake_is_the_references(self):
         # design/reference/robot-puppet.html shake(): the head turns 9° from
@@ -1660,7 +1673,7 @@ class CharacterTests(TestCase):
             " st({ current: cur('correct', 'cat'), round: five }), st({ idleBeat: 'sunk' }), st({ pressed: 'dome', current: cur('playing', 'cat') })];"
             "out([from.map((s) => moments(s, back(s))), from.map((s) => c.soundsFor(moments(s, back(s)))),"
             " moments(back(st()), st({ roundsStarted: 2 }))]);"), [
-            [[]] * 8, [[]] * 8, ['roundStart', 'picture'],
+            [[]] * 8, [[]] * 8, ['roundStart'],
         ])
 
     def test_changes_are_at_least_300ms_apart(self):
@@ -2321,8 +2334,9 @@ class AudioTests(TestCase):
             [0, 5, 9, 9, 0, -1])
 
     def test_channels(self):
+        # the TV's tune-in hiss (B-214) is an effect, like the swipe
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice'})
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -5561,7 +5575,7 @@ class NextDomeTests(TestCase):
             f" moments(st({{ nudges: 2, round: {five} }}), {{ ...st({{ round: {five} }}), screen: 'round-end' }}),"
             " c.snapshot(st({ nudges: 2 })).nudges, c.snapshot({ ...st({ nudges: 2 }), screen: 'theme', current: { word: null, placed: [] } }).nudges,"
             " c.snapshot({ ...st(), nudges: undefined }).nudges, c.NONE.nudges, c.soundsFor(['domeNudge'])]);"),
-            [['correct'], ['domeNudge'], ['domeNudge'], [], ['domeNudge'], ['picture'], ['roundEndGood'], 2, 0, 0, 0, []])
+            [['correct'], ['domeNudge'], ['domeNudge'], [], ['domeNudge'], [], ['roundEndGood'], 2, 0, 0, 0, []])
 
     def test_he_points_at_the_dome_wags_and_comes_back_to_rest(self):
         steps, point, ends, wag, reduced = self.run_node(
@@ -5928,3 +5942,541 @@ class LongWordTests(TestCase):
         for f in sorted(self.JS.glob('*.js')):
             if f.name not in ('card.js', 'feedback.js'):
                 self.assertNotIn('rail-joint', self.code(f.name), f.name)
+
+
+class TvTuneTests(TestCase):
+    """The TV's tune-in on every new word (BACKLOG B-214; the approved
+    prototype is design/reference/tv-motion.html, layer 1 "TV"): tv.js's
+    numbers are the prototype's, its drawing (pure, on byte arrays) ends on
+    the picture exactly, a picture still loading holds the snow, and its
+    subscriber (stand-ins for the DOM, GSAP and animation frames) tunes in
+    once per new word, draws only until the lock, tells main.js at the lock
+    (state.tuned, the robot's "Picture shown"), then rolls a quiet bar every
+    6-11s, and stops everything when the word or the screen changes; under
+    reduced motion the picture fades in over 250ms instead. main.js,
+    the template and game.css wire it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const V = await import('{(self.JS / 'tv.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    # --- the prototype's numbers ---
+
+    def test_the_numbers_are_the_prototypes(self):
+        tune, quiet, frame = self.run_node("out([V.TUNE, V.QUIET, V.FRAME_MS]);")
+        self.assertEqual(tune, {
+            'duration': 1000,
+            'picture': {'from': 230, 'to': 720},
+            'flare': {'to': 900, 'by': 0.18},
+            'snow': {'from': 230, 'to': 700, 'by': 0.78, 'tail': 930},
+            'settle': {'from': 230, 'to': 760},
+            'roll': 1.6,
+            'tear': {'px': 14, 'row': 0.11, 'ms': 0.02},
+            'jolt': {'chance': 0.04, 'px': 30},
+            'blank': 0.08,
+            'blankUntil': 0.02,
+            'bar': {'speed': 0.045, 'base': 0.4, 'height': 0.12, 'loop': 1.25, 'dim': 0.35, 'edge': 1.5, 'edgeLight': 120},
+            'grain': {'keep': 0.42, 'gamma': 1.35, 'gain': 0.7, 'gainRange': 0.55},
+            'tint': [0.88, 0.97, 1],
+            'under': 0.7,
+            'rows': 1.5,
+            'least': {'w': 120, 'h': 60},
+            'fadeOut': 120,
+            'hiss': 0.95,
+            'hold': 2000,
+            'reduced': 250,
+        })
+        # the bar every 6-11s (the acceptance's range), 1.7s down the
+        # screen at 7%; with half of them a 90ms dim to 0.92
+        self.assertEqual(quiet, {'every': {'least': 6000, 'extra': 5000},
+                                 'roll': {'duration': 1700, 'from': -120, 'to': 480, 'opacity': 0.07},
+                                 'flicker': {'chance': 0.5, 'duration': 90, 'brightness': 0.92}})
+        self.assertAlmostEqual(frame, 1000 / 60)
+        # the prototype's own lines, so a change there shows up here
+        proto = (self.ROOT / 'design' / 'reference' / 'tv-motion.html').read_text()
+        for line in ('ease(ramp(t, 230, 720)) * (t > 720 ? 1 + 0.18 * (1 - ramp(t, 720, 900)) : 1)',
+                     'const sa = 1 - 0.78 * ease(ramp(t, 230, 700)) - 0.22 * ramp(t, 700, 930);',
+                     'const settle = 1 - ease(ramp(t, 230, 760));',
+                     'const roll = Math.round(settle * settle * H * 1.6) % H;',
+                     'const tear = 14 * settle;',
+                     'bar = (bar + H * 0.045 * (0.4 + settle)) % (H * 1.25);',
+                     'const blank = Math.round(H * 0.08);',
+                     'let s = Math.pow(v, 1.35) * 255 * rowGain;',
+                     'let r = s * 0.88, g = s * 0.97, b = s;',
+                     'Math.round(scr.clientHeight / 1.5)',
+                     'hiss(T * 0.95);',
+                     '{ duration: 120, fill: "forwards" }',
+                     '{ duration: 1700, easing: "linear" }',
+                     'filter: "brightness(0.92)" }, { filter: "none" }], { duration: 90 }',
+                     '{ duration: 250, easing: "ease-out" }'):
+            self.assertIn(line, proto)
+
+    def test_levels_over_the_tune_in(self):
+        times = [0, 120, 230, 340, 450, 700, 720, 760, 810, 900, 930, 1000, 1200]
+        res = self.run_node(
+            "const r = (x) => Math.round(x * 1000) / 1000;"
+            f"out({times}.map((t) => {{ const l = V.levels(t); return [r(l.pic), r(l.snow), r(l.settle)]; }}));")
+        # the prototype's tuneIn formulas, written out again here
+        ease = lambda t: 1 - (1 - min(max(t, 0), 1)) ** 3
+        ramp = lambda t, a, b: min(max((t - a) / (b - a), 0), 1)
+        want = []
+        for t in times:
+            pa = ease(ramp(t, 230, 720)) * (1 + 0.18 * (1 - ramp(t, 720, 900)) if t > 720 else 1)
+            sa = 1 - 0.78 * ease(ramp(t, 230, 700)) - 0.22 * ramp(t, 700, 930)
+            settle = 1 - ease(ramp(t, 230, 760))
+            want.append([round(pa, 3) + 0, round(sa, 3) + 0, round(settle, 3) + 0])
+        self.assertEqual(res, want)
+        # snow only to 230ms; the roll and tear stop at 760 (locked
+        # still); shining over after 720; no snow from 930; the picture
+        # exactly from then on
+        self.assertEqual(res[1], [0, 1, 1])
+        self.assertEqual(res[7][2], 0)
+        self.assertGreater(res[8][0], 1)
+        self.assertEqual(res[10:], [[1, 0, 0]] * 3)
+
+    # --- the drawing (pure) ---
+
+    DRAW = (
+        "const W = 12, H = 10;"
+        # a picture whose every row has its own colour: row y is (y * 20, 100, 255 - y * 20)
+        "const pic = new Uint8ClampedArray(W * H * 4);"
+        "for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4;"
+        " pic[i] = y * 20; pic[i + 1] = 100; pic[i + 2] = 255 - y * 20; pic[i + 3] = 255; }"
+        "const draw = (p, t, bar, rand) => { const o = new Uint8ClampedArray(W * H * 4); V.drawTune(o, p, W, H, t, bar, rand); return o; };"
+        "const same = (a, b) => a.every((v, i) => v === b[i]);"
+        "const seq = (seed) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; };"
+    )
+
+    def test_it_locks_on_the_picture_exactly(self):
+        res = self.run_node(
+            self.DRAW +
+            "const black = (o) => o.every((v, i) => (i % 4 === 3 ? v === 255 : v === 0));"
+            "out([same(draw(pic, 1000, 3, Math.random), pic), same(draw(pic, 1400, 7, Math.random), pic),"
+            " same(draw(pic, 930, 5, Math.random), pic), black(draw(null, 1000, 3, Math.random)),"
+            " same(draw(pic, 990, 3, Math.random), pic)]);")
+        # at the end it is the picture (no picture: black); a little
+        # before, a trace of snow is still on it
+        self.assertEqual(res, [True, True, True, True, True])
+
+    def test_snow_first_then_the_picture_rolls_in(self):
+        res = self.run_node(
+            self.DRAW +
+            # before 230ms the picture does not show at all: the same grain with or without it
+            "const early = [0, 120, 229].map((t) => same(draw(pic, t, 4, seq(7)), draw(null, t, 4, seq(7))));"
+            # the grain is a cool grey: r <= g <= b on every pixel
+            "const o = draw(null, 100, 50, Math.random);"
+            "let cool = true; for (let i = 0; i < o.length; i += 4) if (!(o[i] <= o[i + 1] && o[i + 1] <= o[i + 2])) cool = false;"
+            # mid-roll (t 300, settle 0.654): with no grain (rand 0, below the bar)
+            # each row shows the picture's row (y + H - roll) % H, and the
+            # black gap (k 0) at its first rows
+            "const settle = V.levels(300).settle; const roll = Math.round(settle * settle * H * 1.6) % H;"
+            "const mid = draw(pic, 300, -100, () => 0);"
+            "const rows = []; for (let y = 0; y < H; y++) rows.push(mid[y * W * 4]);"
+            "out([early, cool, roll, rows, Math.round(V.levels(300).pic * 1000) / 1000]);")
+        early, cool, roll, rows, pa = res
+        self.assertEqual(early, [True, True, True])
+        self.assertTrue(cool)
+        self.assertEqual(roll, 7)
+        blank = round(10 * 0.08)          # 1 row
+        expect = []
+        for y in range(10):
+            sy = (y + 10 - roll) % 10
+            # no grain (rand 0) and no tear: the picture's red, at pa
+            expect.append(0 if sy < blank else round(sy * 20 * pa))
+        self.assertEqual(rows, expect)
+
+    def test_the_sync_bar_dims_its_rows_and_lights_its_edge(self):
+        res = self.run_node(
+            self.DRAW +
+            # constant grain 0.5: s = 0.5^1.35 * 255 * (0.7 + 0.5 * 0.55)
+            "const o = draw(null, 0, 6, () => 0.5);"
+            "const b = (y) => o[(y * W) * 4 + 2];"
+            "out([b(0), b(4), b(5), b(6), b(7), b(9)]);")
+        s = 0.5 ** 1.35 * 255 * (0.7 + 0.5 * 0.55)
+        # bar at row 6, 12% of 10 rows tall (rows 5): dimmed to 0.35; its
+        # edge (rows 5-7, within 1.5) half as bright plus 120
+        self.assertEqual(res, [round(s), round(s), round(s * 0.35 * 0.5 + 120), round(s * 0.5 + 120), round(s * 0.5 + 120), round(s)])
+
+    # --- the clock, the bar, the canvas ---
+
+    def test_a_picture_still_loading_holds_the_snow(self):
+        res = self.run_node(
+            "out([V.clockStep(0, 0, 100, false), V.clockStep(200, 0, 100, false), V.clockStep(230, 70, 16, false),"
+            " V.clockStep(230, 1990, 16, false), V.clockStep(230, 2006, 16, false), V.clockStep(230, 500, 16, true),"
+            " V.clockStep(600, 0, 16, false)]);")
+        self.assertEqual(res, [
+            {'clock': 100, 'held': 0},       # snow only so far: it runs
+            {'clock': 230, 'held': 70},      # it stops where the picture would come in
+            {'clock': 230, 'held': 86},
+            {'clock': 230, 'held': 2006},
+            {'clock': 246, 'held': 2006},    # held 2s: it runs on, to no picture
+            {'clock': 246, 'held': 500},     # the picture is there: it runs on
+            {'clock': 600, 'held': 16},      # (a clock past 230 does not run back)
+        ])
+
+    def test_the_bar_moves_as_fast_on_any_screen(self):
+        res = self.run_node(
+            "const H = 73; const r = (x) => Math.round(x * 1000) / 1000;"
+            "const at60 = V.barStep(10, 1, H, V.FRAME_MS); const at120 = V.barStep(V.barStep(10, 1, H, V.FRAME_MS / 2), 1, H, V.FRAME_MS / 2);"
+            "out([r(at60), r(at120), r(V.barStep(90, 0, H, V.FRAME_MS)), r(V.barStep(0, 0, H, 0))]);")
+        # one 60 Hz frame: H * 0.045 * (0.4 + settle); two 120 Hz frames the
+        # same; it loops at 1.25 heights
+        self.assertEqual(res, [round(10 + 73 * 0.045 * 1.4, 3), round(10 + 73 * 0.045 * 1.4, 3),
+                               round((90 + 73 * 0.045 * 0.4) % (73 * 1.25), 3), 0])
+
+    def test_the_canvas_and_the_pictures_place(self):
+        res = self.run_node(
+            "const r = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v * 100) / 100]));"
+            "out([V.canvasSize(151.2, 110), V.canvasSize(202, 147), V.canvasSize(40, 30),"
+            " r(V.fitRect({ x: 0, y: 0, w: 151, h: 110 }, 600, 448, 'cover')),"
+            " r(V.fitRect({ x: 27, y: 6, w: 98, h: 98 }, 1024, 1024, 'contain')),"
+            " r(V.fitRect({ x: 0, y: 0, w: 100, h: 100 }, 400, 200, 'contain')),"
+            " r(V.fitRect({ x: 1, y: 2, w: 3, h: 4 }, 400, 200, 'fill')), r(V.fitRect({ x: 1, y: 2, w: 3, h: 4 }, 0, 0, 'cover')),"
+            " r(V.tubeEllipse(100, 100)), V.shade('#27665e', 0.85), V.shade('#fff', 0.5), V.shade('teal', 0.85), V.shade(' #27665e ', 1)]);")
+        k = (1 + (0.55 / 0.45) ** 2) ** 0.5
+        self.assertEqual(res, [
+            {'W': 151, 'H': 73}, {'W': 202, 'H': 98}, {'W': 120, 'H': 60},
+            # the new pictures cover the tube (trimmed top and bottom); the
+            # old ones are contained in their square
+            {'x': 0, 'y': -1.37, 'w': 151, 'h': 112.75},
+            {'x': 27, 'y': 6, 'w': 98, 'h': 98},
+            {'x': 0, 'y': 25, 'w': 100, 'h': 50},
+            {'x': 1, 'y': 2, 'w': 3, 'h': 4}, {'x': 1, 'y': 2, 'w': 3, 'h': 4},
+            # game.css's tube: ellipse at 50% 45%, farthest corner
+            {'cx': 50, 'cy': 45, 'rx': round(50 * k, 2), 'ry': round(45 * k, 2)},
+            'rgb(33, 87, 80)', 'rgb(128, 128, 128)', None, 'rgb(39, 102, 94)',
+        ])
+
+    def test_the_quiet_bar_comes_every_6_to_11s_and_flickers_half_the_time(self):
+        res = self.run_node(
+            "out([V.quietWait(() => 0), V.quietWait(() => 0.5), V.quietWait(() => 0.9999), V.flickers(() => 0.49), V.flickers(() => 0.5),"
+            " Array.from({ length: 500 }, () => V.quietWait()).every((w) => w >= 6000 && w < 11000)]);")
+        self.assertEqual(res[:5], [6000, 8500, 10999.5, True, False])
+        self.assertTrue(res[5])
+
+    # --- the subscriber (stand-ins for the DOM, GSAP and frames) ---
+
+    FAKE = """
+        const calls = []; const due = []; let reduced = false; let puts = 0; const prefetched = [];
+        const frames = new Map(); let seq = 0; let now = 1000;
+        globalThis.requestAnimationFrame = (fn) => { frames.set(++seq, fn); return seq; };
+        globalThis.cancelAnimationFrame = (id) => { calls.push(['cancel', frames.has(id)]); frames.delete(id); };
+        Object.defineProperty(globalThis, 'performance', { value: { now: () => now }, configurable: true, writable: true });
+        const run = (n, dt = 1000 / 60) => { let k = 0; for (; k < n && frames.size; k++) { now += dt; const f = [...frames.values()]; frames.clear(); f.forEach((fn) => fn(now)); } return k; };
+        const nm = (t) => (Array.isArray(t) ? t.map(nm) : typeof t === 'function' ? 'fn ' + t.name : t.name);
+        globalThis.gsap = {
+            set(t, v) { calls.push(['set', nm(t), v]); },
+            to(t, v) { calls.push(['to', nm(t), v]); return { kill() { calls.push(['kill tween', nm(t)]); } }; },
+            fromTo(t, a, b) { calls.push(['fromTo', nm(t), a, b]); return { kill() {} }; },
+            killTweensOf(t) { calls.push(['killTweensOf', nm(t)]); if (typeof t === 'function') due.forEach((d) => { if (d.fn === t) d.dead = true; }); },
+            delayedCall(s, fn) { const d = { s, fn, dead: false, kill() { d.dead = true; } }; due.push(d); calls.push(['later', Math.round(s * 1000) / 1000, fn.name || 'arrow']); return d; },
+        };
+        const fire = () => { const d = due.filter((x) => !x.dead); due.length = 0; d.forEach((x) => x.fn()); return d.length; };
+        const pending = () => due.filter((x) => !x.dead).map((x) => [Math.round(x.s * 1000) / 1000, x.fn.name || 'arrow']);
+        const flat = { scale() {}, save() {}, restore() {}, translate() {}, fillRect() {}, beginPath() {}, moveTo() {}, arcTo() {}, closePath() {}, clip() {}, drawImage() {},
+            createRadialGradient: () => ({ addColorStop() {} }), getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4).fill(200) }) };
+        const ctx = { createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData() { puts++; } };
+        const canvas = { name: 'canvas', width: 0, height: 0, getContext: () => ctx };
+        const img = { name: 'img', complete: true, naturalWidth: 600, naturalHeight: 448, offsetLeft: 0, offsetTop: 0, offsetWidth: 151, offsetHeight: 110,
+            on: {}, addEventListener(t, fn) { (this.on[t] = this.on[t] || []).push(fn); } };
+        const roll = { name: 'roll' };
+        const card = { name: 'card', isConnected: true, clientWidth: 151.2, clientHeight: 110,
+            querySelector: (s) => (s === '.tv-tune' ? canvas : s === '.tv-roll' ? roll : null) };
+        globalThis.document = { hidden: false, documentElement: { name: 'html' },
+            querySelector: (s) => (s === '#screen-play .card' ? card : null),
+            getElementById: (id) => (id === 'play-image' ? img : null),
+            createElement: () => ({ width: 0, height: 0, getContext: () => flat }) };
+        globalThis.getComputedStyle = (el) => (el === document.documentElement ? { getPropertyValue: () => ' #27665e' } : { objectFit: 'cover', borderTopLeftRadius: '0px' });
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        globalThis.Image = class { set src(v) { prefetched.push(v); } };
+        let locks = 0; const onLock = () => { locks++; };
+        const words = [{ image: '/w/bus.webp' }, { image: '/w/car.webp' }, { image: '/w/taxi.webp' }];
+        const at = (index, word, o = {}) => ({ screen: 'play', roundsStarted: 1, words, round: { index }, current: { word }, ...o });
+        const theme = { screen: 'theme', roundsStarted: 1, words: [], round: { index: 0 }, current: { word: null } };
+        const take = () => calls.splice(0);
+    """
+
+    def test_a_new_word_tunes_in_once_draws_until_the_lock_and_tells_main(self):
+        res = self.run_node(
+            "V.renderTv(at(0, 'bus'), onLock);"
+            "const start = take(); const firstPuts = puts; const size = [canvas.width, canvas.height];"
+            "V.renderTv(at(0, 'bus'), onLock); V.renderTv(at(0, 'bus', { tuned: false }), onLock);"
+            "const again = take().length;"
+            "const n = run(200);"
+            "out([start, firstPuts, size, again, n, puts, locks, frames.size, take(), pending(), prefetched]);",
+            prelude=self.FAKE)
+        start, first_puts, size, again, n, puts, locks, left, end, pending, prefetched = res
+        # the canvas covers the screen at once with its first frame drawn
+        # (before the new picture can show), nothing else waits yet
+        self.assertIn(['set', 'canvas', {'opacity': 1}], start)
+        self.assertEqual([c for c in start if c[0] in ('to', 'fromTo', 'later')], [])
+        self.assertEqual(first_puts, 1)
+        self.assertEqual(size, [151, 73])
+        # a re-render of the same word does nothing
+        self.assertEqual(again, 0)
+        # one frame per animation frame until the clock reaches 1000ms
+        # (60 frames at 60 Hz, 61 when the sum of the frames falls a hair
+        # short), then no more frames
+        self.assertIn(n, (60, 61))
+        self.assertEqual(puts, n + 1)
+        self.assertEqual(left, 0)
+        # main.js is told once; the canvas fades off in 120ms; the quiet
+        # bar is due 6-11s later
+        self.assertEqual(locks, 1)
+        self.assertEqual(end[0], ['to', 'canvas', {'opacity': 0, 'duration': 0.12, 'ease': 'none'}])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0][1], 'quietBar')
+        self.assertTrue(6 <= pending[0][0] < 11, pending)
+        # the next word's picture starts loading
+        self.assertEqual(prefetched, ['/w/car.webp'])
+
+    def test_the_quiet_bar_rolls_and_sometimes_dims_the_screen(self):
+        res = self.run_node(
+            "V.renderTv(at(0, 'bus'), onLock); run(200); take();"
+            "const rnd = Math.random; Math.random = () => 0.2; fire(); const bar = take(); const next = pending();"
+            "Math.random = () => 0.7; fire(); const bar2 = take();"
+            "document.hidden = true; fire(); const hidden = take(); Math.random = rnd;"
+            "out([bar, next, bar2, hidden]);",
+            prelude=self.FAKE)
+        bar, nxt, bar2, hidden = res
+        self.assertEqual(bar[0], ['fromTo', 'roll', {'yPercent': -120, 'opacity': 0.07}, {'yPercent': 480, 'duration': 1.7, 'ease': 'none'}])
+        self.assertEqual(bar[1], ['fromTo', 'card', {'filter': 'brightness(0.92)'}, {'filter': 'brightness(1)', 'duration': 0.09, 'ease': 'none'}])
+        self.assertEqual(bar[2], ['later', 7, 'quietBar'])      # 6000 + 0.2 * 5000
+        self.assertEqual(nxt, [[7, 'quietBar']])
+        # no flicker this time (0.7 >= 0.5)
+        self.assertEqual([c[1] for c in bar2], ['roll', 9.5])
+        # the page in the background: no bar, the next one still due
+        self.assertEqual(hidden, [['later', 9.5, 'quietBar']])
+
+    def test_leaving_or_a_new_word_stops_it_at_once(self):
+        res = self.run_node(
+            "V.renderTv(at(0, 'bus'), onLock); run(20); take();"
+            "V.renderTv(theme, onLock); const left = take(); const n = run(100);"
+            "const off = [locks, n, puts];"
+            # a word that is answered and replaced mid-tune: the old one stops, the new one tunes in
+            "V.renderTv(at(0, 'bus', { roundsStarted: 2 }), onLock); run(10); take();"
+            "V.renderTv(at(1, 'car', { roundsStarted: 2 }), onLock); const swap = take(); const m = run(200);"
+            # after the lock, leaving drops the waiting bar
+            "V.renderTv(theme, onLock); const quiet = take();"
+            "out([left, off, swap, m, locks, pending(), quiet]);",
+            prelude=self.FAKE)
+        left, off, swap, m, locks, pending, quiet = res
+        self.assertEqual(left[0], ['cancel', True])
+        self.assertIn(['killTweensOf', 'fn quietBar'], left)
+        self.assertIn(['killTweensOf', ['canvas', 'roll', 'card']], left)
+        self.assertIn(['set', ['canvas', 'roll'], {'clearProps': 'opacity,transform'}], left)
+        self.assertIn(['set', 'card', {'clearProps': 'filter'}], left)
+        # nothing draws or locks off the play screen
+        self.assertEqual(off, [0, 0, 21])
+        self.assertEqual(swap[0], ['cancel', True])
+        self.assertIn(['set', 'canvas', {'opacity': 1}], swap)
+        # the new word draws to its own lock, once
+        self.assertIn(m, (60, 61))
+        self.assertEqual(locks, 1)
+        self.assertEqual(pending, [])
+        self.assertIn(['killTweensOf', 'fn quietBar'], quiet)
+
+    def test_a_picture_still_loading_keeps_the_snow_going(self):
+        res = self.run_node(
+            "img.complete = false;"
+            "V.renderTv(at(0, 'bus'), onLock); const a = run(30); const l1 = locks;"
+            "img.complete = true; const b = run(200);"
+            # one that never loads: 2s of held snow, then it tunes in to none
+            "img.complete = false; V.renderTv(at(1, 'car'), onLock); const c = run(400);"
+            "out([a, l1, b, locks, c]);",
+            prelude=self.FAKE)
+        a, l1, b, locks, c = res
+        # 30 frames (500ms) without the picture: still tuning, no lock
+        self.assertEqual([a, l1], [30, 0])
+        # once it is there the clock runs on from 230ms: 47 more frames
+        self.assertEqual(b, 47)
+        # never loads: 1000ms + 2000ms held = 180 frames
+        self.assertEqual(locks, 2)
+        self.assertIn(c, (180, 181))
+
+    def test_reduced_motion_fades_the_picture_in_and_then_locks(self):
+        res = self.run_node(
+            "reduced = true; V.renderTv(at(0, 'bus'), onLock); const start = take(); const before = [locks, frames.size, puts];"
+            "fire(); const after = [locks, take(), pending()];"
+            # a picture still loading: the fade waits for it
+            "img.complete = false; V.renderTv(at(1, 'car'), onLock); const wait = take();"
+            "img.on.load.forEach((fn) => fn()); const loaded = take();"
+            "out([start, before, after, wait, loaded]);",
+            prelude=self.FAKE)
+        start, before, after, wait, loaded = res
+        fade = [c for c in start if c[1] == 'img' or c[0] == 'later']
+        self.assertEqual(fade, [['set', 'img', {'opacity': 0}], ['to', 'img', {'opacity': 1, 'duration': 0.25, 'ease': 'power1.out'}],
+                                ['later', 0.25, 'arrow']])
+        # no snow, no frames, no canvas
+        self.assertEqual(before, [0, 0, 0])
+        self.assertNotIn(['set', 'canvas', {'opacity': 1}], start)
+        # it locks when the fade is over, with no quiet bar after it
+        self.assertEqual(after, [1, [], []])
+        self.assertIn(['later', 2, 'begin'], wait)
+        self.assertNotIn('to', [c[0] for c in wait])
+        self.assertIn(['to', 'img', {'opacity': 1, 'duration': 0.25, 'ease': 'power1.out'}], loaded)
+
+    # --- wiring: main.js, state.js, character.js, audio.js ---
+
+    def test_main_wires_the_tv_after_the_card_and_owns_tuned(self):
+        main = self.code('main.js')
+        self.assertIn("import { renderTv } from './tv.js';", main)
+        self.assertIn('subscribe((s) => renderTv(s, onTuned));', main)
+        self.assertLess(main.index('subscribe(renderCard);'), main.index('subscribe((s) => renderTv(s, onTuned));'))
+        self.assertIn("if (state.screen === 'play' && !state.tuned) setState({ tuned: true });", self.function('onTuned', 'main.js'))
+        # false on every new word and on the theme screen
+        for name, n in (('startRound', 1), ('onNext', 1), ('onThemes', 1)):
+            self.assertEqual(self.function(name, 'main.js').count('tuned: false,'), n, name)
+        self.assertIn('tuned: false,', self.code('state.js'))
+        # only main.js writes it; tv.js never sets state and takes its
+        # hiss from audio.js, which no other module asks for it
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'main.js':
+                self.assertNotRegex(self.code(f.name), r'setState\([^)]*tuned', f.name)
+        tv = self.code('tv.js')
+        self.assertNotIn('setState', tv)
+        self.assertNotIn("from './state.js'", tv)
+        self.assertIn("import { hiss } from './audio.js';", tv)
+        self.assertIn('hiss(TUNE.duration * TUNE.hiss);', tv)
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name not in ('tv.js', 'audio.js'):
+                self.assertNotRegex(self.code(f.name), r'\bhiss\(', f.name)
+            if f.name != 'audio.js':
+                self.assertNotIn('AudioContext', self.code(f.name), f.name)
+
+    # --- the template and game.css ---
+
+    def test_the_canvas_and_the_bar_sit_over_the_picture_under_the_static(self):
+        html = self.HTML.read_text()
+        card = html[html.index('<div class="card">'):html.index('<div class="plate">')]
+        order = [card.index(s) for s in ('id="play-image"', '<canvas class="tv-tune" aria-hidden="true"></canvas>',
+                                         '<div class="tv-roll" aria-hidden="true"></div>', 'class="tv-static"', 'class="tv-flash"')]
+        self.assertEqual(order, sorted(order))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 27)
+        both = self.rule('#screen-play .tv-roll')
+        shared = re.search(r'\n#screen-play \.tv-tune,\n#screen-play \.tv-roll\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        for decl in ('position: absolute;', 'pointer-events: none;', 'opacity: 0;'):
+            self.assertIn(decl, shared)
+        for decl in ('inset: 0;', 'width: 100%;', 'height: 100%;'):
+            self.assertIn(decl, self.rule('#screen-play .tv-tune'))
+        self.assertIn('height: 22%;', both)
+        self.assertIn('background: linear-gradient(to bottom, transparent, var(--tv-roll), transparent);', both)
+        self.assertRegex(self.CSS.read_text(), r'--tv-roll:\s*color-mix\(in srgb, var\(--cream\) 50%, transparent\);')
+
+
+class TvHissTests(TestCase):
+    """The tune-in's hiss and channel click (BACKLOG B-214): made in code in
+    audio.js (the only place sounds play), the prototype's hiss() with its
+    numbers: noise through a 1400 Hz high-pass and a 7000 Hz low-pass, a
+    click in its first samples, 0.09 gain with a 20ms attack, held to 45%
+    and fading out by its end. Nothing while muted or before the first
+    gesture; an effect, so it does not cut his voice; the mute stops it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        script = (
+            "const log = []; const listeners = {}; const sources = [];"
+            "globalThis.fetch = () => Promise.resolve({ ok: false });"
+            "const node = (name, extra = {}) => ({ name, connect(n) { log.push(['connect', name, n.name]); return n; }, ...extra });"
+            "globalThis.AudioContext = class { constructor() { this.state = 'running'; this.sampleRate = 48000; this.currentTime = 5; this.destination = { name: 'out' }; }"
+            " resume() { return Promise.resolve(); }"
+            " createAnalyser() { return node('analyser'); }"
+            " createBuffer(ch, len, rate) { const data = new Float32Array(len); return { len, rate, getChannelData: () => data }; }"
+            " createBufferSource() { const s = node('source', { buffer: null, on: false,"
+            "   start(t) { s.on = true; log.push(['start', t, s.buffer.len]); },"
+            "   stop(t) { log.push(['stop', t]); if (t === undefined) s.on = false; } }); sources.push(s); return s; }"
+            " createBiquadFilter() { const f = node('filter', { type: '', frequency: { value: 0 } }); log.push(['filter', f]); return f; }"
+            " createGain() { const g = node('gain', { gain: { setValueAtTime: (v, t) => log.push(['set', v, t]),"
+            "   exponentialRampToValueAtTime: (v, t) => log.push(['ramp', v, t]) } }); return g; } };"
+            "globalThis.document = { addEventListener(t, fn) { listeners[t] = fn; } };"
+            f"const a = await import('{self.MODULE.as_uri()}');"
+            f"const S = await import('{(self.ROOT / 'static' / 'js' / 'state.js').as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const r = (x) => Math.round(x * 10000) / 10000;"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_the_hiss_is_the_prototypes(self):
+        res = self.run_node(
+            "a.init(); listeners.pointerup(); log.length = 0;"
+            "a.hiss(950);"
+            "const filters = log.filter((e) => e[0] === 'filter').map((e) => [e[1].type, e[1].frequency.value]);"
+            "const data = sources[sources.length - 1].buffer.getChannelData(0);"
+            "const noise = Array.from(data.slice(3)).every((v) => v >= -1 && v < 1) && new Set(data.slice(3, 100)).size > 50;"
+            "out([a.HISS, a.hissEnvelope(950).map(([h, v, t]) => [h, v, r(t)]), filters,"
+            " log.filter((e) => e[0] === 'connect').map((e) => e.slice(1)),"
+            " log.filter((e) => e[0] === 'set' || e[0] === 'ramp').map(([h, v, t]) => [h, v, r(t)]),"
+            " log.filter((e) => e[0] === 'start' || e[0] === 'stop').map(([h, t, n]) => [h, r(t), n === undefined ? null : n]),"
+            " Array.from(data.slice(0, 3)).map(r), noise]);")
+        table, envelope, filters, chain, gain, play, click, noise = res
+        self.assertEqual(table, {'gain': 0.09, 'floor': 0.0001, 'attack': 0.02, 'hold': 0.45, 'highpass': 1400,
+                                 'lowpass': 7000, 'tail': 0.1, 'stop': 0.05, 'click': [1, -1, 0.8]})
+        self.assertEqual(envelope, [['set', 0.0001, 0], ['ramp', 0.09, 0.02], ['set', 0.09, 0.4275], ['ramp', 0.0001, 0.95]])
+        self.assertEqual(filters, [['highpass', 1400], ['lowpass', 7000]])
+        # straight out, not through his analyser (it is not his voice)
+        self.assertEqual(chain, [['source', 'filter'], ['filter', 'filter'], ['filter', 'gain'], ['gain', 'out']])
+        self.assertEqual(gain, [['set', 0.0001, 5], ['ramp', 0.09, 5.02], ['set', 0.09, 5.4275], ['ramp', 0.0001, 5.95]])
+        # 0.95s + 0.1s of noise at 48kHz, from now; stopped 50ms after the fade
+        self.assertEqual(play, [['start', 5, 50400], ['stop', 6, None]])
+        self.assertEqual(click, [1, -1, 0.8])
+        self.assertTrue(noise)
+        proto = (self.ROOT / 'design' / 'reference' / 'tv-motion.html').read_text()
+        for line in ('d[0] = 1; d[1] = -1; d[2] = 0.8;', 'hp.frequency.value = 1400;', 'lp.frequency.value = 7000;',
+                     'g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);', 'g.gain.setValueAtTime(0.09, t + (ms * 0.45) / 1000);',
+                     'ctx.sampleRate * (ms / 1000 + 0.1)', 'src.stop(end + 0.05);'):
+            self.assertIn(line, proto)
+
+    def test_silent_when_muted_or_before_a_gesture_and_the_mute_stops_it(self):
+        res = self.run_node(
+            "a.hiss(950); const before = log.length;"
+            "a.init(); listeners.pointerup(); log.length = 0;"
+            "S.setState({ muted: true }); a.hiss(950); const muted = log.length;"
+            "S.setState({ muted: false }); a.hiss(950); const on = sources.filter((s) => s.on).length;"
+            # the mute (renderSound on the change) stops it
+            "a.renderSound({ ...S.state, muted: false, screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } });"
+            "a.renderSound({ ...S.state, muted: true, screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } });"
+            "out([before, muted, on, sources.filter((s) => s.on).length, a.voiceWave()]);")
+        # nothing before the first gesture or while muted; once playing it
+        # is not his voice (no analyser samples); the mute stops it
+        self.assertEqual(res, [0, 0, 1, 0, None])

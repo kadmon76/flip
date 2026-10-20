@@ -7,7 +7,9 @@
 //     Audio buffers on the first gesture and played by
 //     renderSound, a state subscriber, for the moments character.js's
 //     table (MOMENTS[moment].sound) gives a state change. There is no
-//     second trigger list here.
+//     second trigger list here;
+//   - the TV's tune-in hiss and channel click (BACKLOG B-214): made in
+//     code, no sound file (hiss), played when tv.js starts a tune-in.
 // `state.muted` (localStorage `flip.muted`, read and written only here
 // through loadMuted / saveMuted) means no sound plays at all.
 //
@@ -69,8 +71,28 @@ export const FILES = {
 // new one cuts the one playing, and none starts over the target word
 // (DESIGN "Sound", CHARACTER "Rules"). The swipe is an effect, not his
 // voice: it plays whenever a block goes into a slot and may overlap
-// anything.
-export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx', locked: 'voice' };
+// anything. So is the TV's hiss (B-214; made in code, not a pool).
+export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx', locked: 'voice', hiss: 'fx' };
+
+// The TV's tune-in hiss (BACKLOG B-214, design/reference/tv-motion.html
+// hiss()): white noise `tail` s longer than the hiss, its first samples
+// the channel-change `click`, through a `highpass` and a `lowpass` filter
+// (Hz); its gain rises from `floor` to `gain` in `attack` s, holds to
+// `hold` of the hiss and falls back to `floor` at its end; the source
+// stops `stop` s after that.
+export const HISS = { gain: 0.09, floor: 0.0001, attack: 0.02, hold: 0.45, highpass: 1400, lowpass: 7000, tail: 0.1, stop: 0.05, click: [1, -1, 0.8] };
+
+// The hiss's gain over a hiss `ms` long: [how, value, at s from its
+// start], how 'set' (setValueAtTime) or 'ramp' (exponentialRampToValueAtTime).
+export function hissEnvelope(ms) {
+    const end = ms / 1000;
+    return [
+        ['set', HISS.floor, 0],
+        ['ramp', HISS.gain, HISS.attack],
+        ['set', HISS.gain, end * HISS.hold],
+        ['ramp', HISS.floor, end],
+    ];
+}
 
 // The analyser on the robot's voice (design/reference/robot-puppet.html):
 // its FFT size and the samples of the waveform read each frame.
@@ -140,7 +162,7 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 let ctx = null;             // the AudioContext, made on the first gesture
 const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
 const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
-const live = new Set();     // pooled sources now playing: { src, kind }
+const live = new Set();     // sources now playing: the pooled clips and the TV's hiss (B-214), { src, kind }
 // The robot's voice (the voice channel) plays through an AnalyserNode on
 // its way out, so he can show it (BACKLOG B-210: character.js
 // renderTalk, which main.js hands voiceWave() every frame). The swipe
@@ -286,6 +308,51 @@ export function play(kind) {
         src.start(0);
     } catch (e) {
         // stay silent, no console error
+    }
+}
+
+// The TV's hiss with its channel click, `ms` long (BACKLOG B-214): tv.js
+// calls it as a tune-in starts. Noise made here, filtered and shaped
+// (HISS, hissEnvelope); an effect, so it may overlap anything. Muted or
+// before the first gesture: nothing. Kept with the playing sources, so
+// the mute stops it.
+export function hiss(ms) {
+    if (state.muted || !ctx) return;
+    try {
+        if (ctx.state !== 'running') {
+            const p = ctx.resume();
+            if (p && p.catch) p.catch(() => {});
+        }
+        const len = Math.ceil(ctx.sampleRate * (ms / 1000 + HISS.tail));
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        HISS.click.forEach((v, i) => { data[i] = v; });
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = HISS.highpass;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = HISS.lowpass;
+        const gain = ctx.createGain();
+        const t = ctx.currentTime;
+        for (const [how, value, at] of hissEnvelope(ms)) {
+            if (how === 'set') gain.gain.setValueAtTime(value, t + at);
+            else gain.gain.exponentialRampToValueAtTime(value, t + at);
+        }
+        src.connect(hp);
+        hp.connect(lp);
+        lp.connect(gain);
+        gain.connect(ctx.destination);
+        const entry = { src, kind: 'hiss' };
+        live.add(entry);
+        src.onended = () => live.delete(entry);
+        src.start(t);
+        src.stop(t + ms / 1000 + HISS.stop);
+    } catch (e) {
+        // no hiss here; the picture still tunes in
     }
 }
 

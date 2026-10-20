@@ -403,14 +403,16 @@ export function isChange(step) {
 
 const round3 = (t) => Math.round(t * 1000) / 1000;
 
-// The steps of `moments` (one state change: at most two, e.g. a new round
-// is a round start and a new picture) as one script, `at` seconds from
-// now. The next moment starts when the one before takes its last step
-// (but at least CHANGE_MS after the one before started), and that step
-// and any later ones are dropped: every moment starts with a whole pose.
-// So the new picture follows the round start's wave, and his letter's
-// happy pop (hintGiven) comes when the peek of the second miss is over
-// (CHARACTER "Moment map", B-206). `picks` names the variant per moment.
+// The steps of `moments` (one state change: at most two, e.g. the miss
+// that leaves one bulb lit is his peek and his letter) as one script,
+// `at` seconds from now. The next moment starts when the one before takes
+// its last step (but at least CHANGE_MS after the one before started),
+// and that step and any later ones are dropped: every moment starts with
+// a whole pose. So his letter's happy pop (hintGiven) comes when the peek
+// of the second miss is over (CHARACTER "Moment map", B-206), and a new
+// picture would follow a round start's wave (since B-214 the picture
+// comes on its own, when the TV has tuned in). `picks` names the variant
+// per moment.
 export function scriptFor(moments, picks = {}) {
     let out = [];
     let start = 0;
@@ -635,21 +637,28 @@ export function snapshot(state) {
         hint: onWord ? current.placed.findIndex((p) => !!p && !!p.hint) : -1,
         // his nudges toward the dome on this word (BACKLOG B-212)
         nudges: onWord ? state.nudges || 0 : 0,
+        // the TV has tuned in to this word's picture (BACKLOG B-214)
+        tuned: onWord && !!state.tuned,
         streak: onWord ? streakOf(results, round.index) : 0,
         stars: screen === 'round-end' ? starsFor(results.filter((r) => r && r.correct).length, round.size) : null,
     };
 }
 
-// The moments between two snapshots, in the order they happen (a new
-// round is also a new picture); [] when nothing he reacts to changed.
+// The moments between two snapshots, in the order they happen; [] when
+// nothing he reacts to changed. A new word's picture is shown when the TV
+// has tuned in to it (BACKLOG B-214: tv.js's tune-in locks, about a
+// second after the word came): "Picture shown" comes then, not with the
+// word, so he looks up at the picture and not at the snow. A new round
+// starts with his wave at once.
 export function momentsFor(prev, now) {
     if (now.screen === 'round-end') {
         if (prev.screen === 'round-end') return [];
         return [now.stars >= 2 ? 'roundEndGood' : 'roundEnd'];
     }
     if (!now.key) return [];
-    if (!prev.key || prev.round !== now.round) return ['roundStart', 'picture'];
-    if (prev.key !== now.key) return ['picture'];
+    if (!prev.key || prev.round !== now.round) return now.tuned ? ['roundStart', 'picture'] : ['roundStart'];
+    if (prev.key !== now.key) return now.tuned ? ['picture'] : [];
+    if (now.tuned && !prev.tuned) return ['picture'];
     if (now.status !== prev.status || now.lives < prev.lives) {
         if (now.status === 'revealed') return ['thirdMiss'];
         if (now.status === 'correct') return [now.streak >= STREAK ? 'streak' : 'correct'];
@@ -715,7 +724,7 @@ export function nudgeWait(state) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, nudges: 0, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, nudges: 0, tuned: false, streak: 0, stars: null };
 
 // --- Render ---
 
