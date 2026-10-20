@@ -19,6 +19,8 @@
 //     on easy, at once, and the robot's letter as it lands, are pressed
 //     into their slots with a short clunk, their locked look (game.css)
 //     coming on at the hit
+//   - a new word in two rows appeared (BACKLOG B-213): its brass joint
+//     glows once
 // The correct-check beat (slot pulse, TV flash, sparks) is celebrate.js.
 // Every tween clears what it set when it ends, so the CSS render of state
 // is what stays.
@@ -45,7 +47,9 @@ export function renderFeedback(state) {
         : NONE;
     const prev = last;
     last = now;
-    // A new word or another screen: nothing to react to yet.
+    // A new word: if card.js drew it in two rows, its joint lights up.
+    if (onWord && prev.key !== now.key) glowJoint();
+    // A new word or another screen: nothing else to react to yet.
     if (!onWord || prev.key !== now.key) return;
 
     if (now.lives < prev.lives) {
@@ -387,6 +391,30 @@ function clunk(el, at) {
         const from = locked ? (m.scale * placed) / locked : m.scale;
         // not lazy: drawn at `from` in this very frame, not the next
         gsap.fromTo(el, { scale: from }, { scale: 1, duration: m.duration - m.press, ease: m.ease, lazy: false });
+    });
+}
+
+// --- A word in two rows (BACKLOG B-213) ---
+
+// The brass joint card.js drew for a word in two rows (game.css
+// .rail-joint, one half at each end of the break) lights up once as the
+// word appears: its --joint-glow rises to 1 and falls back to 0 within
+// m.duration (600ms), then the inline value goes, so the CSS rest look
+// is what stays. Reduced motion: no glow, the joint stays as it is. A
+// word in one row has no joint, and nothing happens.
+function glowJoint() {
+    const joints = document.querySelectorAll('#letter-boxes .rail-joint');
+    if (!joints.length) return;
+    const m = motionFor('jointGlow', reducedMotion());
+    if (m.duration === 0) return;
+    gsap.killTweensOf(joints);
+    gsap.fromTo(joints, { '--joint-glow': 0 }, {
+        '--joint-glow': 1,
+        duration: m.duration / 2,
+        ease: m.ease,
+        yoyo: true,
+        repeat: 1,
+        onComplete: () => joints.forEach((el) => el.style.removeProperty('--joint-glow')),
     });
 }
 

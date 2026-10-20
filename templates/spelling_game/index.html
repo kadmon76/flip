@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=25">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=27">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -92,11 +92,16 @@
          the safe area. Ids are keyed on by card.js, controls.js and
          main.js; do not rename. No text anywhere on this screen (DESIGN
          "Words on screen"): feedback is light and motion (feedback.js,
-         celebrate.js). .tv-static and .tv-flash are the TV's wrong-check
-         static and correct-check flash, invisible at rest. -->
+         celebrate.js). .tv-tune is the canvas tv.js draws a new word's
+         tune-in on (snow, sync bar, the picture rolling in) and .tv-roll
+         the faint bar that rolls past after it (BACKLOG B-214); .tv-static
+         and .tv-flash are the TV's wrong-check static and correct-check
+         flash. All four are invisible at rest and take no taps. -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
             <img id="play-image" src="" alt="" />
+            <canvas class="tv-tune" aria-hidden="true"></canvas>
+            <div class="tv-roll" aria-hidden="true"></div>
             <div class="tv-static" aria-hidden="true"></div>
             <div class="tv-flash" aria-hidden="true"></div>
         </div>

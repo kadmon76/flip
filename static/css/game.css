@@ -62,6 +62,8 @@
     --shine-next: color-mix(in srgb, var(--amber) 90%, transparent);
     --shine-next-edge: color-mix(in srgb, var(--amber) 45%, transparent);
     --scanline: color-mix(in srgb, var(--ink) 16%, transparent);
+    /* the faint light bar that rolls down the TV after the tune-in (B-214) */
+    --tv-roll: color-mix(in srgb, var(--cream) 50%, transparent);
     /* TV static on a wrong check: light and dark noise lines */
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
     --static-dark: color-mix(in srgb, var(--ink) 55%, transparent);
@@ -655,6 +657,34 @@ body[data-screen="play"] .play-back-btn {
     box-shadow: inset 0 0 calc(14 * var(--u)) var(--glow-teal);
 }
 
+/* The tune-in on a new word (BACKLOG B-214, tv.js): a canvas over the
+   picture, drawn in code for about a second (snow, the sync bar, the
+   picture rolling in), then faded off the locked picture; and the faint
+   light bar that rolls down the screen every 6-11s after it (tv.js moves
+   it, from above the screen to below). Both sit under the static, the
+   flash and the scanlines, are invisible at rest and take no taps. */
+#screen-play .tv-tune,
+#screen-play .tv-roll {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+}
+
+#screen-play .tv-tune {
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+#screen-play .tv-roll {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 22%;
+    background: linear-gradient(to bottom, transparent, var(--tv-roll), transparent);
+}
+
 /* Wrong check: static over the picture, fine light and dark noise lines
    on the tube; feedback.js flickers it for 150ms. Correct check: the
    screen flashes warm white; celebrate.js fades it out over 200ms. Both
@@ -751,17 +781,24 @@ body[data-screen="play"] .play-back-btn {
 /* --- Slot rail and letter blocks --- */
 
 /* Brass rail, full safe width. card.js sets --slot-size, --slot-gap,
-   --rail-pad and --cols from layout.js (46px slots, 6px gap, 8px
-   padding; six to a row, 7+ letters in two even rows). */
+   --rail-pad, --slot-font, --hit-x, --hit-y and --cols from layout.js
+   slotLayout (BACKLOG B-213: 1-6 letters one row of 46px slots, 6px
+   gap; 7-8 one row shrunk to fit, down to 36px, 4px gap; 9-10 two rows
+   of 46px split at the word's break; 8px padding) and places each slot
+   in the grid. The grid has two columns per slot of the longest row
+   (--cols counts them), so a row with fewer slots is centred too. */
 .letter-boxes {
     --slot-size: 46px;
     --slot-gap: 6px;
     --rail-pad: 8px;
-    --cols: 1;
+    --slot-font: 28px;
+    --hit-x: 0px;
+    --hit-y: 0px;
+    --cols: 2;
     flex: 0 0 auto;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(var(--cols), var(--slot-size));
+    grid-template-columns: repeat(var(--cols), calc((var(--slot-size) - var(--slot-gap)) / 2));
     justify-content: center;
     gap: var(--slot-gap);
     padding: var(--rail-pad);
@@ -773,8 +810,10 @@ body[data-screen="play"] .play-back-btn {
         2px 5px 9px var(--shadow-contact);
 }
 
-/* a slot: a dark hole sunk into the brass, shadowed from the top */
+/* a slot: a dark hole sunk into the brass, shadowed from the top (the
+   brass joint of a broken word is placed from it) */
 .letter-box {
+    position: relative;
     width: var(--slot-size);
     height: var(--slot-size);
     border-radius: 7px;
@@ -827,15 +866,31 @@ body[data-screen="play"] .play-back-btn {
     touch-action: none;
 }
 
-/* a block sitting in a slot fills it (46px), upright, slightly smaller
-   letter, shadow kept inside the hole */
+/* a block sitting in a slot fills it (46px, or 36-46px on a 7-8 letter
+   word), upright, slightly smaller letter (28px in a 46px slot, else
+   0.58 of the slot: --slot-font), shadow kept inside the hole */
 .letter-box > .draggable-letter {
-    font-size: 28px;
+    position: relative;
+    font-size: var(--slot-font);
     border-radius: 7px;
     box-shadow:
         inset -2px -3px 0 var(--cream-lo),
         inset 1px 1px 0 var(--cream-hi),
         1px 2px 3px var(--shadow-deep);
+}
+
+/* A placed letter in a small slot (7-8 letters, BACKLOG B-213) is
+   tapped and picked up on the slot and the brass round it: the rail's
+   full height and halfway into the gaps (--hit-x / --hit-y, 0 in a 46px
+   slot), so a kid's finger still finds it. Transparent, it only takes
+   the touch for its block. drag.js grows the drop area by the same. */
+.letter-box > .draggable-letter::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--hit-y));
+    bottom: calc(-1 * var(--hit-y));
+    left: calc(-1 * var(--hit-x));
+    right: calc(-1 * var(--hit-x));
 }
 
 /* pick-up (DESIGN "Motion"): the shadow lifts over 120ms while drag.js
@@ -873,12 +928,14 @@ body[data-screen="play"] .play-back-btn {
    hole's dark rim shows round it, its top shaded by the rim and no
    shadow of its own. feedback.js gives the block class `landing` while
    it is pressed in (the clunk) or flies in (the robot's letter), which
-   draws it as a placed block until the hit. */
+   draws it as a placed block until the hit. Its letter is 25px, or as
+   large as a placed letter in a smaller slot (BACKLOG B-213: 21px in a
+   36px slot), so it stays as clear as the letters round it. */
 .letter-box.locked > .draggable-letter:not(.landing) {
     --rivet: radial-gradient(circle at 40% 35%, var(--amber-hi) 0 0.6px, var(--brass-hi) 1.2px, var(--brass-dark) 2.3px, transparent 2.9px);
     width: 86%;
     height: 86%;
-    font-size: 25px;
+    font-size: min(25px, var(--slot-font));
     border-radius: 5px;
     color: var(--ink);
     text-shadow: 0 1px 0 var(--brass-hi);
@@ -891,6 +948,53 @@ body[data-screen="play"] .play-back-btn {
     box-shadow:
         inset 0 3px 3px var(--shadow-deep),
         inset -1px -2px 0 var(--brass-dark-lo);
+}
+
+/* The brass joint (BACKLOG B-213): a word in two rows (9-10 letters,
+   split at its break: heli | copter) is one word in two chunks, and a
+   small brass joint on the rail says so. card.js puts one half into the
+   first row's last slot (`.rail-joint.end`, out to the right of it) and
+   one into the second row's first slot (`.rail-joint.start`, out to the
+   left): a brass knuckle lit from the upper left, rimmed in brass-dark,
+   with a cream pin. When the word appears feedback.js lights it once,
+   --joint-glow 0 -> 1 -> 0 in 600ms: an amber glow round the knuckle and
+   on its pin; under reduced motion it stays as it is. The look is
+   provisional (the human may restyle it in Claude Design), so all of it
+   is in this one rule set. */
+.rail-joint {
+    --joint-glow: 0;
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 22px;
+    margin-top: -11px;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 50%, var(--cream) 0 2px, var(--brass-dark) 2.5px 3.2px, transparent 3.6px),
+        linear-gradient(150deg, var(--brass-hi) 0%, var(--brass) 50%, var(--brass-dark) 100%);
+    box-shadow:
+        inset 0 0 0 1.5px var(--brass-dark),
+        1px 2px 3px var(--shadow-deep),
+        0 0 calc(var(--joint-glow) * 12px) calc(var(--joint-glow) * 3px) var(--glow-amber);
+}
+
+.rail-joint.end {
+    left: calc(100% + 1px);
+    border-radius: 0 11px 11px 0;
+}
+
+.rail-joint.start {
+    right: calc(100% + 1px);
+    border-radius: 11px 0 0 11px;
+}
+
+.rail-joint::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 50% 50%, var(--amber-hi) 0 2.5px, transparent 5px);
+    opacity: var(--joint-glow);
 }
 
 body.dragging-active {

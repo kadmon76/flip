@@ -188,9 +188,14 @@ class GameCssPaletteTests(TestCase):
 
 
 class SlotLayoutTests(TestCase):
-    """static/js/layout.js slotLayout(): 46px slots, 6px apart, 8px rail
-    padding; six slots fit one row, 7+ letters wrap into two even rows
-    (DESIGN.md "Layout", BACKLOG B-113)."""
+    """static/js/layout.js slotLayout(): 8px of brass round the slots and
+    the ladder of BACKLOG B-213 (DESIGN.md "Layout"): 1-6 letters one row
+    of 46px slots 6px apart; 7-8 letters one row, never broken, the slots
+    shrunk to the largest whole px that fits (never under 36px), 4px
+    apart, the letter 0.58 of the slot and the tap and drop area reaching
+    the rail's edges; 9-10 letters two rows of 46px split at the word's
+    `break`, each row centred, at half without one. A rail narrower than
+    360 wide holds what fits, in rows as even as possible (B-113)."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
     RAIL = 332   # 360px phone minus the frame's 14px safe area on each side
@@ -199,10 +204,10 @@ class SlotLayoutTests(TestCase):
         if shutil.which('node') is None:
             self.skipTest('node not installed')
 
-    def layout(self, count, width=RAIL):
+    def node(self, expr):
         script = (
-            f"import {{ slotLayout }} from '{self.MODULE.as_uri()}';"
-            f"console.log(JSON.stringify(slotLayout({count}, {width})));"
+            f"import * as L from '{self.MODULE.as_uri()}';"
+            f"console.log(JSON.stringify({expr}));"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
@@ -211,35 +216,149 @@ class SlotLayoutTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
+    def layout(self, count, width=RAIL, brk=None):
+        return self.node(f"L.slotLayout({count}, {width}, {json.dumps(brk)})")
+
+    @staticmethod
+    def xs(l, width):
+        """Each slot's left edge in the rail (px from its outer left edge):
+        the grid has two columns per slot of the longest row, each
+        (size - gap) / 2 wide, `gap` apart, centred inside the padding."""
+        half = (l['size'] - l['gap']) / 2
+        grid = 2 * l['cols'] * half + (2 * l['cols'] - 1) * l['gap']
+        left = l['pad'] + (width - 2 * l['pad'] - grid) / 2
+        return [left + (c['col'] - 1) * (half + l['gap']) for c in l['cells']]
+
     def test_slot_size_gap_and_padding(self):
-        self.assertEqual(self.layout(4), {'size': 46, 'gap': 6, 'pad': 8, 'cols': 4, 'rows': 1})
+        self.assertEqual(self.layout(4), {
+            'size': 46, 'gap': 6, 'pad': 8, 'font': 28, 'hit': {'x': 0, 'y': 0}, 'cols': 4, 'rows': 1, 'split': [4],
+            'cells': [{'row': 1, 'col': 1}, {'row': 1, 'col': 3}, {'row': 1, 'col': 5}, {'row': 1, 'col': 7}], 'joints': []})
 
     def test_up_to_six_letters_fit_one_row_at_phone_width(self):
         for n in range(1, 7):
-            self.assertEqual((self.layout(n)['cols'], self.layout(n)['rows']), (n, 1), n)
+            l = self.layout(n)
+            self.assertEqual((l['size'], l['gap'], l['cols'], l['rows'], l['split'], l['joints']), (46, 6, n, 1, [n], []), n)
 
-    def test_seven_to_ten_letters_wrap_into_two_even_rows(self):
-        self.assertEqual((self.layout(7)['cols'], self.layout(7)['rows']), (4, 2))    # 4 + 3
-        self.assertEqual((self.layout(8)['cols'], self.layout(8)['rows']), (4, 2))    # 4 + 4
-        self.assertEqual((self.layout(9)['cols'], self.layout(9)['rows']), (5, 2))    # 5 + 4
-        self.assertEqual((self.layout(10)['cols'], self.layout(10)['rows']), (5, 2))  # 5 + 5
+    def test_seven_and_eight_letters_shrink_into_one_row(self):
+        # 41px for 7 letters and 36px for 8 at 360 wide, 4px apart, a
+        # letter of 0.58 of the slot, the tap and drop area out to the
+        # rail's edges (8px of padding) and halfway into the gaps
+        seven, eight = self.layout(7), self.layout(8)
+        self.assertEqual((seven['size'], seven['gap'], seven['font'], seven['hit']), (41, 4, 24, {'x': 2, 'y': 8}))
+        self.assertEqual((eight['size'], eight['gap'], eight['font'], eight['hit']), (36, 4, 21, {'x': 2, 'y': 8}))
+        inner = self.RAIL - 16
+        for l, n in ((seven, 7), (eight, 8)):
+            self.assertEqual((l['rows'], l['split'], l['joints']), (1, [n], []))
+            # the largest whole size that fits
+            self.assertLessEqual(n * l['size'] + (n - 1) * 4, inner)
+            self.assertGreater(n * (l['size'] + 1) + (n - 1) * 4, inner)
+            # the tap area covers the rail's full height: about 52px
+            self.assertEqual(l['size'] + 2 * l['hit']['y'], l['size'] + 2 * l['pad'])
+        self.assertEqual(eight['size'] + 2 * eight['hit']['y'], 52)
 
-    def test_seven_letters_wrap_on_a_wide_rail_too(self):
-        # 480px column: seven would fit, but the rail holds six to a row.
-        self.assertEqual(self.layout(6, 452)['rows'], 1)
-        self.assertEqual((self.layout(7, 452)['cols'], self.layout(7, 452)['rows']), (4, 2))
+    def test_seven_and_eight_letters_never_break_even_with_a_break(self):
+        # scooter 4, bicycle 2 in the content; an 8-letter word likewise
+        for n, brk in ((7, 4), (7, 2), (8, 4), (8, 3)):
+            l = self.layout(n, brk=brk)
+            self.assertEqual((l['rows'], l['split'], l['joints']), (1, [n], []), (n, brk))
+            self.assertEqual(l, self.layout(n), (n, brk))
+
+    def test_the_slots_never_shrink_under_36px_nor_grow_over_46px(self):
+        # a 480px column (452px rail): 7 and 8 fit at 46px, still 4px apart
+        for n in (7, 8):
+            l = self.layout(n, 452)
+            self.assertEqual((l['size'], l['gap'], l['font'], l['hit'], l['rows']), (46, 4, 28, {'x': 0, 'y': 0}, 1), n)
+        # 412 and 375 wide phones: one row in between
+        for width in (384, 347):
+            for n in (7, 8):
+                l = self.layout(n, width)
+                self.assertTrue(36 <= l['size'] <= 46, (n, width, l['size']))
+                self.assertEqual(l['rows'], 1)
+        # under 360 wide 8 slots of 36px no longer fit: two even rows of
+        # 46px, as many as fit on a row
+        l = self.layout(8, 300)
+        self.assertEqual((l['size'], l['split']), (46, [4, 4]))
+
+    def test_nine_and_ten_letters_split_at_the_break(self):
+        # the content's words: helicopter 4 (heli | copter), submarine 3
+        # (sub | marine), motorbike 5 (motor | bike); 46px slots, 6px apart
+        for n, brk, split in ((10, 4, [4, 6]), (9, 3, [3, 6]), (9, 5, [5, 4]), (10, 6, [6, 4]), (10, 5, [5, 5])):
+            l = self.layout(n, brk=brk)
+            self.assertEqual((l['size'], l['gap'], l['font'], l['hit'], l['rows'], l['split']),
+                             (46, 6, 28, {'x': 0, 'y': 0}, 2, split), (n, brk))
+            self.assertEqual([c['row'] for c in l['cells']], [1] * split[0] + [2] * split[1])
+            # the joint: the end of the first row and the start of the second
+            self.assertEqual(l['joints'], [{'at': brk - 1, 'side': 'end'}, {'at': brk, 'side': 'start'}])
+
+    def test_each_row_is_centred(self):
+        for n, brk in ((10, 4), (9, 3), (9, 5), (10, None), (9, None), (8, None), (7, None), (5, None)):
+            for width in (self.RAIL, 452):
+                l = self.layout(n, width, brk)
+                xs, k = self.xs(l, width), 0
+                for count in l['split']:
+                    row = xs[k:k + count]
+                    k += count
+                    left, right = row[0], width - (row[-1] + l['size'])
+                    self.assertAlmostEqual(left, right, msg=(n, brk, width))
+                    # slots `gap` apart on the row
+                    self.assertTrue(all(abs(b - a - l['size'] - l['gap']) < 1e-9 for a, b in zip(row, row[1:])), (n, brk, row))
+
+    def test_without_a_usable_break_nine_and_ten_split_at_half(self):
+        # round.js makeWord warns about a missing break; the rail falls
+        # back to the even split, never by a break that cannot split it
+        for brk in (None, 0, 10, 11, -2, 2.5, '4'):
+            self.assertEqual(self.layout(10, brk=brk)['split'], [5, 5], brk)
+            self.assertEqual(self.layout(9, brk=brk if brk != 10 else 9)['split'], [5, 4], brk)
+        # a break whose row would not fit the rail: also at half
+        self.assertEqual(self.layout(10, brk=1)['split'], [5, 5])
+        self.assertEqual(self.node("[L.isBreak(4, 10), L.isBreak(9, 10), L.isBreak(10, 10), L.isBreak(0, 9), L.isBreak(2.5, 9), L.isBreak('3', 9), L.isBreak(null, 9)]"),
+                         [True, True, False, False, False, False, False])
 
     def test_every_row_fits_the_rail(self):
         for n in range(1, 11):
-            l = self.layout(n)
-            self.assertLessEqual(l['cols'] * 46 + (l['cols'] - 1) * 6 + 2 * 8, self.RAIL, n)
+            for brk in [None] + list(range(1, n)):
+                l = self.layout(n, brk=brk)
+                self.assertLessEqual(max(l['split']) * l['size'] + (max(l['split']) - 1) * l['gap'] + 2 * 8, self.RAIL, (n, brk))
+                self.assertEqual(sum(l['split']), n)
+                self.assertEqual(len(l['cells']), n)
+                self.assertLessEqual(l['rows'], 2)
 
     def test_narrow_rail_holds_what_fits(self):
-        # 280px rail: 264px inside, five 46px slots with 6px gaps.
-        self.assertEqual((self.layout(6, 280)['cols'], self.layout(6, 280)['rows']), (3, 2))
+        # 280px rail: 264px inside, five 46px slots with 6px gaps
+        l = self.layout(6, 280)
+        self.assertEqual((l['cols'], l['rows'], l['split']), (3, 2, [3, 3]))
+        self.assertEqual(l['joints'], [{'at': 2, 'side': 'end'}, {'at': 3, 'side': 'start'}])
 
     def test_zero_letters_is_safe(self):
-        self.assertEqual(self.layout(0), {'size': 46, 'gap': 6, 'pad': 8, 'cols': 1, 'rows': 0})
+        self.assertEqual(self.layout(0), {'size': 46, 'gap': 6, 'pad': 8, 'font': 28, 'hit': {'x': 0, 'y': 0},
+                                          'cols': 1, 'rows': 0, 'split': [], 'cells': [], 'joints': []})
+
+    def test_a_slots_drop_area(self):
+        # slotArea grows a slot by `hit`; dropsIn is GSAP's hitTest(block,
+        # slot, '50%') for 46px slots (half of the smaller of the two),
+        # and on a small slot the area reaching the rail's edges only adds
+        # to it: a block let go over the brass round the slot lands
+        res = self.node(
+            "(() => {"
+            " const r = (left, top, w, h = w) => ({ left, top, width: w, height: h });"
+            " const slot = r(100, 100, 36), hit = { x: 2, y: 8 }, none = { x: 0, y: 0 };"
+            " const big = r(100, 100, 46);"
+            " return ["
+            "  L.slotArea(slot, hit),"
+            # 46px slot: half of the slot's area (1058px²) or not
+            "  L.dropsIn(r(100 - 3, 100 + 23, 56), big, none), L.dropsIn(r(100 - 3, 100 + 26, 56), big, none),"
+            # 36px slot, the block's centre 32px below the slot's: 14px x 36 of the
+            # slot (504px², under half of 1296) but 22px x 40 of its area (880px²)
+            "  L.dropsIn(r(90, 122, 56), slot, none), L.dropsIn(r(90, 122, 56), slot, hit),"
+            # touching, or beside the area: never
+            "  L.dropsIn(r(138, 100, 56), slot, hit), L.dropsIn(r(100, 144, 56), slot, hit),"
+            # the area never makes it stricter: a corner overlap that lands on
+            # the slot (26px x 26) lands on its area (28 x 34) too
+            "  L.dropsIn(r(110, 110, 56), slot, none), L.dropsIn(r(110, 110, 56), slot, hit),"
+            " ];"
+            "})()")
+        self.assertEqual(res[0], {'left': 98, 'top': 92, 'width': 40, 'height': 52, 'right': 138, 'bottom': 144})
+        self.assertEqual(res[1:], [True, False, False, True, False, False, True, True])
 
 
 class BlockLayoutTests(TestCase):
@@ -784,7 +903,10 @@ class TenLetterFitTests(TestCase):
     width is read from game.css), the dome as placed in game.css, the
     robot as in the v5 reference (92px wide, left edge at 7.4% of the
     console, 75px above it; the brass cap is the top 10px). The console's
-    lower corners also clear the frame's rounded inner corners."""
+    lower corners also clear the frame's rounded inner corners. Since
+    BACKLOG B-213 a 7-8 letter word is one row of smaller slots and a 9-10
+    letter word two rows split at its `break` (every split whose rows fit
+    is checked), with the brass joint on the rail."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'layout.js'
     CSS = Path(__file__).resolve().parent.parent / 'static' / 'css' / 'game.css'
@@ -814,11 +936,11 @@ class TenLetterFitTests(TestCase):
         self.assertEqual(left, self.SIDE + 4)
         self.assertAlmostEqual(top + ch, self.H - self.BOTTOM)
 
-    def layouts(self, count):
+    def layouts(self, count, brk=None):
         bench = self.W - 2 * self.SIDE
         script = (
             f"import {{ slotLayout, blockLayout }} from '{self.MODULE.as_uri()}';"
-            f"console.log(JSON.stringify([slotLayout({count}, {bench}), blockLayout({count}, {bench})]));"
+            f"console.log(JSON.stringify([slotLayout({count}, {bench}, {json.dumps(brk)}), blockLayout({count}, {bench})]));"
         )
         result = subprocess.run(
             ['node', '--input-type=module', '-e', script],
@@ -851,18 +973,62 @@ class TenLetterFitTests(TestCase):
         zones, console_top = self.keep_out()
         rail_top = 0.445 * self.W * 2739 / 1264
         for n in range(1, 11):
-            for extras in (0, 2):
-                slots, _ = self.layouts(n)
-                _, blocks = self.layouts(n + extras)
-                rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
-                bench_top = rail_top + rail_h + self.GAP
-                # the column fits the screen: the console is not pushed down
-                self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, (n, extras))
-                for s in blocks['spots']:
-                    x, y = self.SIDE + s['x'], bench_top + s['y']
-                    box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
-                    for name, zone in zones.items():
-                        self.assertFalse(self.overlap(box, zone), (n, extras, name, box, zone))
+            # 9-10 letters: every break whose rows fit, and none
+            for brk in [None] + ([b for b in range(3, n - 2)] if n > 8 else []):
+                for extras in (0, 2):
+                    slots, _ = self.layouts(n, brk)
+                    _, blocks = self.layouts(n + extras)
+                    rail_h = 2 * slots['pad'] + slots['rows'] * slots['size'] + (slots['rows'] - 1) * slots['gap']
+                    bench_top = rail_top + rail_h + self.GAP
+                    # the column fits the screen: the console is not pushed down
+                    self.assertLessEqual(bench_top + blocks['height'] + self.GAP, console_top, (n, brk, extras))
+                    for s in blocks['spots']:
+                        x, y = self.SIDE + s['x'], bench_top + s['y']
+                        box = (x - self.TILT, y - self.TILT, x + blocks['size'] + self.TILT, y + blocks['size'] + self.TILT)
+                        for name, zone in zones.items():
+                            self.assertFalse(self.overlap(box, zone), (n, brk, extras, name, box, zone))
+
+    def test_long_words_rail_heights(self):
+        # BACKLOG B-213 at 360 wide: one row of 41px (7 letters) or 36px
+        # (8) slots makes the rail 57 or 52px tall (62 for 1-6 letters);
+        # two rows of 46px for 9-10 letters, 114px, whatever the break
+        def rail_h(n, brk=None):
+            sl, _ = self.layouts(n, brk)
+            return 2 * sl['pad'] + sl['rows'] * sl['size'] + (sl['rows'] - 1) * sl['gap']
+        self.assertEqual([rail_h(n) for n in range(1, 11)], [62] * 6 + [57, 52, 114, 114])
+        self.assertEqual({rail_h(10, b) for b in (4, 5, 6)} | {rail_h(9, b) for b in (3, 4, 5, 6)}, {114})
+
+    def test_the_brass_joint_stays_on_the_rail(self):
+        # each half of the joint (game.css .rail-joint: `width`, 1px off
+        # its slot) lies inside the rail's 8px padding or the free brass
+        # beside a row, never on another slot and never past the rail's
+        # edge, for every split whose rows fit, at 360 and 480 wide
+        css = re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+        joint = re.search(r'\n\.rail-joint\s*{(.*?)}', css, flags=re.S).group(1)
+        jw = float(re.search(r'\n\s*width:\s*([\d.]+)px;', joint).group(1))
+        jh = float(re.search(r'\n\s*height:\s*([\d.]+)px;', joint).group(1))
+        self.assertIn('pointer-events: none;', joint)
+        off = float(re.search(r'\n\.rail-joint\.end\s*{[^}]*left: calc\(100% \+ ([\d.]+)px\);', css).group(1))
+        self.assertIn(f'right: calc(100% + {off:g}px);', re.search(r'\n\.rail-joint\.start\s*{([^}]*)}', css).group(1))
+        for width in (self.W - 2 * self.SIDE, 452):
+            for n in (9, 10):
+                for brk in [None] + list(range(3, n - 2)):
+                    sl = json.loads(subprocess.run(
+                        ['node', '--input-type=module', '-e',
+                         f"import {{ slotLayout }} from '{self.MODULE.as_uri()}';"
+                         f"console.log(JSON.stringify(slotLayout({n}, {width}, {json.dumps(brk)})));"],
+                        capture_output=True, text=True, timeout=20).stdout)
+                    xs = SlotLayoutTests.xs(sl, width)
+                    self.assertLessEqual(jh, sl['size'])
+                    for j in sl['joints']:
+                        x = xs[j['at']]
+                        a, b = (x + sl['size'] + off, x + sl['size'] + off + jw) if j['side'] == 'end' else (x - off - jw, x - off)
+                        self.assertGreaterEqual(a, 2, (width, n, brk, j))              # inside the rail, 2px of brass to spare
+                        self.assertLessEqual(b, width - 2, (width, n, brk, j))
+                        row = sl['cells'][j['at']]['row']
+                        for k, c in enumerate(sl['cells']):                            # clear of the other slots on its row
+                            if c['row'] == row and k != j['at']:
+                                self.assertFalse(a < xs[k] + sl['size'] and xs[k] < b, (width, n, brk, j, k))
 
     # Decodes an 8-bit RGBA, non-interlaced PNG with node's zlib and
     # returns its alpha channel (the two scene images are that format).
@@ -1320,10 +1486,15 @@ class CharacterTests(TestCase):
             self.assertTrue((self.UI / 'robot' / f).exists(), f)
 
     def test_round_start_pops_him_up_then_the_picture_makes_him_think(self):
+        # BACKLOG B-214: a new round's wave comes at once; the picture when
+        # the TV has tuned in to it (state.tuned, about a second later). A
+        # round whose word came already tuned would have both, the picture
+        # in place of his hands' return to rest.
         self.assertEqual(self.run_node(
             "out([moments(theme, st()), moments({ ...st(), screen: 'round-end' }, st({ roundsStarted: 2 })),"
-            " moments(st(), st({ roundsStarted: 2 })), c.scriptFor(['roundStart', 'picture'], { picture: 'surprise' })]);"), [
-            ['roundStart', 'picture'], ['roundStart', 'picture'], ['roundStart', 'picture'],
+            " moments(st(), st({ roundsStarted: 2 })), moments(st(), st({ tuned: true })),"
+            " moments(theme, st({ tuned: true })), c.scriptFor(['roundStart', 'picture'], { picture: 'surprise' })]);"), [
+            ['roundStart'], ['roundStart'], ['roundStart'], ['picture'], ['roundStart', 'picture'],
             # he waves and pops up, then (in place of his hands' return to
             # rest) the picture: surprised, looking up at the TV
             [{'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'up', 'hands': 'wave', 'pop': 1},
@@ -1331,11 +1502,19 @@ class CharacterTests(TestCase):
              {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
         ])
 
-    def test_next_word_is_a_new_picture(self):
+    def test_next_word_is_a_new_picture_once_the_tv_has_tuned_in(self):
+        # BACKLOG B-214: the next word comes with the TV's tune-in (snow) and
+        # he does nothing yet; "Picture shown" comes when it locks (tuned),
+        # once: a re-render, a block moved after it, or the next word
+        # coming untuned does not play it again
         self.assertEqual(self.run_node(
-            "out(moments(st({ current: cur('correct', 'cat') }),"
-            " st({ round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })));"),
-            ['picture'])
+            "const next = { round: { index: 1, size: 5, results: [{ word: 'cat', correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } };"
+            "out([moments(st({ current: cur('correct', 'cat'), tuned: true }), st(next)),"
+            " moments(st(next), st({ ...next, tuned: true })), moments(st({ ...next, tuned: true }), st({ ...next, tuned: true })),"
+            " moments(st({ ...next, tuned: true }), st({ ...next, tuned: true, current: { ...cur('playing', 'd--'), word: 'dog' } })),"
+            " c.snapshot(st({ tuned: true })).tuned, c.snapshot(st()).tuned, c.NONE.tuned,"
+            " c.snapshot({ ...theme, tuned: true }).tuned, c.soundsFor(moments(st(next), st({ ...next, tuned: true })))]);"),
+            [[], ['picture'], [], ['blockPlaced'], True, False, False, False, []])
 
     def test_blocks_moving_and_the_slots_filling(self):
         # a block into a slot -> blockPlaced, back to the bench ->
@@ -1458,15 +1637,15 @@ class CharacterTests(TestCase):
              ['wake'], ['speakerLocked'], [['shrug', True], ['rest', False]], ['locked'], 7, 0, 0])
 
     def test_a_new_word_or_round_wins_over_the_tap_count(self):
-        # the count runs over the session; a new picture or round start is
-        # what the robot plays when the word changed, and off the play
-        # screen nothing
+        # the count runs over the session; when the word changed the robot
+        # plays a round start, or nothing until the TV has tuned in to the
+        # new picture (B-214), and off the play screen nothing
         self.assertEqual(self.run_node(
             "out([moments(st({ lockedTaps: 2, current: cur('correct', 'cat') }),"
             " st({ lockedTaps: 2, round: { index: 1, size: 5, results: [{ correct: true }] }, current: { ...cur('playing', '---'), word: 'dog' } })),"
             " moments({ ...theme, lockedTaps: 2 }, st({ roundsStarted: 2, lockedTaps: 2 })),"
             " moments({ ...theme, lockedTaps: 2 }, { ...theme, lockedTaps: 3 })]);"),
-            [['picture'], ['roundStart', 'picture'], []])
+            [[], ['roundStart'], []])
 
     def test_the_head_shake_is_the_references(self):
         # design/reference/robot-puppet.html shake(): the head turns 9° from
@@ -1494,7 +1673,7 @@ class CharacterTests(TestCase):
             " st({ current: cur('correct', 'cat'), round: five }), st({ idleBeat: 'sunk' }), st({ pressed: 'dome', current: cur('playing', 'cat') })];"
             "out([from.map((s) => moments(s, back(s))), from.map((s) => c.soundsFor(moments(s, back(s)))),"
             " moments(back(st()), st({ roundsStarted: 2 }))]);"), [
-            [[]] * 8, [[]] * 8, ['roundStart', 'picture'],
+            [[]] * 8, [[]] * 8, ['roundStart'],
         ])
 
     def test_changes_are_at_least_300ms_apart(self):
@@ -2155,8 +2334,9 @@ class AudioTests(TestCase):
             [0, 5, 9, 9, 0, -1])
 
     def test_channels(self):
+        # the TV's tune-in hiss (B-214) is an effect, like the swipe
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice'})
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -2637,8 +2817,10 @@ class RobotLayoutTests(TestCase):
         #   and the console's left third, clear of every block of every
         #   word (1-10 letters, also with hard's two extras) and of the
         #   rail;
-        # - at the top of his pop only the second block row of a 7-10
-        #   letter word passes over him (he is drawn under the blocks);
+        # - at the top of his pop only the second block row of a 9-10
+        #   letter word passes over him (he is drawn under the blocks;
+        #   7-8 letter words did too until BACKLOG B-213 put their slots
+        #   on one row);
         # - his hands rest on the console's edge, and in every hand pose
         #   (and at rest even at the bottom of the pop's trail) they are
         #   clear of the lever's, the speaker's and the dome's tap areas
@@ -2791,7 +2973,9 @@ class RobotLayoutTests(TestCase):
             self.assertNotIn(str(n), r['pop'], n)                # room for the pop-up
             self.assertNotIn(f'h{n}', r['pop'], n)
         self.assertEqual(list(r['popRows']), ['1'])              # only the second row
-        self.assertEqual(sorted((k for k in r['pop'] if not k.startswith('h')), key=int), ['7', '8', '9', '10'])
+        # of a 9-10 letter word: since BACKLOG B-213 a 7-8 letter word is
+        # one row of slots, so its bench lies higher, clear of his pop too
+        self.assertEqual(sorted((k for k in r['pop'] if not k.startswith('h')), key=int), ['9', '10'])
         # the hands rest on the console's edge, over it by a few px, above
         # the lever's tap area even at the bottom of the pop's trail
         self.assertGreater(r['restBottom'], top)
@@ -5391,7 +5575,7 @@ class NextDomeTests(TestCase):
             f" moments(st({{ nudges: 2, round: {five} }}), {{ ...st({{ round: {five} }}), screen: 'round-end' }}),"
             " c.snapshot(st({ nudges: 2 })).nudges, c.snapshot({ ...st({ nudges: 2 }), screen: 'theme', current: { word: null, placed: [] } }).nudges,"
             " c.snapshot({ ...st(), nudges: undefined }).nudges, c.NONE.nudges, c.soundsFor(['domeNudge'])]);"),
-            [['correct'], ['domeNudge'], ['domeNudge'], [], ['domeNudge'], ['picture'], ['roundEndGood'], 2, 0, 0, 0, []])
+            [['correct'], ['domeNudge'], ['domeNudge'], [], ['domeNudge'], [], ['roundEndGood'], 2, 0, 0, 0, []])
 
     def test_he_points_at_the_dome_wags_and_comes_back_to_rest(self):
         steps, point, ends, wag, reduced = self.run_node(
@@ -5455,3 +5639,844 @@ class NextDomeTests(TestCase):
             if f.name != 'main.js':
                 self.assertNotRegex(self.code(f.name), r'setState\([^)]*nudges', f.name)
         self.assertNotIn('setState', self.code('character.js'))
+
+
+class LongWordTests(TestCase):
+    """Long words (BACKLOG B-213): 7-8 letters stay on one row of smaller
+    slots, 9-10 letters break into two rows of 46px at the word's `break`
+    with a brass joint at the break that glows once as the word appears.
+    round.js makeWord carries the `break` (and warns when a 9-10 letter
+    word has none), main.js reads it from the data, card.js lays the
+    slots and the joint out from layout.js slotLayout (run here with a
+    stand-in DOM), drag.js drops into a small slot's whole area,
+    feedback.js glows the joint (stand-ins for GSAP and the DOM), and
+    game.css draws it. The sizes themselves are SlotLayoutTests' and the
+    fit at 360x740 TenLetterFitTests'."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    # --- the data: round.js makeWord, main.js ---
+
+    def test_make_word_carries_the_break_and_warns_without_one(self):
+        res = self.run_node(
+            "const warned = []; console.warn = (m) => warned.push(m);"
+            "let seq = 0; const newId = () => `t${++seq}`;"
+            "const make = (e) => { warned.length = 0; const cur = R.makeWord(e, 'normal', newId); return [cur.break, warned.length]; };"
+            "out([make({ word: 'helicopter', break: 4 }), make({ word: 'submarine', break: 3 }), make({ word: 'motorbike', break: 5 }),"
+            # 7-8 letters: the break is carried (the rail ignores it), nothing to warn about
+            "     make({ word: 'scooter', break: 4 }), make({ word: 'airplane' }), make({ word: 'duck' }),"
+            # 9-10 letters without a usable break: null, and one warning naming the word
+            "     make({ word: 'helicopter' }), make({ word: 'submarine', break: 9 }), make({ word: 'motorbike', break: '5' }),"
+            "     make({ word: 'helicopter', break: 0 }), make({ word: 'helicopter', break: 4.5 })]);")
+        self.assertEqual(res, [[4, 0], [3, 0], [5, 0], [4, 0], [None, 0], [None, 0], [None, 1], [None, 1], [None, 1], [None, 1], [None, 1]])
+
+    def test_make_word_warning_names_the_word(self):
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            "R.makeWord({ word: 'submarine' }, 'hard', () => 'x');"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('flip: "submarine" has 9 letters and no break', result.stderr)
+
+    def test_every_long_content_word_has_a_break_that_fits(self):
+        # the theme data carries `break` for its 9-10 letter words (the
+        # content batch), and each row of the split fits a 360 wide rail
+        # (six 46px slots); `break` on a shorter word is allowed and unused
+        long_words = 0
+        for f in sorted((self.ROOT / 'static' / 'data').glob('*.json')):
+            for word, entry in json.loads(f.read_text()).items():
+                if len(word) > 8:
+                    long_words += 1
+                    brk = entry.get('break')
+                    self.assertIsInstance(brk, int, (f.name, word))
+                    self.assertTrue(1 <= brk < len(word), (f.name, word, brk))
+                    self.assertLessEqual(max(brk, len(word) - brk), 6, (f.name, word, brk))
+        self.assertGreaterEqual(long_words, 3)
+
+    def test_main_reads_the_break_from_the_data(self):
+        start = self.function('startRound', 'main.js')
+        self.assertIn('.map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));', start)
+        self.assertIn('current: makeWord(words[0], level, newTileId),', start)
+        self.assertIn('        break: null,', (self.JS / 'state.js').read_text())
+        self.assertIn('break: brk,', self.function('makeWord', 'round.js'))
+
+    # --- card.js: the rail, with a stand-in DOM ---
+
+    FAKE_DOM = """
+        class El {
+            constructor(tag) {
+                this.tag = tag; this.children = []; this.parentNode = null; this.dataset = {}; this.attrs = {};
+                this.cls = new Set(); this.clientWidth = 0; this.textContent = '';
+                this.style = { setProperty(k, v) { this[k] = String(v); } };
+                this.classList = {
+                    toggle: (c, on) => { if (on === undefined ? !this.cls.has(c) : on) this.cls.add(c); else this.cls.delete(c); },
+                    add: (c) => this.cls.add(c), remove: (c) => this.cls.delete(c), contains: (c) => this.cls.has(c),
+                };
+            }
+            set className(v) { this.cls = new Set(v.split(' ').filter(Boolean)); }
+            get className() { return [...this.cls].join(' '); }
+            set innerHTML(v) { this.children.forEach((c) => { c.parentNode = null; }); this.children = []; }
+            get firstChild() { return this.children[0] || null; }
+            appendChild(c) { if (c.parentNode) c.remove(); c.parentNode = this; this.children.push(c); return c; }
+            insertBefore(c, ref) {
+                if (c.parentNode) c.remove(); c.parentNode = this;
+                const i = ref ? this.children.indexOf(ref) : -1;
+                if (i < 0) this.children.push(c); else this.children.splice(i, 0, c);
+                return c;
+            }
+            remove() { const p = this.parentNode; if (!p) return; p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; }
+            setAttribute(k, v) { this.attrs[k] = String(v); }
+            getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+            addEventListener() {}
+            querySelectorAll(sel) { return sel === '.rail-joint' ? this.children.filter((c) => c.cls.has('rail-joint')) : []; }
+            querySelector(sel) {
+                const m = /^\\.rail-joint\\[data-side="(\\w+)"\\]$/.exec(sel);
+                return m ? this.children.find((c) => c.cls.has('rail-joint') && c.dataset.side === m[1]) || null : null;
+            }
+        }
+        const els = { 'play-image': new El('img'), 'word-counter': new El('p'), 'letter-boxes': new El('div'), 'letter-tray': new El('div') };
+        els['letter-boxes'].clientWidth = 332;
+        els['letter-tray'].clientWidth = 332;
+        globalThis.document = { getElementById: (id) => els[id] || null, querySelectorAll: () => [], createElement: (t) => new El(t) };
+        globalThis.gsap = { set() {} };
+        globalThis.Draggable = { create() { return [{ on: true, enabled(v) { if (v === undefined) return this.on; this.on = v; return this; }, kill() {} }]; } };
+    """
+
+    def render(self, body):
+        return self.run_node(
+            f"const C = await import('{(self.JS / 'card.js').as_uri()}');"
+            "let seq = 0; const newId = () => `t${++seq}`;"
+            "const rail = els['letter-boxes'];"
+            "const view = () => ({ vars: ['--slot-size', '--slot-gap', '--slot-font', '--hit-x', '--hit-y', '--cols'].map((k) => rail.style[k]),"
+            "  boxes: rail.children.map((b) => [b.style.gridRow, b.style.gridColumn, b.children.map((c) => c.cls.has('rail-joint') ? c.className : 'tile')]) });"
+            "const show = (entry, level = 'normal') => { const current = R.makeWord(entry, level, newId);"
+            "  C.renderCard({ screen: 'play', lives: 3, round: { index: 0, size: 5 }, current }); return current; };"
+            + body,
+            prelude=self.FAKE_DOM,
+        )
+
+    def test_card_lays_a_broken_word_out_in_two_centred_rows_with_the_joint(self):
+        heli, sub = self.render(
+            "const cur = show({ word: 'helicopter', break: 4 }); const a = view();"
+            "show({ word: 'submarine', break: 3 }); out([a, view()]);")
+        self.assertEqual(heli['vars'], ['46px', '6px', '28px', '0px', '0px', '12'])
+        # heli | copter: four slots on the first row (one slot in from the
+        # left of the six-slot grid), six on the second
+        self.assertEqual([b[:2] for b in heli['boxes']],
+                         [['1', '3 / span 2'], ['1', '5 / span 2'], ['1', '7 / span 2'], ['1', '9 / span 2'],
+                          ['2', '1 / span 2'], ['2', '3 / span 2'], ['2', '5 / span 2'], ['2', '7 / span 2'],
+                          ['2', '9 / span 2'], ['2', '11 / span 2']])
+        self.assertEqual([b[2] for b in heli['boxes']], [[], [], [], ['rail-joint end'], ['rail-joint start'], [], [], [], [], []])
+        # sub | marine
+        self.assertEqual([b[0] for b in sub['boxes']], ['1'] * 3 + ['2'] * 6)
+        self.assertEqual([b[2] for b in sub['boxes']], [[], [], ['rail-joint end'], ['rail-joint start'], [], [], [], [], []])
+
+    def test_card_moves_the_joint_when_the_next_word_breaks_elsewhere(self):
+        # submarine then motorbike: nine slots both, so the slots are kept,
+        # but the rows and the joint follow the new break (motor | bike);
+        # then a word on one row has no joint at all
+        moto, air, scooter = self.render(
+            "show({ word: 'submarine', break: 3 }); const kept = rail.children[0];"
+            "show({ word: 'motorbike', break: 5 }); const a = view(); a.kept = rail.children[0] === kept;"
+            "show({ word: 'airplane' }); const b = view();"
+            "show({ word: 'scooter', break: 4 }, 'easy'); out([a, b, view()]);")
+        self.assertTrue(moto['kept'])
+        self.assertEqual([b[:2] for b in moto['boxes']],
+                         [['1', '1 / span 2'], ['1', '3 / span 2'], ['1', '5 / span 2'], ['1', '7 / span 2'], ['1', '9 / span 2'],
+                          ['2', '2 / span 2'], ['2', '4 / span 2'], ['2', '6 / span 2'], ['2', '8 / span 2']])
+        self.assertEqual([b[2] for b in moto['boxes']], [[], [], [], [], ['rail-joint end'], ['rail-joint start'], [], [], []])
+        self.assertEqual(moto['vars'][-1], '10')
+        # 8 letters: one row of 36px slots, 4px apart, a 21px letter, the
+        # tap area 2px into each gap and 8px up and down to the rail's edges
+        self.assertEqual(air['vars'], ['36px', '4px', '21px', '2px', '8px', '16'])
+        self.assertEqual({b[0] for b in air['boxes']}, {'1'})
+        self.assertEqual([b[2] for b in air['boxes']], [[]] * 8)
+        # 7 letters, its break unused; on easy the given s is in its slot
+        self.assertEqual(scooter['vars'], ['41px', '4px', '24px', '2px', '8px', '14'])
+        self.assertEqual([b[2] for b in scooter['boxes']], [['tile']] + [[]] * 6)
+
+    def test_card_keeps_a_placed_block_in_front_of_the_joint(self):
+        # feedback.js reads a filled slot's block as its first child
+        boxes = self.render(
+            "const cur = show({ word: 'helicopter', break: 4 });"
+            "const t = cur.tray.find((x) => x.letter === 'i');"
+            "const placed = [...cur.placed]; placed[3] = { letter: 'i', tileId: t.id };"
+            "const next = { ...cur, placed, tray: cur.tray.map((x) => (x.id === t.id ? { ...x, used: true } : x)) };"
+            "C.renderCard({ screen: 'play', lives: 3, round: { index: 0, size: 5 }, current: next });"
+            "out(view().boxes.map((b) => b[2]));")
+        self.assertEqual(boxes[3], ['tile', 'rail-joint end'])
+        self.assertEqual(boxes[4], ['rail-joint start'])
+
+    # --- drag.js: a small slot's drop area ---
+
+    def test_drag_drops_into_the_slots_whole_area(self):
+        near = self.function('nearestHitBox', 'drag.js')
+        self.assertIn("import { slotLayout, dropsIn } from './layout.js';", self.code('drag.js'))
+        self.assertIn('const { hit } = slotLayout(state.current.placed.length, rail.clientWidth, state.current.break);', near)
+        self.assertIn('if (!dropsIn(t, b, hit)) return;', near)
+        self.assertNotIn('hitTest', near)
+
+    # --- feedback.js: the joint glows once ---
+
+    def glow(self, body):
+        return self.run_node(
+            "const log = []; let reduced = false;"
+            "globalThis.window = { matchMedia: () => ({ matches: reduced }) };"
+            "globalThis.gsap = { set() {}, to() {}, timeline() { const t = { to() { return t; }, set() { return t; } }; return t; },"
+            " killTweensOf(t) { log.push(['kill', t.length]); }, delayedCall() {}, getProperty() { return 0; },"
+            " fromTo(t, a, b) { log.push(['fromTo', t.map((j) => j.side), a, { ...b, onComplete: typeof b.onComplete }]); b.onComplete && b.onComplete(); } };"
+            "const joint = (side) => { const props = { '--joint-glow': '1' }; return { side, props, style: { removeProperty: (k) => delete props[k] } }; };"
+            "let joints = [];"
+            "globalThis.document = { getElementById: () => ({ children: [] }), querySelector: () => null,"
+            " querySelectorAll: (sel) => (sel === '#letter-boxes .rail-joint' ? joints : []) };"
+            f"const F = await import('{(self.JS / 'feedback.js').as_uri()}');"
+            "const at = (index, word) => ({ screen: 'play', lives: 3, pressed: null, round: { index },"
+            " current: { word, status: 'playing', tray: [], placed: Array(word.length).fill(null) } });"
+            + body)
+
+    def test_the_joint_glows_once_when_a_broken_word_appears(self):
+        log, left = self.glow(
+            "joints = [joint('end'), joint('start')];"
+            "F.renderFeedback(at(0, 'helicopter'));"
+            # a re-render of the same word, then a move on it: no glow again
+            "F.renderFeedback(at(0, 'helicopter')); F.renderFeedback(at(0, 'helicopter'));"
+            "out([log, joints.map((j) => j.props)]);")
+        self.assertEqual(log, [['kill', 2], ['fromTo', ['end', 'start'], {'--joint-glow': 0},
+                                {'--joint-glow': 1, 'duration': 0.3, 'ease': 'power1.inOut', 'yoyo': True, 'repeat': 1,
+                                 'onComplete': 'function'}]])
+        # when it is over the inline value goes: the CSS rest look stays
+        self.assertEqual(left, [{}, {}])
+
+    def test_the_next_broken_word_glows_again_and_a_word_on_one_row_never(self):
+        log = self.glow(
+            "F.renderFeedback(at(0, 'duck')); F.renderFeedback(at(1, 'scooter'));"   # no joint in the DOM
+            "joints = [joint('end'), joint('start')];"
+            "F.renderFeedback(at(2, 'submarine')); F.renderFeedback(at(3, 'motorbike'));"
+            "joints = [];"
+            "F.renderFeedback({ screen: 'round-end', round: { index: 4 }, current: { word: 'motorbike' } });"
+            "out(log.filter((e) => e[0] === 'fromTo').length);")
+        self.assertEqual(log, 2)
+
+    def test_reduced_motion_keeps_the_joint_steady(self):
+        log = self.glow(
+            "reduced = true; joints = [joint('end'), joint('start')];"
+            "F.renderFeedback(at(0, 'helicopter')); out([log, joints.map((j) => j.props)]);")
+        self.assertEqual(log, [[], [{'--joint-glow': '1'}, {'--joint-glow': '1'}]])
+        m = json.loads(subprocess.run(
+            ['node', '--input-type=module', '-e',
+             f"import {{ motionFor }} from '{(self.JS / 'motion.js').as_uri()}';"
+             "console.log(JSON.stringify([motionFor('jointGlow', false), motionFor('jointGlow', true)]));"],
+            capture_output=True, text=True, timeout=20).stdout)
+        self.assertEqual(m, [{'duration': 0.6, 'ease': 'power1.inOut', 'scale': 1}, {'duration': 0, 'ease': 'none', 'scale': 1}])
+
+    # --- game.css ---
+
+    def test_the_rail_grid_and_the_slot_letter(self):
+        rail = self.rule('.letter-boxes')
+        self.assertIn('grid-template-columns: repeat(var(--cols), calc((var(--slot-size) - var(--slot-gap)) / 2));', rail)
+        self.assertIn('justify-content: center;', rail)
+        for decl in ('--slot-font: 28px;', '--hit-x: 0px;', '--hit-y: 0px;'):
+            self.assertIn(decl, rail)
+        self.assertIn('position: relative;', self.rule('.letter-box'))
+        placed = self.rule('.letter-box > .draggable-letter')
+        self.assertIn('font-size: var(--slot-font);', placed)
+        self.assertIn('position: relative;', placed)
+        # a placed letter's tap area: the rail's full height in a small slot
+        area = self.rule('.letter-box > .draggable-letter::before')
+        for decl in ("content: '';", 'position: absolute;', 'top: calc(-1 * var(--hit-y));', 'bottom: calc(-1 * var(--hit-y));',
+                     'left: calc(-1 * var(--hit-x));', 'right: calc(-1 * var(--hit-x));'):
+            self.assertIn(decl, area)
+        # a locked letter (B-211) as large as the letters round it in a small slot
+        self.assertIn('font-size: min(25px, var(--slot-font));', self.rule('.letter-box.locked > .draggable-letter:not(.landing)'))
+        html = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 26)
+
+    def test_the_joint_is_one_small_rule_set_in_the_palette(self):
+        css = self.css()
+        sets = re.findall(r'\n([^\n{]*\.rail-joint[^\n{]*){', css)
+        self.assertEqual([s.strip() for s in sets], ['.rail-joint', '.rail-joint.end', '.rail-joint.start', '.rail-joint::after'])
+        body = ''.join(self.rule(s.strip()) for s in sets)
+        for colour in ('var(--brass)', 'var(--brass-dark)', 'var(--cream)'):
+            self.assertIn(colour, body)
+        self.assertNotIn('#', body)
+        self.assertNotIn('rgb', body)
+        joint = self.rule('.rail-joint')
+        self.assertIn('--joint-glow: 0;', joint)
+        self.assertIn('pointer-events: none;', joint)
+        self.assertIn('calc(var(--joint-glow) * 12px)', joint)
+        self.assertIn('opacity: var(--joint-glow);', self.rule('.rail-joint::after'))
+        # no other module draws or moves it
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name not in ('card.js', 'feedback.js'):
+                self.assertNotIn('rail-joint', self.code(f.name), f.name)
+
+
+class TvTuneTests(TestCase):
+    """The TV's tune-in on every new word (BACKLOG B-214; the approved
+    prototype is design/reference/tv-motion.html, layer 1 "TV"): tv.js's
+    numbers are the prototype's, its drawing (pure, on byte arrays) ends on
+    the picture exactly, a picture still loading holds the snow, and its
+    subscriber (stand-ins for the DOM, GSAP and animation frames) tunes in
+    once per new word, draws only until the lock, tells main.js at the lock
+    (state.tuned, the robot's "Picture shown"), then rolls a quiet bar every
+    6-11s, and stops everything when the word or the screen changes; under
+    reduced motion the picture fades in over 250ms instead. main.js,
+    the template and game.css wire it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const V = await import('{(self.JS / 'tv.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    # --- the prototype's numbers ---
+
+    def test_the_numbers_are_the_prototypes(self):
+        tune, quiet, frame = self.run_node("out([V.TUNE, V.QUIET, V.FRAME_MS]);")
+        self.assertEqual(tune, {
+            'duration': 1000,
+            'picture': {'from': 230, 'to': 720},
+            'flare': {'to': 900, 'by': 0.18},
+            'snow': {'from': 230, 'to': 700, 'by': 0.78, 'tail': 930},
+            'settle': {'from': 230, 'to': 760},
+            'roll': 1.6,
+            'tear': {'px': 14, 'row': 0.11, 'ms': 0.02},
+            'jolt': {'chance': 0.04, 'px': 30},
+            'blank': 0.08,
+            'blankUntil': 0.02,
+            'bar': {'speed': 0.045, 'base': 0.4, 'height': 0.12, 'loop': 1.25, 'dim': 0.35, 'edge': 1.5, 'edgeLight': 120},
+            'grain': {'keep': 0.42, 'gamma': 1.35, 'gain': 0.7, 'gainRange': 0.55},
+            'tint': [0.88, 0.97, 1],
+            'under': 0.7,
+            'rows': 1.5,
+            'least': {'w': 120, 'h': 60},
+            'fadeOut': 120,
+            'hiss': 0.95,
+            'hold': 2000,
+            'reduced': 250,
+        })
+        # the bar every 6-11s (the acceptance's range), 1.7s down the
+        # screen at 7%; with half of them a 90ms dim to 0.92
+        self.assertEqual(quiet, {'every': {'least': 6000, 'extra': 5000},
+                                 'roll': {'duration': 1700, 'from': -120, 'to': 480, 'opacity': 0.07},
+                                 'flicker': {'chance': 0.5, 'duration': 90, 'brightness': 0.92}})
+        self.assertAlmostEqual(frame, 1000 / 60)
+        # the prototype's own lines, so a change there shows up here
+        proto = (self.ROOT / 'design' / 'reference' / 'tv-motion.html').read_text()
+        for line in ('ease(ramp(t, 230, 720)) * (t > 720 ? 1 + 0.18 * (1 - ramp(t, 720, 900)) : 1)',
+                     'const sa = 1 - 0.78 * ease(ramp(t, 230, 700)) - 0.22 * ramp(t, 700, 930);',
+                     'const settle = 1 - ease(ramp(t, 230, 760));',
+                     'const roll = Math.round(settle * settle * H * 1.6) % H;',
+                     'const tear = 14 * settle;',
+                     'bar = (bar + H * 0.045 * (0.4 + settle)) % (H * 1.25);',
+                     'const blank = Math.round(H * 0.08);',
+                     'let s = Math.pow(v, 1.35) * 255 * rowGain;',
+                     'let r = s * 0.88, g = s * 0.97, b = s;',
+                     'Math.round(scr.clientHeight / 1.5)',
+                     'hiss(T * 0.95);',
+                     '{ duration: 120, fill: "forwards" }',
+                     '{ duration: 1700, easing: "linear" }',
+                     'filter: "brightness(0.92)" }, { filter: "none" }], { duration: 90 }',
+                     '{ duration: 250, easing: "ease-out" }'):
+            self.assertIn(line, proto)
+
+    def test_levels_over_the_tune_in(self):
+        times = [0, 120, 230, 340, 450, 700, 720, 760, 810, 900, 930, 1000, 1200]
+        res = self.run_node(
+            "const r = (x) => Math.round(x * 1000) / 1000;"
+            f"out({times}.map((t) => {{ const l = V.levels(t); return [r(l.pic), r(l.snow), r(l.settle)]; }}));")
+        # the prototype's tuneIn formulas, written out again here
+        ease = lambda t: 1 - (1 - min(max(t, 0), 1)) ** 3
+        ramp = lambda t, a, b: min(max((t - a) / (b - a), 0), 1)
+        want = []
+        for t in times:
+            pa = ease(ramp(t, 230, 720)) * (1 + 0.18 * (1 - ramp(t, 720, 900)) if t > 720 else 1)
+            sa = 1 - 0.78 * ease(ramp(t, 230, 700)) - 0.22 * ramp(t, 700, 930)
+            settle = 1 - ease(ramp(t, 230, 760))
+            want.append([round(pa, 3) + 0, round(sa, 3) + 0, round(settle, 3) + 0])
+        self.assertEqual(res, want)
+        # snow only to 230ms; the roll and tear stop at 760 (locked
+        # still); shining over after 720; no snow from 930; the picture
+        # exactly from then on
+        self.assertEqual(res[1], [0, 1, 1])
+        self.assertEqual(res[7][2], 0)
+        self.assertGreater(res[8][0], 1)
+        self.assertEqual(res[10:], [[1, 0, 0]] * 3)
+
+    # --- the drawing (pure) ---
+
+    DRAW = (
+        "const W = 12, H = 10;"
+        # a picture whose every row has its own colour: row y is (y * 20, 100, 255 - y * 20)
+        "const pic = new Uint8ClampedArray(W * H * 4);"
+        "for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4;"
+        " pic[i] = y * 20; pic[i + 1] = 100; pic[i + 2] = 255 - y * 20; pic[i + 3] = 255; }"
+        "const draw = (p, t, bar, rand) => { const o = new Uint8ClampedArray(W * H * 4); V.drawTune(o, p, W, H, t, bar, rand); return o; };"
+        "const same = (a, b) => a.every((v, i) => v === b[i]);"
+        "const seq = (seed) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; };"
+    )
+
+    def test_it_locks_on_the_picture_exactly(self):
+        res = self.run_node(
+            self.DRAW +
+            "const black = (o) => o.every((v, i) => (i % 4 === 3 ? v === 255 : v === 0));"
+            "out([same(draw(pic, 1000, 3, Math.random), pic), same(draw(pic, 1400, 7, Math.random), pic),"
+            " same(draw(pic, 930, 5, Math.random), pic), black(draw(null, 1000, 3, Math.random)),"
+            " same(draw(pic, 990, 3, Math.random), pic)]);")
+        # at the end it is the picture (no picture: black); a little
+        # before, a trace of snow is still on it
+        self.assertEqual(res, [True, True, True, True, True])
+
+    def test_snow_first_then_the_picture_rolls_in(self):
+        res = self.run_node(
+            self.DRAW +
+            # before 230ms the picture does not show at all: the same grain with or without it
+            "const early = [0, 120, 229].map((t) => same(draw(pic, t, 4, seq(7)), draw(null, t, 4, seq(7))));"
+            # the grain is a cool grey: r <= g <= b on every pixel
+            "const o = draw(null, 100, 50, Math.random);"
+            "let cool = true; for (let i = 0; i < o.length; i += 4) if (!(o[i] <= o[i + 1] && o[i + 1] <= o[i + 2])) cool = false;"
+            # mid-roll (t 300, settle 0.654): with no grain (rand 0, below the bar)
+            # each row shows the picture's row (y + H - roll) % H, and the
+            # black gap (k 0) at its first rows
+            "const settle = V.levels(300).settle; const roll = Math.round(settle * settle * H * 1.6) % H;"
+            "const mid = draw(pic, 300, -100, () => 0);"
+            "const rows = []; for (let y = 0; y < H; y++) rows.push(mid[y * W * 4]);"
+            "out([early, cool, roll, rows, Math.round(V.levels(300).pic * 1000) / 1000]);")
+        early, cool, roll, rows, pa = res
+        self.assertEqual(early, [True, True, True])
+        self.assertTrue(cool)
+        self.assertEqual(roll, 7)
+        blank = round(10 * 0.08)          # 1 row
+        expect = []
+        for y in range(10):
+            sy = (y + 10 - roll) % 10
+            # no grain (rand 0) and no tear: the picture's red, at pa
+            expect.append(0 if sy < blank else round(sy * 20 * pa))
+        self.assertEqual(rows, expect)
+
+    def test_the_sync_bar_dims_its_rows_and_lights_its_edge(self):
+        res = self.run_node(
+            self.DRAW +
+            # constant grain 0.5: s = 0.5^1.35 * 255 * (0.7 + 0.5 * 0.55)
+            "const o = draw(null, 0, 6, () => 0.5);"
+            "const b = (y) => o[(y * W) * 4 + 2];"
+            "out([b(0), b(4), b(5), b(6), b(7), b(9)]);")
+        s = 0.5 ** 1.35 * 255 * (0.7 + 0.5 * 0.55)
+        # bar at row 6, 12% of 10 rows tall (rows 5): dimmed to 0.35; its
+        # edge (rows 5-7, within 1.5) half as bright plus 120
+        self.assertEqual(res, [round(s), round(s), round(s * 0.35 * 0.5 + 120), round(s * 0.5 + 120), round(s * 0.5 + 120), round(s)])
+
+    # --- the clock, the bar, the canvas ---
+
+    def test_a_picture_still_loading_holds_the_snow(self):
+        res = self.run_node(
+            "out([V.clockStep(0, 0, 100, false), V.clockStep(200, 0, 100, false), V.clockStep(230, 70, 16, false),"
+            " V.clockStep(230, 1990, 16, false), V.clockStep(230, 2006, 16, false), V.clockStep(230, 500, 16, true),"
+            " V.clockStep(600, 0, 16, false)]);")
+        self.assertEqual(res, [
+            {'clock': 100, 'held': 0},       # snow only so far: it runs
+            {'clock': 230, 'held': 70},      # it stops where the picture would come in
+            {'clock': 230, 'held': 86},
+            {'clock': 230, 'held': 2006},
+            {'clock': 246, 'held': 2006},    # held 2s: it runs on, to no picture
+            {'clock': 246, 'held': 500},     # the picture is there: it runs on
+            {'clock': 600, 'held': 16},      # (a clock past 230 does not run back)
+        ])
+
+    def test_the_bar_moves_as_fast_on_any_screen(self):
+        res = self.run_node(
+            "const H = 73; const r = (x) => Math.round(x * 1000) / 1000;"
+            "const at60 = V.barStep(10, 1, H, V.FRAME_MS); const at120 = V.barStep(V.barStep(10, 1, H, V.FRAME_MS / 2), 1, H, V.FRAME_MS / 2);"
+            "out([r(at60), r(at120), r(V.barStep(90, 0, H, V.FRAME_MS)), r(V.barStep(0, 0, H, 0))]);")
+        # one 60 Hz frame: H * 0.045 * (0.4 + settle); two 120 Hz frames the
+        # same; it loops at 1.25 heights
+        self.assertEqual(res, [round(10 + 73 * 0.045 * 1.4, 3), round(10 + 73 * 0.045 * 1.4, 3),
+                               round((90 + 73 * 0.045 * 0.4) % (73 * 1.25), 3), 0])
+
+    def test_the_canvas_and_the_pictures_place(self):
+        res = self.run_node(
+            "const r = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v * 100) / 100]));"
+            "out([V.canvasSize(151.2, 110), V.canvasSize(202, 147), V.canvasSize(40, 30),"
+            " r(V.fitRect({ x: 0, y: 0, w: 151, h: 110 }, 600, 448, 'cover')),"
+            " r(V.fitRect({ x: 27, y: 6, w: 98, h: 98 }, 1024, 1024, 'contain')),"
+            " r(V.fitRect({ x: 0, y: 0, w: 100, h: 100 }, 400, 200, 'contain')),"
+            " r(V.fitRect({ x: 1, y: 2, w: 3, h: 4 }, 400, 200, 'fill')), r(V.fitRect({ x: 1, y: 2, w: 3, h: 4 }, 0, 0, 'cover')),"
+            " r(V.tubeEllipse(100, 100)), V.shade('#27665e', 0.85), V.shade('#fff', 0.5), V.shade('teal', 0.85), V.shade(' #27665e ', 1)]);")
+        k = (1 + (0.55 / 0.45) ** 2) ** 0.5
+        self.assertEqual(res, [
+            {'W': 151, 'H': 73}, {'W': 202, 'H': 98}, {'W': 120, 'H': 60},
+            # the new pictures cover the tube (trimmed top and bottom); the
+            # old ones are contained in their square
+            {'x': 0, 'y': -1.37, 'w': 151, 'h': 112.75},
+            {'x': 27, 'y': 6, 'w': 98, 'h': 98},
+            {'x': 0, 'y': 25, 'w': 100, 'h': 50},
+            {'x': 1, 'y': 2, 'w': 3, 'h': 4}, {'x': 1, 'y': 2, 'w': 3, 'h': 4},
+            # game.css's tube: ellipse at 50% 45%, farthest corner
+            {'cx': 50, 'cy': 45, 'rx': round(50 * k, 2), 'ry': round(45 * k, 2)},
+            'rgb(33, 87, 80)', 'rgb(128, 128, 128)', None, 'rgb(39, 102, 94)',
+        ])
+
+    def test_the_quiet_bar_comes_every_6_to_11s_and_flickers_half_the_time(self):
+        res = self.run_node(
+            "out([V.quietWait(() => 0), V.quietWait(() => 0.5), V.quietWait(() => 0.9999), V.flickers(() => 0.49), V.flickers(() => 0.5),"
+            " Array.from({ length: 500 }, () => V.quietWait()).every((w) => w >= 6000 && w < 11000)]);")
+        self.assertEqual(res[:5], [6000, 8500, 10999.5, True, False])
+        self.assertTrue(res[5])
+
+    # --- the subscriber (stand-ins for the DOM, GSAP and frames) ---
+
+    FAKE = """
+        const calls = []; const due = []; let reduced = false; let puts = 0; const prefetched = [];
+        const frames = new Map(); let seq = 0; let now = 1000;
+        globalThis.requestAnimationFrame = (fn) => { frames.set(++seq, fn); return seq; };
+        globalThis.cancelAnimationFrame = (id) => { calls.push(['cancel', frames.has(id)]); frames.delete(id); };
+        Object.defineProperty(globalThis, 'performance', { value: { now: () => now }, configurable: true, writable: true });
+        const run = (n, dt = 1000 / 60) => { let k = 0; for (; k < n && frames.size; k++) { now += dt; const f = [...frames.values()]; frames.clear(); f.forEach((fn) => fn(now)); } return k; };
+        const nm = (t) => (Array.isArray(t) ? t.map(nm) : typeof t === 'function' ? 'fn ' + t.name : t.name);
+        globalThis.gsap = {
+            set(t, v) { calls.push(['set', nm(t), v]); },
+            to(t, v) { calls.push(['to', nm(t), v]); return { kill() { calls.push(['kill tween', nm(t)]); } }; },
+            fromTo(t, a, b) { calls.push(['fromTo', nm(t), a, b]); return { kill() {} }; },
+            killTweensOf(t) { calls.push(['killTweensOf', nm(t)]); if (typeof t === 'function') due.forEach((d) => { if (d.fn === t) d.dead = true; }); },
+            delayedCall(s, fn) { const d = { s, fn, dead: false, kill() { d.dead = true; } }; due.push(d); calls.push(['later', Math.round(s * 1000) / 1000, fn.name || 'arrow']); return d; },
+        };
+        const fire = () => { const d = due.filter((x) => !x.dead); due.length = 0; d.forEach((x) => x.fn()); return d.length; };
+        const pending = () => due.filter((x) => !x.dead).map((x) => [Math.round(x.s * 1000) / 1000, x.fn.name || 'arrow']);
+        const flat = { scale() {}, save() {}, restore() {}, translate() {}, fillRect() {}, beginPath() {}, moveTo() {}, arcTo() {}, closePath() {}, clip() {}, drawImage() {},
+            createRadialGradient: () => ({ addColorStop() {} }), getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4).fill(200) }) };
+        const ctx = { createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData() { puts++; } };
+        const canvas = { name: 'canvas', width: 0, height: 0, getContext: () => ctx };
+        const img = { name: 'img', complete: true, naturalWidth: 600, naturalHeight: 448, offsetLeft: 0, offsetTop: 0, offsetWidth: 151, offsetHeight: 110,
+            on: {}, addEventListener(t, fn) { (this.on[t] = this.on[t] || []).push(fn); } };
+        const roll = { name: 'roll' };
+        const card = { name: 'card', isConnected: true, clientWidth: 151.2, clientHeight: 110,
+            querySelector: (s) => (s === '.tv-tune' ? canvas : s === '.tv-roll' ? roll : null) };
+        globalThis.document = { hidden: false, documentElement: { name: 'html' },
+            querySelector: (s) => (s === '#screen-play .card' ? card : null),
+            getElementById: (id) => (id === 'play-image' ? img : null),
+            createElement: () => ({ width: 0, height: 0, getContext: () => flat }) };
+        globalThis.getComputedStyle = (el) => (el === document.documentElement ? { getPropertyValue: () => ' #27665e' } : { objectFit: 'cover', borderTopLeftRadius: '0px' });
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        globalThis.Image = class { set src(v) { prefetched.push(v); } };
+        let locks = 0; const onLock = () => { locks++; };
+        const words = [{ image: '/w/bus.webp' }, { image: '/w/car.webp' }, { image: '/w/taxi.webp' }];
+        const at = (index, word, o = {}) => ({ screen: 'play', roundsStarted: 1, words, round: { index }, current: { word }, ...o });
+        const theme = { screen: 'theme', roundsStarted: 1, words: [], round: { index: 0 }, current: { word: null } };
+        const take = () => calls.splice(0);
+    """
+
+    def test_a_new_word_tunes_in_once_draws_until_the_lock_and_tells_main(self):
+        res = self.run_node(
+            "V.renderTv(at(0, 'bus'), onLock);"
+            "const start = take(); const firstPuts = puts; const size = [canvas.width, canvas.height];"
+            "V.renderTv(at(0, 'bus'), onLock); V.renderTv(at(0, 'bus', { tuned: false }), onLock);"
+            "const again = take().length;"
+            "const n = run(200);"
+            "out([start, firstPuts, size, again, n, puts, locks, frames.size, take(), pending(), prefetched]);",
+            prelude=self.FAKE)
+        start, first_puts, size, again, n, puts, locks, left, end, pending, prefetched = res
+        # the canvas covers the screen at once with its first frame drawn
+        # (before the new picture can show), nothing else waits yet
+        self.assertIn(['set', 'canvas', {'opacity': 1}], start)
+        self.assertEqual([c for c in start if c[0] in ('to', 'fromTo', 'later')], [])
+        self.assertEqual(first_puts, 1)
+        self.assertEqual(size, [151, 73])
+        # a re-render of the same word does nothing
+        self.assertEqual(again, 0)
+        # one frame per animation frame until the clock reaches 1000ms
+        # (60 frames at 60 Hz, 61 when the sum of the frames falls a hair
+        # short), then no more frames
+        self.assertIn(n, (60, 61))
+        self.assertEqual(puts, n + 1)
+        self.assertEqual(left, 0)
+        # main.js is told once; the canvas fades off in 120ms; the quiet
+        # bar is due 6-11s later
+        self.assertEqual(locks, 1)
+        self.assertEqual(end[0], ['to', 'canvas', {'opacity': 0, 'duration': 0.12, 'ease': 'none'}])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0][1], 'quietBar')
+        self.assertTrue(6 <= pending[0][0] < 11, pending)
+        # the next word's picture starts loading
+        self.assertEqual(prefetched, ['/w/car.webp'])
+
+    def test_the_quiet_bar_rolls_and_sometimes_dims_the_screen(self):
+        res = self.run_node(
+            "V.renderTv(at(0, 'bus'), onLock); run(200); take();"
+            "const rnd = Math.random; Math.random = () => 0.2; fire(); const bar = take(); const next = pending();"
+            "Math.random = () => 0.7; fire(); const bar2 = take();"
+            "document.hidden = true; fire(); const hidden = take(); Math.random = rnd;"
+            "out([bar, next, bar2, hidden]);",
+            prelude=self.FAKE)
+        bar, nxt, bar2, hidden = res
+        self.assertEqual(bar[0], ['fromTo', 'roll', {'yPercent': -120, 'opacity': 0.07}, {'yPercent': 480, 'duration': 1.7, 'ease': 'none'}])
+        self.assertEqual(bar[1], ['fromTo', 'card', {'filter': 'brightness(0.92)'}, {'filter': 'brightness(1)', 'duration': 0.09, 'ease': 'none'}])
+        self.assertEqual(bar[2], ['later', 7, 'quietBar'])      # 6000 + 0.2 * 5000
+        self.assertEqual(nxt, [[7, 'quietBar']])
+        # no flicker this time (0.7 >= 0.5)
+        self.assertEqual([c[1] for c in bar2], ['roll', 9.5])
+        # the page in the background: no bar, the next one still due
+        self.assertEqual(hidden, [['later', 9.5, 'quietBar']])
+
+    def test_leaving_or_a_new_word_stops_it_at_once(self):
+        res = self.run_node(
+            "V.renderTv(at(0, 'bus'), onLock); run(20); take();"
+            "V.renderTv(theme, onLock); const left = take(); const n = run(100);"
+            "const off = [locks, n, puts];"
+            # a word that is answered and replaced mid-tune: the old one stops, the new one tunes in
+            "V.renderTv(at(0, 'bus', { roundsStarted: 2 }), onLock); run(10); take();"
+            "V.renderTv(at(1, 'car', { roundsStarted: 2 }), onLock); const swap = take(); const m = run(200);"
+            # after the lock, leaving drops the waiting bar
+            "V.renderTv(theme, onLock); const quiet = take();"
+            "out([left, off, swap, m, locks, pending(), quiet]);",
+            prelude=self.FAKE)
+        left, off, swap, m, locks, pending, quiet = res
+        self.assertEqual(left[0], ['cancel', True])
+        self.assertIn(['killTweensOf', 'fn quietBar'], left)
+        self.assertIn(['killTweensOf', ['canvas', 'roll', 'card']], left)
+        self.assertIn(['set', ['canvas', 'roll'], {'clearProps': 'opacity,transform'}], left)
+        self.assertIn(['set', 'card', {'clearProps': 'filter'}], left)
+        # nothing draws or locks off the play screen
+        self.assertEqual(off, [0, 0, 21])
+        self.assertEqual(swap[0], ['cancel', True])
+        self.assertIn(['set', 'canvas', {'opacity': 1}], swap)
+        # the new word draws to its own lock, once
+        self.assertIn(m, (60, 61))
+        self.assertEqual(locks, 1)
+        self.assertEqual(pending, [])
+        self.assertIn(['killTweensOf', 'fn quietBar'], quiet)
+
+    def test_a_picture_still_loading_keeps_the_snow_going(self):
+        res = self.run_node(
+            "img.complete = false;"
+            "V.renderTv(at(0, 'bus'), onLock); const a = run(30); const l1 = locks;"
+            "img.complete = true; const b = run(200);"
+            # one that never loads: 2s of held snow, then it tunes in to none
+            "img.complete = false; V.renderTv(at(1, 'car'), onLock); const c = run(400);"
+            "out([a, l1, b, locks, c]);",
+            prelude=self.FAKE)
+        a, l1, b, locks, c = res
+        # 30 frames (500ms) without the picture: still tuning, no lock
+        self.assertEqual([a, l1], [30, 0])
+        # once it is there the clock runs on from 230ms: 47 more frames
+        self.assertEqual(b, 47)
+        # never loads: 1000ms + 2000ms held = 180 frames
+        self.assertEqual(locks, 2)
+        self.assertIn(c, (180, 181))
+
+    def test_reduced_motion_fades_the_picture_in_and_then_locks(self):
+        res = self.run_node(
+            "reduced = true; V.renderTv(at(0, 'bus'), onLock); const start = take(); const before = [locks, frames.size, puts];"
+            "fire(); const after = [locks, take(), pending()];"
+            # a picture still loading: the fade waits for it
+            "img.complete = false; V.renderTv(at(1, 'car'), onLock); const wait = take();"
+            "img.on.load.forEach((fn) => fn()); const loaded = take();"
+            "out([start, before, after, wait, loaded]);",
+            prelude=self.FAKE)
+        start, before, after, wait, loaded = res
+        fade = [c for c in start if c[1] == 'img' or c[0] == 'later']
+        self.assertEqual(fade, [['set', 'img', {'opacity': 0}], ['to', 'img', {'opacity': 1, 'duration': 0.25, 'ease': 'power1.out'}],
+                                ['later', 0.25, 'arrow']])
+        # no snow, no frames, no canvas
+        self.assertEqual(before, [0, 0, 0])
+        self.assertNotIn(['set', 'canvas', {'opacity': 1}], start)
+        # it locks when the fade is over, with no quiet bar after it
+        self.assertEqual(after, [1, [], []])
+        self.assertIn(['later', 2, 'begin'], wait)
+        self.assertNotIn('to', [c[0] for c in wait])
+        self.assertIn(['to', 'img', {'opacity': 1, 'duration': 0.25, 'ease': 'power1.out'}], loaded)
+
+    # --- wiring: main.js, state.js, character.js, audio.js ---
+
+    def test_main_wires_the_tv_after_the_card_and_owns_tuned(self):
+        main = self.code('main.js')
+        self.assertIn("import { renderTv } from './tv.js';", main)
+        self.assertIn('subscribe((s) => renderTv(s, onTuned));', main)
+        self.assertLess(main.index('subscribe(renderCard);'), main.index('subscribe((s) => renderTv(s, onTuned));'))
+        self.assertIn("if (state.screen === 'play' && !state.tuned) setState({ tuned: true });", self.function('onTuned', 'main.js'))
+        # false on every new word and on the theme screen
+        for name, n in (('startRound', 1), ('onNext', 1), ('onThemes', 1)):
+            self.assertEqual(self.function(name, 'main.js').count('tuned: false,'), n, name)
+        self.assertIn('tuned: false,', self.code('state.js'))
+        # only main.js writes it; tv.js never sets state and takes its
+        # hiss from audio.js, which no other module asks for it
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'main.js':
+                self.assertNotRegex(self.code(f.name), r'setState\([^)]*tuned', f.name)
+        tv = self.code('tv.js')
+        self.assertNotIn('setState', tv)
+        self.assertNotIn("from './state.js'", tv)
+        self.assertIn("import { hiss } from './audio.js';", tv)
+        self.assertIn('hiss(TUNE.duration * TUNE.hiss);', tv)
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name not in ('tv.js', 'audio.js'):
+                self.assertNotRegex(self.code(f.name), r'\bhiss\(', f.name)
+            if f.name != 'audio.js':
+                self.assertNotIn('AudioContext', self.code(f.name), f.name)
+
+    # --- the template and game.css ---
+
+    def test_the_canvas_and_the_bar_sit_over_the_picture_under_the_static(self):
+        html = self.HTML.read_text()
+        card = html[html.index('<div class="card">'):html.index('<div class="plate">')]
+        order = [card.index(s) for s in ('id="play-image"', '<canvas class="tv-tune" aria-hidden="true"></canvas>',
+                                         '<div class="tv-roll" aria-hidden="true"></div>', 'class="tv-static"', 'class="tv-flash"')]
+        self.assertEqual(order, sorted(order))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 27)
+        both = self.rule('#screen-play .tv-roll')
+        shared = re.search(r'\n#screen-play \.tv-tune,\n#screen-play \.tv-roll\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        for decl in ('position: absolute;', 'pointer-events: none;', 'opacity: 0;'):
+            self.assertIn(decl, shared)
+        for decl in ('inset: 0;', 'width: 100%;', 'height: 100%;'):
+            self.assertIn(decl, self.rule('#screen-play .tv-tune'))
+        self.assertIn('height: 22%;', both)
+        self.assertIn('background: linear-gradient(to bottom, transparent, var(--tv-roll), transparent);', both)
+        self.assertRegex(self.CSS.read_text(), r'--tv-roll:\s*color-mix\(in srgb, var\(--cream\) 50%, transparent\);')
+
+
+class TvHissTests(TestCase):
+    """The tune-in's hiss and channel click (BACKLOG B-214): made in code in
+    audio.js (the only place sounds play), the prototype's hiss() with its
+    numbers: noise through a 1400 Hz high-pass and a 7000 Hz low-pass, a
+    click in its first samples, 0.09 gain with a 20ms attack, held to 45%
+    and fading out by its end. Nothing while muted or before the first
+    gesture; an effect, so it does not cut his voice; the mute stops it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        script = (
+            "const log = []; const listeners = {}; const sources = [];"
+            "globalThis.fetch = () => Promise.resolve({ ok: false });"
+            "const node = (name, extra = {}) => ({ name, connect(n) { log.push(['connect', name, n.name]); return n; }, ...extra });"
+            "globalThis.AudioContext = class { constructor() { this.state = 'running'; this.sampleRate = 48000; this.currentTime = 5; this.destination = { name: 'out' }; }"
+            " resume() { return Promise.resolve(); }"
+            " createAnalyser() { return node('analyser'); }"
+            " createBuffer(ch, len, rate) { const data = new Float32Array(len); return { len, rate, getChannelData: () => data }; }"
+            " createBufferSource() { const s = node('source', { buffer: null, on: false,"
+            "   start(t) { s.on = true; log.push(['start', t, s.buffer.len]); },"
+            "   stop(t) { log.push(['stop', t]); if (t === undefined) s.on = false; } }); sources.push(s); return s; }"
+            " createBiquadFilter() { const f = node('filter', { type: '', frequency: { value: 0 } }); log.push(['filter', f]); return f; }"
+            " createGain() { const g = node('gain', { gain: { setValueAtTime: (v, t) => log.push(['set', v, t]),"
+            "   exponentialRampToValueAtTime: (v, t) => log.push(['ramp', v, t]) } }); return g; } };"
+            "globalThis.document = { addEventListener(t, fn) { listeners[t] = fn; } };"
+            f"const a = await import('{self.MODULE.as_uri()}');"
+            f"const S = await import('{(self.ROOT / 'static' / 'js' / 'state.js').as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const r = (x) => Math.round(x * 10000) / 10000;"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_the_hiss_is_the_prototypes(self):
+        res = self.run_node(
+            "a.init(); listeners.pointerup(); log.length = 0;"
+            "a.hiss(950);"
+            "const filters = log.filter((e) => e[0] === 'filter').map((e) => [e[1].type, e[1].frequency.value]);"
+            "const data = sources[sources.length - 1].buffer.getChannelData(0);"
+            "const noise = Array.from(data.slice(3)).every((v) => v >= -1 && v < 1) && new Set(data.slice(3, 100)).size > 50;"
+            "out([a.HISS, a.hissEnvelope(950).map(([h, v, t]) => [h, v, r(t)]), filters,"
+            " log.filter((e) => e[0] === 'connect').map((e) => e.slice(1)),"
+            " log.filter((e) => e[0] === 'set' || e[0] === 'ramp').map(([h, v, t]) => [h, v, r(t)]),"
+            " log.filter((e) => e[0] === 'start' || e[0] === 'stop').map(([h, t, n]) => [h, r(t), n === undefined ? null : n]),"
+            " Array.from(data.slice(0, 3)).map(r), noise]);")
+        table, envelope, filters, chain, gain, play, click, noise = res
+        self.assertEqual(table, {'gain': 0.09, 'floor': 0.0001, 'attack': 0.02, 'hold': 0.45, 'highpass': 1400,
+                                 'lowpass': 7000, 'tail': 0.1, 'stop': 0.05, 'click': [1, -1, 0.8]})
+        self.assertEqual(envelope, [['set', 0.0001, 0], ['ramp', 0.09, 0.02], ['set', 0.09, 0.4275], ['ramp', 0.0001, 0.95]])
+        self.assertEqual(filters, [['highpass', 1400], ['lowpass', 7000]])
+        # straight out, not through his analyser (it is not his voice)
+        self.assertEqual(chain, [['source', 'filter'], ['filter', 'filter'], ['filter', 'gain'], ['gain', 'out']])
+        self.assertEqual(gain, [['set', 0.0001, 5], ['ramp', 0.09, 5.02], ['set', 0.09, 5.4275], ['ramp', 0.0001, 5.95]])
+        # 0.95s + 0.1s of noise at 48kHz, from now; stopped 50ms after the fade
+        self.assertEqual(play, [['start', 5, 50400], ['stop', 6, None]])
+        self.assertEqual(click, [1, -1, 0.8])
+        self.assertTrue(noise)
+        proto = (self.ROOT / 'design' / 'reference' / 'tv-motion.html').read_text()
+        for line in ('d[0] = 1; d[1] = -1; d[2] = 0.8;', 'hp.frequency.value = 1400;', 'lp.frequency.value = 7000;',
+                     'g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);', 'g.gain.setValueAtTime(0.09, t + (ms * 0.45) / 1000);',
+                     'ctx.sampleRate * (ms / 1000 + 0.1)', 'src.stop(end + 0.05);'):
+            self.assertIn(line, proto)
+
+    def test_silent_when_muted_or_before_a_gesture_and_the_mute_stops_it(self):
+        res = self.run_node(
+            "a.hiss(950); const before = log.length;"
+            "a.init(); listeners.pointerup(); log.length = 0;"
+            "S.setState({ muted: true }); a.hiss(950); const muted = log.length;"
+            "S.setState({ muted: false }); a.hiss(950); const on = sources.filter((s) => s.on).length;"
+            # the mute (renderSound on the change) stops it
+            "a.renderSound({ ...S.state, muted: false, screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } });"
+            "a.renderSound({ ...S.state, muted: true, screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } });"
+            "out([before, muted, on, sources.filter((s) => s.on).length, a.voiceWave()]);")
+        # nothing before the first gesture or while muted; once playing it
+        # is not his voice (no analyser samples); the mute stops it
+        self.assertEqual(res, [0, 0, 1, 0, None])

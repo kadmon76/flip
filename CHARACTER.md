@@ -82,7 +82,8 @@ Pose and movement change together; never more than one change per 300ms.
 | Block placed (into a slot: from the bench, from another slot, or swapping one out) | rest pose, a glance down, then ahead; while the kid drags a block his eyes and head follow it | swipe | always |
 | Block returned (to the bench by tap, drag or the reset lever) | as Block placed | — | always |
 | All slots filled | points at the dome, eyes wide; about 4 in 10 times extra excited (double pop, finger wagging, eyebrows jumping); from the third round, as Block placed | swipe | first 2 rounds since the page was loaded (not stored) |
-| Kid idle 10s | thinks (squint, frown, fist at his chin), sinks, then every few seconds peeks over the edge with no hands showing, looking left and right, until the kid's next input | — | once per word |
+| Dome nudge (the word answered, correct or revealed, and the dome not pressed 4s after the answer; again every 8s until it is) | points at the dome (eyes wide, eyebrows up, head turned to it), pops up, wags the pointing finger, then rest | — (no fitting clip yet) | every 8s |
+| Kid idle 10s | thinks (squint, frown, fist at his chin), sinks, then every few seconds peeks over the edge with no hands showing, looking left and right, until the kid's next input | — | once per word, while the word is open (an answered word gets the dome nudge instead) |
 | Wake up (the kid's next input after the idle sink) | pops up, eyes wide | — | after Kid idle |
 | Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | always |
 | Wrong check that leaves one bulb lit | ducks to his eyes (no hands), looks left and right, shivers, comes back | error clip | always |

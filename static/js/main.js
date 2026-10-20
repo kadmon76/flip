@@ -1,13 +1,15 @@
 // main.js — wiring: theme selection, the level picker, round flow, the
 // console controls (check dome, reset lever, speaker), the header's mute
 // toggle and the play screen's back button, the kid-idle timer and the
-// dome-nudge timer for the robot and his voice's frames, screen renders.
+// dome-nudge timer for the robot and his voice's frames, the TV's lock
+// (tv.js), screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
 import { returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
+import { renderTv } from './tv.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave } from './audio.js';
 import { starsFor } from './score.js';
@@ -116,8 +118,10 @@ async function startRound({ name, dataUrl }) {
     // starts with its first letter given (round.js, BACKLOG B-204). Up to
     // two of the words this theme's earlier rounds missed come back, in
     // random places (round.js pickRound, missed.js; BACKLOG B-208).
+    // A long word's `break` (BACKLOG B-213) says where its slots go to a
+    // second row (round.js makeWord, layout.js slotLayout).
     const words = pickRound(data, ROUND_SIZE, level, missedWords(name))
-        .map((word) => ({ word, image: data[word].image, audio: data[word].audio }));
+        .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
     stopWord();
     setState({
         theme: name,
@@ -132,6 +136,7 @@ async function startRound({ name, dataUrl }) {
         lastInput: performance.now(),
         idleBeat: null,
         nudges: 0,
+        tuned: false,
         startingRound: false,
     });
     armIdle();
@@ -267,6 +272,7 @@ function onNext(extra = {}) {
             lastInput: performance.now(),
             idleBeat: null,
             nudges: 0,
+            tuned: false,
             ...extra,
         });
         armIdle();
@@ -321,6 +327,17 @@ function armNudge() {
     };
     const wait = nudgeWait(state);
     if (wait !== null) setTimeout(tick, wait);
+}
+
+// --- The TV (BACKLOG B-214, tv.js) ---
+
+// tv.js tells when a new word's picture has locked at the end of its
+// tune-in (or of its fade in under reduced motion): the robot's "Picture
+// shown" moment plays on the change (character.js). tv.js stops a tune-in
+// when the word or the screen changes, so the call is always about the
+// word now showing.
+function onTuned() {
+    if (state.screen === 'play' && !state.tuned) setState({ tuned: true });
 }
 
 // --- Round-end screen ---
@@ -447,6 +464,7 @@ function onThemes() {
         speaking: false,
         idleBeat: null,
         nudges: 0,
+        tuned: false,
     });
 }
 
@@ -508,6 +526,7 @@ subscribe(renderThemeButtons);
 subscribe(renderLevel);
 subscribe(renderCard);
 subscribe(renderFeedback);    // after the card render: keys off its DOM
+subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
 subscribe(renderControls);
 subscribe(renderRobot);
 subscribe(renderRoundEnd);

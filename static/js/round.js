@@ -8,6 +8,7 @@
 // `rand` (default Math.random) is there so the test can seed them.
 
 import { levelRules } from './level.js';
+import { ONE_ROW_MAX, isBreak } from './layout.js';
 
 // A shuffled copy of `arr` (Fisher-Yates).
 export function shuffle(arr, rand = Math.random) {
@@ -113,6 +114,11 @@ export function extraLetters(word, count, rand = Math.random) {
 // placeIn, takeOut), the reset lever leaves the given letter (drag.js
 // leverResult, returnAll), and card.js draws it with the locked look
 // (game.css .letter-box.locked).
+// `break` (BACKLOG B-213) is the entry's `break`, the number of letters
+// on the first slot row of a word long enough to be in two (layout.js
+// slotLayout), or null when it has none that splits the word. A word of
+// more than ONE_ROW_MAX letters without one is split at half, with a
+// console warning for whoever writes the theme's data.
 export function makeWord(entry, level, newId, rand = Math.random) {
     const letters = entry.word.split('');
     const extras = extraLetters(entry.word, levelRules(level).distractors, rand);
@@ -125,10 +131,15 @@ export function makeWord(entry, level, newId, rand = Math.random) {
         tile.given = true;
         placed[0] = { letter: tile.letter, tileId: tile.id, locked: true };
     }
+    const brk = isBreak(entry.break, letters.length) ? entry.break : null;
+    if (letters.length > ONE_ROW_MAX && brk === null) {
+        console.warn(`flip: "${entry.word}" has ${letters.length} letters and no break; its two slot rows split at half`);
+    }
     return {
         word: entry.word,
         image: entry.image,
         audio: entry.audio,
+        break: brk,
         tray,
         placed,
         status: 'playing',

@@ -24,7 +24,7 @@ export function renderCard(state) {
     renderImage(current);
     renderHearts(lives);
     renderCounter(round);
-    renderBoxes(current.placed.length);
+    renderBoxes(current.placed.length, current.break);
     // The given letter's block (easy, BACKLOG B-204; round.js makeWord)
     // starts in its slot and has no spot on the bench.
     const bench = current.tray.filter((t) => !t.given);
@@ -88,23 +88,60 @@ function renderCounter(round) {
     }
 }
 
-function renderBoxes(count) {
+// The slots on the rail (layout.js slotLayout; BACKLOG B-213): their
+// size, the letter's size in them, how far a placed letter's tap area
+// reaches past its slot (game.css, from --hit-x / --hit-y), each slot's
+// place in the rail's grid (two grid columns per slot of the longest
+// row, so every row is centred) and the brass joint of a word in two
+// rows. Sizes depend on the rail width, so this runs on every render
+// (main.js also re-renders on resize); the slots themselves are rebuilt
+// only when the letter count changes.
+function renderBoxes(count, brk) {
     const container = $('letter-boxes');
-    // Columns depend on the rail width, so this runs on every render
-    // (main.js also re-renders on resize); the slots themselves are
-    // rebuilt only when the letter count changes.
-    const { size, gap, pad, cols } = slotLayout(count, container.clientWidth);
+    const { size, gap, pad, font, hit, cols, cells, joints } = slotLayout(count, container.clientWidth, brk);
     container.style.setProperty('--slot-size', `${size}px`);
     container.style.setProperty('--slot-gap', `${gap}px`);
     container.style.setProperty('--rail-pad', `${pad}px`);
-    container.style.setProperty('--cols', cols);
-    if (container.children.length === count) return;
-    container.innerHTML = '';
-    for (let i = 0; i < count; i++) {
-        const box = document.createElement('div');
-        box.className = 'letter-box';
-        container.appendChild(box);
+    container.style.setProperty('--slot-font', `${font}px`);
+    container.style.setProperty('--hit-x', `${hit.x}px`);
+    container.style.setProperty('--hit-y', `${hit.y}px`);
+    container.style.setProperty('--cols', 2 * cols);
+    if (container.children.length !== count) {
+        container.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const box = document.createElement('div');
+            box.className = 'letter-box';
+            container.appendChild(box);
+        }
     }
+    cells.forEach(({ row, col }, i) => {
+        const box = container.children[i];
+        box.style.gridRow = String(row);
+        box.style.gridColumn = `${col} / span 2`;
+        renderJoint(box, joints.filter((j) => j.at === i).map((j) => j.side));
+    });
+}
+
+// The brass joint of a word in two rows (BACKLOG B-213): one half at the
+// end of the first row, one at the start of the second, showing it is one
+// word in two chunks. Each half is a `.rail-joint` span with class `end`
+// or `start` inside its slot, after the letter block (feedback.js reads
+// a filled slot's block as its first child); its look is game.css
+// `.rail-joint`, provisional and kept in that one rule set so it can be
+// restyled or replaced. `sides` are the halves slot `box` has; the spans
+// are a DOM cache, added and removed to match on every render.
+function renderJoint(box, sides) {
+    box.querySelectorAll('.rail-joint').forEach((el) => {
+        if (!sides.includes(el.dataset.side)) el.remove();
+    });
+    sides.forEach((side) => {
+        if (box.querySelector(`.rail-joint[data-side="${side}"]`)) return;
+        const el = document.createElement('span');
+        el.className = `rail-joint ${side}`;
+        el.dataset.side = side;
+        el.setAttribute('aria-hidden', 'true');
+        box.appendChild(el);
+    });
 }
 
 // One empty spot per tray tile on the bench, positioned from layout.js.
@@ -151,7 +188,7 @@ function removeStaleTiles(tray) {
     }
 }
 
-// Put `el` as the only child of `parent` (a slot or a bench spot), tilted
+// Put `el` as the first child of `parent` (a slot or a bench spot), tilted
 // by `rot` degrees; reset the drag transform whenever it actually moves.
 // GSAP owns the tile's transform, so the tilt goes through it as well.
 function mount(el, parent, rot = 0) {

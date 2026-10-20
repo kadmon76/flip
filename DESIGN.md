@@ -54,11 +54,40 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
 - **TV screen** (in % of the background image): x 28%–70%, y 16.4%–30.5%.
   The word picture sits inside, masked to the screen's rounded corners,
   with faint scanlines and a soft teal glow.
+- **TV tune-in** (BACKLOG B-214; `design/reference/tv-motion.html` layer 1,
+  its numbers): on every new word (the round's first and each next one)
+  the TV tunes in for ~1s, drawn in code on a canvas over the picture,
+  inside the screen's mask and under its scanlines and glow: fine streaky
+  snow (the prototype's cool grey grain), a dark sync bar rolling down,
+  the picture rolling vertically (a black gap between frames) and tearing
+  sideways from 230ms, slowing, locked still by 760ms; the snow is gone by
+  930ms and at 1s the canvas fades off the picture (120ms). A short hiss
+  with a channel click, made in code (Web Audio, `audio.js`), plays with
+  it; silent when muted. A picture still loading keeps the snow going (2s
+  at most). Input is never blocked. The robot's "Picture shown" comes at
+  the lock.
+- **TV after the lock:** alive but quiet: a faint cream bar (22% of the
+  screen tall, opacity 0.07) rolls down the screen in 1.7s every 6–11s,
+  and with half of them the screen dims to 0.92 for 90ms. Nothing while
+  the play screen is hidden. Reduced motion: the picture fades in over
+  250ms instead of the snow and roll (no hiss), then locks; no bar, no
+  flicker.
 - **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
   lives bulbs. Right: split-flap counter "2 / 5".
 - **Slot rail:** brass, full safe width, directly below the machine
-  (~y 347–413). Slots 46x46px, gap 6px, rail padding 8px. Six slots fit
-  one row; 7+ letters wrap into two even rows.
+  (~y 347–413), rail padding 8px. A word breaks as rarely as possible
+  (BACKLOG B-213): 1–6 letters, one row of 46x46px slots, gap 6px; 7–8
+  letters, one row, never broken (a `break` in the word's data is
+  ignored), the slots shrunk to the largest size that fits, never below
+  36px (41px for 7, 36px for 8 at 360 wide), gap 4px, the letter in a
+  slot ~0.58 of its size, a slot's tap and drop area the rail's full
+  height (~52px); 9–10 letters, two rows of 46px slots split at the
+  word's `break` (the letters on the first row: heli | copter), not by
+  even halves, each row centred, with a small brass joint at the end of
+  the first row and the start of the second that glows once (~600ms,
+  steady under reduced motion) as the word appears; only a 9–10 letter
+  word without a `break` falls back to the even split, with a console
+  warning.
 - **Letter blocks:** cream clay blocks lying on the bench below the rail,
   52px min, slightly rotated (±4°), in loose staggered rows (max 4 per
   row; on hard a 10-letter word's 12 blocks put five on the first row in a play column narrower than 462px, that is on every phone, and a third row of three starts right of the robot's reach, B-207). Lowercase by default.
@@ -136,7 +165,7 @@ block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays the error clip only). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. The swipe is an effect and may overlap anything. Muted: nothing
+dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and a tap on the held-back speaker (B-203) still gets the robot's head-shake, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
@@ -163,4 +192,4 @@ Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" i
 - No English on screen except the target word and the logo; numbers ok.
 - Only palette colours; fonts as above.
 - Tap targets ≥48px (slots may be 46px).
-- Nothing clipped, overlapping, or scrolling sideways at 360px.
+- Nothing clipped, overlapping, or scrolling sideways at 360px (on the play screen `document.documentElement.scrollWidth` equals the viewport width and `scrollHeight` its height; a positioned glow box past the column edge adds scroll, a `box-shadow` does not).

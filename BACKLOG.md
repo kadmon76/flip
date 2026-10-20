@@ -372,7 +372,7 @@ Build order: long words → TV tune-in → picture life and win (written as an i
   - Layout fit: at 360x740 every word of 1–10 letters still fits without overlap with the console, dome and robot, including hard mode's 2 extra letters (B-207). Extend the layout tests for the new sizes and the split rows.
   - DESIGN.md "Layout" slot rail line is updated to this ladder (replacing "Six slots fit one row; 7+ letters wrap into two even rows"), with a DECISIONS entry.
   - Screenshots: `long-7-scooter.png`, `long-8-letters.png` (any 8-letter test word), `long-10-helicopter.png`, `long-9-motorbike.png`, `long-10-hard-extras.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/71
 
 ### B-214 TV tune-in on every new word
 - why: the TV is an old analog set, so each new word should tune in like changing the channel. It makes every new picture a small event and sets up the funny picture motion that comes next. Approved by the human on 2026-10-18 (prototype v3).
@@ -390,7 +390,7 @@ Build order: long words → TV tune-in → picture life and win (written as an i
   - Architecture: the tune-in is one-shot motion keyed on the word changing (a transition, like `feedback.js`'s TV static); the CLAUDE.md architecture list names where it lives. No state outside `state.js`.
   - DESIGN.md records the tune-in and the ambient bar next to the TV screen line.
   - Screenshots: `tv-tune-snow.png` (early in the tune-in), `tv-tune-roll.png` (picture rolling), `tv-locked.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/71
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
@@ -418,3 +418,5 @@ Build order: long words → TV tune-in → picture life and win (written as an i
 - Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
 - Robot voice lines for the puppet's moments (the ~60-line ElevenLabs pool): the reference page `design/reference/robot-puppet.html` shows the line each moment wants (e.g. surprised "Ooh! What is THAT?", smirky "Take your time… I'll just… wait here."); the human will generate them.
+- A dome-aimed point pose for the robot's dome nudge (B-212 reuses `point`, turned 32° down, while the dome is ~13° down from his hand at 360); tune it on `design/reference/robot-puppet.html` with the human.
+- `tools/shot.mjs`: a `--reduced-motion` flag (`Emulation.setEmulatedMedia`) and a `--step-timeout <ms>` option, so reduced-motion shots and long real-flow runs don't need a throwaway copy (B-210, B-211, B-212 used one).
