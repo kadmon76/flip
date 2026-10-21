@@ -355,7 +355,7 @@ lever → 2nd-miss hint → hard distractors → missed words return → level-u
 ## M3 — Long words and a TV that tunes in
 Decided by the human on 2026-10-16 (long words) and 2026-10-18 (TV motion, prototype v3).
 Content (the word list, word pictures, voice) is made in chat sessions and lands in its own PRs. The theme files under `static/data/` are written by that content batch from the word list, never by an agent; content stays read-only here.
-Build order: long words → TV tune-in → picture life and win (written as an item once the theme data carries each word's `motion` fields).
+Build order: long words → TV tune-in. Picture life and win are now M5 (the theme data carries each word's `motion` fields).
 
 ### B-213 Long words: one row up to 8 letters, chunk break for 9–10
 - why: splitting a long word in an arbitrary place ("helic / opter") hides the word's shape, which is the thing being learned. Words should break as rarely as possible, and when they must, the break should teach something: a compound word's parts or a syllable chunk. Decided by the human 2026-10-16.
@@ -392,9 +392,117 @@ Build order: long words → TV tune-in → picture life and win (written as an i
   - Screenshots: `tv-tune-snow.png` (early in the tune-in), `tv-tune-roll.png` (picture rolling), `tv-locked.png`. Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/71
 
+## M4 — Stages instead of levels, gears and boosts
+Decided by the human on 2026-10-13 (stages, gears, boosts) and 2026-10-15 (lever rule); build decisions 2026-10-21. **Read PROGRESSION.md first**: it is the source for every item here, and its tables are the starting numbers. CLAUDE.md "Product rules" already describe where M4 ends up.
+Looks: new screens and controls use the interim style (DESIGN.md "Other screens", the lab palette, no English text). The human will restyle them later in Claude Design, so keep each new visual piece in one small, easily replaced component. Choose the interim look yourself and record it in DECISIONS; don't open a question issue only about looks.
+Today's theme data is partial (25 words have a voice; the rest wait for the voice batch), so some stages have 1–2 words or none. Every item must work with that and with full stages of 5.
+Build order: stages replace levels → stage rounds and clearing → stage map and replay → gears → boosts → struggle help.
+
+### B-215 Stages replace the level picker
+- why: difficulty should come from moving forward in the game, not from a picker the kid doesn't understand (playtest 2026-10-13: the three bulb buttons were unclear, and the stickers button under them got pressed as if it were "start"). PROGRESSION.md "Principles", "Stages".
+- acceptance:
+  - New `stage.js` replaces `level.js` (pure, no DOM, no module state; a Django test runs it through `node`): `STAGES` = `[1, 2, 3, 4, 5, 'long']`; `stagesOf(data)`, the stages a theme's data has words in, in that order; `stageRules(stage)`, PROGRESSION.md's table as `{ givenFirst, extras }` (anything that is not a stage gets stage 1's rules).
+  - `state.round.stage` replaces `state.round.level`. Gone: `state.level`, `state.streak`, `level.js`, reading or writing localStorage `flip.level` (a stale value is simply ignored), the level-up nudge (B-209), and the level picker (`#level-picker`, `#level-easy`, `#level-normal`, `#level-hard`; removed from the template, from CLAUDE.md's id list, with a DECISIONS entry). The theme screen shows the theme cards and the stickers button.
+  - round.js `makeWord(entry, stage, newId)` reads `stageRules`: `givenFirst` gives the first letter, locked (as easy did); `extras` puts that many extra letters on the bench, `CONFUSIONS` first (as hard did).
+  - Words are picked by `stage`, never by `difficulty`. The data's `difficulty` field is no longer read (the content batch drops it later; don't edit the data).
+  - The speaker plays the word on every stage, before and after it is answered (`speakerAction` gives `'word'` whenever the word has audio). The held-back speaker (B-203: `speaker-cap`, the `lockedTaps` head-shake and "hmm no" from the speaker) goes. Keep the robot's `speakerLocked` moment and its sound: B-219 reuses them.
+  - The lever follows PROGRESSION.md "Lever rule" on every stage (drag.js `leverResult`, `returnAll`): after a wrong check on the word, a pull keeps and locks the letters that check found right and that are still in their slots, and sends back everything else, also when blocks were moved since the check (letters placed after the check are never judged by the lever); a second pull with nothing moved since sends back everything but the given letter and the robot's letter, including letters a pull locked; before the word's first wrong check, everything but those two goes back. What the last wrong check found right is recorded in state (on `current`).
+  - Until B-216, a tapped theme plays a round of its first stage: up to 2 missed words back (as today), then that stage's words at random, filled from the theme's other stages (nearest first) when it has fewer than 5.
+  - Docs: DESIGN.md's level-picker convention, the speaker's held-back line and the easy-only lever wording follow the stage rules; CLAUDE.md's architecture list replaces the `level.js` bullet with `stage.js` and updates the round.js, controls.js and drag.js bullets.
+  - Tests: the level tests become stage tests; lever tests cover a pull after a wrong check, after a wrong check and a moved block, a second pull, and a pull before any check.
+  - Screenshots: `theme-no-levels.png`, `stage1-first-letter.png`, `stage3-one-extra.png` (stage forced through the dev hook), `lever-after-move.png` (a wrong check, one block moved, then a pull: the checked-right letters stay, locked). Checklist passes.
+- status:
+
+### B-216 Stage rounds, clearing a stage, and the next stage
+- why: the kid moves forward by playing; each stage is a short set of words, and clearing it opens the next (PROGRESSION.md "Stages").
+- acceptance:
+  - New `progress.js`, the only place localStorage `flip.progress.v1` is read or written (every read and write in try/catch, as stickers.js): `{ "<theme>": { "solved": [word, ...], "cleared": [stage, ...] } }`, keyed by the theme keys as they are (`animals`, `transportation`), like stickers and missed words. Pure helpers, tested through `node`: `currentStage(data, progress)`, the first stage of `stagesOf(data)` not cleared (all cleared: the last one); `afterRound(progress, data, stage, results)`, which adds every word checked correct this round to `solved` (help counts; a revealed word does not) and adds `stage` to `cleared` once all of its words in the data are solved, and says whether it was just cleared. A cleared stage stays cleared, even when the data later adds words to it.
+  - round.js `pickRound` for a stage follows PROGRESSION.md "Rounds": up to `MISSED_BACK` missed words, then the stage's unsolved words, then its solved words, then words from earlier stages, then, only if still short, from later stages (nearest first); 5 words in random order. Tests use today's data (transportation stage 1 is only `bus`, stage 2 is empty) and a full test theme.
+  - Tapping a theme plays its current stage. The round's stage is fixed for the round.
+  - Progress is recorded once per finished round, in `onNext`'s round-end branch (where missed words are recorded). A round left with the back button records nothing.
+  - Round-end: under the stars, a row of the theme's stage bulbs (one per stage, lit = cleared; DESIGN.md "Other screens" conventions). When the round cleared its stage, that bulb lights with a pop as the stars finish (reduced motion: it is simply lit). Play again (▶) starts the theme's current stage, so after a clear it is the next one.
+  - Screenshots: `round-end-stage-cleared.png`, `round-end-not-cleared.png`, `play-next-stage.png` (the first word after clearing stage 1: no given letter). Checklist passes.
+- status:
+
+### B-217 Stage map: see your progress, replay a stage
+- why: the kid sees how far they got in a theme and can go back to a cleared stage for confidence, missing stickers or gears (PROGRESSION.md "Replay").
+- acceptance:
+  - Tapping a theme card opens a new stage screen (`#screen-stages`) for that theme. It shows the theme's picture at the top and one station per stage in `stagesOf(data)` (up to 6), in the interim style: a cream panel button with the stage number as a split-flap digit (the `long` stage shows a small brass joint between two chunks, the B-213 joint, instead of a digit) and one bulb. Cleared: bulb lit, tappable. Current: bulb pulsing amber, the button raised and glowing, tappable; this is the screen's obvious start. Not open yet: bulb dark, button dimmed, not tappable. Tap areas at least 48x48; aria-labels name the stage number. No text.
+  - Tapping a cleared or current station starts a round of that stage. A replay of a cleared stage records solved words (and, from B-218, gears and stickers) but clears nothing new.
+  - The stage screen's back arrow (the sticker book's back glyph) goes to the theme screen. The play screen's back arrow (B-201) now goes to the theme's stage screen.
+  - Theme cards show the theme's progress as a small row of bulbs under the picture (lit = cleared).
+  - Screenshots: `stages-new-theme.png` (only stage 1 open), `stages-mid.png` (two cleared, the third current), `theme-cards-progress.png`. Checklist passes.
+- status:
+
+### B-218 Gears: earn them, see them; stickers for clean words
+- why: gears are what the kid earns by playing and spends on boosts; stickers become the reward for a clean spelling (PROGRESSION.md "Gears", "Repetition and stickers").
+- acceptance:
+  - New `gears.js`, the only place localStorage `flip.gears.v1` (a whole number, 0 or more) is read or written, in try/catch. Pure helpers tested through `node`: the gears for a word result and for a finished round.
+  - Each word's result records `clean`: checked correct on the first check, with no boost (B-219 adds `boosted`).
+  - Earned: 1 gear for a correct word, 1 more if it is clean, 2 when the round reaches the round-end screen. Never lost. A word's gears are added at its correct check.
+  - Stickers: `stickers.js` `add` is called only for a clean word (CLAUDE.md "Product rules"). Stars are unchanged.
+  - Shown: a gear counter, a brass cog drawn in code with the count in split-flap digits, on the theme screen (in the header) and on the play screen, where it sits on the console between the speaker and the dome as the face of the boost button B-219 builds (not tappable yet). On a correct word, small cogs fly from the TV to the counter and the count flips up (600ms at most; reduced motion: the count just changes).
+  - Round-end shows the round's gears: the cog and "+N" in split-flap digits. Numbers only.
+  - Screenshots: `gears-play.png`, `gears-fly.png` (mid-flight), `gears-theme.png`, `round-end-gears.png`. Checklist passes.
+- status:
+
+### B-219 Boosts: pay gears, the robot remembers a letter
+- why: help the kid chooses and pays for, so the free help can fade (PROGRESSION.md "Boosts", "Guardrails").
+- acceptance:
+  - The console's gear counter (B-218) becomes the boost button. It is off (dimmed, taps ignored) until every slot of the current word has been filled at least once, after a boost was used on this word (one per word), and once the word is answered.
+  - Tapping it opens a small brass tray above the console, over the bench, with the boosts that apply now (PROGRESSION.md "Offered when"): Remember this one (3 gears), First letter (2), Clean-up (2). Each is an icon drawn in code with its cost as gear pips (one small cog per gear). Tapping outside the tray closes it; no tap goes through it to a block below.
+  - Remember this one: the empty and wrong slots glow; the kid taps one; the robot puts the right letter there with the second-miss hint's motion (B-206: a wrong block hops back, the right one flies in and locks). First letter: the same for the first slot, with no slot to pick. Clean-up: the extra blocks puff away (300ms) from the bench and from any slot; the other blocks keep their spots.
+  - The gears are taken when the boost happens. Not enough gears: nothing is spent and the tray closes; the robot plays his `speakerLocked` reaction with its "hmm no", and the gear counter flickers.
+  - A boosted word's result has `boosted: true`: it still counts for its stage (B-216) and earns its correct-word gear, but no clean bonus and no sticker (B-218).
+  - A letter placed by a boost stays through every lever pull, like the hint letter.
+  - `boost.js` holds the pure rules (which boosts are offered, the costs, the per-word limit) tested through `node`; CLAUDE.md's architecture list names it.
+  - Screenshots: `boost-off.png`, `boost-tray.png`, `boost-pick-slot.png`, `boost-placed.png`, `boost-no-gears.png`, `boost-cleanup.png` (a stage with extras, through the dev hook). Checklist passes.
+- status:
+
+### B-220 Struggle help: easier words after three hard ones
+- why: a kid who keeps missing gets an easy win before they give up (PROGRESSION.md "Guardrails").
+- acceptance:
+  - After three words in a row in a round that were not clean (a wrong check, a boost or a reveal), the next two words not yet shown are swapped for solved words from the theme's earlier stages. Swapped-out words stay unsolved and come back in later rounds. Nothing happens on stage 1, or when no earlier word is solved. The kid isn't told.
+  - A pure `swapForStruggle(...)` in round.js, tested through `node`; main.js applies it before the next word.
+  - Screenshots: `struggle-swap.png` (the swapped-in word on the play screen, after three forced misses). Checklist passes.
+- status:
+
+## M5 — Living pictures
+Approved by the human on 2026-10-18 (prototype v3: "every word picture should be lively with a humorous approach, with the humour emphasised in the correct-word animation"). Reference: `design/reference/tv-motion.html` (serve the repo root and open `/design/reference/tv-motion.html`), layers 2 "Life" and 3 "Win"; its layer 1 is B-214. Each word's `motion` fields come from the data (see the word data format in the M3 note); the data is read-only.
+Build order: life → win.
+
+### B-221 Picture life on the TV
+- why: every word picture should feel alive and a little funny, not a still.
+- acceptance:
+  - A word whose data entry has `motion` shows, once the tune-in locks, as two layers: `motion.plate` (the background) with `motion.subject` (the cutout) over it, framed exactly like `image` is today (they line up pixel for pixel with the full picture). The tune-in still draws from `image`. A word without `motion` (`duck` today) shows its still picture as before.
+  - The subject loops its `idle` move around its `pivot` (`top` about 50% 12%, `bottom` about 50% 88%, `center` 50% 50%; the prototype's bat uses 51% 14% and its taxi 50% 88%). `sway` and `rumble` are the prototype's `IDLE` keyframes and timings. The others are new, in the same small scale (the subject moves at most about 2% of the picture or 3°, loops of 1–3.5s): `bob` (a gentle up and down), `hop` (small hops with a squash on landing and a pause between), `wobble` (a rock side to side from its base), `float` (a slow drift up and down with a slight tilt), `breathe` (a slow scale to about 1.02 from the pivot), `spin` (a slow turn back and forth, about ±10°, never a full turn). One table in code.
+  - The plate's glow breathes (brightness 1 → 1.07, 4.2s each way) and about 6 dim specks drift up (the prototype's motes).
+  - Never in the way: the layers take no taps; the TV's quiet bar and flicker and the wrong-check static still show over them; the robot's "Picture shown" timing is unchanged.
+  - Performance: transforms and opacity only, no per-frame script; all of it stops on a new word, on leaving the play screen and while the page is hidden. Smooth on a mid-range Android phone.
+  - `prefers-reduced-motion`: the two layers show still; no idle, glow or specks.
+  - A new `picture.js` (a subscriber after `renderTv`) renders the layers and runs the life; it never mutates state; its tables and pure helpers are tested through `node`; CLAUDE.md's architecture list names it. The data has no `face` or `win_image` yet; leave the peek and win frames out.
+  - DESIGN.md records the life layer next to the TV lines.
+  - Screenshots: `life-cat.png`, `life-bus.png`, `life-helicopter.png`, `life-duck-still.png`. Checklist passes.
+- status:
+
+### B-222 Each word's own win on a correct answer
+- why: the correct answer is where each picture's joke pays off (the human's example: the bat opens its wings), instead of the same burst on every word.
+- acceptance:
+  - When a word is checked correct, its subject plays its `win` move once, inside the TV's mask, then goes back to its idle. `cheer` (1.9s), `bungee` (1.4s) and `drive` (1.5s, with its exhaust puffs) are the prototype's `WIN` moves. New, in the same spirit, big and silly, 1.2–1.9s, each ending exactly where it started: `hop-spin` (a high hop with one full turn in the air, a squash on landing), `wobble-flop` (wobbles, flops over to one side, springs back up), `splash` (dips, then leaps in an arc while teal and cream drops fly), `pop` (a squash, then a big bouncy pop to about 1.25 and settle), `zoom` (shoots off the top with a blur and drops back in from above).
+  - With it, the TV's warm flash and sparks (today's correct-check flash and burst) play once, not twice. The slots' pulse and the robot's Correct moment stay as they are.
+  - A word without `motion`: the whole picture does the `pop` move, with the flash and sparks.
+  - Reduced motion: the prototype's opacity pulse (400ms); no move, no sparks.
+  - It lives in `picture.js` (B-221); CLAUDE.md's celebrate.js bullet says the TV's win, flash and sparks now start there. DESIGN.md "Feedback" (Correct) is updated.
+  - Screenshots, each mid-move: `win-cat-cheer.png`, `win-taxi-drive.png`, `win-dog-hop-spin.png`, `win-helicopter-zoom.png`, plus `win-reduced.png`. Checklist passes.
+- status:
+
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
-- Picture life and win motion (layers 2 and 3 of `design/reference/tv-motion.html`): becomes a backlog item once the theme data carries each word's `motion` fields (subject, plate, idle, pivot, win).
+- Picture peek and win frames: once the data carries `face` or `win_image` (the win-frame batch), the face peeks every 3–7s and the win swaps in the second frame, as the prototype's bat (B-221, B-222 leave them out).
+- Slow say boost (PROGRESSION.md): the robot says the word in parts; needs the new voice clips.
+- Buy a new theme with gears (PROGRESSION.md "Build decisions"): once Food and Home are in the data; which themes are open from the start and the price are open questions.
+- Kept letters draggable on later stages (PROGRESSION.md "Lever rule"); M4 locks them on every stage.
+- Stage screens dressed as lab rooms or machine upgrades, and a real stage-cleared animation: a Claude Design session (human).
 - Design bump: the overall look feels mellow and restrained; make it bolder across all screens, worked out in Claude Design first (human, 2026-10-15).
 - Login and saving the sticker book to the DB (django.contrib.auth is already installed).
 - Visual mascot on the theme, round-end and sticker book screens (no corner is reserved since B-116; CHARACTER.md "Poses": robot-hero on the theme screen); character text lines on screens.

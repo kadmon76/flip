@@ -5,8 +5,10 @@ A web spelling game for kids aged 9–10, native Hebrew speakers, beginners
 in English, playing alone on a phone at home. A card shows a picture; the
 player drags letter tiles into boxes to spell the English word. A round is
 5 words and ends with stars. Mastered words become stickers in a sticker
-book. The game is playful and quirky; the character (voice clips now, a
-visual mascot later) is the reason the kid keeps playing.
+book. Each theme climbs through stages of harder words; playing earns
+gears that buy help from the robot (PROGRESSION.md). The game is playful
+and quirky; the character (voice clips now, a visual mascot later) is
+the reason the kid keeps playing.
 "Done" for M1: theme → 5-word round → round-end with stars → juice
 (sounds, wiggle, confetti) → sticker book in localStorage, all working on
 a phone.
@@ -88,12 +90,17 @@ a phone.
   book to the server (not in M1).
 - Mobile-first, touch-first. Drag must feel good on a phone.
 - Short sessions: rounds of 5 words, then a round-end screen.
-- Mistakes (M1 mode): 3 hearts per word. A wrong check costs one heart,
+- Mistakes: 3 hearts per word. A wrong check costs one heart,
   tiles stay so the kid can fix them. Third miss reveals the word and it
-  counts as not mastered. A word counts as mastered only when checked
-  correct with at least one heart left.
-- Rewards are cosmetic only: stars per round, stickers in the book. All
-  themes are always open. Nothing is gated.
+  counts as not mastered. A word's sticker needs a clean spelling: correct
+  on the first check, with no boost (PROGRESSION.md; from B-218, until
+  then correct with a heart left).
+- Progression (M4, PROGRESSION.md is the source): no level picker; each
+  theme's stages open in order, and cleared stages stay open for replay.
+  The word is always hearable, on every stage.
+- Rewards: stars per round and stickers in the book (cosmetic), and gears,
+  earned only by playing, never lost, spent only on boosts. All themes are
+  open. No real money.
 - No English on screen except the target word and the logo; numbers
   allowed. Everything else is an icon, light, sound, motion or the robot
   (DESIGN.md 'Words on screen').
