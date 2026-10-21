@@ -97,7 +97,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   left to right: reset lever (far left), speaker (centre-left), check
   dome (right). Reset and check stay far apart.
 - **Robot:** behind the console's left third, head and shoulders visible
-  (~75px); the console, the rail and the bench blocks are drawn above him (on 7–10 letter words his pop-up passes under the second block row; BACKLOG B-115).
+  (~75px); the console, the rail and the bench blocks are drawn above him (on 9–10 letter words his pop-up passes under the second block row; BACKLOG B-115, B-213).
 - **Header:** split-flap logo "flip" top-left, mute toggle top-right, and on the play screen only the back arrow between them (24px left of the toggle's tap area; B-201), inside the safe area over the shelf.
 
 ## Palette (sampled from v5; use as CSS variables)
@@ -191,5 +191,5 @@ Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" i
 - Scene objects are the image assets; nothing in their place is CSS-drawn.
 - No English on screen except the target word and the logo; numbers ok.
 - Only palette colours; fonts as above.
-- Tap targets ≥48px (slots may be 46px).
+- Tap targets ≥48px (slots may be 46px; on a 7–8 letter word a placed letter's tap area may be 40–45px wide when it spans the rail's full height, B-213).
 - Nothing clipped, overlapping, or scrolling sideways at 360px (on the play screen `document.documentElement.scrollWidth` equals the viewport width and `scrollHeight` its height; a positioned glow box past the column edge adds scroll, a `box-shadow` does not).
