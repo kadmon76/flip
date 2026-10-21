@@ -876,10 +876,11 @@ body[data-screen="play"] .play-back-btn {
 }
 
 /* A locked letter (BACKLOG B-211; card.js sets class `locked` on its slot
-   from the slot's `locked` flag, one look for all: B-204 the first letter
-   given on easy, B-205 a right letter the lever kept after a wrong check
-   on easy, B-206 the robot's letter on the second miss). It never lifts
-   or moves (drag.js keeps it disabled), so it has no hand cursor. */
+   from the slot's `locked` flag, one look for all: stage 1's given first
+   letter (B-204, B-215), a letter the last wrong check found right that
+   the lever kept (B-215b), B-206 the robot's letter on the second miss).
+   It never lifts or moves (drag.js keeps it disabled), so it has no hand
+   cursor. */
 .letter-box.locked > .draggable-letter {
     cursor: default;
 }

@@ -24,9 +24,9 @@
 //   another (`stagger`), landing like a snap into a slot.
 // - `hop`: after the reset lever the placed blocks hop `height` px up and
 //   back down onto their start spots, `stagger` apart.
-// - `clunk`: a letter that locks (BACKLOG B-211: the lever on easy, the
-//   robot's letter as it lands) is pressed into its slot: it sinks to
-//   `scale` of a placed block in `press`, then comes up to its locked
+// - `clunk`: a letter that locks (BACKLOG B-211: a letter the lever keeps,
+//   B-215b; the robot's letter as it lands) is pressed into its slot: it
+//   sinks to `scale` of a placed block in `press`, then comes up to its locked
 //   size by `duration`.
 // - `jointGlow`: when a word in two rows appears (BACKLOG B-213), its
 //   brass joint glows up and back down once within `duration`; reduced

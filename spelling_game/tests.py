@@ -1266,8 +1266,8 @@ class ControlsTests(TestCase):
 
 class ResetTransitionTests(TestCase):
     """static/js/drag.js returnAll() and afterMove(): the reset lever puts
-    every placed block back on the bench (here every letter checked is
-    wrong; the right ones it keeps are LeverTests, B-205); any block move
+    every placed block back on the bench (here no wrong check noted a
+    right letter; the ones it keeps are LeverTests, B-215b); any block move
     after a wrong check reopens the word (BACKLOG B-114)."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'drag.js'
@@ -3637,15 +3637,19 @@ class StageStartTests(TestCase):
 
 
 class LeverTests(TestCase):
-    """Lever: wrong letters first, pull again to start over (BACKLOG B-205;
-    since B-215 the same on every stage, easy's rule until B-215b).
-    static/js/drag.js leverResult(current) (which placed letters a pull
-    sends back and which lock) and returnAll(current) (the pull applied to
-    the word), run through node: right after a wrong check only the wrong
-    letters go back and the right ones lock; the next pull sends back
-    every letter but the given one (stage 1) and the robot's; before a
-    wrong check every letter goes back. The wiring in main.js is checked
-    in the source."""
+    """The lever rule on every stage (BACKLOG B-215b, PROGRESSION.md
+    "Lever rule"). static/js/drag.js checkedWrong(current) (a wrong check
+    notes, per slot, the block it found right: `rightAtCheck`),
+    leverResult(current) (which placed letters a pull sends back and which
+    lock) and returnAll(current) (the pull applied; `justPulled`), run
+    through node in the order a kid plays them: right after a wrong check
+    the blocks it found right stay and lock and the rest go back; after a
+    block moved or a new one was placed the check's right blocks still in
+    their own slot stay, everything else goes back (never a free check); a
+    pull again right after a pull starts the word over; before any wrong
+    check everything goes back. The given letter (stage 1), the robot's
+    hint letter and a boost's letter stay through all of them. The wiring
+    in main.js is checked in the source."""
 
     ROOT = Path(__file__).resolve().parent.parent
     JS = ROOT / 'static' / 'js'
@@ -3656,7 +3660,10 @@ class LeverTests(TestCase):
         script = (
             f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
             f"const C = await import('{(self.JS / 'controls.js').as_uri()}');"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
             "const out = (v) => console.log(JSON.stringify(v));"
+            # a pull: what leverResult says and the word after returnAll
+            "const pull = (cur) => [D.leverResult(cur), D.returnAll(cur)];"
             f"{body}"
         )
         result = subprocess.run(['node', '--input-type=module', '-e', script],
@@ -3673,128 +3680,299 @@ class LeverTests(TestCase):
         return js[start:js.index('\n}\n', start)]
 
     @staticmethod
-    def slot(letter, tile, locked=False):
+    def slot(letter, tile, locked=False, hint=False):
         s = {'letter': letter, 'tileId': tile}
         if locked:
             s['locked'] = True
+        if hint:
+            s['hint'] = True
         return s
 
-    def horse(self, given, status, letters, locked=()):
-        """The word "horse" with `letters` in its slots (' ' = empty), one
-        block per letter named by its letter (h, o, r, s, e). With `given`
-        (stage 1) the h is the given letter (locked in slot 1, its block
-        `given`); the letters in `locked` (block ids) are locked too."""
+    def horse(self, given, letters):
+        """The word "horse" as a kid has filled it, not checked yet:
+        `letters` in its slots (' ' = empty), one block per letter named
+        by its letter (h, o, r, s, e). With `given` (stage 1) the h is the
+        given letter (locked in slot 1, its block `given`)."""
         tray = [{'id': t, 'letter': t, 'used': t in letters} for t in 'sroeh']
         if given:
             tray[-1]['given'] = True
-        placed = [self.slot(ch, ch, (ch == 'h' and given) or ch in locked) if ch != ' ' else None for ch in letters]
-        return {'word': 'horse', 'image': '/i.svg', 'audio': None, 'status': status, 'tray': tray, 'placed': placed}
-
-    def pull(self, current):
-        """[leverResult(current), returnAll(current), whether `current` was
-        left untouched]."""
-        return self.run_node(
-            f"const cur = {json.dumps(current)}; const before = JSON.stringify(cur);"
-            "const r = D.leverResult(cur); const after = D.returnAll(cur);"
-            "out([r, after, JSON.stringify(cur) === before]);")
+        placed = [self.slot(ch, ch, ch == 'h' and given) if ch != ' ' else None for ch in letters]
+        return {'word': 'horse', 'image': '/i.svg', 'audio': None, 'status': 'playing', 'tray': tray,
+                'placed': placed, 'rightAtCheck': None, 'justPulled': False}
 
     def used(self, current):
         return {t['id']: t['used'] for t in current['tray']}
 
-    # --- leverResult and the pull ---
+    H = staticmethod(lambda: {'letter': 'h', 'tileId': 'h', 'locked': True})   # stage 1's given h
 
-    def test_after_a_wrong_check_only_the_wrong_letters_go_back_and_the_right_lock(self):
-        # "hsore" on stage 1: h given, s o r wrong, e right -> s, o, r go
-        # back; e locks
-        result, after, pure = self.pull(self.horse(True, 'wrong', 'hsore'))
-        self.assertEqual(result, {'back': ['s', 'o', 'r'], 'lock': ['e']})
-        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, self.slot('e', 'e', True)])
-        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': True, 'h': True})
-        self.assertEqual(after['status'], 'playing')     # the dome stays off until the slots are full again
+    # --- the wrong check notes what it found right ---
+
+    def test_a_wrong_check_notes_the_right_block_of_each_slot(self):
+        checked, fresh, again, pure = self.run_node(
+            f"const cur = {json.dumps(self.horse(True, 'hosre'))}; const before = JSON.stringify(cur);"
+            "const c = D.checkedWrong(cur);"
+            "out([c, R.makeWord({ word: 'horse' }, 1, ((n) => () => 't' + ++n)(0)),"
+            " D.checkedWrong({ ...cur, justPulled: true }), JSON.stringify(cur) === before]);")
+        self.assertEqual(checked['status'], 'wrong')
+        # per slot: the tile id of the block found right there, else null
+        self.assertEqual(checked['rightAtCheck'], ['h', 'o', None, None, 'e'])
+        self.assertFalse(checked['justPulled'])
+        self.assertEqual(checked['placed'], self.horse(True, 'hosre')['placed'])   # nothing moves
+        # a new word: no wrong check yet, no pull
+        self.assertIsNone(fresh['rightAtCheck'])
+        self.assertFalse(fresh['justPulled'])
+        # a check is not a pull
+        self.assertFalse(again['justPulled'])
         self.assertTrue(pure)
-        # the locked right letter is a locked slot like the given one: it
-        # takes nothing and its block cannot be moved or tapped out
-        self.assertEqual(self.run_node(
-            f"const cur = {json.dumps(after)};"
-            "out([D.isLocked(cur.placed[4]), D.placeIn(cur, 's', 4), D.placeIn(cur, 'e', 1), D.takeOut(cur, 'e'),"
-            " C.domeAction(cur), C.canReset(cur)]);"),
-            [True, None, None, None, None, True])
+
+    def test_just_pulled_is_set_by_a_pull_and_cleared_by_any_block_move(self):
+        hinted = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(False, 'hrose'))});"
+            "out(D.giveHint({ ...c, justPulled: true }));")
+        res = self.run_node(
+            f"const cur = D.checkedWrong({json.dumps(self.horse(True, 'hosre'))});"
+            "const p = D.returnAll(cur);"
+            "out([cur.justPulled, p.justPulled, D.returnAll(p).justPulled,"
+            " D.takeOut(p, 'o') === null, D.placeIn(p, 's', 2).justPulled, D.takeOut(D.placeIn(p, 's', 2), 's').justPulled,"
+            # a move that changes nothing (a locked slot) is no move
+            " D.placeIn(p, 's', 1)]);")
+        self.assertEqual(res, [False, True, True, True, False, False, None])
+        # the robot's letter landing is a block move too
+        self.assertFalse(hinted['justPulled'])
+        self.assertEqual(hinted['placed'][1], self.slot('o', 'o', True, True))
+
+    # --- a pull right after a wrong check ---
+
+    def test_a_pull_right_after_a_wrong_check_keeps_the_right_letters_locked(self):
+        # "hosre" on stage 1: h given, o and e right, s and r wrong
+        result, after, controls = self.run_node(
+            f"const cur = D.checkedWrong({json.dumps(self.horse(True, 'hosre'))});"
+            "const [r, a] = pull(cur);"
+            "out([r, a, [D.isLocked(a.placed[1]), D.placeIn(a, 's', 1), D.placeIn(a, 'o', 2), D.takeOut(a, 'e'),"
+            " C.domeAction(a), C.canReset(a)]]);")
+        self.assertEqual(result, {'back': ['s', 'r'], 'lock': ['o', 'e']})
+        self.assertEqual(after['placed'], [self.H(), self.slot('o', 'o', True), None, None, self.slot('e', 'e', True)])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': True, 'e': True, 'h': True})
+        self.assertEqual(after['status'], 'playing')     # reopened; the dome is off until the slots are full
+        self.assertTrue(after['justPulled'])
+        self.assertEqual(after['rightAtCheck'], ['h', 'o', None, None, 'e'])   # kept for the next pull
+        # a kept letter is a locked slot like the given one
+        self.assertEqual(controls, [True, None, None, None, None, True])
 
     def test_the_same_on_a_stage_without_a_given_letter(self):
-        # "hsore" with no given letter: h and e are right and lock
-        result, after, _ = self.pull(self.horse(False, 'wrong', 'hsore'))
-        self.assertEqual(result, {'back': ['s', 'o', 'r'], 'lock': ['h', 'e']})
-        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, self.slot('e', 'e', True)])
-        # the next pull starts over: everything goes back, unlocked
-        result, again, _ = self.pull(after)
-        self.assertEqual(result, {'back': ['h', 'e'], 'lock': []})
-        self.assertEqual(again['placed'], [None] * 5)
-        self.assertEqual(set(self.used(again).values()), {False})
-
-    def test_second_pull_sends_back_everything_but_the_given_letter_and_unlocks_it(self):
-        first = self.pull(self.horse(True, 'wrong', 'hsore'))[1]
-        result, after, pure = self.pull(first)
-        self.assertEqual(result, {'back': ['e'], 'lock': []})
-        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
-        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
-        self.assertTrue(pure)
-        # any time later: blocks placed since the first pull go back too,
-        # and the locked one unlocks (its slot is emptied)
-        later = self.run_node(f"const cur = {json.dumps(first)}; out(D.placeIn(D.placeIn(cur, 'r', 1), 'o', 2));")
-        result, after, _ = self.pull(later)
-        self.assertEqual(result, {'back': ['r', 'o', 'e'], 'lock': []})
-        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
-        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
-        # with only the given letter left, a pull sends nothing back
-        result, again, _ = self.pull(after)
-        self.assertEqual(result, {'back': [], 'lock': []})
-        self.assertEqual(again['placed'], after['placed'])
-
-    def test_a_new_wrong_check_makes_the_next_pull_drop_the_wrong_letters_again(self):
-        # after the first pull (e locked) the kid fills "hosre" and checks
-        # wrong again: o is right now and locks, e stays locked, s and r go
-        current = self.horse(True, 'wrong', 'hosre', locked='e')
-        result, after, _ = self.pull(current)
-        self.assertEqual(result, {'back': ['s', 'r'], 'lock': ['o', 'e']})
+        result, after = self.run_node(
+            f"out(pull(D.checkedWrong({json.dumps(self.horse(False, 'hosre'))})));")
+        self.assertEqual(result, {'back': ['s', 'r'], 'lock': ['h', 'o', 'e']})
         self.assertEqual(after['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True), None, None,
                                            self.slot('e', 'e', True)])
 
-    def test_after_a_block_moved_since_the_wrong_check_the_pull_starts_over(self):
-        # the wrong check belongs to the arrangement that was checked: once
-        # a block moved (status back to 'playing') the lever cannot tell
-        # right from wrong without a check, so it sends back every letter
-        moved = self.run_node(f"out(D.takeOut({json.dumps(self.horse(True, 'wrong', 'hsore'))}, 's'));")
+    # --- a wrong check, a block moved, then a pull ---
+
+    def test_a_block_moved_since_the_check_the_right_ones_still_in_place_stay(self):
+        # after the check the kid drags the right o from slot 2 into slot
+        # 3 (the wrong s there goes back): the o is no longer in its own
+        # slot, so it goes back with the wrong r; the e, still where the
+        # check found it, stays and locks
+        moved, result, after = self.run_node(
+            f"const m = D.placeIn(D.checkedWrong({json.dumps(self.horse(True, 'hosre'))}), 'o', 2);"
+            "out([m, ...pull(m)]);")
         self.assertEqual(moved['status'], 'playing')
-        result, after, _ = self.pull(moved)
-        self.assertEqual(result, {'back': ['o', 'r', 'e'], 'lock': []})
-        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
+        self.assertFalse(moved['justPulled'])
+        self.assertEqual(result, {'back': ['o', 'r'], 'lock': ['e']})
+        self.assertEqual(after['placed'], [self.H(), None, None, None, self.slot('e', 'e', True)])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': True, 'h': True})
 
-    def test_before_any_wrong_check_every_letter_but_the_given_one_goes_back(self):
-        result, after, _ = self.pull(self.horse(True, 'playing', 'hro e'))
-        self.assertEqual(result, {'back': ['r', 'o', 'e'], 'lock': []})
-        self.assertEqual(after['placed'], [self.slot('h', 'h', True), None, None, None, None])
-        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
-        result, after, _ = self.pull(self.horse(False, 'playing', 'hro e'))
-        self.assertEqual(result, {'back': ['h', 'r', 'o', 'e'], 'lock': []})
-        self.assertEqual(after['placed'], [None] * 5)
+    def test_a_right_block_taken_out_and_put_back_in_its_slot_stays(self):
+        result, after = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(False, 'hosre'))});"
+            "out(pull(D.placeIn(D.takeOut(D.takeOut(c, 's'), 'o'), 'o', 1)));")
+        self.assertEqual(result, {'back': ['r'], 'lock': ['h', 'o', 'e']})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True), None, None,
+                                           self.slot('e', 'e', True)])
 
-    def test_a_word_with_a_letter_twice_judges_each_slot_by_its_letter(self):
-        # "sheep", s given, checked as "seehp": either e block is right in
-        # an e slot (as the check compares letters), so e2 in slot 3 locks
-        # while e1 in slot 2 goes back, with the h; p locks
-        current = {
-            'word': 'sheep', 'status': 'wrong',
-            'tray': [{'id': 's', 'letter': 's', 'used': True, 'given': True}, {'id': 'e1', 'letter': 'e', 'used': True},
-                     {'id': 'p', 'letter': 'p', 'used': True}, {'id': 'h', 'letter': 'h', 'used': True},
-                     {'id': 'e2', 'letter': 'e', 'used': True}],
-            'placed': [self.slot('s', 's', True), self.slot('e', 'e1'), self.slot('e', 'e2'), self.slot('h', 'h'),
-                       self.slot('p', 'p')],
-        }
-        result, after, _ = self.pull(current)
+    def test_a_block_placed_after_the_check_goes_back_even_when_right(self):
+        # after the check the kid takes the wrong s and r out and puts
+        # them in their right slots: "horse", never checked. The lever does
+        # not judge them (no free check): both go back, the o and e the
+        # check found right stay
+        result, after, filled = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(True, 'hosre'))});"
+            "const f = D.placeIn(D.placeIn(D.takeOut(D.takeOut(c, 's'), 'r'), 'r', 2), 's', 3);"
+            "out([...pull(f), f.placed.map((p) => p.letter).join('')]);")
+        self.assertEqual(filled, 'horse')
+        self.assertEqual(result, {'back': ['r', 's'], 'lock': ['o', 'e']})
+        self.assertEqual(after['placed'], [self.H(), self.slot('o', 'o', True), None, None, self.slot('e', 'e', True)])
+
+    def test_a_new_block_in_an_empty_slot_goes_back(self):
+        # stage 4 "duck" with the extras b and o: checked as "dOck" (the
+        # extra o in slot 2), the kid takes the o out and puts the right u
+        # in the empty slot; the pull sends the u back, d, c, k stay
+        tray = [{'id': i, 'letter': i[-1], 'used': i in ('d', 'xo', 'c', 'k')} for i in ('xo', 'k', 'd', 'xb', 'u', 'c')]
+        for t in tray:
+            if t['id'].startswith('x'):
+                t['extra'] = True
+        duck = {'word': 'duck', 'image': '/i.svg', 'audio': None, 'status': 'playing', 'tray': tray,
+                'placed': [self.slot('d', 'd'), self.slot('o', 'xo'), self.slot('c', 'c'), self.slot('k', 'k')],
+                'rightAtCheck': None, 'justPulled': False}
+        result, after = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(duck)});"
+            "out(pull(D.placeIn(D.takeOut(c, 'xo'), 'u', 1)));")
+        self.assertEqual(result, {'back': ['u'], 'lock': ['d', 'c', 'k']})
+        self.assertEqual(after['placed'], [self.slot('d', 'd', True), None, self.slot('c', 'c', True),
+                                           self.slot('k', 'k', True)])
+        self.assertEqual({t['id']: t['used'] for t in after['tray']},
+                         {'xo': False, 'k': True, 'd': True, 'xb': False, 'u': False, 'c': True})
+
+    def test_the_check_judged_blocks_not_letters(self):
+        # "sheep", s given, checked as "seehp": the e1 in slot 2 is wrong
+        # there (an h), the e2 in slot 3 right. Swapping the two e blocks
+        # after the check puts the e1 in an e slot it was never checked in:
+        # it goes back; the e2 is out of its own slot and goes back too
+        tray = [{'id': 's', 'letter': 's', 'used': True, 'given': True}, {'id': 'e1', 'letter': 'e', 'used': True},
+                {'id': 'p', 'letter': 'p', 'used': True}, {'id': 'h', 'letter': 'h', 'used': True},
+                {'id': 'e2', 'letter': 'e', 'used': True}]
+        sheep = {'word': 'sheep', 'image': '/i.svg', 'audio': None, 'status': 'playing', 'tray': tray,
+                 'placed': [self.slot('s', 's', True), self.slot('e', 'e1'), self.slot('e', 'e2'), self.slot('h', 'h'),
+                            self.slot('p', 'p')],
+                 'rightAtCheck': None, 'justPulled': False}
+        right_away, swapped = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(sheep)});"
+            "const s = D.placeIn(D.placeIn(D.takeOut(c, 'e1'), 'e1', 2), 'e2', 1);"
+            "out([pull(c), pull(s)]);")
+        result, after = right_away
         self.assertEqual(result, {'back': ['e1', 'h'], 'lock': ['e2', 'p']})
         self.assertEqual(after['placed'], [self.slot('s', 's', True), None, self.slot('e', 'e2', True), None,
                                            self.slot('p', 'p', True)])
-        self.assertEqual(self.used(after), {'s': True, 'e1': False, 'p': True, 'h': False, 'e2': True})
+        result, after = swapped
+        self.assertEqual(result, {'back': ['e2', 'e1', 'h'], 'lock': ['p']})
+        self.assertEqual(after['placed'], [self.slot('s', 's', True), None, None, None, self.slot('p', 'p', True)])
+
+    # --- a second pull ---
+
+    def test_a_second_pull_right_after_starts_over(self):
+        first, second, third = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(True, 'hosre'))});"
+            "const a = D.returnAll(c); const b = pull(a); const d = pull(b[1]);"
+            "out([a, b, d]);")
+        self.assertEqual(first['placed'], [self.H(), self.slot('o', 'o', True), None, None, self.slot('e', 'e', True)])
+        # every letter but the given h goes back, the ones the first pull
+        # locked too (their slots are emptied, so they unlock), and the
+        # check is forgotten
+        result, after = second
+        self.assertEqual(result, {'back': ['o', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.H(), None, None, None, None])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
+        self.assertIsNone(after['rightAtCheck'])
+        self.assertTrue(after['justPulled'])
+        self.assertEqual(after['status'], 'playing')
+        # with only the given letter left, a pull sends nothing back
+        result, again = third
+        self.assertEqual(result, {'back': [], 'lock': []})
+        self.assertEqual(again['placed'], after['placed'])
+
+    def test_after_a_start_over_every_letter_goes_back_until_the_next_wrong_check(self):
+        result, after = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(True, 'hosre'))});"
+            "const o = D.returnAll(D.returnAll(c));"
+            "out(pull(D.placeIn(D.placeIn(o, 'o', 1), 'e', 4)));")
+        self.assertEqual(result, {'back': ['o', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.H(), None, None, None, None])
+
+    def test_a_pull_after_a_pull_and_a_move_keeps_the_locked_letters(self):
+        # not right after: the kid placed the r since, so the pull is
+        # judged by the check again; the r goes back, o and e stay locked
+        result, after = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(True, 'hosre'))});"
+            "out(pull(D.placeIn(D.returnAll(c), 'r', 2)));")
+        self.assertEqual(result, {'back': ['r'], 'lock': ['o', 'e']})
+        self.assertEqual(after['placed'], [self.H(), self.slot('o', 'o', True), None, None, self.slot('e', 'e', True)])
+        self.assertTrue(after['justPulled'])
+
+    def test_a_new_wrong_check_makes_the_next_pull_keep_its_right_letters(self):
+        # first check "hsore" (e right), a pull (e locks), the kid fills
+        # "hosre" and checks wrong again: the o is right now and locks too
+        result, after = self.run_node(
+            f"const c = D.checkedWrong({json.dumps(self.horse(True, 'hsore'))});"
+            "const f = D.placeIn(D.placeIn(D.placeIn(D.returnAll(c), 'o', 1), 's', 2), 'r', 3);"
+            "out(pull(D.checkedWrong(f)));")
+        self.assertEqual(result, {'back': ['s', 'r'], 'lock': ['o', 'e']})
+        self.assertEqual(after['placed'], [self.H(), self.slot('o', 'o', True), None, None, self.slot('e', 'e', True)])
+
+    # --- a pull before any check ---
+
+    def test_before_any_wrong_check_every_letter_goes_back(self):
+        given, plain, spelled = self.run_node(
+            f"out([pull({json.dumps(self.horse(True, 'hro e'))}), pull({json.dumps(self.horse(False, 'hro e'))}),"
+            f" pull({json.dumps(self.horse(False, 'horse'))})]);")
+        result, after = given
+        self.assertEqual(result, {'back': ['r', 'o', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [self.H(), None, None, None, None])
+        self.assertEqual(self.used(after), {'s': False, 'r': False, 'o': False, 'e': False, 'h': True})
+        self.assertTrue(after['justPulled'])
+        self.assertIsNone(after['rightAtCheck'])
+        result, after = plain
+        self.assertEqual(result, {'back': ['h', 'r', 'o', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [None] * 5)
+        # every letter right but not checked: still all go back (no free check)
+        result, after = spelled
+        self.assertEqual(result, {'back': ['h', 'o', 'r', 's', 'e'], 'lock': []})
+        self.assertEqual(after['placed'], [None] * 5)
+
+    # --- the given, hint and boost letters through all of them ---
+
+    def test_the_given_and_hint_letters_stay_through_every_pull(self):
+        # stage 1 "horse": a first wrong check "hsore", a pull (e locks),
+        # the kid fills "hrsoe" and misses again, which leaves one bulb:
+        # the robot puts the o into slot 2 (from slot 4; the r goes back).
+        # Then a pull after the check, a pull again (start over), letters
+        # placed and a pull before any new check: the given h and his o
+        # stay through all of them
+        steps = self.run_node(
+            f"const c1 = D.checkedWrong({json.dumps(self.horse(True, 'hsore'))});"
+            "const p1 = D.returnAll(c1);"
+            "const f = D.placeIn(D.placeIn(D.placeIn(p1, 'r', 1), 's', 2), 'o', 3);"
+            "const h = D.giveHint(D.checkedWrong(f));"
+            "const [r2, p2] = pull(h); const [r3, p3] = pull(p2);"
+            "const g = D.placeIn(D.placeIn(D.placeIn(p3, 'r', 2), 's', 3), 'e', 4);"
+            "const [r4, p4] = pull(g);"
+            "out([h.placed, r2, p2.placed, r3, p3.placed, r4, p4.placed]);")
+        hinted, r2, p2, r3, p3, r4, p4 = steps
+        o = self.slot('o', 'o', True, True)
+        self.assertEqual(hinted, [self.H(), o, self.slot('s', 's'), None, self.slot('e', 'e', True)])
+        # after the check: the s (wrong) goes, the e stays locked
+        self.assertEqual(r2, {'back': ['s'], 'lock': ['e']})
+        self.assertEqual(p2, [self.H(), o, None, None, self.slot('e', 'e', True)])
+        # right after: start over, the lever-locked e goes too
+        self.assertEqual(r3, {'back': ['e'], 'lock': []})
+        self.assertEqual(p3, [self.H(), o, None, None, None])
+        # no wrong check since the start over: all the kid placed goes
+        self.assertEqual(r4, {'back': ['r', 's', 'e'], 'lock': []})
+        self.assertEqual(p4, [self.H(), o, None, None, None])
+
+    def test_a_hint_letter_on_a_stage_without_a_given_letter(self):
+        # "hrose" checked wrong with one bulb left: his o takes slot 2, the
+        # r goes back, slot 3 is empty; the kid puts the r there (right,
+        # never checked): the pull sends it back, h, s, e lock, his o stays
+        result, after = self.run_node(
+            f"const h = D.giveHint(D.checkedWrong({json.dumps(self.horse(False, 'hrose'))}));"
+            "out(pull(D.placeIn(h, 'r', 2)));")
+        self.assertEqual(result, {'back': ['r'], 'lock': ['h', 's', 'e']})
+        self.assertEqual(after['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True, True), None,
+                                           self.slot('s', 's', True), self.slot('e', 'e', True)])
+
+    def test_a_boost_letter_stays_like_the_hint(self):
+        # B-219 marks a boost's letter `boost: true` on its slot (locked):
+        # "hsroe" with a boost's r in slot 3, before a check, right after
+        # a wrong check and on a start over
+        cur = self.horse(False, 'hsroe')
+        cur['placed'][2] = {'letter': 'r', 'tileId': 'r', 'locked': True, 'boost': True}
+        before, checked, again, kept = self.run_node(
+            f"const cur = {json.dumps(cur)}; const c = D.checkedWrong(cur); const p = D.returnAll(c);"
+            "out([D.leverResult(cur), D.leverResult(c), D.leverResult(p), D.returnAll(p).placed[2]]);")
+        self.assertEqual(before, {'back': ['h', 's', 'o', 'e'], 'lock': []})
+        self.assertEqual(checked, {'back': ['s', 'o'], 'lock': ['h', 'e']})
+        self.assertEqual(again, {'back': ['h', 'e'], 'lock': []})
+        self.assertEqual(kept, cur['placed'][2])
 
     # --- wiring ---
 
@@ -3802,19 +3980,33 @@ class LeverTests(TestCase):
         drag = self.code('drag.js')
         self.assertNotIn('level', drag)
         self.assertNotIn('stage', drag)
-        for name in ('leverResult', 'returnAll'):
+        for name in ('checkedWrong', 'leverResult', 'returnAll'):
             body = self.function(name, 'drag.js')
-            for word in ('document', 'window', 'state.', 'setState', 'gsap'):
+            for word in ('document', 'window', 'state.', 'setState', 'gsap', "status === 'wrong'"):
                 self.assertNotIn(word, body, (name, word))
+        self.assertIn('export function checkedWrong(current) {', drag)
         self.assertIn('export function leverResult(current) {', drag)
-        self.assertIn("if (current.status === 'wrong') {", self.function('leverResult', 'drag.js'))
         self.assertIn('export function returnAll(current) {', drag)
+        lever = self.function('leverResult', 'drag.js')
+        self.assertIn('current.justPulled', lever)
+        self.assertIn('current.rightAtCheck', lever)
+        self.assertIn('.filter(({ p }) => p && !given.has(p.tileId) && !p.hint && !p.boost);', lever)
         self.assertIn('leverResult(current)', self.function('returnAll', 'drag.js'))
 
-    def test_the_lever_pull_in_main(self):
+    def test_the_wiring_in_main(self):
+        main = self.code('main.js')
+        self.assertIn("import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';", main)
         lever = self.function('onLever', 'main.js')
         self.assertIn("setState({ pressed: 'lever', current: returnAll(state.current) });", lever)
         self.assertNotIn('round.', lever)
+        check = self.function('onCheck', 'main.js')
+        self.assertIn('const checked = checkedWrong(current);', check)
+        self.assertEqual(check.count('checkedWrong('), 1)
+        # nothing else writes the lever's facts
+        for name in ('main.js', 'card.js', 'feedback.js', 'controls.js', 'character.js'):
+            code = self.code(name)
+            for word in ('rightAtCheck', 'justPulled'):
+                self.assertNotIn(word, code, (name, word))
 
 
 class HintTests(TestCase):
@@ -3972,11 +4164,15 @@ class HintTests(TestCase):
         pull = lambda cur: self.run_node(
             f"const cur = {json.dumps(cur)};"
             "out([D.leverResult(cur), D.returnAll(cur)]);")
+        # the second miss as main.js makes it: the wrong check (drag.js
+        # checkedWrong, BACKLOG B-215b, which notes the right letters the
+        # lever keeps), then his letter
+        missed = lambda cur: self.run_node(f"out(D.giveHint(D.checkedWrong({json.dumps(cur)})));")
         # no given letter, right after the second miss ("hrose": his o
         # took slot 2 from the r, which went back, leaving slot 3 empty):
         # the right h, s and e lock, nothing is wrong to send back; the
         # robot's o is in neither list
-        after = self.hint(self.horse(False, 'wrong', 'hrose'))[1]
+        after = missed(self.horse(False, 'playing', 'hrose'))
         result, pulled = pull(after)
         self.assertEqual(result, {'back': [], 'lock': ['h', 's', 'e']})
         self.assertEqual(pulled['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True, True), None,
@@ -3988,7 +4184,7 @@ class HintTests(TestCase):
         self.assertEqual(self.used(second), {'s': False, 'r': False, 'o': True, 'e': False, 'h': False})
         # stage 1 right after the second miss: the wrong letters go back,
         # the right ones lock; the given and the hint letter are in neither
-        after = self.hint(self.horse(True, 'wrong', 'hsore'))[1]
+        after = missed(self.horse(True, 'playing', 'hsore'))
         result, first = pull(after)
         self.assertEqual(result, {'back': ['r'], 'lock': ['e']})
         self.assertEqual(first['placed'], [self.slot('h', 'h', True), self.slot('o', 'o', True, True), None, None,
@@ -4157,9 +4353,10 @@ class HintTests(TestCase):
 
     def test_the_check_that_leaves_one_bulb_gives_the_letter_on_every_stage(self):
         main = self.code('main.js')
-        self.assertIn("import { returnAll, giveHint, afterHint, revealed } from './drag.js';", main)
+        self.assertIn("import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';", main)
         check = self.function('onCheck')
-        self.assertIn("const checked = { ...current, status: 'wrong' };", check)
+        # the wrong check notes the letters it found right (BACKLOG B-215b)
+        self.assertIn('const checked = checkedWrong(current);', check)
         self.assertIn('const left = lives - 1;', check)
         self.assertIn('current: left === 1 ? giveHint(checked) : checked', check)
         self.assertEqual(check.count('giveHint('), 1)
@@ -4179,7 +4376,7 @@ class HintTests(TestCase):
             body = self.function(name, 'drag.js')
             for word in ('document', 'window', 'state.', 'setState', 'gsap', 'stageRules'):
                 self.assertNotIn(word, body, (name, word))
-        self.assertIn('.filter(({ p }) => p && !given.has(p.tileId) && !p.hint);', self.function('leverResult', 'drag.js'))
+        self.assertIn('.filter(({ p }) => p && !given.has(p.tileId) && !p.hint && !p.boost);', self.function('leverResult', 'drag.js'))
         # a block picked up mid-motion stops where it is: its x, y and
         # scale tweens end on the press, also the parts of its motion not
         # yet started; a turn to its tilt (or a fade) still finishes
@@ -4391,12 +4588,13 @@ class ExtrasTests(TestCase):
         self.assertNotIn('tray', check)
 
     def test_the_lever_sends_an_extra_back(self):
-        # right after a wrong check the extras in slots go back (always
-        # wrong) and the right d and k lock; before a check all go back
+        # right after a wrong check (drag.js checkedWrong, BACKLOG B-215b)
+        # the extras in slots go back (always wrong) and the right d and k
+        # lock; before a check all go back
         res = self.run_node(
-            f"const cur = {json.dumps(self.duck('dOBk', 'wrong'))};"
+            f"const open = {json.dumps(self.duck('dOBk'))}; const cur = D.checkedWrong(open);"
             "const after = D.returnAll(cur);"
-            "const open = { ...cur, status: 'playing' }; const all = D.returnAll(open);"
+            "const all = D.returnAll(open);"
             "out([D.leverResult(cur), after.placed, after.tray.filter((t) => t.used).length, after.status,"
             " D.leverResult(open), all.placed, all.tray.filter((t) => t.used).length]);")
         self.assertEqual(res, [{'back': ['xo', 'xb'], 'lock': ['d', 'k']},
@@ -4901,7 +5099,7 @@ class LockedLookTests(TestCase):
         const P = (letters, locked = 'h') => letters.split('').map((ch) => (ch === '_' ? null
             : { letter: ch, tileId: ch, ...(locked.includes(ch) ? { locked: true } : {}) }));
         const wrong = { screen: 'play', lives: 2, pressed: null, round: { index: 0 },
-            current: { word: 'horse', status: 'wrong', tray, placed: P('hosre') } };
+            current: D.checkedWrong({ word: 'horse', status: 'playing', tray, placed: P('hosre'), rightAtCheck: null, justPulled: false }) };
         // where the render put them: h, o, e in slots 1, 2, 5; s, r on the bench
         tiles.h = el('h', 23, 103, 40); tiles.o = el('o', 75, 103, 40); tiles.e = el('e', 231, 103, 40);
         tiles.s = el('s', 20, 200, 52); tiles.r = el('r', 80, 200, 52);
@@ -5001,11 +5199,11 @@ class LockedLookTests(TestCase):
         res = self.run_node(
             "const out1 = [];"
             # a pull before any wrong check sends every letter but the given one back
-            "const open = { ...wrong, current: { ...wrong.current, status: 'playing' } };"
+            "const open = { ...wrong, current: { ...wrong.current, status: 'playing', rightAtCheck: null } };"
             "F.renderFeedback(open); F.renderFeedback({ ...open, pressed: 'lever', current: D.returnAll(open.current) });"
             "out1.push(clunks());"
             # a new word starts with its given letter locked: no clunk
-            "const start = { ...wrong, round: { index: 1 }, current: { ...wrong.current, status: 'playing', placed: P('h____') } };"
+            "const start = { ...wrong, round: { index: 1 }, current: { ...wrong.current, status: 'playing', placed: P('h____'), rightAtCheck: null } };"
             "F.renderFeedback({ ...start, screen: 'theme' }); F.renderFeedback(start); out1.push(clunks());"
             # a block placed, a correct check, a start-over pull
             "F.renderFeedback({ ...start, current: { ...start.current, placed: P('ho___') } });"

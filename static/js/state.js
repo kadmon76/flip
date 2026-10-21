@@ -25,7 +25,7 @@ export const state = {
         // `break` in the content JSON; round.js makeWord, layout.js
         // slotLayout, BACKLOG B-213), or null
         break: null,
-        // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (stage 1's given first letter, round.js makeWord; a right letter the lever kept after a wrong check, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
+        // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (stage 1's given first letter, round.js makeWord; a letter the last wrong check found right that the lever kept, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter (and from B-219 a boost's, boost: true); a start-over pull sends a lever-locked one back
         placed: [],
         // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: stage 1's first letter's block, which has no bench spot; extra: on a stage with extras, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable
         // for the life of the word so the DOM tile can be keyed to it
@@ -34,6 +34,18 @@ export const state = {
         // makes it 'playing' again, as does the robot's letter when it
         // finishes the word, drag.js afterHint) | 'correct' | 'revealed'
         status: 'playing',
+        // The reset lever's facts (BACKLOG B-215b, PROGRESSION.md "Lever
+        // rule", drag.js leverResult). rightAtCheck: per slot, the tile id
+        // the word's last wrong check found right there, else null (drag.js
+        // checkedWrong); null before any wrong check and after a start-over
+        // pull. A pull keeps those blocks still in their own slot, locked,
+        // and sends every other letter back.
+        rightAtCheck: null,
+        // true after a lever pull (drag.js returnAll), false after any
+        // block move (a drag, a tap, the robot's letter landing: placeIn,
+        // takeOut, giveHint) and after a wrong check; a pull while it is
+        // true starts the word over.
+        justPulled: false,
     },
     lives: 3,                   // attempts left for the current word
     // Console control held down (DESIGN "Controls and states"): 'dome' for

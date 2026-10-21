@@ -7,7 +7,7 @@
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
-import { returnAll, giveHint, afterHint, revealed } from './drag.js';
+import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderTv } from './tv.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
@@ -144,11 +144,13 @@ function onDome() {
 
 // Reset lever: down for 250ms, and the placed blocks go back to their
 // start spots at once (feedback.js shakes the rail and hops the blocks).
-// Which ones go (BACKLOG B-205, drag.js leverResult; the same on every
-// stage, B-215): right after a wrong check, only the wrong letters go and
-// the right ones lock; otherwise every one but the given letter and the
-// robot's letter. Input is not blocked; tapping a single placed block
-// still returns only that block (drag.js).
+// Which ones go (BACKLOG B-215b, drag.js leverResult; the same on every
+// stage): after a wrong check the letters it found right that are still
+// in their own slot stay and lock, every other one goes; a pull again
+// right after a pull starts the word over; before any wrong check every
+// one goes. The given letter, the robot's letter and a boost's letter
+// always stay. Input is not blocked; tapping a single placed block still
+// returns only that block (drag.js).
 function onLever() {
     if (state.screen !== 'play' || state.pressed || !canReset(state.current)) return;
     setState({ pressed: 'lever', current: returnAll(state.current) });
@@ -197,8 +199,10 @@ function onCheck(extra = {}) {
         // every stage (BACKLOG B-206, drag.js giveHint): in the same
         // setState, so the robot (character.js hintGiven) and the fly-in
         // (feedback.js) see it with the miss. A word then checked correct
-        // is mastered as any other (a bulb is left).
-        const checked = { ...current, status: 'wrong' };
+        // is mastered as any other (a bulb is left). The check notes the
+        // letters it found right, the ones the lever keeps (drag.js
+        // checkedWrong, BACKLOG B-215b).
+        const checked = checkedWrong(current);
         const left = lives - 1;
         setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
         // With extras his letter can finish the word, in place of an extra

@@ -16,7 +16,7 @@
 //     out of slots hop back to their start spots (a letter it left or
 //     locked stays put; drag.js leverResult)
 //   - a letter locked (BACKLOG B-211): the right letters the lever kept
-//     on easy, at once, and the robot's letter as it lands, are pressed
+//     (B-215b), at once, and the robot's letter as it lands, are pressed
 //     into their slots with a short clunk, their locked look (game.css)
 //     coming on at the hit
 //   - a new word in two rows appeared (BACKLOG B-213): its brass joint
@@ -72,8 +72,8 @@ export function renderFeedback(state) {
         shakeRail();
         hopBack(prev.placed);
     }
-    // a letter that locked clunks into its slot now (the lever on easy,
-    // BACKLOG B-205); the robot's letter clunks as it lands (hintIn)
+    // a letter that locked clunks into its slot now (the lever, BACKLOG
+    // B-215b); the robot's letter clunks as it lands (hintIn)
     newlyLocked(prev.placed, now.placed)
         .filter((i) => !now.placed[i].hint)
         .forEach((i) => clunk(tileEl(now.placed[i].tileId), 0));

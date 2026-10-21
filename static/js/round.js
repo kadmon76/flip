@@ -124,6 +124,9 @@ export function extraLetters(word, count, rand = Math.random) {
 // placeIn, takeOut), the reset lever leaves the given letter (drag.js
 // leverResult, returnAll), and card.js draws it with the locked look
 // (game.css .letter-box.locked).
+// A word starts unchecked and unpulled: `rightAtCheck` null (no wrong
+// check yet) and `justPulled` false, the lever's two facts (drag.js
+// checkedWrong, leverResult; BACKLOG B-215b).
 // `break` (BACKLOG B-213) is the entry's `break`, the number of letters
 // on the first slot row of a word long enough to be in two (layout.js
 // slotLayout), or null when it has none that splits the word. A word of
@@ -154,5 +157,7 @@ export function makeWord(entry, stage, newId, rand = Math.random) {
         tray,
         placed,
         status: 'playing',
+        rightAtCheck: null,
+        justPulled: false,
     };
 }
