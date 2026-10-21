@@ -6,28 +6,16 @@ export const state = {
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }] }] from themes.json and the data files; image is the first word's
     theme: null,
     words: [],                  // [{ word, image, audio, break }] for the current round
-    // results[i] = { word, correct }; level is the level the round is
-    // played at, copied from `level` when a theme is tapped (startRound)
+    // results[i] = { word, correct }; stage is the stage the round is
+    // played at (BACKLOG B-215: 1-5 or 'long', stage.js STAGES), set when
+    // a theme is tapped (startRound; until B-216 the theme's first stage)
     // and fixed for the round (null while no round is in play); the
-    // round's rules are level.js levelRules(round.level).
-    round: { index: 0, size: 5, level: null, results: [] },
-    // The level the kid picked on the theme screen (BACKLOG B-202):
-    // 'easy' | 'normal' | 'hard'. Remembered in localStorage `flip.level`
-    // (level.js loadLevel / saveLevel); main.js sets it from there at
-    // start-up. A change takes effect from the next round.
-    level: 'easy',
-    // Rounds in a row finished with 3 stars on one level (BACKLOG B-209):
-    // { level, rounds }, this session only (not stored). main.js onNext
-    // updates it once per finished round (level.js streakAfter: fewer
-    // stars, or a round on another level, start it over); a round left
-    // with the back button never gets there and changes nothing. From
-    // LEVEL_UP_ROUNDS on, the round-end screen suggests the next level
-    // (level.js levelUpFor), except on hard.
-    streak: { level: null, rounds: 0 },
+    // round's rules are stage.js stageRules(round.stage), for every word
+    // of the round.
+    round: { index: 0, size: 5, stage: null, results: [] },
     // A round is being set up: true from a tap that starts one (a theme
-    // card, play again, the level-up nudge) until main.js startRound has
-    // the theme's data file and shows the round. A second tap meanwhile
-    // starts nothing.
+    // card, play again) until main.js startRound has the theme's data file
+    // and shows the round. A second tap meanwhile starts nothing.
     startingRound: false,
     current: {
         word: null,
@@ -37,9 +25,9 @@ export const state = {
         // `break` in the content JSON; round.js makeWord, layout.js
         // slotLayout, BACKLOG B-213), or null
         break: null,
-        // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (easy's given first letter, round.js makeWord; a right letter the lever kept after a wrong check on easy, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
+        // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (stage 1's given first letter, round.js makeWord; a right letter the lever kept after a wrong check, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter; its next pull sends a lever-locked one back
         placed: [],
-        // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: the easy first letter's block, which has no bench spot; extra: on hard, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable
+        // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: stage 1's first letter's block, which has no bench spot; extra: on a stage with extras, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
         // 'playing' | 'wrong' (checked, lives left; the next block move
@@ -53,11 +41,11 @@ export const state = {
     // on the reset lever; null otherwise.
     pressed: null,
     speaking: false,            // the word's audio is playing (speaker-on)
-    // Taps on the speaker while it holds the word back (normal and hard,
-    // before the word is answered; BACKLOG B-203, controls.js
-    // speakerAction). Each tap is one more: the robot's `speakerLocked`
-    // moment (character.js) and its "hmm no" (audio.js) play on the
-    // change, so only the change matters; counted over the session.
+    // Times the robot shakes his head (his `speakerLocked` moment in
+    // character.js, with its "hmm no" in audio.js): each one more plays it
+    // once, so only the change matters; counted over the session. Since
+    // BACKLOG B-215 the speaker always plays the word, so nothing adds to
+    // it yet; B-219 adds one when the kid can't afford a boost.
     lockedTaps: 0,
     // Sound off (the header's mute toggle, B-108): no sound plays at all.
     // Remembered in localStorage `flip.muted` (audio.js loadMuted /

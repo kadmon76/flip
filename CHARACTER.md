@@ -92,7 +92,7 @@ Pose and movement change together; never more than one change per 300ms.
 | Correct | fist pump, happy eyes, pop | correct clip | always |
 | 3 correct in a row | two fists pumping, double pop, cap sparks | correct clip | always |
 | Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | tada | always |
-| Speaker locked (normal and hard, before the word is answered) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | every tap |
+| Speaker locked (from B-219: a boost the kid can't afford; the speaker always plays the word since B-215) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | every time |
 
 Voice lines (the ~60-line pool, pre-generated AI voice, his own quirks
 after the target word) are a later item; M1 uses the existing clips.

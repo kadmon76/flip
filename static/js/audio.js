@@ -60,10 +60,11 @@ export const FILES = {
     },
     tada: { dir: 'celebration', names: ['tada.mp3'] },
     swipe: { dir: 'swipe', names: ['swipe1.mp3', 'swipe2.mp3', 'swipe3.mp3', 'swipe4.mp3'] },
-    // His "not yet" when the speaker holds the word back (BACKLOG B-203,
-    // moment speakerLocked): the one "hmm no" clip, a placeholder until
-    // new lines exist. The file is also in the error pool; it is
-    // downloaded and decoded once (init, decodeAll).
+    // His "not yet" (moment speakerLocked, on a change of `lockedTaps`;
+    // BACKLOG B-203, and from B-219 a boost the kid can't afford; the
+    // speaker no longer holds the word back, B-215): the one "hmm no"
+    // clip, a placeholder until new lines exist. The file is also in the
+    // error pool; it is downloaded and decoded once (init, decodeAll).
     locked: { dir: 'error', names: ['hmm no.mp3'] },
 };
 

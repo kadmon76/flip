@@ -90,7 +90,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   warning.
 - **Letter blocks:** cream clay blocks lying on the bench below the rail,
   52px min, slightly rotated (±4°), in loose staggered rows (max 4 per
-  row; on hard a 10-letter word's 12 blocks put five on the first row in a play column narrower than 462px, that is on every phone, and a third row of three starts right of the robot's reach, B-207). Lowercase by default.
+  row; with 2 extra letters (stages 4–5, B-215) a 10-letter word's 12 blocks put five on the first row in a play column narrower than 462px, that is on every phone, and a third row of three starts right of the robot's reach, B-207). Lowercase by default.
 - **Console:** pinned to the bottom of the safe area, inset 4px from each
   side of it (324px wide at 360) so its lower corners clear the frame's
   rounded inner corners. On its brass plate,
@@ -129,13 +129,13 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   taken out. Press: `pressed` for 120ms, then the result. After a correct
   answer or a reveal it is `next`: the lit dome blinks on and off (1.2s a blink: lit 480ms, an ember at 0.2 for 408ms, 156ms changes) and, while lit, its glass shines and an amber halo spills past its rim onto the console and the bench, under the blocks (B-212); pressing it goes to
   the next word (the dome is both check and next). After a wrong check it
-  stays `off` until a block moves (drag, tap or the reset lever), or until the robot's second-miss letter completes the word (hard, B-207), when it is `ready` at once.
+  stays `off` until a block moves (drag, tap or the reset lever), or until the robot's second-miss letter completes the word (a stage with extra letters, B-207, B-215), when it is `ready` at once.
 - **Reset lever** (`#reset-btn`): tap → `lever-down` for 250ms, rail shakes
   ±4px for 200ms, placed blocks hop back to their starting spots (300ms,
-  30ms stagger), except a locked letter (easy's given first letter, B-204), which stays in its slot; lever springs back. Tap area 48x48. On easy, a pull right after a wrong check (no block moved since) sends back only the letters in wrong slots, and the right ones stay and lock with the same look; any other pull sends back every letter but the given one and the robot's second-miss letter, including the letters an earlier pull locked (B-205). The robot's second-miss letter (B-206) stays through every pull on every level, like the given one.
-- **Locked letter** (a slot with the `locked` flag: easy's given first letter, a right letter the easy lever keeps, the robot's second-miss letter): one look for all, a brass plate riveted into the slot in place of the cream block (B-211). Brass face (`--brass-hi` → `--brass` → `--brass-dark`, lit from the upper left), the letter in `--ink` (25px) stamped in with a `--brass-hi` line under it, a small brass rivet in each corner, and sunk: 86% of the slot, so the hole's dark rim shows round it, its top shaded by the rim, no shadow of its own. It never lifts or moves. When a letter locks (the lever, or the robot's letter as it lands) it clunks in: drawn as a placed block it presses in to 0.8 (90ms, ease-in), turns to brass at the hit and comes up to its locked size (110ms, ease-out); no sound. Reduced motion: no press; a letter the lever keeps dips in opacity (200ms), the robot's letter only fades in where it lands (its fly-in's fade).
+  30ms stagger), except a locked letter (stage 1's given first letter, B-204, B-215), which stays in its slot; lever springs back. Tap area 48x48. On every stage (B-215, until B-215b), a pull right after a wrong check (no block moved since) sends back only the letters in wrong slots, and the right ones stay and lock with the same look; any other pull sends back every letter but the given one and the robot's second-miss letter, including the letters an earlier pull locked (B-205). The robot's second-miss letter (B-206) stays through every pull on every stage, like the given one.
+- **Locked letter** (a slot with the `locked` flag: stage 1's given first letter, a right letter the lever keeps, the robot's second-miss letter): one look for all, a brass plate riveted into the slot in place of the cream block (B-211). Brass face (`--brass-hi` → `--brass` → `--brass-dark`, lit from the upper left), the letter in `--ink` (25px) stamped in with a `--brass-hi` line under it, a small brass rivet in each corner, and sunk: 86% of the slot, so the hole's dark rim shows round it, its top shaded by the rim, no shadow of its own. It never lifts or moves. When a letter locks (the lever, or the robot's letter as it lands) it clunks in: drawn as a placed block it presses in to 0.8 (90ms, ease-in), turns to brass at the hit and comes up to its locked size (110ms, ease-out); no sound. Reduced motion: no press; a letter the lever keeps dips in opacity (200ms), the robot's letter only fades in where it lands (its fly-in's fade).
 - **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
-  playing. Where a mode hides it, show `speaker-cap` and ignore taps. On normal and hard, before the word is answered (correct or revealed), a tap holds the word back: the robot's head-shake, frown and shrug and "hmm no" instead; the speaker looks the same, no lock icon (B-203).
+  playing. A word with no audio file shows `speaker-cap` and ignores taps. On every stage a tap plays the word, before and after the word is answered; it never holds the word back (B-215, PROGRESSION.md: the word is always hearable; B-203's held-back speaker is gone).
 - **Mute toggle** (`#mute-btn`): top-right, one button: the small cream speaker glyph (code; wave, or cross while muted) then the brass switch (`mute-switch-on` knob right = sound on, `mute-switch-off` knob left = muted, stacked and swapped by class). Remembered in localStorage.
 - **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → theme screen at once, the round dropped (B-201).
 
@@ -143,8 +143,8 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb
   flickers three times and goes dark (`--bulb-off`); the TV picture gets a
   150ms static flicker; robot: Wrong check moment (CHARACTER.md).
-- Second miss (the wrong check that leaves one bulb lit, every level; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
-- Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on hard, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
+- Second miss (the wrong check that leaves one bulb lit, every stage; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
+- Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on a stage with extra letters, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
   robot: Third miss moment (CHARACTER.md).
 - Correct: slots pulse once; TV screen flashes warm white (200ms); up to
   40 sparks (amber, teal, cream) burst from the TV, 600ms, removed after;
@@ -160,13 +160,13 @@ shadow lifts, 120ms.
 
 ## Sound
 On by default, mute toggle remembered. Existing clips in `static/sounds/`:
-correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`, held-back speaker (B-203) → `error/hmm no.mp3`,
+correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`,
 block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays the error clip only). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
 dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
-plays; a speaker tap that would play the word is ignored, and a tap on the held-back speaker (B-203) still gets the robot's head-shake, silently. All playback goes through `audio.js`.
+plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
 Theme, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
@@ -176,7 +176,7 @@ labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
 theme's picture, not its name. These are placeholders; a design pass
 will replace them.
 
-Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned and mastered / missed are lit / dark (stars, bulbs), never ticks, crosses or outlines; a picked option (the level picker) is an icon button pressed in with its bulbs lit (`aria-pressed="true"`), the others raised with dark bulbs.
+Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned, mastered / missed and a theme's stages cleared / not cleared are lit / dark (stars, bulbs), never ticks, crosses or outlines. There is no level picker: how hard a round is comes from its theme's stage (PROGRESSION.md "Stages", B-215).
 
 ## Screenshots (implementer produces, reviewer checks)
 - `tools/shot.mjs`, viewport 360x740, device scale 2, saved under

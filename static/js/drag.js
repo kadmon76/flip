@@ -6,7 +6,6 @@
 
 import { state, setState } from './state.js';
 import { motionFor } from './motion.js';
-import { levelRules } from './level.js';
 import { followBlock } from './character.js';
 import { slotLayout, dropsIn } from './layout.js';
 
@@ -218,8 +217,8 @@ function placedIndex(current, tileId) {
 }
 
 // A slot holding a locked letter (round.js makeWord: the given first
-// letter on easy, BACKLOG B-204; a right letter the lever kept after a
-// wrong check on easy, B-205, leverResult; the robot's letter on the
+// letter on stage 1, BACKLOG B-204, B-215; a right letter the lever kept
+// after a wrong check, B-205, leverResult; the robot's letter on the
 // second miss, B-206, giveHint): it stays where it is.
 export function isLocked(slot) {
     return !!(slot && slot.locked);
@@ -286,39 +285,39 @@ export function afterMove(status) {
     return status === 'wrong' ? 'playing' : status;
 }
 
-// What a pull on the reset lever does on `level` (the round's level,
-// state.round.level; BACKLOG B-205): { back, lock }, the tile ids of the
-// placed letters that go back to the bench and of the ones that stay in
-// their slot, locked. The easy given first letter (its tray tile is
-// `given`, BACKLOG B-204) and the robot's second-miss letter (its slot is
-// `hint`, B-206, giveHint) are in neither: they always stay, locked.
-//   - Easy (leverDropsWrongFirst), right after a wrong check (status
-//     'wrong': the checked letters have not moved since): only the
-//     letters in wrong slots go back; the ones in right slots lock.
+// What a pull on the reset lever does (BACKLOG B-205): { back, lock },
+// the tile ids of the placed letters that go back to the bench and of the
+// ones that stay in their slot, locked. The given first letter (stage 1;
+// its tray tile is `given`, BACKLOG B-204) and the robot's second-miss
+// letter (its slot is `hint`, B-206, giveHint) are in neither: they
+// always stay, locked. On every stage (B-215: easy's rule until B-215b
+// brings PROGRESSION.md's lever rule):
+//   - Right after a wrong check (status 'wrong': the checked letters have
+//     not moved since): only the letters in wrong slots go back; the ones
+//     in right slots lock.
 //   - Otherwise (before any wrong check, after a block moved since the
-//     check, the next pull after a wrong-letters pull, and every pull on
-//     normal and hard): every placed letter goes back, a locked one too
-//     (it unlocks), and nothing locks.
-export function leverResult(level, current) {
+//     check, the next pull after a wrong-letters pull): every placed
+//     letter goes back, a locked one too (it unlocks), and nothing locks.
+export function leverResult(current) {
     const given = new Set(current.tray.filter((t) => t.given).map((t) => t.id));
     const placed = current.placed
         .map((p, i) => ({ p, right: !!p && p.letter === current.word[i] }))
         .filter(({ p }) => p && !given.has(p.tileId) && !p.hint);
     const ids = (list) => list.map(({ p }) => p.tileId);
-    if (current.status === 'wrong' && levelRules(level).leverDropsWrongFirst) {
+    if (current.status === 'wrong') {
         return { back: ids(placed.filter((s) => !s.right)), lock: ids(placed.filter((s) => s.right)) };
     }
     return { back: ids(placed), lock: [] };
 }
 
-// The reset lever's pull on `level` (leverResult): the letters it sends
-// back leave their slot (unlocked, as the slot is emptied) for their
-// start spot on the bench, the ones it locks stay with `locked: true`,
-// and the given letter and the robot's letter stay as they are. Pure
-// (main.js applies it through setState, feedback.js hops the blocks that
-// left a slot); a wrong check is reopened as by any other move.
-export function returnAll(current, level) {
-    const { back, lock } = leverResult(level, current);
+// The reset lever's pull (leverResult): the letters it sends back leave
+// their slot (unlocked, as the slot is emptied) for their start spot on
+// the bench, the ones it locks stay with `locked: true`, and the given
+// letter and the robot's letter stay as they are. Pure (main.js applies
+// it through setState, feedback.js hops the blocks that left a slot); a
+// wrong check is reopened as by any other move.
+export function returnAll(current) {
+    const { back, lock } = leverResult(current);
     const goBack = new Set(back);
     const locks = new Set(lock);
     const placed = current.placed.map((p) => {
@@ -335,19 +334,19 @@ export function returnAll(current, level) {
 }
 
 // The robot's letter on the second miss (BACKLOG B-206): the wrong check
-// that leaves one lives bulb lit also places one letter, on every level.
+// that leaves one lives bulb lit also places one letter, on every stage.
 // { index, tileId, back }: the first slot that is empty or holds a wrong
 // letter (`index`; a locked slot is always right and is skipped), the
 // block that gets its right letter (`tileId`) and the block already in
 // that slot, which goes back to the bench (`back`, null when the slot is
 // empty). The block is one with that letter lying on the bench if there
 // is one, else the one in the first wrong slot holding that letter (that
-// slot is emptied); never one in a right slot. On easy and normal every
-// block is in a slot when a check is made, so it comes from a wrong
-// slot. On hard the bench also holds extra letters (BACKLOG B-207,
-// round.js makeWord): they are never the letter given; one in the slot
-// goes back like any wrong letter. null when there is nothing to give
-// (every slot right).
+// slot is emptied); never one in a right slot. On a stage without extras
+// every block is in a slot when a check is made, so it comes from a wrong
+// slot. On a stage with extras the bench also holds extra letters
+// (BACKLOG B-207, B-215, round.js makeWord): they are never the letter
+// given; one in the slot goes back like any wrong letter. null when
+// there is nothing to give (every slot right).
 export function hintFor(current) {
     const { word, placed, tray } = current;
     const right = (p, i) => !!p && p.letter === word[i];
@@ -372,7 +371,7 @@ export function hintFor(current) {
 // `hintGiven` and feedback.js's fly-in key on it); the block that was
 // there goes back to its spot on the bench. The status is kept: main.js
 // applies it in the same setState as the wrong check, so the word stays
-// 'wrong' (the dome off until a block moves; on hard afterHint may
+// 'wrong' (the dome off until a block moves; with extras afterHint may
 // reopen it right after, when his letter finished the word, BACKLOG
 // B-207). Pure; `current` itself when there is nothing to give.
 export function giveHint(current) {
@@ -389,7 +388,7 @@ export function giveHint(current) {
     return { ...current, placed, tray };
 }
 
-// After the robot's letter (giveHint): on hard it can finish the word,
+// After the robot's letter (giveHint): with extras it can finish the word,
 // when the only wrong slot held an extra letter and the right block lay
 // on the bench (BACKLOG B-207). Every slot then holds its right letter,
 // an arrangement that was never checked, so the word reopens ('playing'):
@@ -408,7 +407,7 @@ export function afterHint(current) {
 // the word's own blocks. A block already in its right slot stays there (a
 // locked one stays locked: the given letter, a lever-locked one, the
 // robot's letter), so on the reveal only the others fly in (feedback.js).
-// The extra letters of hard (BACKLOG B-207) are never used: one in a slot
+// The extra letters (BACKLOG B-207) are never used: one in a slot
 // goes back to its bench spot (`used` is whether a block is in a slot).
 export function revealed(current) {
     const letters = current.word.split('');
