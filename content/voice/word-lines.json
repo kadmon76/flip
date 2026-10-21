@@ -1,0 +1,1170 @@
+{
+ "version": 8,
+ "date": "2026-10-22",
+ "doc": "claude/flip-robot-lines.md",
+ "notes": "Text master for the robot's word lines: the gag line after a correct answer, and the broken-Hebrew guess on a new picture. Kept in its own file instead of gag_line / he_line in claude/flip-word-list.json, so the picture batch and the voice work never overwrite each other's edits. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags; they describe sounds and delivery, never actions (actions live in the poses). pose = hand poses in order; recipe = tone recipe 1-6 in the doc; win = the picture's win move from the word list, which the gag line plays with. Writing rules from the human's review (2026-10-19, round 2): every gag says the word, clearly, best at the start; very simple English a beginner of 9-10 knows, about 10 spoken words or fewer; the fun is silly, childish and ridiculous, carried by sounds and acting (animal noises, squeaky voices, crashes, sneezes, dizzy spins) rather than wordplay or clever English. Robot moments (v4, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on the target word or a Hebrew word; pauses use [short pause] / [pause]. A Hebrew guess plays on a new picture (in place of a shared picture line, about 1 in 6 times the word comes up): mangled Hebrew, a silly beat, then the English word, a bridge from Hebrew to English. status: approved = words seen and approved by the human (only tags changed in v4); draft = new, to review. Animals and Transport approved 2026-10-19 (round 2); Food drafted 2026-10-19; Home drafted 2026-10-21. Still missing (2026-10-21): the 19 new animal words and the 21 new transport words of the 130-word list (the approved animals and transport lines cover the 26 old words only). Approvals now live only on the Robot Line Review page (https://claude.ai/artifact/5fmw8W8FCej3MgeMkAtwmu, one tab per theme plus Robot lines): a line is done when he marked Keep there or it was approved earlier; Change or Drop sends it back to Claude. 2026-10-22: he kept every Food and Home line on the page (including the 12 earlier 'revised'/'draft' ones), so all 64 Food and Home words are approved. he_status = the Hebrew guess's own status where it differs.",
+ "words": {
+  "cat": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "cheer",
+   "gag": "Cat! [purring loudly, like a motor] Prrrrrr… [motor sputtering] [giggles] Oops. That's my motor.",
+   "gag_pose": [
+    "point",
+    "giggle"
+   ],
+   "he": "Kha-TOOL! [proudly] I know Hebrew! [happy robotic beep] Kha-tool… cat!",
+   "he_pose": [
+    "pump",
+    "point"
+   ],
+   "status": "approved"
+  },
+  "dog": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Dog! Sit! [short pause] Sit! [short pause] [sighs] Okay… I sit. [rusty creak, metal clank]",
+   "gag_pose": [
+    "point",
+    "rest"
+   ],
+   "status": "approved"
+  },
+  "frog": {
+   "theme": "animals",
+   "recipe": 4,
+   "win": "hop-spin",
+   "gag": "[tenderly] From the outside, you are a frog… [sighs] but on the inside, [electronic glitches] you are always a prince to me.",
+   "gag_pose": [
+    "hands on heart (new)"
+   ],
+   "gag2": "[proudly] MOO! [coughs, electronic glitch] I mean… ribbit. Ribbit! I'm a frog.",
+   "gag2_pose": [
+    "pump",
+    "scratch"
+   ],
+   "he": "Tsfar… tsfarrr… [sneezes] ATCHOO! [sparks crackling] [sniffs] Sorry. Very sneezy word.",
+   "he_pose": [
+    "cover"
+   ],
+   "status": "approved",
+   "by": "his own gag lines"
+  },
+  "fish": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Fish! [bubbly voice] Blub blub blub… [short pause] Look! I am a fish! [robotic beep] A robot fish.",
+   "gag_pose": [
+    "pump",
+    "giggle"
+   ],
+   "status": "approved"
+  },
+  "duck": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "splash",
+   "gag": "Duck! [quacks badly] Quack quack! [short pause] [proudly] I speak duck! [glitchy robotic quack] QUACK!",
+   "gag_pose": [
+    "pump",
+    "pump2"
+   ],
+   "status": "approved"
+  },
+  "bird": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Bird! Tweet tweet! [short pause] [very loud, off-key, electronic squeal] TWEEEEET! [short pause] Oops. Too loud.",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "lion": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "cheer",
+   "gag": "Lion! [big breath] ROAR! [tiny squeak, robotic beep] [short pause] Hmm… baby roar.",
+   "gag_pose": [
+    "pump2",
+    "shrug"
+   ],
+   "he": "A-ree-YEH! [short pause] Ari? Hello, Ari! [robot giggles, high buzzing sounds] No, no… lion!",
+   "he_pose": [
+    "wave",
+    "giggle"
+   ],
+   "status": "approved"
+  },
+  "horse": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "Horse! Wait for me! [galloping away] [short pause] Come back, horse! [galloping back, happy robotic beeping] Yay!",
+   "gag_pose": [
+    "wave",
+    "clap"
+   ],
+   "status": "approved"
+  },
+  "tiger": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "[huge yawn] Ahhhh… Tiger is sleepy. [yawns] Me too… [snores, robotic whirring down]",
+   "gag_pose": [
+    "cover",
+    "rest"
+   ],
+   "status": "approved"
+  },
+  "rabbit": {
+   "theme": "animals",
+   "recipe": 3,
+   "win": "hop-spin",
+   "gag": "One ear up! One ear down! [robot giggles, high buzzing sounds] Silly rabbit!",
+   "gag_pose": [
+    "pointUp",
+    "giggle"
+   ],
+   "status": "approved"
+  },
+  "mouse": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "[whispers] Shh… a mouse! [loud sneeze] ATCHOO! [electronic glitches] [tiny feet running] Bye-bye, mouse!",
+   "gag_pose": [
+    "cover",
+    "wave"
+   ],
+   "he": "Akh-BAR! [squeaky voice] Akh-bar, akh-bar! [short pause] [robotic squeak] Squeak! Mouse!",
+   "he_pose": [
+    "chin",
+    "giggle"
+   ],
+   "status": "approved"
+  },
+  "bear": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "wobble-flop",
+   "gag": "Bear hug! [metal creaking] [squeaky] Too big! Too big hug!",
+   "gag_pose": [
+    "clap",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "wolf": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "cheer",
+   "gag": "Wolf! Ahhh-WOOO! [short pause] [proudly] Ahhh-WOOOOOO… [robotic beep] [giggles] We sing!",
+   "gag_pose": [
+    "chin",
+    "pump2"
+   ],
+   "status": "approved"
+  },
+  "bat": {
+   "theme": "animals",
+   "recipe": 3,
+   "win": "cheer",
+   "gag": "[deadpan] A bat. [pause] It's just like a cat… [short pause] but different. [robotic beep]",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved",
+   "by": "his own gag line"
+  },
+  "bus": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "drive",
+   "gag": "Bus! Bump! Bump! Bump! [loose parts rattling] [dizzy] My head is shaking!",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "he": "Oh-toh-BOOS! [short pause] Oh-toh… [robot giggles, high buzzing sounds] No! Just bus!",
+   "he_pose": [
+    "gasp",
+    "pointUp"
+   ],
+   "status": "approved"
+  },
+  "car": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "Car! Vroom vroom! [short pause] [robotic honk] Beep beep!",
+   "gag_pose": [
+    "pump",
+    "point"
+   ],
+   "status": "approved"
+  },
+  "truck": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "drive",
+   "gag": "Big truck! [strains, motor revving] Nnnngh! I lift it! [short pause] [motor sputtering] [weakly] …Too big.",
+   "gag_pose": [
+    "pump2",
+    "shrug"
+   ],
+   "status": "approved"
+  },
+  "taxi": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "[calling] Taxi! … Taxi! … [shouts] TAXI! [grumbles in frustration] … [long sigh, steam hissing]",
+   "gag_pose": [
+    "wave",
+    "shrug"
+   ],
+   "status": "approved",
+   "by": "his own gag line; the win animation has the taxi zoom straight past him"
+  },
+  "boat": {
+   "theme": "transportation",
+   "recipe": 5,
+   "win": "splash",
+   "gag": "Boat! Row, row… [seasick, robotic gurgling] Ohhh… my tummy…",
+   "gag_pose": [
+    "wave",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "plane": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "zoom",
+   "gag": "Plane! Neeeeow! [metal flapping and clanking] [short pause] Hmm. Robots can't fly.",
+   "gag_pose": [
+    "pump2",
+    "shrug"
+   ],
+   "status": "approved"
+  },
+  "train": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "Train! Choo choo! [coughs, steam hissing] Cough cough! [hoarse] …choo.",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "helicopter": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "zoom",
+   "gag": "Helicopter! Whirr whirr whirr… [dizzy, robotic whirring down] Whooa… I see two helicopters!",
+   "gag_pose": [
+    "pointUp",
+    "shrug"
+   ],
+   "he": "Ma-SOOK! Ma-sook! [metal clanking rhythm] [short pause] Not a dance! Helicopter!",
+   "he_pose": [
+    "pump2",
+    "pointUp"
+   ],
+   "status": "approved"
+  },
+  "scooter": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "Scooter! Wheee! [wobbling, squeaky wheels] Whoa… whoa… [short pause] [proudly, happy robotic beeping] I did it!",
+   "gag_pose": [
+    "pump",
+    "pump2"
+   ],
+   "status": "approved"
+  },
+  "bicycle": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "drive",
+   "gag": "Bicycle! Look! No hands! [metal crash] [short pause] [electronic glitch] Oops.",
+   "gag_pose": [
+    "pump",
+    "shrug"
+   ],
+   "he": "O-fa-NA-yim… o… fa… na… [out of breath, steam hissing] So long! [short pause] Bicycle!",
+   "he_pose": [
+    "chin",
+    "pointUp"
+   ],
+   "status": "approved"
+  },
+  "motorbike": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "Motorbike! VROOM VROOM! [short pause] [alarm beeping] Too loud! Too loud!",
+   "gag_pose": [
+    "pump2",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "submarine": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Submarine! [gurgling] Blub blub blub… [short pause] [sparks crackling] Wet robot! Wet robot!",
+   "gag_pose": [
+    "wave",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "milk": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "This is milk. [short pause] Just like water… [electronic glitch] but different.",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "approved",
+   "old_gag": "[happily] Milk! [slurps] Mmm… [glitching voice] Ro-bots… should… not… drink… milk.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "chair": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "wobble-flop",
+   "gag": "This is a chair. I'll just sit here… [electric zap, buzzing] [short pause] [shaky voice] That's a weird chair…",
+   "gag_pose": [
+    "shock",
+    "shrug"
+   ],
+   "he": "Shul-KHAN? …No. Kee-SEH! [electronic glitch] [whispers] I knew that.",
+   "he_pose": [
+    "chin"
+   ],
+   "status": "approved",
+   "old_gag": "[happy sigh] Ahh, a chair. Time to sit… [wobbling] whoa… whoa… WHOA! [metal crash] …The floor is nice too.",
+   "by": "his idea (review 2026-10-21); tags by Claude",
+   "note": "The new gag is an electric zap; the picture's win move (wobble-flop for the wobbly leg) may want a small zap instead.",
+   "he_status": "approved"
+  },
+  "jam": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "This is jam. It goes on bread. [short pause] [robotic beep] Not on robots.",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "approved",
+   "dropped_gag": "Jam! [licking] Mmm… [short pause] [sticky, motor straining] Oh no! My mittens are stuck!",
+   "note": "old line dropped in review 2026-10-21; this is a new draft"
+  },
+  "fig": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Fig! [rolling away] [short pause] [sad little beep] Bye-bye, fig!",
+   "gag_pose": [
+    "point",
+    "wave"
+   ],
+   "status": "approved"
+  },
+  "nut": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "Nut! [knocking] Hello? [crack!] [gasps, robotic beep] It opened!",
+   "gag_pose": [
+    "chin",
+    "gasp"
+   ],
+   "status": "approved"
+  },
+  "bun": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Bun! Boing! Boing! [robot giggles, high buzzing sounds] A bouncy bun!",
+   "gag_pose": [
+    "point",
+    "giggle"
+   ],
+   "status": "approved"
+  },
+  "gum": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "Gum! [chewing] Chomp chomp… [blowing] Fffff… [POP!] [short pause] [deadpan, electronic glitch] That was expected.",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved",
+   "old_gag": "Gum! [chewing] Chomp chomp… [blowing] Fffff… [POP!] [short pause] [electronic glitch] On my face.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "can": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "A can! [can opening] Psssht! [fizz spraying, sparks crackling] Whoa! Bubbles everywhere!",
+   "gag_pose": [
+    "point",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "egg": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "Egg! [wobbling] Whoa… whoa… [crack] Uh-oh… [tiny peep] Hello? [happy robotic beep]",
+   "gag_pose": [
+    "shock",
+    "wave"
+   ],
+   "he": "Bei-TSA! [short pause] Bei-tsa… [clucks, robotic beep] Bok bok! Egg!",
+   "he_pose": [
+    "chin",
+    "giggle"
+   ],
+   "status": "approved",
+   "he_status": "approved"
+  },
+  "mint": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "Mint! [chewing] Hmm… [blowing out] HAAA! [shivers, loose parts rattling] Brrr! Cold!",
+   "gag_pose": [
+    "chin",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "plum": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "hop-spin",
+   "gag": "Plum! Jump, plum, jump! [boing] [short pause] [happy robotic beeping] Yay! Good plum!",
+   "gag_pose": [
+    "point",
+    "clap"
+   ],
+   "status": "approved"
+  },
+  "pasta": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "bungee",
+   "gag": "This is pasta… pasta… [strong Italian accent] PASTA! [happy robotic beeping]",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "approved",
+   "old_gag": "Pasta! [slurping a long noodle] Sllllurrrp… [short pause] [motor straining] Still going… Sllllurrrp!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "melon": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Melon! [thud] Oops… [short pause] [sad little beep] Melon fell down!",
+   "gag_pose": [
+    "point",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "corn": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is corn. [short pause] And when it goes pop… [popping sounds] [excited] POPCORN! [happy robotic beeping]",
+   "gag_pose": [
+    "pump",
+    "pump2"
+   ],
+   "status": "approved",
+   "old_gag": "Corn! [nibbling very fast, robotic whirring] Nom-nom-nom-nom-nom… [typewriter ding]",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude"
+  },
+  "lemon": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Lemon! [licking] [sour] Eeeeeek! [electronic glitches] Sour!",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "he": "Lee-MON! [short pause] Lee… le… [computer bleeps] [proudly] Le-mon! Lemon!",
+   "he_pose": [
+    "chin",
+    "pointUp"
+   ],
+   "status": "approved"
+  },
+  "salad": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a salad. [leaves rustling] [short pause] Leaves… leaves… more leaves… [confused robotic beep] [whispers] I think it's a tree.",
+   "gag_pose": [
+    "pump2",
+    "shrug"
+   ],
+   "he": "Sa-LAT! [short pause] Sa-laaat… [electronic glitch] [whispers] No… salaD! Salad!",
+   "he_pose": [
+    "chin",
+    "pointUp"
+   ],
+   "status": "approved",
+   "dropped_gag": "Salad! Up! Up! [leaves rustling] [short pause] [muffled, robotic beep] I'm in the salad.",
+   "note": "old line dropped in review 2026-10-21 (pass 2); this is a new draft",
+   "he_status": "approved"
+  },
+  "toast": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "This is toast. And it's… ahhh… hmmm… [slow computer bleeps] let me think… [short pause] [proudly] for toasting purposes!",
+   "gag_pose": [
+    "gasp",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Toast! [toaster ding] [whoosh] [short pause] [confused robotic beep] Where did it go?",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude"
+  },
+  "mango": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "[whispers] Mango… [short pause] [whispers] I like mangos. [tiny happy beep]",
+   "gag_pose": [
+    "pump",
+    "giggle"
+   ],
+   "status": "approved",
+   "old_gag": "Mango! [juicy bite] Mmm! [short pause] [sticky, electronic glitch] Mango on my eyebrows!",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude"
+  },
+  "pizza": {
+   "theme": "food",
+   "recipe": 4,
+   "win": "bungee",
+   "gag": "[strong Italian accent] This is pizza! [short pause] MAMMA MIA! [happy robotic beeping]",
+   "gag_pose": [
+    "pump",
+    "clap"
+   ],
+   "status": "approved",
+   "old_gag": "Pizza! [big bite] Mmm! [happy robotic beeping] [mouth full] Pizza is my best friend!",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude"
+  },
+  "cake": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Cake! [deep breath] Fffff! [candles fizzing back on] [short pause] Hey! Again? [steam hissing] Fffff!",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "apple": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Apple! [little propeller whirring] Whirr… [gasps, robotic beep] A flying apple!",
+   "gag_pose": [
+    "point",
+    "gasp"
+   ],
+   "status": "approved"
+  },
+  "banana": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "hop-spin",
+   "gag": "Banana! [slipping] Whoa! [metal crash] [short pause] Not again!",
+   "gag_pose": [
+    "shock",
+    "shrug"
+   ],
+   "status": "approved"
+  },
+  "soup": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Soup! [blowing] Fff… [sipping] Hot! Hot! Hot! [steam hissing]",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "bread": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "Bread! [sniffing] Mmm… [short pause] [soft happy beeping] [whispers] I love you, bread.",
+   "gag_pose": [
+    "chin",
+    "clap"
+   ],
+   "status": "approved"
+  },
+  "carrot": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Carrot! [crunch!] [chewing loudly] CRUNCH! CRUNCH! [robot giggles, high buzzing sounds] So loud!",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "cheese": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "Cheese! [short pause] Say cheese! [camera shutter click] [robot giggles, high buzzing sounds]",
+   "gag_pose": [
+    "point",
+    "giggle"
+   ],
+   "he": "G'vi-NA? [short pause] Gvi-gvi-NA! [electronic glitch] [giggles] Cheese!",
+   "he_pose": [
+    "chin",
+    "giggle"
+   ],
+   "status": "approved",
+   "old_gag": "Cheese! I see you! [robot giggles, high buzzing sounds] Peek-a-boo!",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude",
+   "he_status": "approved"
+  },
+  "falafel": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Fa… fal… falfa… flafla… [electronic glitches] [short pause] [proudly] Falafel!",
+   "gag_pose": [
+    "gasp",
+    "wave"
+   ],
+   "status": "approved",
+   "old_gag": "Falafel! Boing! [short pause] [alarm beeping] Come back, falafel!",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude"
+  },
+  "popcorn": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is popcorn. [loud crunching] [short pause] [whispers] Shhh! The movie started.",
+   "gag_pose": [
+    "shock",
+    "cover"
+   ],
+   "status": "approved",
+   "old_gag": "Popcorn! [pop!] Ah! [pop!] Ah! [pop pop pop!] AAAH! [robotic panic beeping]",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude"
+  },
+  "avocado": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "hop-spin",
+   "gag": "Avocado! Boing! [metal bonk] Oops. Right on my head.",
+   "gag_pose": [
+    "point",
+    "scratch"
+   ],
+   "status": "approved"
+  },
+  "ketchup": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Ketchup! [straining] Nnngh… [SPLAT!] [short pause] [electronic glitch] Red robot!",
+   "gag_pose": [
+    "pump2",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "sandwich": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "Sandwich! [short pause] [robot whispers] Hello? Anybody in there?",
+   "gag_pose": [
+    "chin",
+    "wave"
+   ],
+   "status": "approved"
+  },
+  "chocolate": {
+   "theme": "food",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Chocolate! [snap!] Mmm… [whispers] One more. [snap!] [happy robotic beeping] One more…",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "watermelon": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "This is watermelon. [short pause] Not exactly water… [electronic glitch] and not exactly melon. [confused robotic beep]",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "he": "Av-a-TEE-akh! Av-a… [tongue twisted, electronic glitches] Ab-ba-ba-ba… [short pause] Watermelon!",
+   "he_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Watermelon! [big bite] Mmm! [short pause] Water… melon… [hiccups, robotic beep] Too much water!",
+   "by": "his idea (review 2026-10-21, pass 2); tags by Claude",
+   "he_status": "approved"
+  },
+  "strawberry": {
+   "theme": "food",
+   "recipe": 5,
+   "win": "hop-spin",
+   "gag": "[dreamy singing] Straw-berry… straw-berry… [humming, robotic whirring] [short pause] Sorry. That song is stuck in my gears.",
+   "gag_pose": [
+    "point",
+    "pump"
+   ],
+   "he": "TOOT! TOOT! [like a robot train horn] [short pause] No, no… strawberry!",
+   "he_pose": [
+    "pump2",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Strawberry! Nice hat! [short pause] [happy robotic beeping] I want a hat too!",
+   "by": "Claude, after his idea (review 2026-10-21, pass 2)",
+   "note": "His idea used a famous song's hook; this is an original tune in the same spirit, to keep the game clear of song rights.",
+   "he_status": "approved"
+  },
+  "bed": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Bed! [happy sigh] Nap time… [snores, robotic whirring down]",
+   "gag_pose": [
+    "rest",
+    "shock"
+   ],
+   "status": "approved",
+   "old_gag": "Bed! [happy sigh] Nap time… [snores, robotic whirring down] Boing! [startled] Hey! Bouncy pillow!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "pan": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Pan! [proudly] Watch me flip! Hup! [loud metal clang] [dizzy, shaky voice, electronic glitch] I'm okay… I'm okay…",
+   "gag_pose": [
+    "pump",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Pan! [proudly] Watch me flip! Hup! [short pause] [loud metal clang] …It flipped me.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "cup": {
+   "theme": "home",
+   "recipe": 5,
+   "win": "splash",
+   "gag": "This is a cup. If you drop it, it will… [cow mooing] [short pause] [confused robotic beep] …Never mind.",
+   "gag_pose": [
+    "chin",
+    "shock"
+   ],
+   "status": "approved",
+   "old_gag": "Cup! [whispers] Careful, cup… careful… [splash] [electronic glitch] Wet mittens!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "rug": {
+   "theme": "home",
+   "recipe": 5,
+   "win": "zoom",
+   "gag": "Rug! [whispers] Is it… flying? [gasps, happy robotic beeping] Take me with you!",
+   "gag_pose": [
+    "gasp",
+    "wave"
+   ],
+   "status": "approved"
+  },
+  "box": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Box! [knocking] Hello? [short pause] [cardboard flaps popping] AAH! [robotic beep] Empty box!",
+   "gag_pose": [
+    "chin",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "lamp": {
+   "theme": "home",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "This is a lamp. If you turn it off… [click, electric buzz fading] [short pause] [whispers, worried] Hello? Where did you go?",
+   "gag_pose": [
+    "point",
+    "giggle"
+   ],
+   "status": "approved",
+   "old_gag": "Lamp! On! Off! On! [electric buzz] [giggles] My eyes do that too!",
+   "by": "his idea (review 2026-10-21); tags by Claude",
+   "note": "Game: dim the screen at the click, bring it back on 'Where did you go?' (his idea)."
+  },
+  "mop": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Mop! [singing] La la la… swish, swish… [humming, robotic whirring] La la la…",
+   "gag_pose": [
+    "pump2",
+    "clap"
+   ],
+   "status": "approved",
+   "old_gag": "Mop! [singing] La la la… [swishing, robotic whirring] We dance! Twirl, mop, twirl!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "doll": {
+   "theme": "home",
+   "recipe": 4,
+   "win": "wobble-flop",
+   "gag": "Doll! [tenderly] Hi, little friend. [soft happy beeping] Sit with me?",
+   "gag_pose": [
+    "wave",
+    "rest"
+   ],
+   "status": "approved"
+  },
+  "bell": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "bungee",
+   "gag": "This is a bell! Ding ding! [loud ding, loose parts rattling]",
+   "gag_pose": [
+    "pump",
+    "scratch"
+   ],
+   "status": "approved",
+   "old_gag": "Bell! Ding dong! [loud ding] [loose parts rattling] Ooh, my head rings too!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "sink": {
+   "theme": "home",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Sink! [water draining down the sink] [short pause] Let it sink in… [giggles, high buzzing sounds]",
+   "gag_pose": [
+    "shock",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Sink! [water spraying] Whoa! [sparks crackling] Robots and water? No, thank you!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "book": {
+   "theme": "home",
+   "recipe": 3,
+   "win": "pop",
+   "gag": "This is a book. You put it on a shelf… [short pause] and then you forget it. [forgetful robotic beep]",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Book! [deadpan] I read it once. [short pause] [computer bleeps] I forgot the ending.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "fork": {
+   "theme": "home",
+   "recipe": 5,
+   "win": "wobble-flop",
+   "gag": "Fork! [boing, wobbling] Boing-boing-boing! [robot giggles, high buzzing sounds]",
+   "gag_pose": [
+    "point",
+    "giggle"
+   ],
+   "status": "approved",
+   "old_gag": "Fork! [boing, wobbling] Boing-boing-boing! [robot giggles, high buzzing sounds] Stop dancing, fork!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "clock": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a clock. That reminds me that… [long pause, slow computer bleeps] …this is a clock.",
+   "gag_pose": [
+    "chin",
+    "shock"
+   ],
+   "status": "approved",
+   "old_gag": "Clock! Tick tock, tick tock… [fast ticking] Tick-tick-tick-tick! [dizzy, robotic whirring down] Too fast!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "spoon": {
+   "theme": "home",
+   "recipe": 5,
+   "win": "wobble-flop",
+   "gag": "Spoon! [whispers] Don't fall, spoon… [short pause] [metal clink] [sad little beep] It fell.",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved"
+  },
+  "bath": {
+   "theme": "home",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "This is a bath. And yes, even robots take a bath… [short pause] [sloshing, happy robotic beeping] …with oil.",
+   "gag_pose": [
+    "pump",
+    "cover"
+   ],
+   "status": "approved",
+   "old_gag": "Bath! [giggles] Bubbles everywhere! [sneezes] ATCHOO! [electronic glitch] Bubble in my nose!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "sofa": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a sofa. [pause] I'm just going to sit here… for a while. [happy sigh, springs creaking, robotic whirring down]",
+   "gag_pose": [
+    "rest",
+    "giggle"
+   ],
+   "he": "Sa-PA! [short pause] Sa-pa… so-fa… [happy robotic beep] Same-same! Sofa!",
+   "he_pose": [
+    "chin",
+    "pump"
+   ],
+   "status": "approved",
+   "old_gag": "Sofa! [happy sigh] Ahh, soft… [springs bouncing] Whoa! [robot giggles, high buzzing sounds] Bouncy sofa!",
+   "by": "his idea (review 2026-10-21); tags by Claude",
+   "he_status": "approved"
+  },
+  "bowl": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "wobble-flop",
+   "gag": "Bowl! Spin, bowl, spin! [spinning whirr] [short pause] [computer bleeps] Now my head spins!",
+   "gag_pose": [
+    "point",
+    "shock"
+   ],
+   "status": "approved"
+  },
+  "plate": {
+   "theme": "home",
+   "recipe": 3,
+   "win": "wobble-flop",
+   "gag": "This is a plate. And it's… [long pause, computer bleeps] well… it's a plate!",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Plate! [deadpan] A plate. Very round. [robotic beep] [short pause] No food. Very sad.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "stove": {
+   "theme": "home",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "Stove! [flames whooshing] Hot hot hot! [steam hissing] [short pause] My eyebrows! Are they okay?",
+   "gag_pose": [
+    "shock",
+    "cover"
+   ],
+   "status": "approved"
+  },
+  "phone": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Phone! [buzzing] Bzzz bzzz! [short pause] Hello? [robotic beep] [whispers] It's for you!",
+   "gag_pose": [
+    "point",
+    "wave"
+   ],
+   "he": "Tele-FON! [ring ring] Hello? [short pause] [electronic glitch] Oh! Phone!",
+   "he_pose": [
+    "wave",
+    "pointUp"
+   ],
+   "status": "approved",
+   "he_status": "approved"
+  },
+  "key": {
+   "theme": "home",
+   "recipe": 2,
+   "win": "pop",
+   "gag": "Key! [sparkle chime] Shiny! [short pause] [robotic beep] Now… where did I put mine…",
+   "gag_pose": [
+    "point",
+    "shrug"
+   ],
+   "he": "Maf-TE-akh… maf… [throat clearing, rusty creak] Ugh. [short pause] Key! Short word!",
+   "he_pose": [
+    "chin",
+    "pointUp"
+   ],
+   "status": "approved",
+   "old_gag": "Key! [sparkle chime] Shiny! [short pause] [robotic beep] Now… where is the door?",
+   "by": "his idea (review 2026-10-21); tags by Claude",
+   "he_status": "approved"
+  },
+  "door": {
+   "theme": "home",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "This is a door. [knock knock] [short pause] [whispers] Nobody is home… [robotic beep] Oh wait. I'm home.",
+   "gag_pose": [
+    "wave",
+    "clap"
+   ],
+   "status": "approved",
+   "dropped_gag": "Door! [creaking open] Hello? [short pause] [happy robotic beeping] Ooh, warm light! Come in, come in!",
+   "note": "old line dropped in review 2026-10-21; this is a new draft"
+  },
+  "table": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Table! [drumroll with his mouth] Ta-da! [whoosh, crash] [short pause] [electronic glitch] Almost!",
+   "gag_pose": [
+    "pump2",
+    "shrug"
+   ],
+   "he": "Kee-SEH? …No! Shul-KHAN! [electronic glitch] [whispers] I mix them again!",
+   "he_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved",
+   "he_status": "approved"
+  },
+  "knife": {
+   "theme": "home",
+   "recipe": 3,
+   "win": "pop",
+   "gag": "Knife! [sparkle chime] Shiny! [short pause] [whispers] Only for grown-ups. [soft robotic beep]",
+   "gag_pose": [
+    "point",
+    "chin"
+   ],
+   "status": "approved"
+  },
+  "computer": {
+   "theme": "home",
+   "recipe": 4,
+   "win": "pop",
+   "gag": "Computer! [gasps] Cousin! [happy robotic beeping] Beep boop? [short pause] [whispers] It's a little shy.",
+   "gag_pose": [
+    "gasp",
+    "shrug"
+   ],
+   "status": "approved",
+   "old_gag": "Computer! [gasps] Cousin! [happy robotic beeping] Beep boop? [short pause] [sad little beep] It doesn't talk.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "television": {
+   "theme": "home",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "Television! [radio static] Hello, TV! [robot giggles, high buzzing sounds] Your antenna is like my eyebrows!",
+   "gag_pose": [
+    "wave",
+    "giggle"
+   ],
+   "status": "approved"
+  },
+  "blanket": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "Blanket! [flapping] Whoosh! [short pause] [muffled, robotic beep] Who turned off the light?",
+   "gag_pose": [
+    "shock",
+    "shrug"
+   ],
+   "status": "approved"
+  },
+  "kitchen": {
+   "theme": "home",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "Kitchen! [pot lid rattling] Ooh! [sniffing] Spaghetti? [stomach rumbles, electronic glitch] My memory is hungry again!",
+   "gag_pose": [
+    "gasp",
+    "chin"
+   ],
+   "status": "approved"
+  },
+  "umbrella": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "bungee",
+   "gag": "This is an umbrella. [short pause] You always need one… [rain pattering, electronic glitch] when you forget to bring one.",
+   "gag_pose": [
+    "shock",
+    "wave"
+   ],
+   "status": "approved",
+   "old_gag": "Umbrella! [wind whooshing] Whoa! Hold on! [metal creaking] [short pause] Bye-bye, umbrella!",
+   "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "toothbrush": {
+   "theme": "home",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "Toothbrush! [brushing fast] Brush brush brush! [foam bubbling, electronic glitch] Wait… I have no teeth!",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "approved"
+  }
+ }
+}
