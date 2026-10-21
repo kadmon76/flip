@@ -35,7 +35,8 @@ Each stage turns one or two dials, never all at once:
 | long | 7–10 letters, in chunks | 0 | 0 | lock |
 
 Extra letters are the beginner confusions first (round.js `CONFUSIONS`).
-All numbers are first guesses to tune in play.
+A round's stage rules apply to every word in it, review and fill words
+included. All numbers are first guesses to tune in play.
 
 **Clearing a stage.** A stage is cleared when every one of its words has
 been checked correct at least once (with or without help; a word the
@@ -71,7 +72,7 @@ some letters since the check. Letters placed after the check are not
 judged by the lever, so it never works as a free check. Pulling again
 right after (nothing moved since) starts the word over. Before the
 word's first wrong check, the lever sends back everything. The given
-first letter and the robot's hint letter always stay. (Kept letters may
+first letter, the robot's hint letter and a boost's letter always stay. (Kept letters may
 become draggable on later stages; not now.)
 
 **Gears.** Earned only by playing, never lost:
@@ -83,10 +84,13 @@ become draggable on later stages; not now.)
 
 | Boost | What happens | Cost (gears) | Offered when |
 | --- | --- | --- | --- |
-| Remember this one | Kid taps an empty or wrong slot; the robot puts the right letter there, locked | 3 | a slot is empty or wrong |
-| First letter | The robot places the word's first letter, locked | 2 | the first slot isn't already locked |
-| Clean-up | The extra letters leave the bench | 2 | the bench has extra letters |
+| Remember this one | Kid taps any slot that isn't locked; the robot puts the right letter there, locked (even if the right letter was already there) | 3 | a slot isn't locked |
+| First letter | The robot places the word's first letter, locked | 2 | the first slot isn't locked |
+| Clean-up | The extra letters leave the bench and any slot | 2 | the word still has extra blocks |
 | Slow say | The robot says the word in parts (fi…sh) | 1 | later: needs the new voice clips |
+
+Boosts must never work as a free check: what is offered, and what
+glows, never depends on whether a placed letter is right.
 
 ## Guardrails
 - **One boost per word** (start at 1, tune in play).
