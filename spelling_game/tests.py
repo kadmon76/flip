@@ -6480,3 +6480,147 @@ class TvHissTests(TestCase):
         # nothing before the first gesture or while muted; once playing it
         # is not his voice (no analyser samples); the mute stops it
         self.assertEqual(res, [0, 0, 1, 0, None])
+
+
+class VoiceScriptTests(TestCase):
+    """tools/voices.py, the offline tool that makes the robot's voice clips.
+    No network: the API call is replaced by a stand-in."""
+    ROOT = Path(__file__).resolve().parent.parent
+    TOOL = ROOT / 'tools' / 'voices.py'
+
+    def load(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('flip_voices', str(self.TOOL))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_clean_words_and_letters(self):
+        v = self.load()
+        items, waiting = v.plan_items(['words', 'letters'])
+        words = [i for i in items if i['set'] == 'words']
+        letters = [i for i in items if i['set'] == 'letters']
+        self.assertEqual(len(words), 130)
+        self.assertEqual(len(letters), 26)
+        self.assertEqual(waiting, {})
+        self.assertEqual(len(set(i['file'] for i in items)), 156)
+        self.assertEqual(len(set(i['id'] for i in items)), 156)
+        by_id = {i['id']: i for i in items}
+        self.assertEqual(by_id['cat']['text'], 'Cat!')
+        self.assertEqual(by_id['cat']['file'], 'words/animals/cat.mp3')
+        self.assertEqual(by_id['toothbrush']['file'], 'words/home/toothbrush.mp3')
+        self.assertEqual(by_id['letter-z']['text'], 'Zee!')
+        self.assertEqual(by_id['letter-w']['file'], 'letters/w.mp3')
+        for i in items:
+            self.assertTrue(i['text'].endswith('!'), i)
+            self.assertNotIn('[', i['text'])
+
+    def test_only_approved_acted_lines(self):
+        v = self.load()
+        items, waiting = v.plan_items(['gags', 'hebrew', 'robot'])
+        robot = json.loads((self.ROOT / 'content' / 'voice' / 'robot-lines.json').read_text())
+        lines = [l for p in robot['pools'].values() for l in p['lines']]
+        approved = [l['id'] for l in lines if l['status'] == 'approved']
+        self.assertEqual(sorted(i['id'] for i in items if i['set'] == 'robot'), sorted(approved))
+        self.assertEqual(waiting.get('robot', 0), len(lines) - len(approved))
+        words = json.loads((self.ROOT / 'content' / 'voice' / 'word-lines.json').read_text())['words']
+        for i in items:
+            if i['set'] in ('gags', 'hebrew'):
+                w = i['id'].rsplit('-', 1)[0]
+                self.assertEqual(words[w]['status'], 'approved')
+        frog = {i['id']: i['file'] for i in items if i['id'].startswith('frog-')}
+        self.assertEqual(frog, {'frog-gag': 'gags/animals/frog.mp3', 'frog-gag2': 'gags/animals/frog-2.mp3',
+                                'frog-he': 'hebrew/animals/frog.mp3'})
+
+    def test_drafts_are_left_out(self):
+        import tempfile
+        v = self.load()
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ('words.json', 'robot-lines.json'):
+                shutil.copy(str(self.ROOT / 'content' / 'voice' / name), tmp)
+            words = json.loads((self.ROOT / 'content' / 'voice' / 'word-lines.json').read_text())
+            words['words']['cat']['status'] = 'draft'
+            words['words']['cat']['he_status'] = 'approved'
+            Path(tmp, 'word-lines.json').write_text(json.dumps(words))
+            items, waiting = v.plan_items(['gags', 'hebrew'], content_dir=tmp)
+            ids = set(i['id'] for i in items)
+            self.assertNotIn('cat-gag', ids)
+            self.assertIn('cat-he', ids)   # the Hebrew guess has its own approval
+            self.assertEqual(waiting.get('gags'), 1)
+
+    def test_make_skips_what_exists_and_remakes_changed_text(self):
+        import io, os, tempfile, contextlib
+        v = self.load()
+        calls = []
+
+        def fake_request(key, method, path, body=None, query=''):
+            calls.append((method, path, body, query))
+            return b'ID3fake-' + body['text'].encode(), {}
+        v.request = fake_request
+        v.PAUSE = 0
+        os.environ['ELEVENLABS_API_KEY'] = 'test-key'
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                v.OUT = tmp
+                args = ['make', '--set', 'words,letters', '--only', 'cat,letter-z', '--yes']
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(v.main(args), 0)
+                self.assertEqual(len(calls), 2)
+                method, path, body, query = calls[0]
+                self.assertEqual((method, path), ('POST', '/text-to-speech/' + v.VOICE_ID))
+                self.assertEqual(body, {'text': 'Cat!', 'model_id': 'eleven_v4'})
+                self.assertEqual(query, 'output_format=mp3_44100_128')
+                self.assertEqual(Path(tmp, 'words', 'animals', 'cat.mp3').read_bytes(), b'ID3fake-Cat!')
+                manifest = json.loads(Path(tmp, 'manifest.json').read_text())
+                self.assertEqual(manifest['clips']['letters/z.mp3']['text'], 'Zee!')
+                self.assertEqual(manifest['voice_id'], v.VOICE_ID)
+                # a second run spends nothing
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(v.main(args), 0)
+                self.assertEqual(len(calls), 2)
+                # a changed text, a missing file or --force remakes it
+                manifest['clips']['words/animals/cat.mp3']['text'] = 'Cat.'
+                Path(tmp, 'manifest.json').write_text(json.dumps(manifest))
+                Path(tmp, 'letters', 'z.mp3').unlink()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(v.main(args), 0)
+                self.assertEqual(len(calls), 4)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(v.main(args + ['--force']), 0)
+                self.assertEqual(len(calls), 6)
+        finally:
+            del os.environ['ELEVENLABS_API_KEY']
+
+    def test_a_refused_key_stops_the_run(self):
+        import io, os, tempfile, contextlib
+        v = self.load()
+        calls = []
+
+        def refused(key, method, path, body=None, query=''):
+            calls.append(path)
+            raise v.ApiError(401, 'invalid api key')
+        v.request = refused
+        os.environ['ELEVENLABS_API_KEY'] = 'bad'
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                v.OUT = tmp
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(v.main(['make', '--set', 'letters', '--yes']), 1)
+                self.assertEqual(len(calls), 1)
+                self.assertFalse(Path(tmp, 'manifest.json').exists())
+        finally:
+            del os.environ['ELEVENLABS_API_KEY']
+
+    def test_standard_library_only_and_python_3_8(self):
+        import ast, sys
+        src = self.TOOL.read_text()
+        tree = ast.parse(src, feature_version=(3, 8))
+        mods = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                mods.update(a.name.split('.')[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                mods.add(node.module.split('.')[0])
+        self.assertEqual(mods, {'argparse', 'json', 'os', 'sys', 'time', 'urllib', 'datetime'})
+        for name in ('removeprefix', 'removesuffix'):
+            self.assertNotIn(name, src)
