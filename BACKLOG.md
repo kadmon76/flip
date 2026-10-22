@@ -411,7 +411,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - Docs: DESIGN.md's level-picker convention and the speaker's held-back line (B-203) follow the stage rules; CLAUDE.md's architecture list replaces the `level.js` bullet with `stage.js` and updates the round.js and controls.js bullets.
   - Tests: the level tests become stage tests.
   - Screenshots: `theme-no-levels.png`, `stage1-first-letter.png`, `stage3-one-extra.png` (stage forced through the dev hook). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/76
 
 ### B-215b Lever rule on every stage
 - why: after a wrong check the lever should keep what the kid got right, on every stage, without ever working as a free check (human, 2026-10-15; PROGRESSION.md "Lever rule").
@@ -421,7 +421,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - DESIGN.md "Controls and states" (reset lever, locked letter) describes this rule instead of easy's; CLAUDE.md's drag.js bullet is updated.
   - Tests through `node`: a pull right after a wrong check; a wrong check, a block moved, then a pull; a wrong check, a new block placed in an empty slot, then a pull (it goes back); a second pull; a pull before any check; the given and hint letters through all of them.
   - Screenshots: `lever-after-check.png`, `lever-after-move.png` (a wrong check, one block moved, then a pull: the checked-right letters stay, locked), `lever-start-over.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/76
 
 ### B-216 Stage rounds, clearing a stage, and the next stage
 - why: the kid moves forward by playing; each stage is a short set of words, and clearing it opens the next (PROGRESSION.md "Stages").
@@ -432,7 +432,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - Progress is recorded once per finished round, in `onNext`'s round-end branch (where missed words are recorded). A round left with the back button records nothing.
   - Round-end: under the stars, a row of the theme's stage bulbs (one per stage, lit = cleared; DESIGN.md "Other screens" conventions). When the round cleared its stage, that bulb lights with a pop as the stars finish (reduced motion: it is simply lit). Play again (▶) starts the theme's current stage, so after a clear it is the next one.
   - Screenshots: `round-end-stage-cleared.png`, `round-end-not-cleared.png`, `play-next-stage.png` (the first word after clearing stage 1: no given letter). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/76
 
 ### B-217 Stage map: see your progress, replay a stage
 - why: the kid sees how far they got in a theme and can go back to a cleared stage for confidence, missing stickers or gears (PROGRESSION.md "Replay").
