@@ -220,7 +220,8 @@ h3 {
     color: var(--amber-deep);
 }
 
-/* Back to the theme screen (BACKLOG B-201), on the play screen only
+/* Back to the theme's stage screen (BACKLOG B-201; the theme screen
+   until B-217), on the play screen only
    (screens.js mirrors state.screen onto <body data-screen>; hidden until
    then, so it never shows on another screen and never moves the mute
    toggle there). The sticker book's line arrow, same SVG at the same
@@ -509,9 +510,13 @@ body[data-screen="play"] .play-back-btn {
    so the first card keeps clear of the header, and the 68px the level
    row took until BACKLOG B-215, now space that keeps the stickers button
    apart from the cards (the 2026-10-13 playtest pressed it as "start"):
-   230px cards at 360x740, as before. */
+   230px cards at 360x740, as before. Under the picture, inside the card,
+   the theme's stage bulbs (BACKLOG B-217); the picture gives up their
+   row's height and is cropped a little at the top and bottom. */
 .theme-btn {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     width: min(240px, 100%, (100vh - 280px) / 2);
     aspect-ratio: 1 / 1;
     padding: 8px;
@@ -521,12 +526,27 @@ body[data-screen="play"] .play-back-btn {
 
 .theme-btn img {
     display: block;
+    flex: 1 1 0;
+    min-height: 0;
     width: 100%;
-    height: 100%;
     object-fit: cover;
     border-radius: var(--radius-small);
     user-select: none;
     -webkit-user-drag: none;
+}
+
+/* the theme's progress (BACKLOG B-217): one small bulb per stage the
+   theme has words in, lit = cleared (main.js renderStageBulbs, the
+   round-end row's bulbs, smaller) */
+.theme-btn .stage-bulbs {
+    flex: 0 0 auto;
+    margin-top: 8px;
+    gap: 10px;
+}
+
+.theme-btn .stage-bulbs .bulb {
+    width: 14px;
+    height: 14px;
 }
 
 .theme-btn:active {
@@ -1582,6 +1602,174 @@ body.dragging-active {
 .round-words .bulb {
     width: 22px;
     height: 22px;
+}
+
+/* --- Stage screen (interim, DESIGN "Other screens (interim)") --- */
+
+/* BACKLOG B-217 (stagemap.js; a design pass will replace all of this):
+   Back on the left and the theme's picture centred in a small card on
+   top (the gallery's top row), then the stations, one per stage, climbing
+   from stage 1 at the bottom (the first child) in a zig-zag, left and
+   right of the column's centre, spread over the space left. */
+#screen-stages {
+    gap: 12px;
+}
+
+.stages-top {
+    flex: 0 0 auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: start;
+}
+
+.stages-top .panel-btn {
+    justify-self: start;
+}
+
+/* the theme's picture in a small card, as on the theme screen; smaller
+   on a short screen (120px at 740 tall, 96px at 640) */
+.stages-pic {
+    display: block;
+    width: clamp(88px, 100vh - 544px, 120px);
+    aspect-ratio: 1 / 1;
+    padding: 6px;
+}
+
+.stages-pic img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.stations {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: 6px;
+}
+
+/* A station: a cream panel button (.panel) 112x64, its mark (the stage
+   number as a split-flap digit, or the long stage's joint) and its bulb
+   side by side. The 1st, 3rd and 5th stations (by position, not stage
+   number: transportation's 1, 3, 4, long go left, right, left, right) sit
+   44px left of the centre, the 2nd, 4th and 6th 44px right. */
+.station {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 112px;
+    height: 64px;
+    padding: 0;
+    color: var(--ink);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: transform 120ms ease-out;
+}
+
+.station:nth-child(odd) {
+    margin-right: 88px;
+}
+
+.station:nth-child(even) {
+    margin-left: 88px;
+}
+
+.station .flaps {
+    --flap-w: 30px;
+    --flap-h: 40px;
+    --flap-font: 30px;
+}
+
+.station .bulb {
+    width: 20px;
+    height: 20px;
+}
+
+/* The long stage's mark: two chunks (dark slot holes, the rail's) with
+   the brass joint of a word in two rows between them (BACKLOG B-213:
+   game.css's .rail-joint look, here one whole knuckle rounded on both
+   sides, centred between the chunks). */
+.station-long {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.station-long .chunk {
+    width: 17px;
+    height: 30px;
+    border-radius: 5px;
+    background: linear-gradient(to bottom, var(--bench-deep), var(--brass-dark-lo));
+    box-shadow: inset 0 3px 4px var(--shadow-deep), 0 1px 0 var(--brass-hi);
+}
+
+.station-long .rail-joint {
+    left: calc(50% - 5px);
+    width: 10px;
+    border-radius: 5px;
+}
+
+/* the current stage (and, with every stage cleared, the last one): the
+   obvious start, raised toward the light and glowing amber */
+.station.is-start {
+    transform: translate(-1px, -3px);
+    box-shadow:
+        inset 0 0 0 1px var(--brass-dark),
+        0 0 0 1px var(--brass-dark),
+        5px 10px 14px var(--shadow-contact),
+        0 0 18px 5px var(--glow-amber);
+}
+
+/* the current stage's bulb pulses (the dome's ready pulse: 0.45 <-> 1,
+   1.2s each way); under reduced motion it is steadily lit */
+.station.is-current .bulb::before {
+    animation: station-bulb 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes station-bulb {
+    from {
+        opacity: 0.45;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .station.is-current .bulb::before {
+        animation: none;
+    }
+}
+
+.station:not(:disabled):active {
+    transform: translate(1px, 2px);
+    box-shadow:
+        inset 0 0 0 1px var(--brass-dark),
+        0 0 0 1px var(--brass-dark),
+        1px 2px 4px var(--shadow-contact);
+}
+
+/* not open yet: dimmed, flat, not tappable (the button is disabled) */
+.station.is-closed {
+    cursor: default;
+    filter: brightness(0.55) saturate(0.7);
+    box-shadow:
+        inset 0 0 0 1px var(--brass-dark),
+        0 0 0 1px var(--brass-dark),
+        1px 2px 4px var(--shadow-contact);
 }
 
 /* --- Sticker book screen (interim, DESIGN "Other screens (interim)") --- */

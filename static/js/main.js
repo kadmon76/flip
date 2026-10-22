@@ -1,6 +1,7 @@
-// main.js — wiring: theme selection, round flow (a round of the theme's
-// current stage, its progress recorded at the round end), the console
-// controls (check dome, reset lever, speaker), the
+// main.js — wiring: theme selection and the theme's stage map (BACKLOG
+// B-217: a theme card opens its stage screen, a station there starts a
+// round of its stage), round flow (its progress recorded at the round
+// end), the console controls (check dome, reset lever, speaker), the
 // header's mute toggle and the play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
 // the TV's lock (tv.js), screen renders.
@@ -17,12 +18,13 @@ import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
+import { renderStageMap } from './stagemap.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
 import { stagesOf } from './stage.js';
 import { pickRound, makeWord } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
-import { forTheme as progressFor, currentStage, record as recordProgress } from './progress.js';
+import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,15 +42,24 @@ const newTileId = () => `t${++tileSeq}`;
 // Each data file: { "duck": { image, audio, stage }, ... }; the
 // theme card shows the image of the first word (the theme's picture),
 // and the gallery (gallery.js) lists every word, so each theme keeps its
-// word list.
+// word list; and its stages (stage.js stagesOf: the stages its data has
+// words in, in order), for the bulbs on its card and its stage map
+// (BACKLOG B-217).
 async function loadThemes() {
     const index = await fetch('/static/config/themes.json').then((r) => r.json());
     const themes = await Promise.all(Object.entries(index).map(async ([name, dataUrl]) => {
         const data = await fetch(dataUrl).then((r) => r.json());
         const words = Object.keys(data).map((word) => ({ word, image: data[word].image }));
-        return { name, dataUrl, image: words.length ? words[0].image : null, words };
+        return { name, dataUrl, image: words.length ? words[0].image : null, words, stages: stagesOf(data) };
     }));
     setState({ themes });
+}
+
+// The stages a theme has cleared, from state.progress (progress.js
+// load(), BACKLOG B-217); none for a theme never finished.
+function clearedOf(state, name) {
+    const progress = (state.progress || {})[name];
+    return progress && Array.isArray(progress.cleared) ? progress.cleared : [];
 }
 
 // DOM cache: the themes array the buttons were last built from. Not game
@@ -57,32 +68,68 @@ let builtThemes = null;
 
 // One cream card per theme showing the theme's picture, not its name
 // (DESIGN "Other screens (interim)"); the name is only the aria-label.
+// Under the picture, the theme's progress as a small row of bulbs, one
+// per stage, lit when cleared (BACKLOG B-217, renderStageBulbs); the
+// rows are updated in place on every render, so they follow
+// state.progress. A tap opens the theme's stage screen.
 function renderThemeButtons(state) {
-    if (state.themes === builtThemes) return;
-    builtThemes = state.themes;
     const container = $('theme-buttons');
-    container.innerHTML = '';
-    for (const theme of state.themes) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'theme-btn panel';
-        btn.setAttribute('aria-label', theme.name);
-        if (theme.image) {
-            const img = document.createElement('img');
-            img.src = theme.image;
-            img.alt = '';
-            btn.appendChild(img);
+    if (state.themes !== builtThemes) {
+        builtThemes = state.themes;
+        container.innerHTML = '';
+        for (const theme of state.themes) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'theme-btn panel';
+            btn.setAttribute('aria-label', theme.name);
+            if (theme.image) {
+                const img = document.createElement('img');
+                img.src = theme.image;
+                img.alt = '';
+                btn.appendChild(img);
+            }
+            const row = document.createElement('span');
+            row.className = 'stage-bulbs';
+            row.setAttribute('aria-hidden', 'true');
+            btn.appendChild(row);
+            btn.addEventListener('click', () => onTheme(theme));
+            container.appendChild(btn);
         }
-        btn.addEventListener('click', () => startRound(theme));
-        container.appendChild(btn);
     }
+    state.themes.forEach((theme, i) => {
+        renderStageBulbs(container.children[i].lastElementChild, theme.stages || [], clearedOf(state, theme.name));
+    });
 }
 
-async function startRound({ name, dataUrl }) {
+// --- Stage screen (BACKLOG B-217, stagemap.js) ---
+
+// A theme card opens the theme's stage map; no round starts yet.
+function onTheme(theme) {
+    if (state.screen !== 'theme') return;
+    setState({ screen: 'stages', theme: theme.name });
+}
+
+// A station: a round of its stage, if the stage is open (cleared, or the
+// theme's current stage; progress.js stations, from the same
+// state.progress the map shows). A not-open station is disabled anyway.
+function onStation(stage) {
+    if (state.screen !== 'stages') return;
+    const theme = state.themes.find((t) => t.name === state.theme);
+    if (!theme) return;
+    const open = stations(theme.stages, state.progress[theme.name]).some((s) => s.stage === stage && s.open);
+    if (open) startRound(theme, stage);
+}
+
+// `chosen`: the stage picked on the stage map (BACKLOG B-217); none for
+// play again, which plays the theme's current stage.
+async function startRound({ name, dataUrl }, chosen = null) {
     // One round at a time: while the data file of a round just started is
-    // on its way, another tap (a second tap on a theme card, or play
-    // again) starts nothing (BACKLOG B-209, review fix).
+    // on its way, another tap (a second tap on a station, or play again)
+    // starts nothing (BACKLOG B-209, review fix).
     if (state.startingRound) return;
+    // Where the tap came from: the theme's stage screen (a station) or
+    // its round end (play again).
+    const from = state.screen;
     setState({ startingRound: true });
     // data shape: { "duck": { image, audio, stage, break }, ... }
     let data;
@@ -92,22 +139,33 @@ async function startRound({ name, dataUrl }) {
         setState({ startingRound: false });
         throw e;
     }
-    // The round's stage (BACKLOG B-216; round.stage below, fixed for the
-    // round): the theme's current stage, the first of the stages its data
-    // has words in that the kid has not cleared (progress.js
-    // currentStage; all cleared: the last one), so after a clear, play
-    // again starts the next one. Its rules (stage.js stageRules) start
-    // every word of the round (round.js makeWord): on stage 1 the first
-    // letter is given, on stages 3-5 extra letters lie on the bench. The
-    // words (round.js pickRound, PROGRESSION.md "Rounds"): up to two of
-    // the words this theme's earlier rounds missed come back, in random
-    // places (missed.js; BACKLOG B-208), then the stage's words not yet
-    // solved (progress.js), its solved words, the earlier stages' words,
-    // and only while places are left the later stages'.
+    // The kid left while the data file was on its way (the stage screen's
+    // back arrow, the round end's themes, then maybe another theme's
+    // card): no round starts (BACKLOG B-217, review fix).
+    if (state.screen !== from || state.theme !== name) {
+        setState({ startingRound: false });
+        return;
+    }
+    // The round's stage (BACKLOG B-216, B-217; round.stage below, fixed
+    // for the round): the stage picked on the stage map (a cleared stage,
+    // replayed, or the current one), else the theme's current stage, the
+    // first of the stages its data has words in that the kid has not
+    // cleared (progress.js currentStage; all cleared: the last one), so
+    // after a clear, play again starts the next one. A replay of a
+    // cleared stage records its solved words at the round end and clears
+    // nothing new (progress.js afterRound). Its rules (stage.js
+    // stageRules) start every word of the round (round.js makeWord): on
+    // stage 1 the first letter is given, on stages 3-5 extra letters lie
+    // on the bench. The words (round.js pickRound, PROGRESSION.md
+    // "Rounds"): up to two of the words this theme's earlier rounds
+    // missed come back, in random places (missed.js; BACKLOG B-208), then
+    // the stage's words not yet solved (progress.js), its solved words,
+    // the earlier stages' words, and only while places are left the later
+    // stages'.
     // A long word's `break` (BACKLOG B-213) says where its slots go to a
     // second row (round.js makeWord, layout.js slotLayout).
     const progress = progressFor(name);
-    const stage = currentStage(data, progress);
+    const stage = chosen === null ? currentStage(data, progress) : chosen;
     const words = pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
     stopWord();
@@ -229,9 +287,10 @@ function onCheck(extra = {}) {
 // B-216): the words checked correct are solved, and the round's stage is
 // cleared once all its words are; the round keeps the theme's cleared
 // stages and whether this round cleared its own, for the round-end's
-// stage bulbs. A round left with the back button never gets here, so it
-// records nothing (B-201). The next word starts by the round's stage
-// rules, as the first did (BACKLOG B-215).
+// stage bulbs, and state.progress is read again for the theme cards and
+// the stage map (BACKLOG B-217). A round left with the back button
+// never gets here, so it records nothing (B-201). The next word starts
+// by the round's stage rules, as the first did (BACKLOG B-215).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -244,6 +303,7 @@ function onNext(extra = {}) {
         const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);
         setState({
             round: { ...round, results, cleared: progress.cleared, justCleared },
+            progress: loadProgress(),
             screen: 'round-end',
             speaking: false,
             idleBeat: null,
@@ -424,19 +484,28 @@ function renderRoundEnd(state) {
 // New round in the same theme: new random words, hearts and results
 // reset by startRound, at the theme's current stage (progress.js
 // currentStage, BACKLOG B-216), so after a round that cleared its stage
-// it is the next one. Falls back to the theme screen if the theme is
-// somehow missing from state.themes.
+// it is the next one; also after a replay of a cleared stage (B-217
+// leaves play again as B-216 made it). Falls back to the theme screen if
+// the theme is somehow missing from state.themes.
 function onPlayAgain() {
     const theme = state.themes.find((t) => t.name === state.theme);
     if (theme) startRound(theme);
     else onThemes();
 }
 
+// The theme screen, from the round-end (themes) or the stage screen's
+// back arrow (BACKLOG B-217): no theme, no round.
 function onThemes() {
+    leaveRound({ screen: 'theme', theme: null });
+}
+
+// No round in play any more: the word clip stops and the round's data,
+// words, results and word are cleared, with `patch` (the screen to show,
+// and on the theme screen no theme) in the same setState.
+function leaveRound(patch) {
     stopWord();
     setState({
-        screen: 'theme',
-        theme: null,
+        ...patch,
         data: null,
         words: [],
         round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },
@@ -449,23 +518,24 @@ function onThemes() {
     });
 }
 
-// --- Header: the play screen's back button (BACKLOG B-201) ---
+// --- Header: the play screen's back button (BACKLOG B-201, B-217) ---
 
-// Leave the round for the theme screen at once, no confirmation. The
-// unfinished round is dropped: the stickers it added to the book (words
-// checked correct this round that were not in the book before, marked
-// `newSticker` by onCheck) come out again, and onThemes stops the word
-// clip and clears the round (words, results, current word), so no stars,
-// stickers or results are kept. A sticker the book already had stays.
-// Pending timers find the round gone: the dome's checks the screen, the
-// idle timer ends off the play screen, and the robot drops his waiting
-// steps when the screen changes (character.js).
+// Leave the round for the theme's stage screen at once (B-217; it went
+// to the theme screen until then), no confirmation. The unfinished round
+// is dropped: the stickers it added to the book (words checked correct
+// this round that were not in the book before, marked `newSticker` by
+// onCheck) come out again, and leaveRound stops the word clip and clears
+// the round (words, results, current word), so no stars, stickers or
+// results are kept; the theme stays, for its stage map. A sticker the
+// book already had stays. Pending timers find the round gone: the dome's
+// checks the screen, the idle timer ends off the play screen, and the
+// robot drops his waiting steps when the screen changes (character.js).
 function onPlayBack() {
     if (state.screen !== 'play') return;
     for (const r of state.round.results) {
         if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);
     }
-    onThemes();
+    leaveRound({ screen: 'stages' });
 }
 
 // --- Header: the mute toggle (BACKLOG B-108, B-108b) ---
@@ -511,6 +581,7 @@ subscribe(renderControls);
 subscribe(renderRobot);
 subscribe(renderRoundEnd);
 subscribe(renderGallery);
+subscribe((s) => renderStageMap(s, onStation));
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 subscribe(renderMute);
 subscribe(renderSound);       // the robot's clips (character.js's table) and the mute
@@ -527,6 +598,7 @@ $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
+$('stages-back-btn').addEventListener('click', onThemes);
 $('mute-btn').addEventListener('click', onMute);
 $('play-back-btn').addEventListener('click', onPlayBack);
 // Any touch, click or key counts as input for the idle timer (capture:
@@ -540,6 +612,9 @@ renderScreens(state);
 // `flip.level` left in the browser by an earlier version is ignored.
 initAudio();
 setState({ muted: loadMuted() });
+// The kid's progress per theme (progress.js, BACKLOG B-217), for the
+// theme cards' bulbs and the stage map.
+setState({ progress: loadProgress() });
 loadThemes();
 
 // Box sizing depends on the row width (layout.js); re-render on rotate.

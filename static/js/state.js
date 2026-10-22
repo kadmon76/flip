@@ -2,19 +2,31 @@
 // Only this module mutates state; everything else calls setState().
 
 export const state = {
-    screen: 'theme',            // 'theme' | 'play' | 'round-end' | 'gallery'
-    themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }] }] from themes.json and the data files; image is the first word's
+    screen: 'theme',            // 'theme' | 'stages' | 'play' | 'round-end' | 'gallery'
+    themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }], stages }] from themes.json and the data files; image is the first word's; stages: stage.js stagesOf(data), the stages the data has words in (BACKLOG B-217)
+    // The theme being played: set when its card is tapped (its stage
+    // screen, BACKLOG B-217) and kept through its rounds, their round end
+    // and the play screen's back arrow to its stage screen; null on the
+    // theme screen.
     theme: null,
+    // The kid's progress per theme as progress.js load() reads it from
+    // the browser ({ "<theme>": { solved, cleared } }): main.js sets it at
+    // start-up and again after each round's record, so the theme cards'
+    // bulbs and the stage map (BACKLOG B-217) are a render of state.
+    // progress.js stays the only reader and writer of the stored copy.
+    progress: {},
     // The data file of the round's theme ({ "cat": { image, audio, stage,
     // break }, ... }), set by startRound with the round and kept to its
     // round-end screen (the round's stage's words, progress.js afterRound;
-    // the theme's stages, stage.js stagesOf); null on the theme screen.
+    // the theme's stages, stage.js stagesOf); null with no round in play
+    // (the theme and stage screens).
     data: null,
     words: [],                  // [{ word, image, audio, break }] for the current round
     // results[i] = { word, correct }; stage is the stage the round is
     // played at (BACKLOG B-215: 1-5 or 'long', stage.js STAGES), set when
-    // a theme is tapped or play again is (startRound: the theme's current
-    // stage, progress.js currentStage, BACKLOG B-216) and fixed for the
+    // a station on the theme's stage map is tapped (its stage, BACKLOG
+    // B-217) or play again is (startRound: the theme's current stage,
+    // progress.js currentStage, BACKLOG B-216) and fixed for the
     // round (null while no round is in play); the round's rules are
     // stage.js stageRules(round.stage), for every word of the round.
     // cleared and justCleared are set when the round is recorded, at its
@@ -22,9 +34,10 @@ export const state = {
     // cleared stages after the round, and whether this round cleared its
     // stage (the round-end's stage bulbs; celebrate.js pops that bulb).
     round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false },
-    // A round is being set up: true from a tap that starts one (a theme
-    // card, play again) until main.js startRound has the theme's data file
-    // and shows the round. A second tap meanwhile starts nothing.
+    // A round is being set up: true from a tap that starts one (a station
+    // on the stage map, play again) until main.js startRound has the theme's data file
+    // and shows the round, or finds the kid has left the screen the tap came
+    // from (BACKLOG B-217) and starts none. A second tap meanwhile starts nothing.
     startingRound: false,
     current: {
         word: null,

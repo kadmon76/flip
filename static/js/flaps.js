@@ -2,7 +2,8 @@
 // characters (DESIGN "Type": Courier Prime Bold, cream on charcoal flaps;
 // styles are game.css's .flap). One flap per character, spaces dropped,
 // the slash on a narrower flap; the full text goes on aria-label. Used by
-// the round-end score (main.js) and the sticker book counts (gallery.js).
+// the round-end score (main.js), the sticker book counts (gallery.js) and
+// the stage map's station digits (stagemap.js).
 // No state; the element is rebuilt on every call.
 
 export function renderFlaps(el, text) {

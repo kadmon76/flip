@@ -3037,20 +3037,26 @@ class PlayBackTests(TestCase):
         shown = re.findall(r'\n([^{}\n]*\.play-back-btn[^{}\n]*?)\s*{[^}]*display: (?!none)', css)
         self.assertEqual(shown, ['body[data-screen="play"] .play-back-btn'])
 
-    def test_tap_drops_the_round_and_goes_to_the_theme_screen(self):
+    def test_tap_drops_the_round_and_goes_to_the_stage_screen(self):
+        # since B-217 the back arrow goes to the theme's stage screen (the
+        # theme stays); the round is dropped as before (leaveRound, which
+        # onThemes also uses for the theme screen)
         main = self.main_js()
         self.assertIn("$('play-back-btn').addEventListener('click', onPlayBack);", main)
         self.assertIn("import { add as addSticker, remove as removeSticker } from './stickers.js';", main)
         back = self.function('onPlayBack')
         self.assertIn("if (state.screen !== 'play') return;", back)
         self.assertIn('if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);', back)
-        self.assertTrue(back.rstrip().endswith('onThemes();'))
+        self.assertTrue(back.rstrip().endswith("leaveRound({ screen: 'stages' });"))
+        self.assertNotIn('theme:', back)
         self.assertNotIn('confirm(', main)
-        themes = self.function('onThemes')
-        self.assertLess(themes.index('stopWord();'), themes.index('setState({'))
-        for decl in ("screen: 'theme',", 'data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false },',
+        self.assertIn("leaveRound({ screen: 'theme', theme: null });", self.function('onThemes'))
+        leave = self.function('leaveRound')
+        self.assertLess(leave.index('stopWord();'), leave.index('setState({'))
+        self.assertLess(leave.index('...patch,'), leave.index('data: null,'))
+        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false },',
                      'current: { word: null,', 'speaking: false,', 'pressed: null,', 'idleBeat: null,'):
-            self.assertIn(decl, themes, decl)
+            self.assertIn(decl, leave, decl)
 
 
 class StageTests(TestCase):
@@ -3191,7 +3197,7 @@ class StageTests(TestCase):
 
     def test_the_theme_screen_shows_the_cards_and_the_stickers_button(self):
         html = self.client.get('/').content.decode()
-        theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-play"')]
+        theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-stages"')]
         self.assertLess(theme.index('id="theme-buttons"'), theme.index('<div class="actions">'))
         actions = theme[theme.index('<div class="actions">'):]
         self.assertEqual(re.findall(r'<button id="([^"]+)"', theme), ['stickers-btn'])
@@ -3216,9 +3222,11 @@ class StageTests(TestCase):
         # tested in ProgressTests), read once the data file is in; with
         # nothing cleared it is the first stage with words in its data, or
         # stage 1 for data with none, as B-215 played
+        # (since B-217 a tapped station picks the stage; with none picked,
+        # play again, it is still the current stage)
         start = self.main_function('startRound')
         self.assertIn('const progress = progressFor(name);', start)
-        line = 'const stage = currentStage(data, progress);'
+        line = 'const stage = chosen === null ? currentStage(data, progress) : chosen;'
         self.assertIn(line, start)
         self.assertLess(start.index('await fetch('), start.index('const progress = progressFor(name);'))
         self.assertLess(start.index('const progress = progressFor(name);'), start.index(line))
@@ -3240,7 +3248,7 @@ class StageTests(TestCase):
         main = self.code('main.js')
         self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },',
-                      self.main_function('onThemes'))
+                      self.main_function('leaveRound'))
         for name in ('onCheck', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
 
@@ -3260,7 +3268,9 @@ class StageTests(TestCase):
         self.assertIn('roundsStarted: state.roundsStarted + 1,', last)
         self.assertIn('startingRound: false,', last)
         main = self.code('main.js')
-        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 3)
+        # (since B-217 also cleared when the kid left while the data file
+        # was on its way: StageMapTests)
+        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 4)
         for name in ('onPlayAgain', 'onThemes', 'onNext', 'onPlayBack'):
             self.assertNotIn('startingRound:', self.main_function(name), name)
 
@@ -5624,8 +5634,9 @@ class NextDomeTests(TestCase):
             self.assertLess(branch.index('setState('), branch.index('armNudge();'))
         miss = check[check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5):]
         self.assertNotIn('armNudge', miss)
-        # back to 0 on every new word, the round end and the theme screen
-        for name, n in (('startRound', 1), ('onNext', 2), ('onThemes', 1)):
+        # back to 0 on every new word, the round end and leaving the round
+        # (leaveRound: the theme screen, or the stage screen, B-217)
+        for name, n in (('startRound', 1), ('onNext', 2), ('leaveRound', 1)):
             self.assertEqual(self.function(name).count('nudges: 0,'), n, name)
         self.assertEqual(len(re.findall(r'\bnudges:', main)), 5)
         # only main.js writes it; character.js reads it and never sets state
@@ -5921,7 +5932,15 @@ class LongWordTests(TestCase):
     def test_the_joint_is_one_small_rule_set_in_the_palette(self):
         css = self.css()
         sets = re.findall(r'\n([^\n{]*\.rail-joint[^\n{]*){', css)
-        self.assertEqual([s.strip() for s in sets], ['.rail-joint', '.rail-joint.end', '.rail-joint.start', '.rail-joint::after'])
+        # BACKLOG B-217: the stage map's long station shows the same joint,
+        # placed and rounded on both sides by one rule that draws nothing
+        # of its own (no colour), so a restyle of the four rules carries over
+        self.assertEqual([s.strip() for s in sets], ['.rail-joint', '.rail-joint.end', '.rail-joint.start', '.rail-joint::after',
+                                                     '.station-long .rail-joint'])
+        station = self.rule('.station-long .rail-joint')
+        self.assertNotIn('var(--', station)
+        self.assertNotIn('#', station)
+        sets = sets[:4]
         body = ''.join(self.rule(s.strip()) for s in sets)
         for colour in ('var(--brass)', 'var(--brass-dark)', 'var(--cream)'):
             self.assertIn(colour, body)
@@ -5932,9 +5951,10 @@ class LongWordTests(TestCase):
         self.assertIn('pointer-events: none;', joint)
         self.assertIn('calc(var(--joint-glow) * 12px)', joint)
         self.assertIn('opacity: var(--joint-glow);', self.rule('.rail-joint::after'))
-        # no other module draws or moves it
+        # no other module draws or moves it (stagemap.js puts one on the
+        # long station, B-217; it never moves it)
         for f in sorted(self.JS.glob('*.js')):
-            if f.name not in ('card.js', 'feedback.js'):
+            if f.name not in ('card.js', 'feedback.js', 'stagemap.js'):
                 self.assertNotIn('rail-joint', self.code(f.name), f.name)
 
 
@@ -6349,8 +6369,9 @@ class TvTuneTests(TestCase):
         self.assertIn('subscribe((s) => renderTv(s, onTuned));', main)
         self.assertLess(main.index('subscribe(renderCard);'), main.index('subscribe((s) => renderTv(s, onTuned));'))
         self.assertIn("if (state.screen === 'play' && !state.tuned) setState({ tuned: true });", self.function('onTuned', 'main.js'))
-        # false on every new word and on the theme screen
-        for name, n in (('startRound', 1), ('onNext', 1), ('onThemes', 1)):
+        # false on every new word and on leaving the round (leaveRound:
+        # the theme screen, or the stage screen, B-217)
+        for name, n in (('startRound', 1), ('onNext', 1), ('leaveRound', 1)):
             self.assertEqual(self.function(name, 'main.js').count('tuned: false,'), n, name)
         self.assertIn('tuned: false,', self.code('state.js'))
         # only main.js writes it; tv.js never sets state and takes its
@@ -6882,9 +6903,9 @@ class ProgressTests(TestCase):
 
     def test_main_plays_the_current_stage_and_records_only_at_the_round_end(self):
         main = self.code('main.js')
-        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress } from './progress.js';", main)
+        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';", main)
         start = self.function('startRound')
-        self.assertIn('const stage = currentStage(data, progress);', start)
+        self.assertIn('const stage = chosen === null ? currentStage(data, progress) : chosen;', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('        data,\n', start)
         # play again starts a round of the theme's current stage: the same
@@ -6905,7 +6926,7 @@ class ProgressTests(TestCase):
         for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound', 'onPlayAgain'):
             self.assertNotIn('recordProgress', self.function(name), name)
         # the data file travels with the round and leaves with it
-        self.assertIn('data: null,', self.function('onThemes'))
+        self.assertIn('data: null,', self.function('leaveRound'))
         state = (self.JS / 'state.js').read_text()
         self.assertIn('\n    data: null,', state)
 
@@ -7193,3 +7214,450 @@ class RoundEndStagesTests(TestCase):
         self.assertEqual(res, [{'duration': 0.3, 'ease': 'power2.out', 'scale': 1.5},
                                {'duration': 0, 'ease': 'none', 'scale': 1}])
         self.assertIn("if (state.round.justCleared) popBulb(state.round.stage);", self.code('celebrate.js'))
+
+
+class StageMapTests(TestCase):
+    """The stage map (BACKLOG B-217, PROGRESSION.md "Replay"): a tapped
+    theme card opens #screen-stages, one station per stage of the theme's
+    data (progress.js stations: cleared, the start, open; pure, run
+    through node), rendered by stagemap.js (run through node with a
+    stand-in DOM); a cleared or the current station starts a round of its
+    stage, and a replay of a cleared stage clears nothing new; the stage
+    screen's back arrow goes to the theme screen, the play screen's to the
+    stage screen; the theme cards show the theme's stages as bulbs."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"const S = await import('{(self.JS / 'stage.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        m = re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css())
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    @staticmethod
+    def look(stations):
+        # a station as 'stage:flags': c cleared, s start, o open
+        return [f"{s['stage']}:" + ''.join(f for f, k in (('c', 'cleared'), ('s', 'start'), ('o', 'open')) if s[k])
+                for s in stations]
+
+    # --- progress.js stations (pure) ---
+
+    def test_a_new_theme_two_cleared_and_all_cleared(self):
+        # only stage 1 open on a new theme; two cleared, the third the
+        # start; all cleared: all lit, the last also the start
+        res = self.run_node(
+            "const a = [1, 2, 3, 4, 5]; const t = [1, 3, 4, 'long'];"
+            "out([P.stations(a, { solved: [], cleared: [] }), P.stations(a, { solved: [], cleared: [1, 2] }),"
+            " P.stations(a, { solved: [], cleared: [1, 2, 3, 4, 5] }), P.stations(t, { solved: [], cleared: [1, 3, 4, 'long'] }),"
+            " P.stations(t, { solved: [], cleared: [1] })]);")
+        self.assertEqual([self.look(r) for r in res], [
+            ['1:so', '2:', '3:', '4:', '5:'],
+            ['1:co', '2:co', '3:so', '4:', '5:'],
+            ['1:co', '2:co', '3:co', '4:co', '5:cso'],
+            ['1:co', '3:co', '4:co', 'long:cso'],
+            ['1:co', '3:so', '4:', 'long:'],
+        ])
+        self.assertEqual(set(res[0][0]), {'stage', 'cleared', 'start', 'open'})
+
+    def test_odd_stages_and_progress(self):
+        # no stage: stage 1, as currentStage plays it; stages in STAGES
+        # order, non-stages dropped; odd progress clears nothing; a stage
+        # the data adds before a cleared one (transportation's empty 2)
+        # becomes the start, the cleared one after it stays open
+        res = self.run_node(
+            "out([P.stations([], null), P.stations(null, {}), P.stations(['long', 3, '3', 7, 3, 1], { cleared: [3] }),"
+            " P.stations([1, 2], null), P.stations([1, 2], { cleared: 'x' }), P.stations([1, 2], { cleared: ['1', 'Long'] }),"
+            " P.stations([1, 2, 3, 4], { solved: [], cleared: [1, 3] })]);")
+        self.assertEqual([self.look(r) for r in res], [
+            ['1:so'], ['1:so'], ['1:so', '3:co', 'long:'],
+            ['1:so', '2:'], ['1:so', '2:'], ['1:so', '2:'],
+            ['1:co', '2:so', '3:co', '4:'],
+        ])
+
+    def test_the_start_is_the_current_stage(self):
+        # play again (currentStage) plays the map's start, whatever the
+        # data and the progress
+        datas = [self.content('animals'), self.content('transportation'), {'ox': {'stage': 3}, 'kite': {'stage': 'long'}}, {}]
+        progresses = [None, {'cleared': []}, {'cleared': [1]}, {'cleared': [1, 2]}, {'cleared': [1, 3]},
+                      {'cleared': [1, 2, 3, 4, 5]}, {'cleared': [1, 3, 4, 'long']}, {'cleared': [3, 'long']}]
+        same = self.run_node(
+            f"const datas = {json.dumps(datas)}; const ps = {json.dumps(progresses)};"
+            "out(datas.flatMap((d) => ps.map((p) => P.stations(S.stagesOf(d), p).find((s) => s.start).stage === P.currentStage(d, p)"
+            " && P.stations(S.stagesOf(d), p).filter((s) => s.start).length === 1)));")
+        self.assertEqual(same, [True] * (len(datas) * len(progresses)))
+
+    def test_a_replay_of_a_cleared_stage_clears_nothing_new(self):
+        # animals with stages 1 and 2 cleared, 3 current: a replay of
+        # stage 1 that gets every word right, fill words fish and duck
+        # (all of stage 3) too, records the solved words and clears
+        # nothing (only the round's stage can clear, and it already is);
+        # stage 3 clears at the end of its own round (B-216); a replay
+        # with every word wrong changes nothing and writes nothing
+        data = self.content('animals')
+        res = self.run_node(
+            "const store = new Map(); let writes = 0;"
+            "globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => { writes++; store.set(k, v); } };"
+            f"const data = {json.dumps(data)};"
+            "store.set(P.KEY, JSON.stringify({ animals: { solved: ['cat', 'dog', 'frog'], cleared: [1, 2] } }));"
+            "const words = ['cat', 'dog', 'frog', 'fish', 'duck'];"
+            "const replay = P.record('animals', data, 1, words.map((word) => ({ word, correct: true })));"
+            "const after = P.stations(S.stagesOf(data), P.forTheme('animals'));"
+            "const w = writes;"
+            "const wrong = P.record('animals', data, 2, words.map((word) => ({ word, correct: false })));"
+            "const quiet = writes === w;"
+            "const own = P.record('animals', data, 3, [{ word: 'cat', correct: false }]);"
+            "out([replay, after, wrong, quiet, own]);")
+        replay, after, wrong, quiet, own = res
+        self.assertEqual(replay, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2]},
+                                  'justCleared': False})
+        self.assertEqual(self.look(after), ['1:co', '2:co', '3:so', '4:', '5:'])
+        self.assertEqual(wrong, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2]},
+                                 'justCleared': False})
+        self.assertTrue(quiet)
+        self.assertEqual(own, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2, 3]},
+                               'justCleared': True})
+
+    def test_progress_js_stays_pure_and_currentstage_reads_the_stations(self):
+        code = self.code('progress.js')
+        for word in ('document', 'window', 'setState'):
+            self.assertNotIn(word, code, word)
+        self.assertIn('return stations(stagesOf(data), progress).find((s) => s.start).stage;', self.function('currentStage', 'progress.js'))
+
+    # --- the stage screen's markup and look ---
+
+    def test_the_stage_screen_markup_has_no_text(self):
+        html = self.client.get('/').content.decode()
+        self.assertLess(html.index('<div id="screen-theme"'), html.index('<div id="screen-stages"'))
+        self.assertLess(html.index('<div id="screen-stages"'), html.index('<div id="screen-play"'))
+        screen = html[html.index('<div id="screen-stages"'):html.index('<div id="screen-play"')]
+        screen = re.sub(r'<!--.*?-->', '', screen, flags=re.S)
+        self.assertIn('style="display: none;"', screen[:80])
+        self.assertNotRegex(re.sub(r'<[^>]+>', ' ', screen), r'[A-Za-z0-9]')
+        # Back is the sticker book's arrow, an icon button with its word
+        # only in aria-label
+        back = re.search(r'<button id="stages-back-btn" class="panel-btn" type="button" aria-label="Back">(.*?)</button>',
+                         screen, flags=re.S)
+        self.assertIsNotNone(back)
+        book = re.search(r'<button id="gallery-back-btn"[^>]*>(.*?)</button>', html, flags=re.S).group(1)
+        self.assertEqual(back.group(1).strip(), book.strip())
+        for id_ in ('stages-pic', 'stages-picture', 'stage-stations'):
+            self.assertIn(f'id="{id_}"', screen, id_)
+        self.assertLess(screen.index('id="stages-pic"'), screen.index('id="stage-stations"'))
+        # the protected ids are all still there
+        for id_ in ('screen-theme', 'screen-play', 'screen-round-end', 'screen-gallery', 'letter-boxes', 'letter-tray',
+                    'word-counter', 'check-btn', 'play-again-btn', 'themes-btn', 'round-stars', 'round-score', 'round-new',
+                    'round-words', 'stickers-btn', 'gallery-back-btn', 'gallery-empty', 'gallery-themes', 'reset-btn',
+                    'speak-btn', 'mute-btn', 'play-back-btn'):
+            self.assertIn(f'id="{id_}"', html, id_)
+        self.assertIn("'stages': 'screen-stages',", (self.JS / 'screens.js').read_text())
+        template = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", template).group(1)), 30)
+
+    def test_the_stations_look_and_fit(self):
+        station = self.rule('.station')
+        w = int(re.search(r'\n\s*width: (\d+)px;', station).group(1))
+        h = int(re.search(r'\n\s*height: (\d+)px;', station).group(1))
+        self.assertGreaterEqual(min(w, h), 48)
+        # the zig-zag keeps a station inside the 324px column at 360 wide
+        shift = int(re.search(r'margin-right: (\d+)px;', self.rule('.station:nth-child(odd)')).group(1))
+        self.assertEqual(f'margin-left: {shift}px;', self.rule('.station:nth-child(even)').strip())
+        self.assertLessEqual(w + shift, 324)
+        # six stations and the picture fit under the logo at 360x640:
+        # logo line 70, picture clamp(88px, 100vh - 544px, 120px) in its
+        # row, the screen's 12px gap, six stations with 6px between, the
+        # 22px bottom safe area
+        self.assertIn('width: clamp(88px, 100vh - 544px, 120px);', self.rule('.stages-pic'))
+        for height in (740, 667, 640):
+            pic = max(88, min(120, height - 544))
+            self.assertLessEqual(70 + pic + 12 + 6 * h + 5 * 6 + 22, height, height)
+        self.assertIn('flex-direction: column-reverse;', self.rule('.stations'))      # stage 1 at the bottom
+        # the start raised and glowing; the current bulb pulses (steady
+        # under reduced motion); a station not open is dimmed
+        start = self.rule('.station.is-start')
+        self.assertIn('transform: translate(-1px, -3px);', start)
+        self.assertIn('var(--glow-amber)', start)
+        self.assertIn('animation: station-bulb 1.2s ease-in-out infinite alternate;', self.rule('.station.is-current .bulb::before'))
+        css = self.css()
+        self.assertRegex(css, r'@keyframes station-bulb {\s*from {\s*opacity: 0\.45;\s*}\s*to {\s*opacity: 1;\s*}\s*}')
+        self.assertRegex(css, r'@media \(prefers-reduced-motion: reduce\) {\s*\.station\.is-current \.bulb::before {\s*animation: none;\s*}\s*}')
+        self.assertIn('filter: brightness(0.55) saturate(0.7);', self.rule('.station.is-closed'))
+        # only palette variables
+        new = css[css.index('\n#screen-stages {'):css.index('\n#screen-gallery {')]
+        self.assertNotRegex(new, r'#[0-9a-fA-F]{3,6}\b')
+        self.assertNotIn('rgb', new)
+
+    # --- stagemap.js with a stand-in DOM ---
+
+    DOM = """
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, dataset: {}, className: '', textContent: '', disabled: false, onclick: null, parent: null,
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+                removeAttribute(k) { delete this.attrs[k]; },
+                appendChild(c) { c.parent = this; this.children.push(c); return c; },
+                get lastElementChild() { return this.children[this.children.length - 1]; },
+                set innerHTML(v) { this.children = []; }, };
+            return el;
+        };
+        globalThis.document = { createElement: make, getElementById: (id) => ids[id] };
+        const ids = { 'stages-pic': make('div'), 'stages-picture': make('img'), 'stage-stations': make('div') };
+        const M = await import('STAGEMAP');
+        const picks = [];
+        const onPick = (s) => picks.push(s);
+        const text = (el) => (el.textContent || '') + el.children.map(text).join('');
+        const view = () => ids['stage-stations'].children.map((b) => ({ stage: b.dataset.stage, cls: b.className, disabled: b.disabled,
+            label: b.attrs['aria-label'], tap: !!b.onclick, bulb: b.lastElementChild.className,
+            mark: b.children[0].className, parts: b.children[0].children.map((c) => c.className), text: text(b),
+            hidden: b.children[0].attrs['aria-hidden'] }));
+        const themes = [{ name: 'animals', image: '/cat.webp', stages: [1, 2, 3, 4, 5] }, { name: 'transportation', image: '/bus.webp', stages: [1, 3, 4, 'long'] }];
+        const st = (o) => ({ screen: 'stages', theme: 'animals', themes, progress: {}, ...o });
+    """
+
+    def run_map(self, body):
+        return self.run_node(self.DOM.replace('STAGEMAP', (self.JS / 'stagemap.js').as_uri()) + body)
+
+    def test_the_map_renders_each_station_from_state(self):
+        res = self.run_map(
+            "M.renderStageMap(st({ progress: { animals: { solved: [], cleared: [1, 2] } } }), onPick);"
+            "const mid = view(); const pic = [ids['stages-picture'].attrs.src, ids['stages-pic'].attrs['aria-label']];"
+            "ids['stage-stations'].children.forEach((b) => b.onclick && b.onclick());"
+            "out([mid, pic, picks, ids['stage-stations'].attrs['aria-label']]);")
+        mid, pic, picks, label = res
+        self.assertEqual([s['stage'] for s in mid], ['1', '2', '3', '4', '5'])
+        self.assertEqual([s['cls'] for s in mid], [
+            'station panel is-cleared', 'station panel is-cleared', 'station panel is-current is-start',
+            'station panel is-closed', 'station panel is-closed'])
+        self.assertEqual([s['disabled'] for s in mid], [False, False, False, True, True])
+        self.assertEqual([s['tap'] for s in mid], [True, True, True, False, False])
+        self.assertEqual([s['bulb'] for s in mid], ['bulb', 'bulb', 'bulb', 'bulb off', 'bulb off'])
+        self.assertEqual([s['label'] for s in mid], ['stage 1: cleared', 'stage 2: cleared', 'stage 3: play',
+                                                     'stage 4: not open yet', 'stage 5: not open yet'])
+        # the number as one split-flap digit, the only text; the mark is
+        # hidden from screen readers (the button's label names the stage)
+        self.assertEqual([s['text'] for s in mid], ['1', '2', '3', '4', '5'])
+        self.assertEqual([s['parts'] for s in mid], [['flap']] * 5)
+        self.assertEqual({s['mark'] for s in mid}, {'station-mark flaps'})
+        self.assertEqual({s['hidden'] for s in mid}, {'true'})
+        self.assertEqual(pic, ['/cat.webp', 'animals'])
+        self.assertEqual(picks, [1, 2, 3])                       # a tap on an open station: its stage
+        self.assertEqual(label, 'stages cleared: 2 / 5')
+
+    def test_new_theme_all_cleared_and_the_long_station(self):
+        res = self.run_map(
+            "M.renderStageMap(st({ theme: 'transportation' }), onPick); const fresh = view();"
+            "M.renderStageMap(st({ theme: 'transportation', progress: { transportation: { solved: [], cleared: [1, 3, 4, 'long'] } } }), onPick);"
+            "const all = view(); out([fresh, all]);")
+        fresh, all_ = res
+        self.assertEqual([s['cls'] for s in fresh], ['station panel is-current is-start', 'station panel is-closed',
+                                                     'station panel is-closed', 'station panel is-closed'])
+        self.assertEqual([s['tap'] for s in fresh], [True, False, False, False])
+        self.assertEqual([s['bulb'] for s in fresh], ['bulb', 'bulb off', 'bulb off', 'bulb off'])
+        # every stage cleared: all lit, the last also the start (raised
+        # and glowing), its bulb steady (cleared, not pulsing)
+        self.assertEqual([s['cls'] for s in all_], ['station panel is-cleared'] * 3 + ['station panel is-cleared is-start'])
+        self.assertEqual([s['bulb'] for s in all_], ['bulb'] * 4)
+        self.assertEqual([s['tap'] for s in all_], [True] * 4)
+        # long: two chunks and the B-213 joint between them, no digit
+        long_ = all_[3]
+        self.assertEqual(long_['stage'], 'long')
+        self.assertEqual(long_['mark'], 'station-mark station-long')
+        self.assertEqual(long_['parts'], ['chunk', 'rail-joint', 'chunk'])
+        self.assertEqual(long_['text'], '')
+        self.assertEqual(long_['label'], 'stage long: cleared')
+
+    def test_a_rerender_updates_in_place_and_other_screens_render_nothing(self):
+        res = self.run_map(
+            "M.renderStageMap(st({ screen: 'theme' }), onPick); const off = ids['stage-stations'].children.length;"
+            "M.renderStageMap(st(), onPick); const first = ids['stage-stations'].children.slice();"
+            "M.renderStageMap(st({ progress: { animals: { solved: [], cleared: [1] } } }), onPick);"
+            "const kept = ids['stage-stations'].children.every((b, i) => b === first[i]); const moved = view().map((s) => s.cls);"
+            "M.renderStageMap(st({ theme: 'transportation' }), onPick);"
+            "const rebuilt = ids['stage-stations'].children.map((b) => b.dataset.stage); const other = !first.includes(ids['stage-stations'].children[1]);"
+            "M.renderStageMap(st({ theme: 'nope' }), onPick);"
+            "out([off, kept, moved, rebuilt, other, ids['stage-stations'].children.length]);")
+        off, kept, moved, rebuilt, other, n = res
+        self.assertEqual(off, 0)
+        self.assertTrue(kept)                                    # the pulse is not restarted
+        self.assertEqual(moved[:2], ['station panel is-cleared', 'station panel is-current is-start'])
+        self.assertEqual(rebuilt, ['1', '3', '4', 'long'])
+        self.assertTrue(other)
+        self.assertEqual(n, 4)                                   # an unknown theme renders nothing
+
+    def test_stagemap_js_never_sets_state_and_keeps_no_module_state(self):
+        code = self.code('stagemap.js')
+        self.assertNotIn('setState', code)
+        self.assertNotIn('localStorage', code)
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
+                         ["import { stations } from './progress.js';", "import { renderFlaps } from './flaps.js';"])
+
+    # --- main.js: the flow ---
+
+    def test_a_theme_card_opens_its_stage_screen(self):
+        main = self.code('main.js')
+        self.assertIn('words, stages: stagesOf(data) };', self.function('loadThemes'))
+        cards = self.function('renderThemeButtons')
+        self.assertIn("btn.addEventListener('click', () => onTheme(theme));", cards)
+        self.assertNotIn('startRound', cards)
+        on = self.function('onTheme')
+        self.assertIn("if (state.screen !== 'theme') return;", on)
+        self.assertIn("setState({ screen: 'stages', theme: theme.name });", on)
+        self.assertIn('subscribe((s) => renderStageMap(s, onStation));', main)
+        self.assertIn("$('stages-back-btn').addEventListener('click', onThemes);", main)
+        self.assertIn("leaveRound({ screen: 'theme', theme: null });", self.function('onThemes'))
+
+    def test_a_cleared_or_current_station_starts_a_round_of_its_stage(self):
+        on = self.function('onStation')
+        self.assertIn("if (state.screen !== 'stages') return;", on)
+        self.assertIn('const open = stations(theme.stages, state.progress[theme.name]).some((s) => s.stage === stage && s.open);', on)
+        self.assertIn('if (open) startRound(theme, stage);', on)
+        start = self.function('startRound')
+        self.assertTrue(start.lstrip().startswith('async function startRound({ name, dataUrl }, chosen = null) {'))
+        self.assertIn('const stage = chosen === null ? currentStage(data, progress) : chosen;', start)
+        # play again still plays the theme's current stage (B-216)
+        self.assertIn('if (theme) startRound(theme);', self.function('onPlayAgain'))
+        # the stage picked and the map agree: the start of the stations is
+        # what play again picks (test_the_start_is_the_current_stage), and
+        # the open stations are the cleared ones and the start
+        res = self.run_node(
+            "out([1, 2, 3, 4, 5].map((s) => P.stations([1, 2, 3, 4, 5], { cleared: [1, 2] }).some((x) => x.stage === s && x.open)));")
+        self.assertEqual(res, [True, True, True, False, False])
+
+    def test_progress_is_in_state_read_at_start_up_and_after_each_record(self):
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n    progress: {},', state)
+        self.assertIn("'theme' | 'stages' | 'play' | 'round-end' | 'gallery'", state)
+        main = self.code('main.js')
+        self.assertIn('setState({ progress: loadProgress() });', main)
+        self.assertLess(main.index('setState({ progress: loadProgress() });'), main.index('loadThemes();\n'))
+        nxt = self.function('onNext')
+        self.assertLess(nxt.index('recordProgress('), nxt.index('progress: loadProgress(),'))
+        self.assertLess(nxt.index('progress: loadProgress(),'), nxt.index("screen: 'round-end',"))
+        self.assertEqual(len(re.findall(r'\bprogress: ', main)), 2)
+        self.assertEqual(main.count('loadProgress()'), 2)
+
+    def test_no_round_starts_once_the_kid_has_left_the_screen_the_tap_came_from(self):
+        # review fix: a station tapped, then the stage screen's back arrow
+        # before the data file arrives (and maybe another theme's card), or
+        # play again then themes on the round end: no round starts, and the
+        # next tap can start one. main.js's own startRound runs through
+        # node with stand-ins for what it calls.
+        start = self.function('startRound')
+        res = self.run_node(
+            "const state = { screen: 'stages', theme: 'animals', startingRound: false, roundsStarted: 0, round: null };"
+            "const setState = (p) => Object.assign(state, p);"
+            "let arrive = null; globalThis.fetch = () => new Promise((r) => { arrive = () => r({ json: () => ({ cat: { stage: 1 } }) }); });"
+            "const progressFor = () => ({ solved: [], cleared: [] }); const currentStage = () => 1; const missedWords = () => [];"
+            "const pickRound = () => ['cat']; const makeWord = (w, stage) => ({ word: w.word, stage }); const newTileId = () => 't1';"
+            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const LIVES = 3;"
+            + start +
+            "const go = async (from, theme, leave, stage = 1) => {"
+            " Object.assign(state, { screen: from, theme, startingRound: false, round: null });"
+            " const p = startRound({ name: 'animals', dataUrl: '/a.json' }, stage); const during = state.startingRound;"
+            " leave(); arrive(); await p; return [state.screen, state.theme, state.startingRound, state.round && state.round.stage, during]; };"
+            "out([await go('stages', 'animals', () => setState({ screen: 'theme', theme: null })),"
+            " await go('stages', 'animals', () => { setState({ screen: 'theme', theme: null }); setState({ screen: 'stages', theme: 'transportation' }); }),"
+            " await go('round-end', 'animals', () => setState({ screen: 'theme', theme: null }), null),"
+            " await go('stages', 'animals', () => {}, 2), await go('round-end', 'animals', () => {}, null)]);")
+        self.assertEqual(res, [
+            ['theme', None, False, None, True],
+            ['stages', 'transportation', False, None, True],
+            ['theme', None, False, None, True],
+            ['play', 'animals', False, 2, True],
+            ['play', 'animals', False, 1, True],
+        ])
+        self.assertLess(start.index('const from = state.screen;'), start.index('setState({ startingRound: true });'))
+        guard = start.index('if (state.screen !== from || state.theme !== name) {')
+        self.assertLess(start.index('await fetch('), guard)
+        self.assertLess(guard, start.index('const progress = progressFor(name);'))
+
+    def test_the_play_screens_back_arrow_goes_to_the_stage_screen(self):
+        back = self.function('onPlayBack')
+        self.assertTrue(back.rstrip().endswith("leaveRound({ screen: 'stages' });\n}"))
+        self.assertNotIn('theme: null', back)                    # the theme stays, for its map
+        leave = self.function('leaveRound')
+        self.assertNotIn('theme', leave.replace('...patch', ''))
+
+    def test_the_robot_and_the_sound_stay_quiet_on_the_stage_screen(self):
+        # back from any point of a word to the stage screen is no moment,
+        # no sound; a station's round starts as any round does
+        res = self.run_node(
+            f"const c = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status: 'playing', placed: put('---') }, ...o });"
+            "const back = (s) => ({ ...s, screen: 'stages', words: [], round: { index: 0, size: 5, results: [] },"
+            " current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' }, pressed: null, speaking: false, idleBeat: null });"
+            "const moments = (a, b) => c.momentsFor(c.snapshot(a), c.snapshot(b));"
+            "const from = [st(), st({ current: { word: 'cat', status: 'wrong', placed: put('tac') }, lives: 2 }),"
+            " st({ current: { word: 'cat', status: 'correct', placed: put('cat') } })];"
+            "out([from.map((s) => moments(s, back(s))), from.map((s) => c.soundsFor(moments(s, back(s)))),"
+            " moments(back(st()), st({ roundsStarted: 2 }))]);")
+        self.assertEqual(res, [[[]] * 3, [[]] * 3, ['roundStart']])
+
+    # --- main.js: the theme cards' bulbs, through node ---
+
+    def test_the_theme_cards_show_their_stages_as_bulbs(self):
+        src = (self.function('clearedOf') + self.function('renderStageBulbs') + self.function('renderThemeButtons'))
+        res = self.run_node(
+            "const make = (tag) => { const el = { tag, children: [], attrs: {}, dataset: {}, className: '', listeners: [],"
+            " setAttribute(k, v) { this.attrs[k] = v; }, addEventListener(t, f) { this.listeners.push(f); },"
+            " appendChild(c) { this.children.push(c); c.remove = () => this.children.splice(this.children.indexOf(c), 1); return c; },"
+            " get lastElementChild() { return this.children[this.children.length - 1]; }, set innerHTML(v) { this.children = []; } }; return el; };"
+            "const container = make('div');"
+            "globalThis.document = { createElement: make }; const $ = () => container;"
+            "let builtThemes = null; const opened = []; const onTheme = (t) => opened.push(t.name);"
+            + src +
+            "const themes = [{ name: 'animals', image: '/cat.webp', stages: [1, 2, 3, 4, 5] }, { name: 'transportation', image: '/bus.webp', stages: [1, 3, 4, 'long'] }];"
+            "const bulbs = () => container.children.map((c) => [c.children.map((k) => k.tag), c.lastElementChild.className,"
+            " c.lastElementChild.attrs['aria-hidden'], c.lastElementChild.children.map((b) => b.className === 'bulb' ? 1 : 0).join('')]);"
+            "renderThemeButtons({ themes, progress: {} }); const fresh = bulbs(); const cards = container.children.slice();"
+            "renderThemeButtons({ themes, progress: { animals: { solved: [], cleared: [1, 2] }, transportation: { solved: [], cleared: [1] } } });"
+            "const later = bulbs(); const kept = container.children.every((c, i) => c === cards[i]);"
+            "container.children[1].listeners.forEach((f) => f());"
+            "out([fresh, later, kept, opened]);")
+        fresh, later, kept, opened = res
+        self.assertEqual(fresh, [[['img', 'span'], 'stage-bulbs', 'true', '00000'], [['img', 'span'], 'stage-bulbs', 'true', '0000']])
+        self.assertEqual([c[3] for c in later], ['11000', '1000'])
+        self.assertTrue(kept)                                    # the cards are not rebuilt, the bulbs follow progress
+        self.assertEqual(opened, ['transportation'])
+
+    def test_the_cards_bulb_row_fits_under_the_picture(self):
+        card = self.rule('.theme-btn')
+        self.assertIn('display: flex;', card)
+        self.assertIn('flex-direction: column;', card)
+        self.assertIn('aspect-ratio: 1 / 1;', card)             # the card keeps its size (StageTests' fit)
+        img = self.rule('.theme-btn img')
+        self.assertIn('flex: 1 1 0;', img)
+        self.assertIn('min-height: 0;', img)
+        self.assertIn('margin-top: 8px;', self.rule('.theme-btn .stage-bulbs'))
+        bulb = self.rule('.theme-btn .stage-bulbs .bulb')
+        self.assertIn('width: 14px;', bulb)
+        self.assertIn('height: 14px;', bulb)

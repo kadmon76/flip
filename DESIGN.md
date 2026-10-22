@@ -137,7 +137,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
   playing. A word with no audio file shows `speaker-cap` and ignores taps. On every stage a tap plays the word, before and after the word is answered; it never holds the word back (B-215, PROGRESSION.md: the word is always hearable; B-203's held-back speaker is gone).
 - **Mute toggle** (`#mute-btn`): top-right, one button: the small cream speaker glyph (code; wave, or cross while muted) then the brass switch (`mute-switch-on` knob right = sound on, `mute-switch-off` knob left = muted, stacked and swapped by class). Remembered in localStorage.
-- **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → theme screen at once, the round dropped (B-201).
+- **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → the theme's stage screen at once, the round dropped (B-201, B-217).
 
 ## Feedback (no words)
 - Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb
@@ -169,7 +169,7 @@ dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects a
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
-Theme, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
+Theme, stage map, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
 darkened 40% as backdrop, the same frame, cream panels with a brass
 border in CSS, the palette and fonts above, and icons instead of English
 labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
