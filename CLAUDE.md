@@ -68,6 +68,7 @@ a phone.
   dependency (round scoring, stars, mastery, tray/placement helpers) gets
   a Django test that runs it through `node` where practical; otherwise the
   acceptance criteria are verified by screenshots.
+- When an item changes a rule, grep `static/js/` and `static/css/` for the old rule's backlog id and wording (e.g. `B-205`, `easy`) and update every code comment that still describes it; list the files touched in the DECISIONS doc-lines entry.
 - Open PRs as drafts. PR body: what changed, screenshots, DECISIONS made,
   reviewer verdict. A human reviews and merges every PR; agents never merge.
 
