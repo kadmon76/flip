@@ -1488,6 +1488,25 @@ body.dragging-active {
     opacity: 1;
 }
 
+/* The theme's stages under the stars (BACKLOG B-216, interim): one bulb
+   per stage the theme has words in, the lives bulb's look (.bulb), lit
+   when the stage is cleared, dark when not (DESIGN "Other screens"
+   conventions). Pulled up toward the stars, so the column grows by only
+   the row's 18px and 6px of the screen's gap: nothing scrolls at 360x640.
+   celebrate.js pops the bulb of a stage the round just cleared (its --lit
+   and scale, inline while it runs). */
+.stage-bulbs {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: -8px;
+}
+
+.stage-bulbs .bulb {
+    width: 18px;
+    height: 18px;
+}
+
 .round-panel {
     width: 100%;
     padding: 10px 12px 4px;

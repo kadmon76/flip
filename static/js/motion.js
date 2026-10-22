@@ -31,6 +31,11 @@
 // - `jointGlow`: when a word in two rows appears (BACKLOG B-213), its
 //   brass joint glows up and back down once within `duration`; reduced
 //   motion: no glow, the joint stays as it is.
+// - `bulbPop`: on the round-end screen, the bulb of a stage the round just
+//   cleared (BACKLOG B-216) lights as the stars finish: its light comes on
+//   while it swells to `scale` and settles back, within `duration`, ease-out
+//   (no overshoot: DESIGN "Motion" keeps that for snaps and star pops).
+//   Reduced motion: no pop and no fade, the bulb is simply lit.
 export const MOTION = {
     pickup: { duration: 0.12, ease: 'power2.out', scale: 1.08 },
     snap: { duration: 0.2, ease: 'back.out(1.4)', scale: 1 },
@@ -47,6 +52,7 @@ export const MOTION = {
     hop: { duration: 0.3, ease: 'power2.out', scale: 1, stagger: 0.03, height: 16, fade: 0.2 },
     clunk: { duration: 0.2, ease: 'power2.out', scale: 0.8, press: 0.09, fade: 0.2 },
     jointGlow: { duration: 0.6, ease: 'power1.inOut', scale: 1 },
+    bulbPop: { duration: 0.3, ease: 'power2.out', scale: 1.5 },
 };
 
 // Spec for one motion. With `reduced` (prefers-reduced-motion) every

@@ -1,5 +1,6 @@
 // main.js — wiring: theme selection, round flow (a round of the theme's
-// stage), the console controls (check dome, reset lever, speaker), the
+// current stage, its progress recorded at the round end), the console
+// controls (check dome, reset lever, speaker), the
 // header's mute toggle and the play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
 // the TV's lock (tv.js), screen renders.
@@ -18,9 +19,10 @@ import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
-import { STAGES, stagesOf } from './stage.js';
+import { stagesOf } from './stage.js';
 import { pickRound, makeWord } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
+import { forTheme as progressFor, currentStage, record as recordProgress } from './progress.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -90,27 +92,31 @@ async function startRound({ name, dataUrl }) {
         setState({ startingRound: false });
         throw e;
     }
-    // The round's stage (BACKLOG B-215; round.stage below, fixed for the
-    // round): until B-216 brings the kid's progress, the theme's first
-    // stage that has words in its data (stage.js stagesOf), or stage 1
-    // for data with none. Its rules (stage.js stageRules) start every
-    // word of the round (round.js makeWord): on stage 1 the first letter
-    // is given, on stages 3-5 extra letters lie on the bench. The words:
-    // up to two of the words this theme's earlier rounds missed come back,
-    // in random places (round.js pickRound, missed.js; BACKLOG B-208),
-    // then the stage's words, filled from the theme's other stages,
-    // nearest first (round.js pickWords).
+    // The round's stage (BACKLOG B-216; round.stage below, fixed for the
+    // round): the theme's current stage, the first of the stages its data
+    // has words in that the kid has not cleared (progress.js
+    // currentStage; all cleared: the last one), so after a clear, play
+    // again starts the next one. Its rules (stage.js stageRules) start
+    // every word of the round (round.js makeWord): on stage 1 the first
+    // letter is given, on stages 3-5 extra letters lie on the bench. The
+    // words (round.js pickRound, PROGRESSION.md "Rounds"): up to two of
+    // the words this theme's earlier rounds missed come back, in random
+    // places (missed.js; BACKLOG B-208), then the stage's words not yet
+    // solved (progress.js), its solved words, the earlier stages' words,
+    // and only while places are left the later stages'.
     // A long word's `break` (BACKLOG B-213) says where its slots go to a
     // second row (round.js makeWord, layout.js slotLayout).
-    const stage = stagesOf(data)[0] ?? STAGES[0];
-    const words = pickRound(data, ROUND_SIZE, stage, missedWords(name))
+    const progress = progressFor(name);
+    const stage = currentStage(data, progress);
+    const words = pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
     stopWord();
     setState({
         theme: name,
+        data,
         words,
         screen: 'play',
-        round: { index: 0, size: ROUND_SIZE, stage, results: [] },
+        round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },
         current: makeWord(words[0], stage, newTileId),
         lives: LIVES,
         pressed: null,
@@ -219,9 +225,13 @@ function onCheck(extra = {}) {
 // then; one without would count as wrong. The word clip stops with its
 // word. At the round end the theme's missed words are recorded (missed.js,
 // BACKLOG B-208): the words not checked correct are remembered, the ones
-// checked correct come out. A round left with the back button never gets
-// here, so it records nothing (B-201). The next word starts by the
-// round's stage rules, as the first did (BACKLOG B-215).
+// checked correct come out; and so is its progress (progress.js, BACKLOG
+// B-216): the words checked correct are solved, and the round's stage is
+// cleared once all its words are; the round keeps the theme's cleared
+// stages and whether this round cleared its own, for the round-end's
+// stage bulbs. A round left with the back button never gets here, so it
+// records nothing (B-201). The next word starts by the round's stage
+// rules, as the first did (BACKLOG B-215).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -231,8 +241,9 @@ function onNext(extra = {}) {
     const nextIndex = round.index + 1;
     if (nextIndex >= round.size) {
         recordMissed(state.theme, results);
+        const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);
         setState({
-            round: { ...round, results },
+            round: { ...round, results, cleared: progress.cleared, justCleared },
             screen: 'round-end',
             speaking: false,
             idleBeat: null,
@@ -329,10 +340,31 @@ function sticker(off = false) {
     return el;
 }
 
-// Stars, the score as split-flaps, the new-sticker count (a sticker and
-// "+N", the sticker dark at +0) and one row per word (thumbnail, word, a
-// sticker if the word is new in the book, a lit or dark bulb). No English
-// (DESIGN "Words on screen"): only the words and numbers.
+// The theme's stages as a row of bulbs (BACKLOG B-216; DESIGN "Other
+// screens" conventions): one bulb per stage in `stages` (stage.js
+// stagesOf: the stages the theme's data has words in), lit when it is in
+// `cleared`, dark when not. The bulbs are kept and updated in place
+// (made or removed only when the count changes), so a re-render never
+// replaces a bulb celebrate.js is popping; each carries its stage in
+// data-stage for it. No text: the stage is only in aria-label.
+function renderStageBulbs(el, stages, cleared) {
+    while (el.children.length > stages.length) el.lastElementChild.remove();
+    while (el.children.length < stages.length) el.appendChild(document.createElement('span'));
+    stages.forEach((stage, i) => {
+        const lit = cleared.includes(stage);
+        const bulb = el.children[i];
+        bulb.className = lit ? 'bulb' : 'bulb off';
+        bulb.dataset.stage = String(stage);
+        bulb.setAttribute('aria-label', `stage ${stage}: ${lit ? 'cleared' : 'not cleared'}`);
+    });
+    el.setAttribute('aria-label', `stages cleared: ${stages.filter((s) => cleared.includes(s)).length} / ${stages.length}`);
+}
+
+// Stars, the theme's stage bulbs, the score as split-flaps, the
+// new-sticker count (a sticker and "+N", the sticker dark at +0) and one
+// row per word (thumbnail, word, a sticker if the word is new in the
+// book, a lit or dark bulb). No English (DESIGN "Words on screen"): only
+// the words and numbers.
 // The rows are rebuilt from state.round.results on every render; the
 // list is small and nothing on this screen is interactive per row.
 function renderRoundEnd(state) {
@@ -344,6 +376,7 @@ function renderRoundEnd(state) {
     document.querySelectorAll('#round-stars span').forEach((star, i) => {
         star.classList.toggle('earned', i < stars);
     });
+    renderStageBulbs($('round-stages'), stagesOf(state.data), state.round.cleared || []);
     renderFlaps($('round-score'), `${correct} / ${size}`);
     const fresh = results.filter((r) => r.correct && r.newSticker).length;
     const news = $('round-new');
@@ -389,7 +422,9 @@ function renderRoundEnd(state) {
 }
 
 // New round in the same theme: new random words, hearts and results
-// reset by startRound. Falls back to the theme screen if the theme is
+// reset by startRound, at the theme's current stage (progress.js
+// currentStage, BACKLOG B-216), so after a round that cleared its stage
+// it is the next one. Falls back to the theme screen if the theme is
 // somehow missing from state.themes.
 function onPlayAgain() {
     const theme = state.themes.find((t) => t.name === state.theme);
@@ -402,8 +437,9 @@ function onThemes() {
     setState({
         screen: 'theme',
         theme: null,
+        data: null,
         words: [],
-        round: { index: 0, size: ROUND_SIZE, stage: null, results: [] },
+        round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,

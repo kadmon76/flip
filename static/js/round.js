@@ -1,11 +1,12 @@
 // round.js — pure helpers that set up a round from a theme's data file
 // and the round's stage (state.round.stage; the rules are stage.js
 // stageRules, BACKLOG B-215): which words the round plays (pickRound: the
-// theme's missed words back, then pickWords by the stage) and how each
-// word starts (makeWord, by the stage's rules: the first letter given on
-// stage 1, extra letters, extraLetters, on stages 3-5). No DOM and no
-// module state; main.js calls them and puts the result in state, and a
-// Django test runs them through node.
+// theme's missed words back, then pickWords by the stage and the theme's
+// solved words, BACKLOG B-216) and how each word starts (makeWord, by the
+// stage's rules: the first letter given on stage 1, extra letters,
+// extraLetters, on stages 3-5). No DOM and no module state; main.js calls
+// them and puts the result in state, and a Django test runs them through
+// node.
 // `rand` (default Math.random) is there so the test can seed them.
 
 import { STAGES, isStage, stageRules } from './stage.js';
@@ -23,52 +24,55 @@ export function shuffle(arr, rand = Math.random) {
 
 // The words of a round of `stage`: `size` names from `data` (a theme's
 // data file, { "cat": { image, audio, stage }, ... }), in random order
-// (BACKLOG B-215; B-216 orders a stage's own words by solved and
-// unsolved). First the stage's words (the entries whose `stage` is
-// `stage`), at random; while places are left, the words of the theme's
-// other stages, the nearest stage first (by its place in STAGES; of two
-// as near, the earlier one), each stage's words at random; last the words
-// whose `stage` is not a stage. A `stage` that is not a stage reads as
-// stage 1, as in stage.js stageRules. Words are picked by `stage` only:
-// the data's `difficulty` is not read.
-export function pickWords(data, size, stage, rand = Math.random) {
+// (BACKLOG B-216, PROGRESSION.md "Rounds"). `solved` is the theme's
+// solved words (progress.js, the words checked correct at least once).
+// In this order, each group at random: the stage's words (the entries
+// whose `stage` is `stage`) not yet solved; then its solved words; then
+// the words of the theme's earlier stages, the nearest stage first (the
+// review); then, only while places are left (a theme whose data is still
+// partial), the words of its later stages, the nearest first; last the
+// words whose `stage` is not a stage. A `stage` that is not a stage reads
+// as stage 1, as in stage.js stageRules. Words are picked by `stage`
+// only: the data's `difficulty` is not read.
+export function pickWords(data, size, stage, solved = [], rand = Math.random) {
     const names = Object.keys(data);
+    const done = new Set(Array.isArray(solved) ? solved : []);
     const at = isStage(stage) ? STAGES.indexOf(stage) : 0;
-    const nearest = STAGES
-        .map((s, i) => ({ s, far: Math.abs(i - at), i }))
-        .sort((a, b) => a.far - b.far || a.i - b.i)
-        .map(({ s }) => s);
     const of = (s) => names.filter((w) => !!data[w] && data[w].stage === s);
+    const own = of(STAGES[at]);
+    const earlier = STAGES.slice(0, at).reverse();
+    const later = STAGES.slice(at + 1);
     const unstaged = names.filter((w) => !data[w] || !isStage(data[w].stage));
-    const order = [...nearest.flatMap((s) => shuffle(of(s), rand)), ...shuffle(unstaged, rand)];
+    const order = [
+        ...shuffle(own.filter((w) => !done.has(w)), rand),
+        ...shuffle(own.filter((w) => done.has(w)), rand),
+        ...earlier.flatMap((s) => shuffle(of(s), rand)),
+        ...later.flatMap((s) => shuffle(of(s), rand)),
+        ...shuffle(unstaged, rand),
+    ];
     return shuffle(order.slice(0, size), rand);
 }
 
 // How many remembered missed words a round brings back (BACKLOG B-208).
 export const MISSED_BACK = 2;
 
-// The words of a round with the theme's missed words back (BACKLOG
-// B-208): `missed` is the theme's list (missed.js wordsFor, the oldest
-// miss first). The round takes the first MISSED_BACK of them that are
-// still in `data`, on every stage, and fills the other places with
-// pickWords (the stage's pick) from the theme's words that are not
-// remembered, or, when those run out, from the other remembered ones; so
-// a round holds no more than MISSED_BACK remembered words while the
-// theme has enough others. All in random order. With no remembered word
-// in `data` it is pickWords exactly.
-export function pickRound(data, size, stage, missed = [], rand = Math.random) {
+// The words of a round (BACKLOG B-208, B-216; PROGRESSION.md "Rounds"):
+// `missed` is the theme's missed words (missed.js wordsFor, the oldest
+// miss first), `solved` its solved words (progress.js). The round takes
+// the first MISSED_BACK missed words that are still in `data`, on every
+// stage, and fills the other places with pickWords (the stage's unsolved
+// words, its solved words, the earlier stages, then the later ones) from
+// the theme's other words; a missed word after the first MISSED_BACK
+// takes its place there like any word of its stage. All in random order.
+// With no missed word in `data` it is pickWords exactly.
+export function pickRound(data, size, stage, missed = [], solved = [], rand = Math.random) {
     const names = Object.keys(data);
     const list = Array.isArray(missed) ? missed : [];
     const remembered = list.filter((w, i) => names.includes(w) && list.indexOf(w) === i);
     const back = remembered.slice(0, Math.min(MISSED_BACK, size));
-    if (!back.length) return pickWords(data, size, stage, rand);
-    const only = (keep) => Object.fromEntries(names.filter(keep).map((w) => [w, data[w]]));
-    const need = size - back.length;
-    const fresh = pickWords(only((w) => !remembered.includes(w)), need, stage, rand);
-    const more = fresh.length < need
-        ? pickWords(only((w) => remembered.includes(w) && !back.includes(w)), need - fresh.length, stage, rand)
-        : [];
-    return shuffle([...back, ...fresh, ...more], rand);
+    if (!back.length) return pickWords(data, size, stage, solved, rand);
+    const rest = Object.fromEntries(names.filter((w) => !back.includes(w)).map((w) => [w, data[w]]));
+    return shuffle([...back, ...pickWords(rest, size - back.length, stage, solved, rand)], rand);
 }
 
 // Letters a beginner mixes up (BACKLOG B-207): the pairs the backlog

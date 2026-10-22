@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=28">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=29">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -225,13 +225,16 @@
         </div>
     </div>
 
-    <!-- Round-end screen: the stars, then a cream panel with the score
-         (split-flap), the new-sticker count (a sticker and "+N") and the
-         five words, each with its picture, a sticker if it is new in the
-         book and a lit or dark bulb; then themes and play again (BACKLOG
-         B-107, B-111, B-116). main.js fills the stars (class "earned"),
-         #round-score, #round-new and #round-words. Each star is a dark
-         star plus a lit "fill" layer that celebrate.js pops in. -->
+    <!-- Round-end screen: the stars, the theme's stages as a row of
+         bulbs (lit = cleared, BACKLOG B-216), then a cream panel with the
+         score (split-flap), the new-sticker count (a sticker and "+N")
+         and the five words, each with its picture, a sticker if it is new
+         in the book and a lit or dark bulb; then themes and play again
+         (BACKLOG B-107, B-111, B-116). main.js fills the stars (class
+         "earned"), #round-stages, #round-score, #round-new and
+         #round-words. Each star is a dark star plus a lit "fill" layer
+         that celebrate.js pops in; it also pops the bulb of a stage the
+         round just cleared, as the stars finish. -->
     <div id="screen-round-end" class="screen" style="display: none;">
         <div id="round-stars" class="stars" aria-label="Stars">
             <span>
@@ -247,6 +250,7 @@
                 <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
             </span>
         </div>
+        <div id="round-stages" class="stage-bulbs" role="img" aria-label="Stages"></div>
         <div class="panel round-panel">
             <div class="round-totals">
                 <h2 id="round-score" class="flaps"></h2>

@@ -3048,8 +3048,8 @@ class PlayBackTests(TestCase):
         self.assertNotIn('confirm(', main)
         themes = self.function('onThemes')
         self.assertLess(themes.index('stopWord();'), themes.index('setState({'))
-        for decl in ("screen: 'theme',", 'words: [],', 'results: [] },', 'current: { word: null,', 'speaking: false,',
-                     'pressed: null,', 'idleBeat: null,'):
+        for decl in ("screen: 'theme',", 'data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false },',
+                     'current: { word: null,', 'speaking: false,', 'pressed: null,', 'idleBeat: null,'):
             self.assertIn(decl, themes, decl)
 
 
@@ -3167,7 +3167,7 @@ class StageTests(TestCase):
         state = (self.JS / 'state.js').read_text()
         self.assertNotRegex(state, r'\n    level:')
         self.assertNotRegex(state, r'\n    streak:')
-        self.assertIn('\n    round: { index: 0, size: 5, stage: null, results: [] },', state)
+        self.assertIn('\n    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false },', state)
         # lockedTaps stays (the robot's head-shake; B-219 adds to it)
         self.assertRegex(state, r'\n    lockedTaps: 0,')
 
@@ -3211,30 +3211,36 @@ class StageTests(TestCase):
 
     # --- the round's stage ---
 
-    def test_a_tapped_theme_plays_its_first_stage(self):
-        # until B-216: the theme's first stage with words in its data, or
-        # stage 1 for data with none; the same expression as main.js's
+    def test_a_tapped_theme_plays_its_current_stage(self):
+        # since B-216: the theme's current stage (progress.js currentStage,
+        # tested in ProgressTests), read once the data file is in; with
+        # nothing cleared it is the first stage with words in its data, or
+        # stage 1 for data with none, as B-215 played
         start = self.main_function('startRound')
-        line = 'const stage = stagesOf(data)[0] ?? STAGES[0];'
+        self.assertIn('const progress = progressFor(name);', start)
+        line = 'const stage = currentStage(data, progress);'
         self.assertIn(line, start)
-        self.assertLess(start.index('await fetch('), start.index(line))
-        expr = line[len('const stage = '):-1]
+        self.assertLess(start.index('await fetch('), start.index('const progress = progressFor(name);'))
+        self.assertLess(start.index('const progress = progressFor(name);'), start.index(line))
         datas = [self.content('animals'), self.content('transportation'),
                  {'ox': {'stage': 3}, 'kite': {'stage': 'long'}}, {'kite': {'stage': 'long'}}, {'ox': {}}, {}]
-        firsts = self.run_node(f"const {{ stagesOf, STAGES }} = S; out({json.dumps(datas)}.map((data) => {expr}));")
+        firsts = self.run_node(
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"out({json.dumps(datas)}.map((data) => P.currentStage(data, {{ solved: [], cleared: [] }})));")
         self.assertEqual(firsts, [1, 1, 3, 'long', 1, 1])
 
     def test_the_stage_is_fixed_for_the_round(self):
         start = self.main_function('startRound')
-        self.assertIn("import { STAGES, stagesOf } from './stage.js';", (self.JS / 'main.js').read_text())
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [] },', start)
+        self.assertIn("import { stagesOf } from './stage.js';", (self.JS / 'main.js').read_text())
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
-        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name))', start)
+        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('current: makeWord(state.words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
         # nothing else writes a round's stage; leaving a round clears it
         main = self.code('main.js')
-        self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results', main)), 2)
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [] },', self.main_function('onThemes'))
+        self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },',
+                      self.main_function('onThemes'))
         for name in ('onCheck', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
 
@@ -3381,10 +3387,10 @@ class StageStartTests(TestCase):
         start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
         return js[start:js.index('\n}\n', start)]
 
-    def picks(self, data, stage, seeds=40, size=5):
+    def picks(self, data, stage, seeds=40, size=5, solved=()):
         return self.run_node(
-            f"const data = {json.dumps(data)};"
-            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickWords(data, {size}, {json.dumps(stage)}, seeded(i + 1))));")
+            f"const data = {json.dumps(data)}; const solved = {json.dumps(list(solved))};"
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickWords(data, {size}, {json.dumps(stage)}, solved, seeded(i + 1))));")
 
     @staticmethod
     def theme(**stages):
@@ -3427,22 +3433,27 @@ class StageStartTests(TestCase):
             self.assertLessEqual(set(words), {'ship', 'sheep', 'duck', 'clock', 'moon', 'fish'})
         self.assertEqual({w for words in rounds for w in words}, {'ship', 'sheep', 'duck', 'clock', 'moon', 'fish'})
 
-    def test_a_short_stage_fills_from_the_nearest_stages_the_earlier_on_a_tie(self):
-        # stage 3 has one word; stages 2 and 4 are as near (one each), then
-        # stages 1 and 5 (three each): of those the earlier, stage 1, fills
-        # the last two places; stage 5 and long never come
+    def test_a_short_stage_fills_from_the_earlier_stages_then_the_later(self):
+        # since B-216 (PROGRESSION.md "Rounds"): after the stage's own
+        # words the review, the earlier stages, the nearest first (2, then
+        # 1); the later stages only while places are left. Stage 3 has one
+        # word: ship, frog (2) and three of stage 1; boat (4) never comes
         data = self.theme(s1=['ox', 'cat', 'dog'], s2=['frog'], s3=['ship'], s4=['boat'], s5=['tiger', 'mouse', 'horse'],
                           long=['helicopter'])
-        rounds = self.picks(data, 3)
+        for words in self.picks(data, 3):
+            self.assertEqual(set(words), {'ship', 'frog', 'ox', 'cat', 'dog'})
+        # with too few earlier words the later ones fill, the nearest first
+        data2 = self.theme(s1=['ox'], s3=['ship'], s4=['boat', 'goat'], s5=['tiger', 'mouse'])
+        rounds = self.picks(data2, 3)
         for words in rounds:
-            self.assertLessEqual({'ship', 'frog', 'boat'}, set(words))
-            self.assertEqual(len(set(words) & {'ox', 'cat', 'dog'}), 2)
-        self.assertEqual({w for words in rounds for w in words}, {'ship', 'frog', 'boat', 'ox', 'cat', 'dog'})
-        # long: its nearest are 5, then 4, then 3
+            self.assertLessEqual({'ship', 'ox', 'boat', 'goat'}, set(words))
+            self.assertEqual(len(set(words) & {'tiger', 'mouse'}), 1)
+        self.assertEqual({w for words in rounds for w in words}, {'ship', 'ox', 'boat', 'goat', 'tiger', 'mouse'})
+        # long: its earlier stages are 5, then 4
         for words in self.picks(data, 'long'):
             self.assertEqual(set(words), {'helicopter', 'tiger', 'mouse', 'horse', 'boat'})
-        # an empty stage starts with its neighbours: stage 2 of a theme
-        # with none on 2 takes 1 then 3 (the earlier first), then 4
+        # an empty stage starts with the review: stage 2 of a theme with
+        # none on 2 takes 1, then 3, then one of 4
         data = self.theme(s1=['ox', 'cat'], s3=['ship', 'fish'], s4=['boat', 'goat'], s5=['tiger'])
         for words in self.picks(data, 2):
             self.assertLessEqual({'ox', 'cat', 'ship', 'fish'}, set(words))
@@ -3477,7 +3488,7 @@ class StageStartTests(TestCase):
         data = self.content('animals')
         before, after, picks = self.run_node(
             f"const data = {json.dumps(data)}; const before = JSON.stringify(data);"
-            "const p = [null, undefined, 'easy', '1', 1].map((st) => R.pickWords(data, 5, st, seeded(7)));"
+            "const p = [null, undefined, 'easy', '1', 1].map((st) => R.pickWords(data, 5, st, [], seeded(7)));"
             "out([before, JSON.stringify(data), p]);")
         self.assertEqual(before, after)
         self.assertEqual(picks[:4], [picks[4]] * 4)
@@ -3608,9 +3619,9 @@ class StageStartTests(TestCase):
         self.assertNotIn('makeCurrent', main)
         self.assertNotIn('shuffle', main)
         start = self.function('startRound')
-        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name))', start)
+        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [] },', start)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
         nxt = self.function('onNext')
         self.assertIn('current: makeWord(state.words[nextIndex], state.round.stage, newTileId),', nxt)
 
@@ -4801,10 +4812,10 @@ class MissedWordsTests(TestCase):
         start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
         return js[start:js.index('\n}\n', start)]
 
-    def rounds(self, data, stage, missed, seeds=60):
+    def rounds(self, data, stage, missed, seeds=60, solved=()):
         return self.run_node(
-            f"const data = {json.dumps(data)}; const missed = {json.dumps(missed)};"
-            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickRound(data, 5, {json.dumps(stage)}, missed, seeded(i + 1))));")
+            f"const data = {json.dumps(data)}; const missed = {json.dumps(missed)}; const solved = {json.dumps(list(solved))};"
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickRound(data, 5, {json.dumps(stage)}, missed, solved, seeded(i + 1))));")
 
     # --- missed.js: the list per theme ---
 
@@ -4902,8 +4913,8 @@ class MissedWordsTests(TestCase):
                 same = self.run_node(
                     f"const data = {json.dumps(data)};"
                     "out(Array.from({ length: 20 }, (_, i) => JSON.stringify(R.pickRound(data, 5, "
-                    f"{json.dumps(stage)}, {json.dumps(missed) if missed is not None else 'undefined'}, seeded(i + 1))) ==="
-                    f" JSON.stringify(R.pickWords(data, 5, {json.dumps(stage)}, seeded(i + 1)))));")
+                    f"{json.dumps(stage)}, {json.dumps(missed) if missed is not None else 'undefined'}, ['cat', 'bird'], seeded(i + 1))) ==="
+                    f" JSON.stringify(R.pickWords(data, 5, {json.dumps(stage)}, ['cat', 'bird'], seeded(i + 1)))));")
                 self.assertEqual(same, [True] * 20, (stage, missed))
 
     def test_the_two_oldest_missed_words_come_back_on_every_stage(self):
@@ -4915,8 +4926,15 @@ class MissedWordsTests(TestCase):
                 self.assertEqual(len(set(words)), 5, stage)
                 self.assertLessEqual(set(words), set(data), stage)
                 self.assertLessEqual({'tiger', 'rabbit'}, set(words), stage)
-                # up to two: the newer misses wait for a later round
-                self.assertEqual(set(words) & set(missed), {'tiger', 'rabbit'}, stage)
+                # up to two come back: the newer misses of other stages
+                # (lion on 4, wolf on 5) wait for a later round
+                if stage != 5:
+                    self.assertEqual(set(words) & set(missed), {'tiger', 'rabbit'}, stage)
+        # since B-216 (PROGRESSION.md "Rounds") a newer miss of the round's
+        # own stage comes as one of the stage's words: stage 5 is tiger,
+        # rabbit (back), then its other words, mouse, bear and wolf
+        for words in self.rounds(data, 5, missed):
+            self.assertEqual(set(words), {'tiger', 'rabbit', 'mouse', 'bear', 'wolf'})
 
     def test_one_missed_word_comes_back_and_the_others_follow_the_stage(self):
         # animals stage 1 with horse (stage 4) missed: horse, then the
@@ -4958,13 +4976,13 @@ class MissedWordsTests(TestCase):
                 self.assertLessEqual({'pig', 'emu'}, set(words), stage)
         # and a round shorter than the list takes only the oldest
         self.assertEqual(sorted(self.run_node(
-            f"out(R.pickRound({json.dumps(data)}, 1, 2, {json.dumps(missed)}, seeded(3)));")), ['pig'])
+            f"out(R.pickRound({json.dumps(data)}, 1, 2, {json.dumps(missed)}, [], seeded(3)));")), ['pig'])
 
     def test_the_pick_leaves_its_inputs_alone(self):
         data = self.content('animals')
         before, after, missed = self.run_node(
             f"const data = {json.dumps(data)}; const missed = ['tiger', 'lion', 'wolf']; const before = JSON.stringify(data);"
-            "R.pickRound(data, 5, 1, missed, seeded(5)); out([before, JSON.stringify(data), missed]);")
+            "R.pickRound(data, 5, 1, missed, ['cat'], seeded(5)); out([before, JSON.stringify(data), missed]);")
         self.assertEqual(before, after)
         self.assertEqual(missed, ['tiger', 'lion', 'wolf'])
 
@@ -4976,7 +4994,7 @@ class MissedWordsTests(TestCase):
         res = self.run_node(
             f"const data = {json.dumps(data)}; const rounds = [];"
             "const play = (seed, wrong) => {"
-            "  const words = R.pickRound(data, 5, 1, M.wordsFor('animals'), seeded(seed));"
+            "  const words = R.pickRound(data, 5, 1, M.wordsFor('animals'), [], seeded(seed));"
             "  const missed = wrong(words);"
             "  M.record('animals', words.map((word) => ({ word, correct: !missed.includes(word) })));"
             "  rounds.push({ words, after: M.wordsFor('animals') }); return missed; };"
@@ -5015,7 +5033,7 @@ class MissedWordsTests(TestCase):
     def test_main_picks_with_the_themes_missed_words_and_records_only_at_the_round_end(self):
         main = self.code('main.js')
         self.assertIn("import { wordsFor as missedWords, record as recordMissed } from './missed.js';", main)
-        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name))', self.function('startRound'))
+        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', self.function('startRound'))
         # recorded once, in onNext's round-end branch, before the screen
         # changes; a round left with the back button records nothing
         self.assertEqual(main.count('recordMissed('), 1)
@@ -6600,3 +6618,578 @@ class VoiceScriptTests(TestCase):
         self.assertEqual(mods, {'argparse', 'json', 'os', 'sys', 'time', 'urllib', 'datetime'})
         for name in ('removeprefix', 'removesuffix'):
             self.assertNotIn(name, src)
+
+
+class ProgressTests(TestCase):
+    """The kid's progress per theme (BACKLOG B-216, PROGRESSION.md
+    "Stages"): static/js/progress.js keeps the solved words and the
+    cleared stages per theme in localStorage `flip.progress.v1` (shape
+    { "<theme>": { "solved": [word, ...], "cleared": [stage, ...] } };
+    read and written only there, in try/catch); currentStage(data,
+    progress) and afterRound(progress, data, stage, results) are pure. Run
+    through node with a fake localStorage; the wiring in main.js (the
+    stage at startRound, the record at the round end only) is checked in
+    the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # In-memory localStorage (SEED: the key's initial value or null),
+    # counting writes; THROW makes getItem / setItem throw.
+    PRELUDE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.progress.v1', SEED);
+        let writes = 0;
+        const THROW = { get: false, set: false };
+        globalThis.localStorage = {
+            getItem: (k) => { if (THROW.get) throw new Error('blocked'); return store.has(k) ? store.get(k) : null; },
+            setItem: (k, v) => { if (THROW.set) throw new Error('quota'); writes++; store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const raw = () => store.get('flip.progress.v1') ?? null;
+        const out = (v) => console.log(JSON.stringify(v));
+    """
+
+    def run_node(self, body, seed=None):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const SEED = {json.dumps(seed)};"
+            f"{self.PRELUDE}"
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    @staticmethod
+    def results(right, wrong=()):
+        return [{'word': w, 'correct': True} for w in right] + [{'word': w, 'correct': False} for w in wrong]
+
+    # --- the store ---
+
+    def test_missing_key_is_no_progress(self):
+        self.assertEqual(self.run_node("out([P.load(), P.forTheme('animals'), raw(), writes]);"),
+                         [{}, {'solved': [], 'cleared': []}, None, 0])
+
+    def test_a_round_end_records_the_solved_words_and_the_cleared_stage(self):
+        # animals stage 1 is cat and dog: both checked correct (dog with
+        # the robot's help: still correct), frog revealed (not correct)
+        data = self.content('animals')
+        res, stored, mine = self.run_node(
+            f"const r = P.record('animals', {json.dumps(data)}, 1,"
+            " [{ word: 'cat', correct: true, newSticker: true }, { word: 'frog', correct: false },"
+            "  { word: 'dog', correct: true, newSticker: false }, { word: 'fish', correct: true }, { word: 'duck', correct: false }]);"
+            "out([r, JSON.parse(raw()), P.forTheme('animals')]);")
+        self.assertEqual(res, {'progress': {'solved': ['cat', 'dog', 'fish'], 'cleared': [1]}, 'justCleared': True})
+        self.assertEqual(stored, {'animals': {'solved': ['cat', 'dog', 'fish'], 'cleared': [1]}})
+        self.assertEqual(mine, {'solved': ['cat', 'dog', 'fish'], 'cleared': [1]})
+
+    def test_a_stage_clears_once_every_one_of_its_words_is_solved(self):
+        # round 1: cat right, dog revealed: stage 1 not cleared; round 2:
+        # dog right: cleared, just now; round 3: still cleared, not "just"
+        data = json.dumps(self.content('animals'))
+        rounds = self.run_node(
+            f"const data = {data}; const r = [];"
+            "r.push(P.record('animals', data, 1, [{ word: 'cat', correct: true }, { word: 'dog', correct: false }]));"
+            "r.push(P.record('animals', data, 1, [{ word: 'dog', correct: true }, { word: 'cat', correct: false }]));"
+            "r.push(P.record('animals', data, 1, [{ word: 'cat', correct: false }, { word: 'dog', correct: false }]));"
+            "out(r.map((x) => [x.progress.cleared, x.justCleared]));")
+        self.assertEqual(rounds, [[[], False], [[1], True], [[1], False]])
+
+    def test_a_missed_word_stays_solved(self):
+        # solved means checked correct at least once: a later miss keeps it
+        data = self.content('animals')
+        res = self.run_node(
+            f"out(P.afterRound({{ solved: ['cat', 'dog'], cleared: [1] }}, {json.dumps(data)}, 2,"
+            " [{ word: 'cat', correct: false }, { word: 'frog', correct: true }]));")
+        self.assertEqual(res, {'progress': {'solved': ['cat', 'dog', 'frog'], 'cleared': [1, 2]}, 'justCleared': True})
+
+    def test_only_the_rounds_stage_is_cleared(self):
+        # transportation today: stage 1 is only bus, stage 2 has no word;
+        # a stage-1 round of bus, car, truck (stage 3) and two of stage 4,
+        # all right, clears stage 1 only, though car and truck are all of
+        # stage 3; the next round is stage 3 (2 is skipped), which clears
+        # at its end, its words being solved
+        data = json.dumps(self.content('transportation'))
+        res = self.run_node(
+            f"const data = {data};"
+            "const a = P.record('transportation', data, 1, ['bus', 'car', 'truck', 'taxi', 'boat'].map((word) => ({ word, correct: true })));"
+            "const next = P.currentStage(data, P.forTheme('transportation'));"
+            "const b = P.record('transportation', data, next, ['car', 'truck', 'bus', 'plane', 'train'].map((word) => ({ word, correct: false })));"
+            "out([a.progress.cleared, a.justCleared, next, b.progress.cleared, b.justCleared,"
+            " P.currentStage(data, P.forTheme('transportation'))]);")
+        self.assertEqual(res, [[1], True, 3, [1, 3], True, 4])
+
+    def test_a_cleared_stage_stays_cleared_when_the_data_adds_words(self):
+        # stage 1 cleared with cat and dog; the data later adds pig to it:
+        # still cleared, and the current stage is still the next one
+        data = dict(self.content('animals'), pig={'image': '/pig.svg', 'stage': 1})
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const before = {{ solved: ['cat', 'dog', 'frog'], cleared: [1] }};"
+            "const r = P.afterRound(before, data, 1, [{ word: 'pig', correct: false }]);"
+            "out([r, P.currentStage(data, r.progress)]);")
+        self.assertEqual(res, [{'progress': {'solved': ['cat', 'dog', 'frog'], 'cleared': [1]}, 'justCleared': False}, 2])
+
+    def test_a_stage_with_no_word_or_no_stage_is_never_cleared(self):
+        # transportation has no stage-2 word; a value that is not a stage
+        # (null between rounds, '1', 'Long') clears nothing; solved words
+        # still count
+        data = self.content('transportation')
+        res = self.run_node(
+            f"const data = {json.dumps(data)};"
+            "out([2, null, '1', 'Long', 7].map((st) => P.afterRound({ solved: [], cleared: [] }, data, st,"
+            " [{ word: 'bus', correct: true }])).concat([P.afterRound({}, {}, 1, [{ word: 'ox', correct: true }])]));")
+        self.assertEqual(res, [{'progress': {'solved': ['bus'], 'cleared': []}, 'justCleared': False}] * 5
+                         + [{'progress': {'solved': ['ox'], 'cleared': []}, 'justCleared': False}])
+
+    def test_odd_results_are_skipped(self):
+        res = self.run_node(
+            "out(P.afterRound(null, { ox: { stage: 1 } }, 1, [null, { word: 'ox' }, { word: '', correct: true },"
+            " { correct: true }, { word: 'ox', correct: 'yes' }, { word: 7, correct: true }]));")
+        self.assertEqual(res, {'progress': {'solved': [], 'cleared': []}, 'justCleared': False})
+        self.assertEqual(self.run_node("out(P.afterRound(undefined, null, 1, undefined));"),
+                         {'progress': {'solved': [], 'cleared': []}, 'justCleared': False})
+
+    def test_cleared_stages_are_kept_in_stage_order(self):
+        res = self.run_node(
+            "out(P.afterRound({ solved: ['kite'], cleared: ['long', 3, 1] }, { ox: { stage: 2 }, kite: { stage: 'long' } }, 2,"
+            " [{ word: 'ox', correct: true }]));")
+        self.assertEqual(res, {'progress': {'solved': ['kite', 'ox'], 'cleared': [1, 2, 3, 'long']}, 'justCleared': True})
+
+    def test_after_round_leaves_its_inputs_alone(self):
+        data = self.content('animals')
+        same = self.run_node(
+            f"const data = {json.dumps(data)}; const progress = {{ solved: ['cat'], cleared: [] }};"
+            "const results = [{ word: 'dog', correct: true }];"
+            "const before = JSON.stringify([progress, data, results]);"
+            "const r = P.afterRound(progress, data, 1, results);"
+            "out([before === JSON.stringify([progress, data, results]), r.progress.solved !== progress.solved]);")
+        self.assertEqual(same, [True, True])
+
+    # --- currentStage ---
+
+    def test_the_current_stage_is_the_first_not_cleared(self):
+        animals = self.content('animals')
+        transport = self.content('transportation')
+        res = self.run_node(
+            f"const a = {json.dumps(animals)}; const t = {json.dumps(transport)};"
+            "const at = (data, cleared) => P.currentStage(data, { solved: [], cleared });"
+            "out([at(a, []), at(a, [1]), at(a, [1, 2]), at(a, [1, 2, 3, 4]), at(a, [1, 2, 3, 4, 5]),"
+            " at(t, []), at(t, [1]), at(t, [1, 3]), at(t, [1, 3, 4]), at(t, [1, 3, 4, 'long']),"
+            " at(a, [2, 3]), at(t, [1, 2, 3]), at({}, []), at({ ox: {} }, [1]),"
+            " P.currentStage(a, null), P.currentStage(a, { cleared: 'x' }), P.currentStage(a, { cleared: ['1', 'Long'] })]);")
+        # animals: 1-5; transportation: 1, 3, 4, long (2 has no word, so
+        # it is skipped); all cleared: the last; data with no staged word:
+        # stage 1; anything odd in the progress clears nothing
+        self.assertEqual(res, [1, 2, 3, 5, 5, 1, 3, 4, 'long', 'long', 1, 4, 1, 1, 1, 1, 1])
+
+    # --- corrupt or blocked storage ---
+
+    def test_corrupt_progress_is_sanitised_and_a_round_end_recovers(self):
+        for seed in ('not json', '[1, 2]', '"x"', 'null', '7'):
+            self.assertEqual(self.run_node("out(P.load());", seed=seed), {}, seed)
+        seed = json.dumps({
+            'animals': {'solved': ['cat', 'cat', '', 7, None, 'dog'], 'cleared': ['1', 1, 1, 'Long', 'long', 9, None]},
+            'transportation': ['bus'], 'space': None, 'sea': {'solved': 'fish', 'cleared': 3},
+        })
+        lists = self.run_node("out(P.load());", seed=seed)
+        self.assertEqual(lists, {'animals': {'solved': ['cat', 'dog'], 'cleared': [1, 'long']},
+                                 'sea': {'solved': [], 'cleared': []}})
+        stored = self.run_node(
+            "P.record('animals', { cat: { stage: 1 }, frog: { stage: 2 } }, 2, [{ word: 'frog', correct: true }]);"
+            "out(JSON.parse(raw()));", seed='{oops')
+        self.assertEqual(stored, {'animals': {'solved': ['frog'], 'cleared': [2]}})
+
+    def test_blocked_storage_never_throws(self):
+        res = self.run_node(
+            "THROW.get = true; const a = [P.load(), P.forTheme('animals')];"
+            "THROW.get = false; THROW.set = true;"
+            "const b = P.record('animals', { cat: { stage: 1 } }, 1, [{ word: 'cat', correct: true }]);"
+            "Object.defineProperty(globalThis, 'localStorage', { get() { throw new Error('denied'); } });"
+            "const c = [P.load(), P.record('animals', { cat: { stage: 1 } }, 1, [{ word: 'cat', correct: true }])];"
+            "out([a, b, c, writes]);")
+        empty = {'solved': [], 'cleared': []}
+        won = {'progress': {'solved': ['cat'], 'cleared': [1]}, 'justCleared': True}
+        self.assertEqual(res, [[{}, empty], won, [{}, won], 0])
+
+    def test_no_change_writes_nothing_and_other_themes_are_kept(self):
+        seed = json.dumps({'animals': {'solved': ['cat', 'dog'], 'cleared': [1]},
+                           'transportation': {'solved': ['bus'], 'cleared': [1]}})
+        res = self.run_node(
+            "const data = { cat: { stage: 1 }, dog: { stage: 1 }, frog: { stage: 2 } };"
+            "P.record('animals', data, 1, [{ word: 'cat', correct: true }, { word: 'frog', correct: false }]);"
+            "const quiet = writes;"
+            "P.record('animals', data, 2, [{ word: 'frog', correct: true }]);"
+            "out([quiet, writes, JSON.parse(raw()), P.record('', data, 1, []), P.record(null, data, 1, [])]);", seed=seed)
+        self.assertEqual(res[:3], [0, 1, {'animals': {'solved': ['cat', 'dog', 'frog'], 'cleared': [1, 2]},
+                                          'transportation': {'solved': ['bus'], 'cleared': [1]}}])
+        self.assertEqual(res[3:], [{'progress': {'solved': [], 'cleared': []}, 'justCleared': False}] * 2)
+
+    # --- the modules together, as main.js runs them ---
+
+    def test_clearing_stage_1_opens_the_next_stage(self):
+        # animals: a stage-1 round, every word right, clears stage 1; the
+        # next round (play again) is stage 2, whose rules give no first
+        # letter; its round starts with frog, the stage's word, then the
+        # review (cat, dog) and stage 3 (fish, duck)
+        data = self.content('animals')
+        res = self.run_node(
+            f"const data = {json.dumps(data)};"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"const S = await import('{(self.JS / 'stage.js').as_uri()}');"
+            "const first = P.currentStage(data, P.forTheme('animals'));"
+            "const words = R.pickRound(data, 5, first, [], P.forTheme('animals').solved);"
+            "const end = P.record('animals', data, first, words.map((word) => ({ word, correct: true })));"
+            "const next = P.currentStage(data, P.forTheme('animals'));"
+            "const again = R.pickRound(data, 5, next, [], P.forTheme('animals').solved);"
+            "let seq = 0; const w = R.makeWord({ word: again[0], image: '', audio: '' }, next, () => `t${++seq}`);"
+            "out([first, words.slice().sort(), end.justCleared, next, again.slice().sort(), S.stageRules(next), w.placed.every((p) => p === null)]);")
+        self.assertEqual(res, [1, ['cat', 'dog', 'duck', 'fish', 'frog'], True, 2, ['cat', 'dog', 'duck', 'fish', 'frog'],
+                               {'givenFirst': False, 'extras': 0}, True])
+
+    # --- wiring ---
+
+    def test_only_progress_js_names_the_key_and_it_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            text = path.read_text()
+            if path.name == 'progress.js':
+                self.assertIn("export const KEY = 'flip.progress.v1';", text)
+            else:
+                self.assertNotIn('flip.progress', text, path.name)
+        code = self.code('progress.js')
+        for word in ('document', 'window', 'state.', 'setState'):
+            self.assertNotIn(word, code, word)
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
+                         ["import { STAGES, isStage, stagesOf } from './stage.js';"])
+        # every read and write in try/catch
+        for fn in ('storage', 'load', 'save'):
+            self.assertIn('try {', self.function(fn, 'progress.js'), fn)
+        self.assertNotIn('localStorage', self.code('main.js'))
+
+    def test_main_plays_the_current_stage_and_records_only_at_the_round_end(self):
+        main = self.code('main.js')
+        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress } from './progress.js';", main)
+        start = self.function('startRound')
+        self.assertIn('const stage = currentStage(data, progress);', start)
+        self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
+        self.assertIn('        data,\n', start)
+        # play again starts a round of the theme's current stage: the same
+        # startRound, so after a clear it is the next stage
+        self.assertIn('if (theme) startRound(theme);', self.function('onPlayAgain'))
+        # recorded once, in onNext's round-end branch, after the missed
+        # words, before the screen changes; the round keeps the result
+        self.assertEqual(main.count('recordProgress('), 1)
+        nxt = self.function('onNext')
+        end = nxt.index('if (nextIndex >= round.size) {')
+        rec = nxt.index('const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);')
+        self.assertLess(end, rec)
+        self.assertLess(nxt.index('recordMissed(state.theme, results);'), rec)
+        self.assertLess(rec, nxt.index("screen: 'round-end'"))
+        self.assertLess(rec, nxt.index('} else {', end))
+        self.assertIn('round: { ...round, results, cleared: progress.cleared, justCleared },', nxt)
+        # a round left with the back button records nothing
+        for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound', 'onPlayAgain'):
+            self.assertNotIn('recordProgress', self.function(name), name)
+        # the data file travels with the round and leaves with it
+        self.assertIn('data: null,', self.function('onThemes'))
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n    data: null,', state)
+
+
+class StageRoundTests(TestCase):
+    """A round of a stage (BACKLOG B-216, PROGRESSION.md "Rounds"):
+    round.js pickRound(data, size, stage, missed, solved) takes up to
+    MISSED_BACK missed words, then the stage's unsolved words, then its
+    solved words, then the earlier stages' words (the nearest first),
+    then, only if still short, the later stages' (the nearest first); five
+    words in random order. Run through node with a seeded Math.random, on
+    today's data and on a full test theme."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            "const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def rounds(self, data, stage, missed=(), solved=(), seeds=60):
+        return self.run_node(
+            f"const data = {json.dumps(data)};"
+            f"out(Array.from({{ length: {seeds} }}, (_, i) => R.pickRound(data, 5, {json.dumps(stage)},"
+            f" {json.dumps(list(missed))}, {json.dumps(list(solved))}, seeded(i + 1))));")
+
+    # A full theme: five words on each of stages 1-5, eight long ones.
+    FULL = {
+        1: ['cat', 'dog', 'pig', 'hen', 'bee'],
+        2: ['frog', 'crab', 'slug', 'swan', 'moth'],
+        3: ['fish', 'duck', 'sheep', 'shark', 'moose'],
+        4: ['mole', 'goat', 'snail', 'whale', 'snake'],
+        5: ['tiger', 'mouse', 'camel', 'rabbit', 'monkey'],
+        'long': ['elephant', 'kangaroo', 'giraffe', 'squirrel', 'penguin', 'dolphin', 'octopus', 'butterfly'],
+    }
+
+    def full(self):
+        return {w: {'image': f'/{w}.svg', 'stage': s} for s, words in self.FULL.items() for w in words}
+
+    def test_todays_transportation(self):
+        # stage 1 is only bus and stage 2 is empty: bus, then (no earlier
+        # stage) the later ones, car and truck (stage 3) and two of stage 4
+        data = self.content('transportation')
+        stage4 = {'taxi', 'boat', 'plane', 'train'}
+        for solved in ((), ('bus',)):
+            for words in self.rounds(data, 1, solved=solved):
+                self.assertLessEqual({'bus', 'car', 'truck'}, set(words))
+                self.assertEqual(len(set(words) & stage4), 2)
+        # stage 3 (the next after 1): car and truck, the review bus, then
+        # two of stage 4, never a long word
+        for words in self.rounds(data, 3, solved=('bus', 'car', 'truck', 'taxi', 'boat')):
+            self.assertLessEqual({'car', 'truck', 'bus'}, set(words))
+            self.assertEqual(len(set(words) & stage4), 2)
+        # the empty stage 2 (never current, but a round of it still works):
+        # bus, then car and truck, then two of stage 4
+        for words in self.rounds(data, 2):
+            self.assertLessEqual({'bus', 'car', 'truck'}, set(words))
+            self.assertEqual(len(set(words) & stage4), 2)
+        # long: five of its five words
+        for words in self.rounds(data, 'long'):
+            self.assertEqual(set(words), {'helicopter', 'scooter', 'bicycle', 'motorbike', 'submarine'})
+
+    def test_todays_animals(self):
+        # stage 2 is only frog: frog, the review cat and dog (stage 1),
+        # then stage 3's fish and duck
+        data = self.content('animals')
+        for words in self.rounds(data, 2, solved=('cat', 'dog')):
+            self.assertEqual(set(words), {'frog', 'cat', 'dog', 'fish', 'duck'})
+        # stage 4 (bird, lion, horse): then stage 3, the nearest earlier
+        for words in self.rounds(data, 4):
+            self.assertLessEqual({'bird', 'lion', 'horse'}, set(words))
+            self.assertEqual(len(set(words) & {'fish', 'duck'}), 2)
+
+    def test_a_full_stage_is_the_round(self):
+        data = self.full()
+        for stage in (1, 3, 5):
+            for words in self.rounds(data, stage):
+                self.assertEqual(set(words), set(self.FULL[stage]), stage)
+        # replaying a stage all solved: still its own five
+        for words in self.rounds(data, 3, solved=self.FULL[3] + self.FULL[1]):
+            self.assertEqual(set(words), set(self.FULL[3]))
+
+    def test_the_stages_unsolved_words_come_before_its_solved_ones(self):
+        data = self.full()
+        # long has eight: three solved, so the five unsolved are the round
+        solved = ['elephant', 'kangaroo', 'giraffe']
+        for words in self.rounds(data, 'long', solved=solved):
+            self.assertEqual(set(words), set(self.FULL['long']) - set(solved))
+        # two missed words back: three places for stage 3, its three
+        # unsolved words first
+        for words in self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck']):
+            self.assertEqual(set(words), {'cat', 'mole', 'sheep', 'shark', 'moose'})
+        # four of five solved: the one unsolved, then two of the solved
+        rounds = self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck', 'sheep', 'shark'])
+        for words in rounds:
+            self.assertLessEqual({'cat', 'mole', 'moose'}, set(words))
+            self.assertEqual(len(set(words) & {'fish', 'duck', 'sheep', 'shark'}), 2)
+        self.assertEqual({w for words in rounds for w in words}, {'cat', 'mole', 'moose', 'fish', 'duck', 'sheep', 'shark'})
+
+    def test_the_earlier_stages_review_before_the_later_stages_fill(self):
+        # a stage of two words: the nearest earlier stage fills the rest,
+        # never a later one while the earlier stages have words
+        data = self.full()
+        for w in ('sheep', 'shark', 'moose'):
+            del data[w]
+        for words in self.rounds(data, 3):
+            self.assertLessEqual({'fish', 'duck'}, set(words))
+            self.assertEqual(len(set(words) & set(self.FULL[2])), 3)
+        # stage 1 of a theme with two stage-1 words: no earlier stage, so
+        # stage 2 fills (the data still partial)
+        data = self.full()
+        for w in ('pig', 'hen', 'bee'):
+            del data[w]
+        for words in self.rounds(data, 1):
+            self.assertLessEqual({'cat', 'dog'}, set(words))
+            self.assertEqual(len(set(words) & set(self.FULL[2])), 3)
+
+    def test_the_round_is_five_words_in_random_order(self):
+        data = self.full()
+        rounds = self.rounds(data, 3, missed=['cat'], solved=['fish'])
+        for words in rounds:
+            self.assertEqual(len(words), 5)
+            self.assertEqual(len(set(words)), 5)
+        self.assertEqual({words.index('cat') for words in rounds}, {0, 1, 2, 3, 4})
+        self.assertEqual({words.index('sheep') for words in rounds if 'sheep' in words}, {0, 1, 2, 3, 4})
+
+
+class RoundEndStagesTests(TestCase):
+    """The round-end's stage bulbs (BACKLOG B-216): under the stars, one
+    bulb per stage the theme's data has words in, lit = cleared; the bulb
+    of a stage the round just cleared lights with a pop as the stars
+    finish (celebrate.js; reduced motion: simply lit). main.js's
+    renderStageBulbs runs through node with a stand-in element, celebrate.js
+    with stand-ins for the DOM and GSAP."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = "const out = (v) => console.log(JSON.stringify(v));" + body
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def test_the_row_sits_under_the_stars_with_no_text(self):
+        html = self.client.get('/').content.decode()
+        row = re.search(r'<div id="round-stages" class="stage-bulbs"[^>]*></div>', html)
+        self.assertIsNotNone(row)
+        self.assertLess(html.index('id="round-stars"'), row.start())
+        self.assertLess(row.start(), html.index('class="panel round-panel"'))
+        self.assertIn('aria-label=', row.group(0))
+        self.assertIn("renderStageBulbs($('round-stages'), stagesOf(state.data), state.round.cleared || []);",
+                      self.function('renderRoundEnd'))
+        css = self.css()
+        self.assertIn('\n.stage-bulbs {', css)
+        rule = re.search(r'\n\.stage-bulbs \.bulb\s*{([^}]*)}', css).group(1)
+        self.assertIn('width: 18px;', rule)
+        self.assertNotRegex(rule, r'#[0-9a-fA-F]{3,6}')
+        template = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", template).group(1)), 29)
+
+    def test_one_bulb_per_stage_lit_when_cleared_kept_in_place(self):
+        res = self.run_node(
+            "const el = () => ({ children: [], className: '', dataset: {}, attrs: {},"
+            " setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' });"
+            "globalThis.document = { createElement: () => el() };"
+            "const row = el();"
+            "row.appendChild = (c) => { row.children.push(c); c.remove = () => row.children.splice(row.children.indexOf(c), 1); return c; };"
+            "Object.defineProperty(row, 'lastElementChild', { get: () => row.children[row.children.length - 1] });"
+            + self.function('renderStageBulbs') +
+            "const look = () => row.children.map((b) => [b.dataset.stage, b.className, b.textContent]);"
+            "renderStageBulbs(row, [1, 2, 3, 4, 5], []); const none = look(); const first = row.children[0];"
+            "renderStageBulbs(row, [1, 2, 3, 4, 5], [1]); const one = look();"
+            "const kept = row.children[0] === first; const label = row.attrs['aria-label'];"
+            "renderStageBulbs(row, [1, 3, 4, 'long'], [1, 3, 'long']); const t = look();"
+            "out([none, one, kept, label, t, row.children.length]);")
+        none, one, kept, label, t, n = res
+        self.assertEqual(none, [[str(s), 'bulb off', ''] for s in range(1, 6)])
+        self.assertEqual(one, [['1', 'bulb', '']] + [[str(s), 'bulb off', ''] for s in range(2, 6)])
+        self.assertTrue(kept)
+        self.assertEqual(label, 'stages cleared: 1 / 5')
+        self.assertEqual(t, [['1', 'bulb', ''], ['3', 'bulb', ''], ['4', 'bulb off', ''], ['long', 'bulb', '']])
+        self.assertEqual(n, 4)
+
+    # celebrate.js with stand-ins: what it does to the bulbs
+    CELEBRATE = """
+        const log = [];
+        const nm = (el) => (Array.isArray(el) ? el.map((e) => e.id) : el.id);
+        const tl = { to(el, v, at) { log.push(['tl.to', nm(el), v, at]); return tl; } };
+        let done = null;
+        globalThis.gsap = {
+            set(el, v) { log.push(['set', nm(el), v]); },
+            to() {}, fromTo() {},
+            timeline(v) { log.push(['timeline', v.delay]); done = v.onComplete; return tl; },
+            killTweensOf(el) { log.push(['kill', nm(el)]); },
+        };
+        let reduced = false;
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        const bulb = (s) => ({ id: 'b' + s, stage: String(s), style: { removeProperty: (k) => log.push(['unset', 'b' + s, k]) } });
+        const bulbs = [1, 2, 3, 4, 5].map(bulb);
+        let earned = 3;
+        const fills = () => Array.from({ length: earned }, (_, i) => ({ id: 'star' + i }));
+        globalThis.document = {
+            querySelector: (sel) => { const m = /data-stage="([^"]+)"/.exec(sel); return m ? bulbs.find((b) => b.stage === m[1]) || null : null; },
+            querySelectorAll: (sel) => (sel === '#round-stars .earned .fill' ? fills()
+                : sel === '#round-stars .fill' ? [] : sel === '#round-stages .bulb' ? bulbs : []),
+        };
+        const C = await import('CELEBRATE');
+        const play = { screen: 'play', current: { word: 'cat', status: 'correct' }, round: { stage: 2, justCleared: false } };
+        const end = (justCleared, stage = 2) => ({ screen: 'round-end', current: { word: 'cat', status: 'correct' },
+            round: { stage, justCleared } });
+        const bulbLog = () => log.filter((e) => e[0] === 'timeline' || [].concat(e[1]).some((id) => /^b/.test(id)));
+    """
+
+    def run_celebrate(self, body):
+        return self.run_node(self.CELEBRATE.replace('CELEBRATE', (self.JS / 'celebrate.js').as_uri()) + body)
+
+    def test_the_cleared_stages_bulb_pops_as_the_stars_finish(self):
+        log, after, again, left = self.run_celebrate(
+            "C.renderCelebrate(play); C.renderCelebrate(end(true));"
+            "const first = bulbLog(); log.length = 0; done(); const after = log.slice(); log.length = 0;"
+            "C.renderCelebrate(end(true)); const again = bulbLog(); log.length = 0;"
+            "C.renderCelebrate({ ...play, current: { word: 'dog', status: 'playing' } }); const left = bulbLog();"
+            "out([first, after, again, left]);")
+        # dark until the third star has popped (0.2 stagger, 0.2 each:
+        # 0.6s), then its light comes on as it swells to 1.5 and settles
+        log = [e[:1] + [round(e[1], 6)] if e[0] == 'timeline' else e for e in log]
+        self.assertEqual(log, [
+            ['kill', 'b2'], ['set', 'b2', {'--lit': 0}], ['timeline', 0.6],
+            ['tl.to', 'b2', {'--lit': 1, 'duration': 0.15, 'ease': 'power2.out'}, 0],
+            ['tl.to', 'b2', {'scale': 1.5, 'duration': 0.15, 'ease': 'power2.out', 'transformOrigin': '50% 50%'}, 0],
+            ['tl.to', 'b2', {'scale': 1, 'duration': 0.15, 'ease': 'power2.out'}, 0.15],
+        ])
+        # at the end what it set inline is gone; a re-render does nothing;
+        # leaving the screen stops it and clears every bulb
+        self.assertEqual(after, [['set', ['b2'], {'clearProps': 'transform,transformOrigin'}], ['unset', 'b2', '--lit']])
+        self.assertEqual(again, [])
+        self.assertEqual(left[:2], [['kill', ['b1', 'b2', 'b3', 'b4', 'b5']],
+                                    ['set', ['b1', 'b2', 'b3', 'b4', 'b5'], {'clearProps': 'transform,transformOrigin'}]])
+        self.assertEqual(left[2:], [['unset', f'b{s}', '--lit'] for s in range(1, 6)])
+
+    def test_no_star_no_wait_no_clear_no_pop_reduced_simply_lit(self):
+        res = self.run_celebrate(
+            "earned = 0; C.renderCelebrate(play); C.renderCelebrate(end(true, 1)); const none = bulbLog().filter((e) => e[0] === 'timeline');"
+            "C.renderCelebrate(play); log.length = 0; earned = 3; C.renderCelebrate(end(false)); const notCleared = bulbLog();"
+            "C.renderCelebrate(play); log.length = 0; reduced = true; C.renderCelebrate(end(true)); const still = bulbLog();"
+            "out([none, notCleared, still, [0, 1, 2, 3].map((n) => C.starsDone(n))]);")
+        none, not_cleared, still, done = res
+        self.assertEqual(none, [['timeline', 0]])
+        self.assertEqual(not_cleared, [])
+        self.assertEqual(still, [])
+        self.assertEqual([round(x, 6) for x in done], [0, 0.2, 0.4, 0.6])
+
+    def test_the_pop_is_calm_and_reduced_motion_has_none(self):
+        res = self.run_node(
+            f"const M = await import('{(self.JS / 'motion.js').as_uri()}');"
+            "out([M.motionFor('bulbPop', false), M.motionFor('bulbPop', true)]);")
+        self.assertEqual(res, [{'duration': 0.3, 'ease': 'power2.out', 'scale': 1.5},
+                               {'duration': 0, 'ease': 'none', 'scale': 1}])
+        self.assertIn("if (state.round.justCleared) popBulb(state.round.stage);", self.code('celebrate.js'))

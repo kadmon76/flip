@@ -5,14 +5,23 @@ export const state = {
     screen: 'theme',            // 'theme' | 'play' | 'round-end' | 'gallery'
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }] }] from themes.json and the data files; image is the first word's
     theme: null,
+    // The data file of the round's theme ({ "cat": { image, audio, stage,
+    // break }, ... }), set by startRound with the round and kept to its
+    // round-end screen (the round's stage's words, progress.js afterRound;
+    // the theme's stages, stage.js stagesOf); null on the theme screen.
+    data: null,
     words: [],                  // [{ word, image, audio, break }] for the current round
     // results[i] = { word, correct }; stage is the stage the round is
     // played at (BACKLOG B-215: 1-5 or 'long', stage.js STAGES), set when
-    // a theme is tapped (startRound; until B-216 the theme's first stage)
-    // and fixed for the round (null while no round is in play); the
-    // round's rules are stage.js stageRules(round.stage), for every word
-    // of the round.
-    round: { index: 0, size: 5, stage: null, results: [] },
+    // a theme is tapped or play again is (startRound: the theme's current
+    // stage, progress.js currentStage, BACKLOG B-216) and fixed for the
+    // round (null while no round is in play); the round's rules are
+    // stage.js stageRules(round.stage), for every word of the round.
+    // cleared and justCleared are set when the round is recorded, at its
+    // end (main.js onNext, progress.js record; BACKLOG B-216): the theme's
+    // cleared stages after the round, and whether this round cleared its
+    // stage (the round-end's stage bulbs; celebrate.js pops that bulb).
+    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false },
     // A round is being set up: true from a tap that starts one (a theme
     // card, play again) until main.js startRound has the theme's data file
     // and shows the round. A second tap meanwhile starts nothing.
