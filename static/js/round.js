@@ -1,13 +1,15 @@
 // round.js — pure helpers that set up a round from a theme's data file
-// and the round's level (state.round.level; the rules are level.js
-// levelRules): which words the round plays (pickRound: the theme's missed
-// words back, then pickWords by the level) and how each word starts
-// (makeWord; on hard with extra letters, extraLetters). No DOM and
-// no module state; main.js calls them and puts the result in state, and
-// a Django test runs them through node.
+// and the round's stage (state.round.stage; the rules are stage.js
+// stageRules, BACKLOG B-215): which words the round plays (pickRound: the
+// theme's missed words back, then pickWords by the stage and the theme's
+// solved words, BACKLOG B-216) and how each word starts (makeWord, by the
+// stage's rules: the first letter given on stage 1, extra letters,
+// extraLetters, on stages 3-5). No DOM and no module state; main.js calls
+// them and puts the result in state, and a Django test runs them through
+// node.
 // `rand` (default Math.random) is there so the test can seed them.
 
-import { levelRules } from './level.js';
+import { STAGES, isStage, stageRules } from './stage.js';
 import { ONE_ROW_MAX, isBreak } from './layout.js';
 
 // A shuffled copy of `arr` (Fisher-Yates).
@@ -20,48 +22,57 @@ export function shuffle(arr, rand = Math.random) {
     return a;
 }
 
-// The words of a round: `size` names from `data` (a theme's data file,
-// { "duck": { image, audio, difficulty }, ... }), in random order.
-// Normal and hard: any words, at random. Easy (shortWordsFirst, BACKLOG
-// B-204): the words tagged "difficulty": "easy" first (a random `size` of
-// them if there are more), then the shortest of the others (at random
-// among words of the same length; the sort is stable over the shuffle);
-// a theme without tags gets its shortest words. The round then plays
-// them in random order.
-export function pickWords(data, size, level, rand = Math.random) {
-    const names = shuffle(Object.keys(data), rand);
-    if (!levelRules(level).shortWordsFirst) return names.slice(0, size);
-    const isEasy = (w) => !!data[w] && data[w].difficulty === 'easy';
-    const easy = names.filter(isEasy);
-    const rest = names.filter((w) => !isEasy(w)).sort((a, b) => a.length - b.length);
-    return shuffle([...easy, ...rest].slice(0, size), rand);
+// The words of a round of `stage`: `size` names from `data` (a theme's
+// data file, { "cat": { image, audio, stage }, ... }), in random order
+// (BACKLOG B-216, PROGRESSION.md "Rounds"). `solved` is the theme's
+// solved words (progress.js, the words checked correct at least once).
+// In this order, each group at random: the stage's words (the entries
+// whose `stage` is `stage`) not yet solved; then its solved words; then
+// the words of the theme's earlier stages, the nearest stage first (the
+// review); then, only while places are left (a theme whose data is still
+// partial), the words of its later stages, the nearest first; last the
+// words whose `stage` is not a stage. A `stage` that is not a stage reads
+// as stage 1, as in stage.js stageRules. Words are picked by `stage`
+// only: the data's `difficulty` is not read.
+export function pickWords(data, size, stage, solved = [], rand = Math.random) {
+    const names = Object.keys(data);
+    const done = new Set(Array.isArray(solved) ? solved : []);
+    const at = isStage(stage) ? STAGES.indexOf(stage) : 0;
+    const of = (s) => names.filter((w) => !!data[w] && data[w].stage === s);
+    const own = of(STAGES[at]);
+    const earlier = STAGES.slice(0, at).reverse();
+    const later = STAGES.slice(at + 1);
+    const unstaged = names.filter((w) => !data[w] || !isStage(data[w].stage));
+    const order = [
+        ...shuffle(own.filter((w) => !done.has(w)), rand),
+        ...shuffle(own.filter((w) => done.has(w)), rand),
+        ...earlier.flatMap((s) => shuffle(of(s), rand)),
+        ...later.flatMap((s) => shuffle(of(s), rand)),
+        ...shuffle(unstaged, rand),
+    ];
+    return shuffle(order.slice(0, size), rand);
 }
 
 // How many remembered missed words a round brings back (BACKLOG B-208).
 export const MISSED_BACK = 2;
 
-// The words of a round with the theme's missed words back (BACKLOG
-// B-208): `missed` is the theme's list (missed.js wordsFor, the oldest
-// miss first). The round takes the first MISSED_BACK of them that are
-// still in `data`, on every level, and fills the other places with
-// pickWords (the level's pick) from the theme's words that are not
-// remembered, or, when those run out, from the other remembered ones; so
-// a round holds no more than MISSED_BACK remembered words while the
-// theme has enough others. All in random order. With no remembered word
-// in `data` it is pickWords exactly.
-export function pickRound(data, size, level, missed = [], rand = Math.random) {
+// The words of a round (BACKLOG B-208, B-216; PROGRESSION.md "Rounds"):
+// `missed` is the theme's missed words (missed.js wordsFor, the oldest
+// miss first), `solved` its solved words (progress.js). The round takes
+// the first MISSED_BACK missed words that are still in `data`, on every
+// stage, and fills the other places with pickWords (the stage's unsolved
+// words, its solved words, the earlier stages, then the later ones) from
+// the theme's other words; a missed word after the first MISSED_BACK
+// takes its place there like any word of its stage. All in random order.
+// With no missed word in `data` it is pickWords exactly.
+export function pickRound(data, size, stage, missed = [], solved = [], rand = Math.random) {
     const names = Object.keys(data);
     const list = Array.isArray(missed) ? missed : [];
     const remembered = list.filter((w, i) => names.includes(w) && list.indexOf(w) === i);
     const back = remembered.slice(0, Math.min(MISSED_BACK, size));
-    if (!back.length) return pickWords(data, size, level, rand);
-    const only = (keep) => Object.fromEntries(names.filter(keep).map((w) => [w, data[w]]));
-    const need = size - back.length;
-    const fresh = pickWords(only((w) => !remembered.includes(w)), need, level, rand);
-    const more = fresh.length < need
-        ? pickWords(only((w) => remembered.includes(w) && !back.includes(w)), need - fresh.length, level, rand)
-        : [];
-    return shuffle([...back, ...fresh, ...more], rand);
+    if (!back.length) return pickWords(data, size, stage, solved, rand);
+    const rest = Object.fromEntries(names.filter((w) => !back.includes(w)).map((w) => [w, data[w]]));
+    return shuffle([...back, ...pickWords(rest, size - back.length, stage, solved, rand)], rand);
 }
 
 // Letters a beginner mixes up (BACKLOG B-207): the pairs the backlog
@@ -75,11 +86,12 @@ export const CONFUSIONS = [
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'.split('');
 
-// `count` different letters that are not in `word`, for the bench on hard
-// (levelRules(level).distractors): first the partners (CONFUSIONS) of the
-// word's letters, at random, then random other letters. Never a letter of
-// the word; [] when `count` is 0 (and `rand` is then not called, so easy
-// and normal words come out as before).
+// `count` different letters that are not in `word`, for the bench on a
+// stage with extras (stageRules(stage).extras): first the partners
+// (CONFUSIONS) of the word's letters, at random, then random other
+// letters. Never a letter of the word; [] when `count` is 0 (and `rand` is
+// then not called, so a word of a stage without extras comes out as
+// before).
 export function extraLetters(word, count, rand = Math.random) {
     if (!(count > 0)) return [];
     const inWord = new Set(word.split(''));
@@ -100,11 +112,13 @@ export function extraLetters(word, count, rand = Math.random) {
 // in random order (tray: { id, letter, used }; `newId()` gives each a
 // fresh id, unique over the session, so card.js can key the DOM tile to
 // it) and one empty slot per letter (placed: null or { letter, tileId }).
-// Easy (firstLetterGiven, BACKLOG B-204): the word's first letter starts
-// in the first slot, locked. Its block is marked `given`: it has no spot
-// on the bench (card.js lays out only the other blocks) and never goes
-// back there.
-// Hard (distractors, BACKLOG B-207): the bench also gets that many extra
+// The round's stage rules (stage.js stageRules; BACKLOG B-215) apply to
+// every word of the round, review, fill and missed words too:
+// givenFirst (stage 1; easy's, B-204): the word's first letter starts in
+// the first slot, locked. Its block is marked `given`: it has no spot on
+// the bench (card.js lays out only the other blocks) and never goes back
+// there.
+// extras (stages 3–5; hard's, B-207): the bench also gets that many extra
 // blocks with letters that are not in the word (extraLetters), marked
 // `extra`, shuffled in with the others. They can be placed like any
 // block and are wrong in any slot; the check, the second-miss hint and
@@ -114,18 +128,22 @@ export function extraLetters(word, count, rand = Math.random) {
 // placeIn, takeOut), the reset lever leaves the given letter (drag.js
 // leverResult, returnAll), and card.js draws it with the locked look
 // (game.css .letter-box.locked).
+// A word starts unchecked and unpulled: `rightAtCheck` null (no wrong
+// check yet) and `justPulled` false, the lever's two facts (drag.js
+// checkedWrong, leverResult; BACKLOG B-215b).
 // `break` (BACKLOG B-213) is the entry's `break`, the number of letters
 // on the first slot row of a word long enough to be in two (layout.js
 // slotLayout), or null when it has none that splits the word. A word of
 // more than ONE_ROW_MAX letters without one is split at half, with a
 // console warning for whoever writes the theme's data.
-export function makeWord(entry, level, newId, rand = Math.random) {
+export function makeWord(entry, stage, newId, rand = Math.random) {
+    const rules = stageRules(stage);
     const letters = entry.word.split('');
-    const extras = extraLetters(entry.word, levelRules(level).distractors, rand);
+    const extras = extraLetters(entry.word, rules.extras, rand);
     const blocks = [...letters.map((letter) => ({ letter })), ...extras.map((letter) => ({ letter, extra: true }))];
     const tray = shuffle(blocks, rand).map((b) => ({ id: newId(), letter: b.letter, used: false, ...(b.extra ? { extra: true } : {}) }));
     const placed = new Array(letters.length).fill(null);
-    if (levelRules(level).firstLetterGiven && letters.length > 0) {
+    if (rules.givenFirst && letters.length > 0) {
         const tile = tray.find((t) => t.letter === letters[0]);
         tile.used = true;
         tile.given = true;
@@ -143,5 +161,7 @@ export function makeWord(entry, level, newId, rand = Math.random) {
         tray,
         placed,
         status: 'playing',
+        rightAtCheck: null,
+        justPulled: false,
     };
 }

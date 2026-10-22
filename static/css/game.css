@@ -398,7 +398,7 @@ body[data-screen="play"] .play-back-btn {
         3px 6px 10px var(--shadow-contact);
 }
 
-/* An icon button (DESIGN: play, themes, stickers, back, level): 72x56, the
+/* An icon button (DESIGN: play, themes, stickers, back): 72x56, the
    icon in ink. The words are only in aria-label. */
 .panel-btn {
     flex: 0 0 auto;
@@ -504,10 +504,12 @@ body[data-screen="play"] .play-back-btn {
 
 /* One cream card per theme showing the theme's picture (the first
    word's), not its name. Square, up to 240px, smaller on a short screen
-   so both cards, the level row and the button fit (two cards, their
-   gaps, the level row, the button, the logo line and the bottom safe
-   area: 244px), with 36px to spare so the first card keeps clear of the
-   header: 230px cards at 360x740. */
+   so both cards and the button fit: 280px is kept for the logo line, the
+   cards' gaps, the button and the bottom safe area (176px), 36px to spare
+   so the first card keeps clear of the header, and the 68px the level
+   row took until BACKLOG B-215, now space that keeps the stickers button
+   apart from the cards (the 2026-10-13 playtest pressed it as "start"):
+   230px cards at 360x740, as before. */
 .theme-btn {
     display: block;
     width: min(240px, 100%, (100vh - 280px) / 2);
@@ -529,46 +531,6 @@ body[data-screen="play"] .play-back-btn {
 
 .theme-btn:active {
     transform: scale(0.97);
-}
-
-/* The level picker (BACKLOG B-202), right above the stickers button:
-   three icon buttons with 1, 2 and 3 bulbs, the lives bulbs' look
-   (.bulb). Bulbs are dark until their button is the picked level
-   (aria-pressed="true", set by main.js): then the button sits pressed
-   in (shifted down-right, a darker face shaded at its upper-left inner
-   edge, the light being upper left, and a smaller cast shadow) and its
-   bulbs are lit. */
-.levels {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-}
-
-.level-btn {
-    gap: 6px;
-}
-
-.level-btn .bulb {
-    width: 14px;
-    height: 14px;
-}
-
-.level-btn .bulb::before {
-    opacity: 0;
-}
-
-.level-btn[aria-pressed="true"] {
-    transform: translate(1px, 2px);
-    background: linear-gradient(160deg, var(--cream-lo) 0%, var(--cream) 70%);
-    box-shadow:
-        inset 0 0 0 1px var(--brass-dark),
-        inset 2px 3px 5px var(--shadow-contact),
-        0 0 0 1px var(--brass-dark),
-        1px 2px 4px var(--shadow-contact);
-}
-
-.level-btn[aria-pressed="true"] .bulb::before {
-    opacity: 1;
 }
 
 /* --- Play screen: the lab scene (DESIGN.md "Layout") --- */
@@ -914,10 +876,11 @@ body[data-screen="play"] .play-back-btn {
 }
 
 /* A locked letter (BACKLOG B-211; card.js sets class `locked` on its slot
-   from the slot's `locked` flag, one look for all: B-204 the first letter
-   given on easy, B-205 a right letter the lever kept after a wrong check
-   on easy, B-206 the robot's letter on the second miss). It never lifts
-   or moves (drag.js keeps it disabled), so it has no hand cursor. */
+   from the slot's `locked` flag, one look for all: stage 1's given first
+   letter (B-204, B-215), a letter the last wrong check found right that
+   the lever kept (B-215b), B-206 the robot's letter on the second miss).
+   It never lifts or moves (drag.js keeps it disabled), so it has no hand
+   cursor. */
 .letter-box.locked > .draggable-letter {
     cursor: default;
 }
@@ -1469,8 +1432,7 @@ body.dragging-active {
 /* Under the logo, top to bottom: the three stars on the dark backdrop,
    one cream panel (the score and the new stickers, then the five words)
    and the button row near the bottom of the safe area: themes and play
-   again, plus the level-up nudge right of play again when it shows
-   (B-209). Stars and panel are centred in the space between the logo
+   again. Stars and panel are centred in the space between the logo
    and the buttons. At 360x740 (~420px of content above 56px of buttons)
    and at 360x640 nothing scrolls. */
 #screen-round-end {
@@ -1482,9 +1444,9 @@ body.dragging-active {
     margin-top: auto;
 }
 
-/* The row sits 10px above the safe area's bottom on every round-end, so
-   the nudge's ring (8px outside its button, below) clears the bezel and
-   the buttons are in the same place with or without the nudge. */
+/* The row sits 10px above the safe area's bottom on every round-end
+   (since B-209, whose level-up nudge, gone with BACKLOG B-215, needed the
+   room for its ring), so the buttons stay where the kid knows them. */
 #screen-round-end .actions {
     margin-bottom: 10px;
 }
@@ -1524,6 +1486,25 @@ body.dragging-active {
 
 .stars .earned .fill {
     opacity: 1;
+}
+
+/* The theme's stages under the stars (BACKLOG B-216, interim): one bulb
+   per stage the theme has words in, the lives bulb's look (.bulb), lit
+   when the stage is cleared, dark when not (DESIGN "Other screens"
+   conventions). Pulled up toward the stars, so the column grows by only
+   the row's 18px and 6px of the screen's gap: nothing scrolls at 360x640.
+   celebrate.js pops the bulb of a stage the round just cleared (its --lit
+   and scale, inline while it runs). */
+.stage-bulbs {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: -8px;
+}
+
+.stage-bulbs .bulb {
+    width: 18px;
+    height: 18px;
 }
 
 .round-panel {
@@ -1601,57 +1582,6 @@ body.dragging-active {
 .round-words .bulb {
     width: 22px;
     height: 22px;
-}
-
-/* The level-up nudge (BACKLOG B-209): a third icon button right of play
-   again, shown by main.js after two 3-star rounds in a row on one level.
-   It is a level button (.level-btn: the picker's 14px bulbs) holding the
-   next level's bulbs, raised and lit, with an amber ring and glow
-   around it that pulse in the ready dome's rhythm but deeper, so it is
-   noticed (opacity 0.3 <-> 1, 1.2s each way, ease-in-out; steady under
-   reduced motion): the robot is not on this screen, so the glow is what
-   points at it. With three buttons the row's gap narrows to 32px
-   (72 * 3 + 32 * 2 = 280px, clear of the bezel at the sides); the row's
-   10px bottom margin (above) keeps the ring clear of it below. */
-.level-up[hidden] {
-    display: none;
-}
-
-#screen-round-end .actions:has(.level-up:not([hidden])) {
-    gap: 32px;
-}
-
-.level-up {
-    position: relative;
-}
-
-.level-up .bulb::before {
-    opacity: 1;
-}
-
-.level-up::after {
-    content: '';
-    position: absolute;
-    inset: -5px;
-    border-radius: 18px;
-    box-shadow: 0 0 0 3px var(--amber), 0 0 26px 11px var(--glow-amber);
-    pointer-events: none;
-    animation: level-up-glow 1.2s ease-in-out infinite alternate;
-}
-
-@keyframes level-up-glow {
-    from {
-        opacity: 0.3;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .level-up::after {
-        animation: none;
-    }
 }
 
 /* --- Sticker book screen (interim, DESIGN "Other screens (interim)") --- */

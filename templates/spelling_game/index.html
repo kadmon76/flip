@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=27">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=29">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -59,24 +59,11 @@
          readers only, never shown. -->
 
     <!-- Theme screen: one card per theme showing the theme's picture
-         (main.js), the level picker and the sticker book button (star
-         sticker). The level picker (BACKLOG B-202) is three panel buttons
-         with 1, 2 and 3 bulbs (the lives bulbs' look); main.js sets
-         aria-pressed on the picked one, which CSS draws pressed in with
-         its bulbs lit (the others raised, bulbs dark). -->
+         (main.js) and the sticker book button (star sticker). No level
+         picker: a tapped theme plays a round of its stage (BACKLOG
+         B-215, PROGRESSION.md "Stages"). -->
     <div id="screen-theme" class="screen">
         <div id="theme-buttons"></div>
-        <div id="level-picker" class="levels" role="group" aria-label="level">
-            <button id="level-easy" class="panel-btn level-btn" type="button" aria-label="easy" aria-pressed="true">
-                <span class="bulb"></span>
-            </button>
-            <button id="level-normal" class="panel-btn level-btn" type="button" aria-label="normal" aria-pressed="false">
-                <span class="bulb"></span><span class="bulb"></span>
-            </button>
-            <button id="level-hard" class="panel-btn level-btn" type="button" aria-label="hard" aria-pressed="false">
-                <span class="bulb"></span><span class="bulb"></span><span class="bulb"></span>
-            </button>
-        </div>
         <div class="actions">
             <button id="stickers-btn" class="panel-btn" type="button" aria-label="Stickers">
                 <span class="sticker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
@@ -238,18 +225,16 @@
         </div>
     </div>
 
-    <!-- Round-end screen: the stars, then a cream panel with the score
-         (split-flap), the new-sticker count (a sticker and "+N") and the
-         five words, each with its picture, a sticker if it is new in the
-         book and a lit or dark bulb; then themes and play again (BACKLOG
-         B-107, B-111, B-116). main.js fills the stars (class "earned"),
-         #round-score, #round-new and #round-words. Each star is a dark
-         star plus a lit "fill" layer that celebrate.js pops in.
-         #level-up-btn is the level-up nudge (BACKLOG B-209): hidden
-         until two rounds in a row earn 3 stars on one level (not on
-         hard); main.js then fills it with the next level's bulbs, lit,
-         and game.css pulses a glow around it. A tap starts a round of
-         the same theme at that level. -->
+    <!-- Round-end screen: the stars, the theme's stages as a row of
+         bulbs (lit = cleared, BACKLOG B-216), then a cream panel with the
+         score (split-flap), the new-sticker count (a sticker and "+N")
+         and the five words, each with its picture, a sticker if it is new
+         in the book and a lit or dark bulb; then themes and play again
+         (BACKLOG B-107, B-111, B-116). main.js fills the stars (class
+         "earned"), #round-stages, #round-score, #round-new and
+         #round-words. Each star is a dark star plus a lit "fill" layer
+         that celebrate.js pops in; it also pops the bulb of a stage the
+         round just cleared, as the stars finish. -->
     <div id="screen-round-end" class="screen" style="display: none;">
         <div id="round-stars" class="stars" aria-label="Stars">
             <span>
@@ -265,6 +250,7 @@
                 <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
             </span>
         </div>
+        <div id="round-stages" class="stage-bulbs" role="img" aria-label="Stages"></div>
         <div class="panel round-panel">
             <div class="round-totals">
                 <h2 id="round-score" class="flaps"></h2>
@@ -279,7 +265,6 @@
             <button id="play-again-btn" class="panel-btn" type="button" aria-label="Play again">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4.8v14.4a1 1 0 0 0 1.5.86l11.3-7.2a1 1 0 0 0 0-1.72L9.5 3.94A1 1 0 0 0 8 4.8z"/></svg>
             </button>
-            <button id="level-up-btn" class="panel-btn level-btn level-up" type="button" aria-label="next level" hidden></button>
         </div>
     </div>
 

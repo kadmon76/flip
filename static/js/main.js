@@ -1,13 +1,14 @@
-// main.js — wiring: theme selection, the level picker, round flow, the
-// console controls (check dome, reset lever, speaker), the header's mute
-// toggle and the play screen's back button, the kid-idle timer and the
-// dome-nudge timer for the robot and his voice's frames, the TV's lock
-// (tv.js), screen renders.
+// main.js — wiring: theme selection, round flow (a round of the theme's
+// current stage, its progress recorded at the round end), the console
+// controls (check dome, reset lever, speaker), the
+// header's mute toggle and the play screen's back button, the kid-idle
+// timer and the dome-nudge timer for the robot and his voice's frames,
+// the TV's lock (tv.js), screen renders.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
 import { renderCard } from './card.js';
-import { returnAll, giveHint, afterHint, revealed } from './drag.js';
+import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderTv } from './tv.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
@@ -18,9 +19,10 @@ import { add as addSticker, remove as removeSticker } from './stickers.js';
 import { renderGallery } from './gallery.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
-import { LEVELS, loadLevel, saveLevel, streakAfter, levelUpFor } from './level.js';
+import { stagesOf } from './stage.js';
 import { pickRound, makeWord } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
+import { forTheme as progressFor, currentStage, record as recordProgress } from './progress.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,7 +37,7 @@ const newTileId = () => `t${++tileSeq}`;
 // --- Theme screen ---
 
 // themes.json shape: { "animals": "/static/data/animals.json", ... }.
-// Each data file: { "duck": { image, audio, difficulty }, ... }; the
+// Each data file: { "duck": { image, audio, stage }, ... }; the
 // theme card shows the image of the first word (the theme's picture),
 // and the gallery (gallery.js) lists every word, so each theme keeps its
 // word list.
@@ -76,36 +78,13 @@ function renderThemeButtons(state) {
     }
 }
 
-// The level picker (BACKLOG B-202): three panel buttons with 1, 2 and 3
-// bulbs (#level-easy, #level-normal, #level-hard). The picked one gets
-// aria-pressed="true", and CSS draws it pressed in with its bulbs lit;
-// the others are raised with dark bulbs. No text: the level's name is
-// only the aria-label.
-function renderLevel(state) {
-    for (const level of LEVELS) {
-        $(`level-${level}`).setAttribute('aria-pressed', String(level === state.level));
-    }
-}
-
-// Pick a level on the theme screen and remember it. A round already
-// started keeps its own (round.level); the pick is for the next one.
-function onLevel(level) {
-    if (state.screen !== 'theme') return;
-    saveLevel(level);
-    setState({ level });
-}
-
 async function startRound({ name, dataUrl }) {
     // One round at a time: while the data file of a round just started is
-    // on its way, another tap (a second tap on a theme card, play again or
-    // the level-up nudge) starts nothing (BACKLOG B-209, review fix).
+    // on its way, another tap (a second tap on a theme card, or play
+    // again) starts nothing (BACKLOG B-209, review fix).
     if (state.startingRound) return;
-    // The round is played at the level picked when the theme is tapped,
-    // read before the fetch; a later pick changes the next round, not this
-    // one (nothing writes round.level again until the next startRound).
-    const level = state.level;
     setState({ startingRound: true });
-    // data shape: { "duck": { image, audio, difficulty }, ... }
+    // data shape: { "duck": { image, audio, stage, break }, ... }
     let data;
     try {
         data = await fetch(dataUrl).then((r) => r.json());
@@ -113,22 +92,32 @@ async function startRound({ name, dataUrl }) {
         setState({ startingRound: false });
         throw e;
     }
-    // `level` is the round's level (round.level below): on easy the round
-    // prefers the easy-tagged, then the shortest words, and each word
-    // starts with its first letter given (round.js, BACKLOG B-204). Up to
-    // two of the words this theme's earlier rounds missed come back, in
-    // random places (round.js pickRound, missed.js; BACKLOG B-208).
+    // The round's stage (BACKLOG B-216; round.stage below, fixed for the
+    // round): the theme's current stage, the first of the stages its data
+    // has words in that the kid has not cleared (progress.js
+    // currentStage; all cleared: the last one), so after a clear, play
+    // again starts the next one. Its rules (stage.js stageRules) start
+    // every word of the round (round.js makeWord): on stage 1 the first
+    // letter is given, on stages 3-5 extra letters lie on the bench. The
+    // words (round.js pickRound, PROGRESSION.md "Rounds"): up to two of
+    // the words this theme's earlier rounds missed come back, in random
+    // places (missed.js; BACKLOG B-208), then the stage's words not yet
+    // solved (progress.js), its solved words, the earlier stages' words,
+    // and only while places are left the later stages'.
     // A long word's `break` (BACKLOG B-213) says where its slots go to a
     // second row (round.js makeWord, layout.js slotLayout).
-    const words = pickRound(data, ROUND_SIZE, level, missedWords(name))
+    const progress = progressFor(name);
+    const stage = currentStage(data, progress);
+    const words = pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
     stopWord();
     setState({
         theme: name,
+        data,
         words,
         screen: 'play',
-        round: { index: 0, size: ROUND_SIZE, level, results: [] },
-        current: makeWord(words[0], level, newTileId),
+        round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },
+        current: makeWord(words[0], stage, newTileId),
         lives: LIVES,
         pressed: null,
         speaking: false,
@@ -161,14 +150,16 @@ function onDome() {
 
 // Reset lever: down for 250ms, and the placed blocks go back to their
 // start spots at once (feedback.js shakes the rail and hops the blocks).
-// Which ones go depends on the round's level (BACKLOG B-205, drag.js
-// leverResult): on easy, right after a wrong check, only the wrong
-// letters go and the right ones lock; otherwise every one but the easy
-// given letter. Input is not blocked; tapping a single placed block
-// still returns only that block (drag.js).
+// Which ones go (BACKLOG B-215b, drag.js leverResult; the same on every
+// stage): after a wrong check the letters it found right that are still
+// in their own slot stay and lock, every other one goes; a pull again
+// right after a pull starts the word over; before any wrong check every
+// one goes. The given letter, the robot's letter and a boost's letter
+// always stay. Input is not blocked; tapping a single placed block still
+// returns only that block (drag.js).
 function onLever() {
     if (state.screen !== 'play' || state.pressed || !canReset(state.current)) return;
-    setState({ pressed: 'lever', current: returnAll(state.current, state.round.level) });
+    setState({ pressed: 'lever', current: returnAll(state.current) });
     setTimeout(() => {
         if (state.pressed === 'lever') setState({ pressed: null });
     }, PRESS_MS.lever);
@@ -176,22 +167,14 @@ function onLever() {
 
 // Speaker: plays the word's audio file through audio.js; `speaking` shows
 // `speaker-on` until it ends. A word without an audio file shows
-// `speaker-cap` and the tap is ignored. What a tap does depends on the
-// round's level (BACKLOG B-203, controls.js speakerAction): on normal and
-// hard, before the word is answered, the speaker holds the word back and
-// the tap counts one more `lockedTaps`, which is the robot's confused
-// "no" (character.js) with his "hmm no" (audio.js; nothing while muted,
-// the robot still shakes his head). Otherwise a tap while muted is
-// ignored (nothing would play).
+// `speaker-cap` and the tap is ignored. On every stage, before and after
+// the word is answered, a tap plays the word (BACKLOG B-215,
+// controls.js speakerAction); a tap while muted is ignored (nothing would
+// play).
 function onSpeak() {
     const { current } = state;
     if (state.screen !== 'play') return;
-    const action = speakerAction(current, state.round.level);
-    if (action === 'locked') {
-        setState({ lockedTaps: state.lockedTaps + 1 });
-        return;
-    }
-    if (action !== 'word' || state.muted) return;
+    if (speakerAction(current) !== 'word' || state.muted) return;
     setState({ speaking: true });
     speakWord(current.audio, () => setState({ speaking: false }));
 }
@@ -219,14 +202,16 @@ function onCheck(extra = {}) {
         armNudge();
     } else {
         // The miss that leaves one bulb lit also gives one letter, on
-        // every level (BACKLOG B-206, drag.js giveHint): in the same
+        // every stage (BACKLOG B-206, drag.js giveHint): in the same
         // setState, so the robot (character.js hintGiven) and the fly-in
         // (feedback.js) see it with the miss. A word then checked correct
-        // is mastered as any other (a bulb is left).
-        const checked = { ...current, status: 'wrong' };
+        // is mastered as any other (a bulb is left). The check notes the
+        // letters it found right, the ones the lever keeps (drag.js
+        // checkedWrong, BACKLOG B-215b).
+        const checked = checkedWrong(current);
         const left = lives - 1;
         setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
-        // On hard his letter can finish the word, in place of an extra
+        // With extras his letter can finish the word, in place of an extra
         // letter (BACKLOG B-207, drag.js afterHint): the word then reopens
         // and the dome lights at once. Its own setState, after the
         // miss's, so the robot, the sound and the motion see the miss.
@@ -240,10 +225,13 @@ function onCheck(extra = {}) {
 // then; one without would count as wrong. The word clip stops with its
 // word. At the round end the theme's missed words are recorded (missed.js,
 // BACKLOG B-208): the words not checked correct are remembered, the ones
-// checked correct come out; and the streak of 3-star rounds on one level
-// moves on (level.js streakAfter, BACKLOG B-209), which the round-end
-// screen reads for the level-up nudge. A round left with the back button
-// never gets here, so it records nothing and leaves the streak (B-201).
+// checked correct come out; and so is its progress (progress.js, BACKLOG
+// B-216): the words checked correct are solved, and the round's stage is
+// cleared once all its words are; the round keeps the theme's cleared
+// stages and whether this round cleared its own, for the round-end's
+// stage bulbs. A round left with the back button never gets here, so it
+// records nothing (B-201). The next word starts by the round's stage
+// rules, as the first did (BACKLOG B-215).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -253,11 +241,10 @@ function onNext(extra = {}) {
     const nextIndex = round.index + 1;
     if (nextIndex >= round.size) {
         recordMissed(state.theme, results);
-        const stars = starsFor(results.filter((r) => r.correct).length, round.size);
+        const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);
         setState({
-            round: { ...round, results },
+            round: { ...round, results, cleared: progress.cleared, justCleared },
             screen: 'round-end',
-            streak: streakAfter(state.streak, round.level, stars),
             speaking: false,
             idleBeat: null,
             nudges: 0,
@@ -266,7 +253,7 @@ function onNext(extra = {}) {
     } else {
         setState({
             round: { ...round, index: nextIndex, results },
-            current: makeWord(state.words[nextIndex], state.round.level, newTileId),
+            current: makeWord(state.words[nextIndex], state.round.stage, newTileId),
             lives: LIVES,
             speaking: false,
             lastInput: performance.now(),
@@ -353,10 +340,31 @@ function sticker(off = false) {
     return el;
 }
 
-// Stars, the score as split-flaps, the new-sticker count (a sticker and
-// "+N", the sticker dark at +0) and one row per word (thumbnail, word, a
-// sticker if the word is new in the book, a lit or dark bulb). No English
-// (DESIGN "Words on screen"): only the words and numbers.
+// The theme's stages as a row of bulbs (BACKLOG B-216; DESIGN "Other
+// screens" conventions): one bulb per stage in `stages` (stage.js
+// stagesOf: the stages the theme's data has words in), lit when it is in
+// `cleared`, dark when not. The bulbs are kept and updated in place
+// (made or removed only when the count changes), so a re-render never
+// replaces a bulb celebrate.js is popping; each carries its stage in
+// data-stage for it. No text: the stage is only in aria-label.
+function renderStageBulbs(el, stages, cleared) {
+    while (el.children.length > stages.length) el.lastElementChild.remove();
+    while (el.children.length < stages.length) el.appendChild(document.createElement('span'));
+    stages.forEach((stage, i) => {
+        const lit = cleared.includes(stage);
+        const bulb = el.children[i];
+        bulb.className = lit ? 'bulb' : 'bulb off';
+        bulb.dataset.stage = String(stage);
+        bulb.setAttribute('aria-label', `stage ${stage}: ${lit ? 'cleared' : 'not cleared'}`);
+    });
+    el.setAttribute('aria-label', `stages cleared: ${stages.filter((s) => cleared.includes(s)).length} / ${stages.length}`);
+}
+
+// Stars, the theme's stage bulbs, the score as split-flaps, the
+// new-sticker count (a sticker and "+N", the sticker dark at +0) and one
+// row per word (thumbnail, word, a sticker if the word is new in the
+// book, a lit or dark bulb). No English (DESIGN "Words on screen"): only
+// the words and numbers.
 // The rows are rebuilt from state.round.results on every render; the
 // list is small and nothing on this screen is interactive per row.
 function renderRoundEnd(state) {
@@ -368,6 +376,7 @@ function renderRoundEnd(state) {
     document.querySelectorAll('#round-stars span').forEach((star, i) => {
         star.classList.toggle('earned', i < stars);
     });
+    renderStageBulbs($('round-stages'), stagesOf(state.data), state.round.cleared || []);
     renderFlaps($('round-score'), `${correct} / ${size}`);
     const fresh = results.filter((r) => r.correct && r.newSticker).length;
     const news = $('round-new');
@@ -410,27 +419,12 @@ function renderRoundEnd(state) {
 
         list.appendChild(li);
     });
-
-    renderLevelUp(state);
-}
-
-// The level-up nudge (BACKLOG B-209): after LEVEL_UP_ROUNDS rounds in a
-// row with 3 stars on one level (level.js levelUpFor on state.streak),
-// #level-up-btn shows beside play again with the next level's bulbs,
-// lit (the level picker's bulbs), in a slowly pulsing amber glow
-// (game.css): the robot is not on this screen, so the glow points at
-// it. Hidden otherwise, and always on hard. No text: the level is only
-// in the aria-label.
-function renderLevelUp(state) {
-    const next = levelUpFor(state.streak);
-    const btn = $('level-up-btn');
-    btn.hidden = !next;
-    btn.innerHTML = next ? '<span class="bulb"></span>'.repeat(LEVELS.indexOf(next) + 1) : '';
-    btn.setAttribute('aria-label', next ? `next level: ${next}` : 'next level');
 }
 
 // New round in the same theme: new random words, hearts and results
-// reset by startRound. Falls back to the theme screen if the theme is
+// reset by startRound, at the theme's current stage (progress.js
+// currentStage, BACKLOG B-216), so after a round that cleared its stage
+// it is the next one. Falls back to the theme screen if the theme is
 // somehow missing from state.themes.
 function onPlayAgain() {
     const theme = state.themes.find((t) => t.name === state.theme);
@@ -438,27 +432,14 @@ function onPlayAgain() {
     else onThemes();
 }
 
-// The level-up nudge's button: the next level becomes the kid's level
-// (remembered, as a pick on the theme screen is) and a new round of the
-// same theme starts at it (startRound reads state.level). Nothing while a
-// round is being started (a second tap, or play again tapped first): the
-// level stays as that round has it.
-function onLevelUp() {
-    if (state.screen !== 'round-end' || state.startingRound) return;
-    const next = levelUpFor(state.streak);
-    if (!next) return;
-    saveLevel(next);
-    setState({ level: next });
-    onPlayAgain();
-}
-
 function onThemes() {
     stopWord();
     setState({
         screen: 'theme',
         theme: null,
+        data: null,
         words: [],
-        round: { index: 0, size: ROUND_SIZE, level: null, results: [] },
+        round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,
@@ -523,7 +504,6 @@ function onGalleryBack() {
 
 subscribe(renderScreens);
 subscribe(renderThemeButtons);
-subscribe(renderLevel);
 subscribe(renderCard);
 subscribe(renderFeedback);    // after the card render: keys off its DOM
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
@@ -544,13 +524,11 @@ $('check-btn').addEventListener('click', onDome);
 $('reset-btn').addEventListener('click', onLever);
 $('speak-btn').addEventListener('click', onSpeak);
 $('play-again-btn').addEventListener('click', onPlayAgain);
-$('level-up-btn').addEventListener('click', onLevelUp);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
 $('mute-btn').addEventListener('click', onMute);
 $('play-back-btn').addEventListener('click', onPlayBack);
-for (const level of LEVELS) $(`level-${level}`).addEventListener('click', () => onLevel(level));
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
 document.addEventListener('pointerdown', onInput, true);
@@ -558,10 +536,10 @@ document.addEventListener('keydown', onInput, true);
 
 renderScreens(state);
 // Preload the clips (nothing plays until the first gesture), then the
-// remembered mute flag and level.
+// remembered mute flag. No level is read any more (BACKLOG B-215): a
+// `flip.level` left in the browser by an earlier version is ignored.
 initAudio();
 setState({ muted: loadMuted() });
-setState({ level: loadLevel() });
 loadThemes();
 
 // Box sizing depends on the row width (layout.js); re-render on rotate.

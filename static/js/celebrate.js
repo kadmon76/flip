@@ -2,7 +2,9 @@
 // "Feedback", "Motion"): a correct check pulses the slots once, flashes
 // the TV screen warm white and bursts sparks (the confetti pieces, styled
 // as sparks in game.css) from the TV; the round-end screen pops the
-// earned stars in one after another. It runs as a state subscriber after
+// earned stars in one after another and, when the round cleared its
+// stage, then lights that stage's bulb with a pop (BACKLOG B-216). It
+// runs as a state subscriber after
 // card.js and the round-end render, compares the new state with the last
 // one it saw and starts a tween only on the transition (status became
 // 'correct', screen became 'round-end'); a re-render in the same state
@@ -39,8 +41,10 @@ export function renderCelebrate(state) {
 
     if (screen === 'round-end' && prev.screen !== 'round-end') {
         popStars();
+        if (state.round.justCleared) popBulb(state.round.stage);
     } else if (screen !== 'round-end' && prev.screen === 'round-end') {
         settle(document.querySelectorAll('#round-stars .fill'));
+        settleBulbs(document.querySelectorAll('#round-stages .bulb'));
     }
 }
 
@@ -146,6 +150,47 @@ function burstConfetti() {
         tl.to(piece, { opacity: 0, duration: m.duration * 0.4, ease: 'power1.in' }, m.duration * 0.6);
     }
     document.body.appendChild(layer);
+}
+
+// --- Round end: the cleared stage's bulb ---
+
+// Seconds after the round-end screen shows when its `stars` earned stars
+// have popped in (the last one's pop ends); 0 with none. Pure.
+export function starsDone(stars) {
+    const m = motionFor('starPop', false);
+    return stars > 0 ? (stars - 1) * m.stagger + m.duration : 0;
+}
+
+// Drop what the bulb pop set inline (its light and scale), so the
+// render's class (lit or `off`) is what shows again.
+function unsetBulbs(bulbs) {
+    gsap.set(bulbs, { clearProps: 'transform,transformOrigin' });
+    bulbs.forEach((b) => b.style.removeProperty('--lit'));
+}
+
+// Leaving the round-end screen: a pop still running or waiting stops.
+function settleBulbs(bulbs) {
+    if (!bulbs.length) return;
+    gsap.killTweensOf(bulbs);
+    unsetBulbs(bulbs);
+}
+
+// The bulb of `stage` (the round's, which it just cleared; the render
+// has lit it) stays dark until the stars have popped in (starsDone),
+// then its light comes on while it swells and settles back (`bulbPop`).
+// Reduced motion: nothing here, the render's lit bulb simply shows.
+function popBulb(stage) {
+    const bulb = document.querySelector(`#round-stages .bulb[data-stage="${stage}"]`);
+    if (!bulb) return;
+    const m = motionFor('bulbPop', reducedMotion());
+    if (m.duration === 0) return;
+    const stars = document.querySelectorAll('#round-stars .earned .fill').length;
+    gsap.killTweensOf(bulb);
+    gsap.set(bulb, { '--lit': 0 });
+    gsap.timeline({ delay: starsDone(stars), onComplete: () => unsetBulbs([bulb]) })
+        .to(bulb, { '--lit': 1, duration: m.duration / 2, ease: m.ease }, 0)
+        .to(bulb, { scale: m.scale, duration: m.duration / 2, ease: m.ease, transformOrigin: '50% 50%' }, 0)
+        .to(bulb, { scale: 1, duration: m.duration / 2, ease: m.ease }, m.duration / 2);
 }
 
 // --- Round end: star pop ---

@@ -668,7 +668,9 @@ export function momentsFor(prev, now) {
             return now.hint !== -1 && now.hint !== prev.hint ? [miss, 'hintGiven'] : [miss];
         }
     }
-    // One more tap on the speaker while it holds the word back.
+    // One more `lockedTaps`: his head-shake (B-203; since B-215 the speaker
+    // never holds the word back, and B-219 adds one for a boost the kid
+    // can't afford).
     if (now.lockedTaps !== prev.lockedTaps) return ['speakerLocked'];
     // One more nudge toward the dome on the answered word (B-212).
     if (now.nudges > prev.nudges) return ['domeNudge'];
