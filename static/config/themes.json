@@ -1,4 +1,6 @@
 {
     "animals": "/static/data/animals.json",
-    "transportation": "/static/data/transportation.json"
+    "transportation": "/static/data/transportation.json",
+    "food": "/static/data/food.json",
+    "home": "/static/data/home.json"
 }

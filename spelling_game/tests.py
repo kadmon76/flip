@@ -7,6 +7,13 @@ from pathlib import Path
 from django.test import TestCase
 
 
+
+# The word data as it was on 2026-10-22 (25 words in two themes, some stages
+# with one word or none), frozen for the tests that check the stage and round
+# rules on sparse data. The live files in static/data/ are written by
+# tools/themes.py from content/word-list.json and grow as content lands.
+SPARSE_DATA = Path('spelling_game') / 'fixtures' / 'sparse-data'
+
 class HealthEndpointTests(TestCase):
     def test_health_returns_ok_json(self):
         response = self.client.get('/health')
@@ -3097,7 +3104,7 @@ class StageTests(TestCase):
         return json.loads(result.stdout)
 
     def content(self, theme):
-        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
 
     def code(self, name):
         text = (self.JS / name).read_text()
@@ -3399,7 +3406,7 @@ class StageStartTests(TestCase):
         return json.loads(result.stdout)
 
     def content(self, theme):
-        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
 
     def code(self, name):
         return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
@@ -4825,7 +4832,7 @@ class MissedWordsTests(TestCase):
         return json.loads(result.stdout)
 
     def content(self, theme):
-        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
 
     def code(self, name):
         return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
@@ -6702,7 +6709,7 @@ class ProgressTests(TestCase):
         return json.loads(result.stdout)
 
     def content(self, theme):
-        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
 
     def code(self, name):
         return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
@@ -6974,7 +6981,7 @@ class StageRoundTests(TestCase):
         return json.loads(result.stdout)
 
     def content(self, theme):
-        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
 
     def rounds(self, data, stage, missed=(), solved=(), seeds=60):
         return self.run_node(
@@ -7260,7 +7267,7 @@ class StageMapTests(TestCase):
         return json.loads(result.stdout)
 
     def content(self, theme):
-        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
 
     def code(self, name):
         return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
@@ -8690,3 +8697,80 @@ class BoostTests(TestCase):
         css = (self.ROOT / 'static' / 'css' / 'game.css').read_text()
         section = css[css.index('/* --- Boost tray (BACKLOG B-219, boosttray.js) --- */'):css.index('/* --- Round-end screen')]
         self.assertNotRegex(re.sub(r'/\*.*?\*/', '', section, flags=re.S), r'#[0-9a-fA-F]{3,6}\b|rgb|hsl')
+
+
+class ThemeDataTests(TestCase):
+    """tools/themes.py writes static/data/<theme>.json and
+    static/config/themes.json from content/word-list.json (content, no
+    backlog id). The files in the repo must be what the tool writes, and
+    every file they point to must exist."""
+    ROOT = Path(__file__).resolve().parent.parent
+    TOOL = ROOT / 'tools' / 'themes.py'
+
+    def load(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('flip_themes', str(self.TOOL))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_the_theme_files_are_what_the_tool_writes(self):
+        t = self.load()
+        files, _ = t.build(str(self.ROOT))
+        self.assertIn('static/config/themes.json', [k.replace('\\', '/') for k in files])
+        for rel, obj in files.items():
+            self.assertEqual((self.ROOT / rel).read_text(encoding='utf-8'), t.dump(obj),
+                             f'{rel} is out of date: run python3 tools/themes.py write')
+
+    def test_every_word_has_its_picture_and_voice(self):
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        self.assertEqual(list(index), ['animals', 'transportation', 'food', 'home'])
+        for theme, url in index.items():
+            data = json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8'))
+            self.assertTrue(data, theme)
+            for word, entry in data.items():
+                paths = [entry['image'], entry['audio']]
+                paths += [entry['motion'][k] for k in ('subject', 'plate')] if 'motion' in entry else []
+                for p in paths:
+                    self.assertTrue((self.ROOT / p.lstrip('/')).exists(), f'{theme}/{word}: {p}')
+                self.assertTrue(entry['audio'].startswith('/static/voice/words/'), word)
+
+    def test_words_by_stage_then_teaching_order_with_breaks(self):
+        t = self.load()
+        data = json.loads((self.ROOT / 'static' / 'data' / 'transportation.json').read_text(encoding='utf-8'))
+        stages = [e['stage'] for e in data.values()]
+        self.assertEqual(stages, sorted(stages, key=t.STAGES.index))
+        self.assertEqual(list(data)[:5], ['bus', 'jet', 'map', 'bag', 'van'])
+        self.assertEqual(data['helicopter']['break'], 4)
+        self.assertEqual(data['bicycle']['break'], 2)
+        self.assertEqual(t.break_at('motorbike', 'motor|bike'), 5)
+        with self.assertRaises(ValueError):
+            t.break_at('motorbike', 'moto|rbik')
+
+    def test_a_word_waits_for_its_voice_and_keeps_an_old_picture(self):
+        import tempfile
+        t = self.load()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'content').mkdir()
+            (root / 'content' / 'word-list.json').write_text(json.dumps({'themes': {'zoo': {'words': [
+                {'word': 'yak', 'stage': 1, 'hebrew': 'יאק', 'idle': 'bob', 'pivot': 'bottom', 'win': 'pop'},
+                {'word': 'emu', 'stage': 1, 'hebrew': 'אמו', 'idle': 'bob', 'pivot': 'bottom', 'win': 'pop'},
+                {'word': 'gnu', 'stage': 2, 'hebrew': 'גנו', 'idle': 'bob', 'pivot': 'bottom', 'win': 'pop'}]}}}))
+            for p in ['voice/words/zoo/yak.mp3', 'voice/words/zoo/gnu.mp3', 'images/old/gnu.svg',
+                      'images/words/zoo/yak.webp', 'images/words/zoo/yak-subject.webp',
+                      'images/words/zoo/yak-plate.webp']:
+                (root / 'static' / p).parent.mkdir(parents=True, exist_ok=True)
+                (root / 'static' / p).write_text('x')
+            (root / 'static' / 'data').mkdir()
+            (root / 'static' / 'data' / 'zoo.json').write_text(json.dumps(
+                {'gnu': {'stage': 2, 'image': '/static/images/old/gnu.svg'}}))
+            files, waiting = t.build(str(root))
+            data = files[str(Path('static') / 'data' / 'zoo.json')]
+            self.assertEqual(list(data), ['yak', 'gnu'])
+            self.assertEqual(data['yak']['motion']['plate'], '/static/images/words/zoo/yak-plate.webp')
+            self.assertEqual(data['gnu']['image'], '/static/images/old/gnu.svg')
+            self.assertNotIn('motion', data['gnu'])
+            self.assertEqual(waiting, [('zoo', 'emu', 'no voice')])
+            self.assertEqual(dict(files[str(Path('static') / 'config' / 'themes.json')]),
+                             {'zoo': '/static/data/zoo.json'})

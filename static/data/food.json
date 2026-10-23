@@ -1,0 +1,472 @@
+{
+    "jam": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/jam.webp",
+        "audio": "/static/voice/words/food/jam.mp3",
+        "hebrew": "ריבה",
+        "motion": {
+            "subject": "/static/images/words/food/jam-subject.webp",
+            "plate": "/static/images/words/food/jam-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "fig": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/fig.webp",
+        "audio": "/static/voice/words/food/fig.mp3",
+        "hebrew": "תאנה",
+        "motion": {
+            "subject": "/static/images/words/food/fig-subject.webp",
+            "plate": "/static/images/words/food/fig-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "nut": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/nut.webp",
+        "audio": "/static/voice/words/food/nut.mp3",
+        "hebrew": "אגוז",
+        "motion": {
+            "subject": "/static/images/words/food/nut-subject.webp",
+            "plate": "/static/images/words/food/nut-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "bun": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/bun.webp",
+        "audio": "/static/voice/words/food/bun.mp3",
+        "hebrew": "לחמנייה",
+        "motion": {
+            "subject": "/static/images/words/food/bun-subject.webp",
+            "plate": "/static/images/words/food/bun-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "gum": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/gum.webp",
+        "audio": "/static/voice/words/food/gum.mp3",
+        "hebrew": "מסטיק",
+        "motion": {
+            "subject": "/static/images/words/food/gum-subject.webp",
+            "plate": "/static/images/words/food/gum-plate.webp",
+            "idle": "breathe",
+            "pivot": "center",
+            "win": "pop"
+        }
+    },
+    "can": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/can.webp",
+        "audio": "/static/voice/words/food/can.mp3",
+        "hebrew": "פחית",
+        "motion": {
+            "subject": "/static/images/words/food/can-subject.webp",
+            "plate": "/static/images/words/food/can-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "egg": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/egg.webp",
+        "audio": "/static/voice/words/food/egg.mp3",
+        "hebrew": "ביצה",
+        "motion": {
+            "subject": "/static/images/words/food/egg-subject.webp",
+            "plate": "/static/images/words/food/egg-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "milk": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/milk.webp",
+        "audio": "/static/voice/words/food/milk.mp3",
+        "hebrew": "חלב",
+        "motion": {
+            "subject": "/static/images/words/food/milk-subject.webp",
+            "plate": "/static/images/words/food/milk-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "mint": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/mint.webp",
+        "audio": "/static/voice/words/food/mint.mp3",
+        "hebrew": "נענע",
+        "motion": {
+            "subject": "/static/images/words/food/mint-subject.webp",
+            "plate": "/static/images/words/food/mint-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "plum": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/food/plum.webp",
+        "audio": "/static/voice/words/food/plum.mp3",
+        "hebrew": "שזיף",
+        "motion": {
+            "subject": "/static/images/words/food/plum-subject.webp",
+            "plate": "/static/images/words/food/plum-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "pasta": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/pasta.webp",
+        "audio": "/static/voice/words/food/pasta.mp3",
+        "hebrew": "פסטה",
+        "motion": {
+            "subject": "/static/images/words/food/pasta-subject.webp",
+            "plate": "/static/images/words/food/pasta-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "bungee"
+        }
+    },
+    "melon": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/melon.webp",
+        "audio": "/static/voice/words/food/melon.mp3",
+        "hebrew": "מלון",
+        "motion": {
+            "subject": "/static/images/words/food/melon-subject.webp",
+            "plate": "/static/images/words/food/melon-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "corn": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/corn.webp",
+        "audio": "/static/voice/words/food/corn.mp3",
+        "hebrew": "תירס",
+        "motion": {
+            "subject": "/static/images/words/food/corn-subject.webp",
+            "plate": "/static/images/words/food/corn-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "lemon": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/lemon.webp",
+        "audio": "/static/voice/words/food/lemon.mp3",
+        "hebrew": "לימון",
+        "motion": {
+            "subject": "/static/images/words/food/lemon-subject.webp",
+            "plate": "/static/images/words/food/lemon-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "salad": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/salad.webp",
+        "audio": "/static/voice/words/food/salad.mp3",
+        "hebrew": "סלט",
+        "motion": {
+            "subject": "/static/images/words/food/salad-subject.webp",
+            "plate": "/static/images/words/food/salad-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "toast": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/toast.webp",
+        "audio": "/static/voice/words/food/toast.mp3",
+        "hebrew": "טוסט",
+        "motion": {
+            "subject": "/static/images/words/food/toast-subject.webp",
+            "plate": "/static/images/words/food/toast-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "mango": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/mango.webp",
+        "audio": "/static/voice/words/food/mango.mp3",
+        "hebrew": "מנגו",
+        "motion": {
+            "subject": "/static/images/words/food/mango-subject.webp",
+            "plate": "/static/images/words/food/mango-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "pizza": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/pizza.webp",
+        "audio": "/static/voice/words/food/pizza.mp3",
+        "hebrew": "פיצה",
+        "motion": {
+            "subject": "/static/images/words/food/pizza-subject.webp",
+            "plate": "/static/images/words/food/pizza-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "bungee"
+        }
+    },
+    "cake": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/cake.webp",
+        "audio": "/static/voice/words/food/cake.mp3",
+        "hebrew": "עוגה",
+        "motion": {
+            "subject": "/static/images/words/food/cake-subject.webp",
+            "plate": "/static/images/words/food/cake-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "apple": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/food/apple.webp",
+        "audio": "/static/voice/words/food/apple.mp3",
+        "hebrew": "תפוח",
+        "motion": {
+            "subject": "/static/images/words/food/apple-subject.webp",
+            "plate": "/static/images/words/food/apple-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "hop-spin"
+        }
+    },
+    "banana": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/food/banana.webp",
+        "audio": "/static/voice/words/food/banana.mp3",
+        "hebrew": "בננה",
+        "motion": {
+            "subject": "/static/images/words/food/banana-subject.webp",
+            "plate": "/static/images/words/food/banana-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "soup": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/food/soup.webp",
+        "audio": "/static/voice/words/food/soup.mp3",
+        "hebrew": "מרק",
+        "motion": {
+            "subject": "/static/images/words/food/soup-subject.webp",
+            "plate": "/static/images/words/food/soup-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "bread": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/food/bread.webp",
+        "audio": "/static/voice/words/food/bread.mp3",
+        "hebrew": "לחם",
+        "motion": {
+            "subject": "/static/images/words/food/bread-subject.webp",
+            "plate": "/static/images/words/food/bread-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "carrot": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/food/carrot.webp",
+        "audio": "/static/voice/words/food/carrot.mp3",
+        "hebrew": "גזר",
+        "motion": {
+            "subject": "/static/images/words/food/carrot-subject.webp",
+            "plate": "/static/images/words/food/carrot-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "cheese": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/food/cheese.webp",
+        "audio": "/static/voice/words/food/cheese.mp3",
+        "hebrew": "גבינה",
+        "motion": {
+            "subject": "/static/images/words/food/cheese-subject.webp",
+            "plate": "/static/images/words/food/cheese-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "falafel": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/food/falafel.webp",
+        "audio": "/static/voice/words/food/falafel.mp3",
+        "hebrew": "פלאפל",
+        "motion": {
+            "subject": "/static/images/words/food/falafel-subject.webp",
+            "plate": "/static/images/words/food/falafel-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "popcorn": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 3,
+        "image": "/static/images/words/food/popcorn.webp",
+        "audio": "/static/voice/words/food/popcorn.mp3",
+        "hebrew": "פופקורן",
+        "motion": {
+            "subject": "/static/images/words/food/popcorn-subject.webp",
+            "plate": "/static/images/words/food/popcorn-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "avocado": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 3,
+        "image": "/static/images/words/food/avocado.webp",
+        "audio": "/static/voice/words/food/avocado.mp3",
+        "hebrew": "אבוקדו",
+        "motion": {
+            "subject": "/static/images/words/food/avocado-subject.webp",
+            "plate": "/static/images/words/food/avocado-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "ketchup": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 3,
+        "image": "/static/images/words/food/ketchup.webp",
+        "audio": "/static/voice/words/food/ketchup.mp3",
+        "hebrew": "קטשופ",
+        "motion": {
+            "subject": "/static/images/words/food/ketchup-subject.webp",
+            "plate": "/static/images/words/food/ketchup-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "sandwich": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/food/sandwich.webp",
+        "audio": "/static/voice/words/food/sandwich.mp3",
+        "hebrew": "כריך",
+        "motion": {
+            "subject": "/static/images/words/food/sandwich-subject.webp",
+            "plate": "/static/images/words/food/sandwich-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "chocolate": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 5,
+        "image": "/static/images/words/food/chocolate.webp",
+        "audio": "/static/voice/words/food/chocolate.mp3",
+        "hebrew": "שוקולד",
+        "motion": {
+            "subject": "/static/images/words/food/chocolate-subject.webp",
+            "plate": "/static/images/words/food/chocolate-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "watermelon": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 5,
+        "image": "/static/images/words/food/watermelon.webp",
+        "audio": "/static/voice/words/food/watermelon.mp3",
+        "hebrew": "אבטיח",
+        "motion": {
+            "subject": "/static/images/words/food/watermelon-subject.webp",
+            "plate": "/static/images/words/food/watermelon-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "strawberry": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 5,
+        "image": "/static/images/words/food/strawberry.webp",
+        "audio": "/static/voice/words/food/strawberry.mp3",
+        "hebrew": "תות",
+        "motion": {
+            "subject": "/static/images/words/food/strawberry-subject.webp",
+            "plate": "/static/images/words/food/strawberry-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    }
+}
