@@ -2331,9 +2331,12 @@ class AudioTests(TestCase):
             [0, 5, 9, 9, 0, -1])
 
     def test_channels(self):
-        # the TV's tune-in hiss (B-214) is an effect, like the swipe
+        # the TV's tune-in hiss (B-214) is an effect, like the swipe; the
+        # word he says on a correct check and his line after it (B-223)
+        # are his voice
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx'})
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
+                          'word': 'voice', 'line': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -2348,7 +2351,8 @@ class AudioTests(TestCase):
             ['flip.muted', False, 'true', True, 'false', False, False, False, False, 'no throw', False])
 
     def test_nothing_plays_on_load_and_a_gesture_unlocks(self):
-        # init() downloads every clip once and plays nothing, with no
+        # init() downloads every clip once (and fetches his new voice's
+        # manifest, B-223) and plays nothing, with no
         # AudioContext yet; the first pointerup / touchend / click /
         # keydown makes one context, resumes it and plays one silent
         # sample (iOS opens the output on that), then the clips decode.
@@ -2356,14 +2360,15 @@ class AudioTests(TestCase):
         # suspended (the phone switched apps) resumes it again; one
         # finding it running does nothing.
         self.assertEqual(self.run_node(
-            "a.init(); const before = [fetched.length, new Set(fetched).size, ctxs.length, log.length, Object.keys(listeners).sort()];"
+            "a.init(); const before = [fetched.length, new Set(fetched).size, fetched.filter((u) => u === '/static/voice/manifest.json').length,"
+            " ctxs.length, log.length, Object.keys(listeners).sort()];"
             "a.play('swipe'); const early = log.length;"
             "listeners.touchend(); const c = ctxs[0]; const first = [ctxs.length, c.state, c.resumes, log.map((e) => e.src)];"
             "await settle(); clear(); a.play('swipe'); const after = kinds();"
             "listeners.click(); const quiet = [ctxs.length, c.resumes];"
             "c.state = 'interrupted'; listeners.pointerup();"
             "out([before, early, first, after, quiet, [c.state, c.resumes], Object.keys(listeners).length]);"),
-            [[25, 25, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
+            [[26, 26, 1, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
              [1, 'running', 1, ['silence']], ['swipe'], [1, 1], ['running', 2], 4])
 
     def test_no_web_audio_means_silent_not_broken(self):
@@ -9160,3 +9165,451 @@ class ThemeDataTests(TestCase):
             self.assertEqual(waiting, [('zoo', 'emu', 'no voice')])
             self.assertEqual(dict(files[str(Path('static') / 'config' / 'themes.json')]),
                              {'zoo': '/static/data/zoo.json'})
+
+
+class CorrectWordVoiceTests(TestCase):
+    """BACKLOG B-223: on a correct check the robot says the word, clean and
+    complete, from the word's own clip, then one line: on `correct` the
+    word's gag, else a line of pool `correct`; on `streak` a line of pool
+    `streak`, else the gag, else pool `correct`; with none of them the
+    prototype correct clip, after the word. Both are his voice (the
+    analyser). audio.js fetches static/voice/manifest.json once at init (a
+    missing or broken one is empty); the word's clip and gags are fetched
+    and decoded when the word starts; a clip not ready at the check is
+    skipped. Nothing over the word; the line is cut by the next voice
+    clip, a speaker tap or leaving the word. Stand-in manifests."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+    STATE = ROOT / 'static' / 'js' / 'state.js'
+    CHARACTER = ROOT / 'static' / 'js' / 'character.js'
+    MANIFEST = ROOT / 'static' / 'voice' / 'manifest.json'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        # Fakes as AudioTests', plus: the manifest's fetch answers with
+        # `MAN` (undefined: 404; an Error: its JSON fails; `NOJSON`: a
+        # response with no json()); a source's stop() calls its onended
+        # later, as a browser does, and `end(file)` ends the source playing
+        # `file` by itself; decodes of the URLs in `hold` wait until
+        # `release(url)`; console.error is counted in `errors`. `a` is
+        # audio.js, `S` state.js, `C` character.js. `played()` are the
+        # files started so far (folders under static/sounds/ and
+        # static/voice/), `on()` the ones playing now, `kinds()` the kinds
+        # audio.js started them as (from the source's analyser link: 'v'
+        # his voice, 'o' straight out). `st(o)` is a play-screen state on
+        # animals' "cat" (its clip /static/voice/words/animals/cat.mp3),
+        # `correct(o)` the same word checked correct (first of the round),
+        # `streak(o)` the third correct word in a row ("cat" again).
+        script = (
+            "const log = []; const listeners = {}; const made = []; const fetched = []; const missing = new Set();"
+            "const ctxs = []; const sources = []; const decodes = []; const hold = new Set(); const held = {};"
+            "let MAN; const NOJSON = {}; const errors = []; console.error = (...x) => errors.push(x.join(' '));"
+            "globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.on = {}; made.push(this); }"
+            " addEventListener(t, fn) { this.on[t] = fn; }"
+            " play() { this.paused = false; log.push({ op: 'play', src: this.src, el: true }); return Promise.resolve(); }"
+            " pause() { this.paused = true; log.push({ op: 'pause', src: this.src }); } };"
+            "globalThis.fetch = (url) => { fetched.push(url);"
+            " if (url === '/static/voice/manifest.json') {"
+            "  if (MAN === undefined) return Promise.resolve({ ok: false });"
+            "  if (MAN === NOJSON) return Promise.resolve({ ok: true });"
+            "  return Promise.resolve({ ok: true, json: () => (MAN instanceof Error ? Promise.reject(MAN) : Promise.resolve(MAN)) }); }"
+            " return Promise.resolve({ ok: !missing.has(url), arrayBuffer: () => Promise.resolve({ url }) }); };"
+            "const an = { name: 'analyser', fftSize: 0, connect() {}, getByteTimeDomainData(x) { x.fill(200); } };"
+            "globalThis.AudioContext = class { constructor() { this.state = 'suspended'; this.destination = { name: 'out' }; ctxs.push(this); }"
+            " resume() { this.state = 'running'; return Promise.resolve(); }"
+            " createAnalyser() { return an; }"
+            " createBuffer() { return { url: 'silence' }; }"
+            " decodeAudioData(data) { decodes.push(data.url);"
+            "  if (hold.has(data.url)) return new Promise((r) => { held[data.url] = () => r({ url: data.url }); });"
+            "  return Promise.resolve({ url: data.url }); }"
+            " createBufferSource() { const s = { buffer: null, on: false, to: null, connect(t) { s.to = t; },"
+            "   start() { s.on = true; log.push({ op: 'play', src: s.buffer.url, to: s.to && s.to.name }); },"
+            "   stop() { if (!s.on) return; s.on = false; log.push({ op: 'stop', src: s.buffer.url });"
+            "     setTimeout(() => s.onended && s.onended(), 0); } };"
+            "   sources.push(s); return s; } };"
+            "globalThis.document = { addEventListener(t, fn, c) { listeners[t] = fn; } };"
+            f"const a = await import('{self.MODULE.as_uri()}');"
+            f"const S = await import('{self.STATE.as_uri()}');"
+            f"const C = await import('{self.CHARACTER.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const tick = () => new Promise((r) => setTimeout(r, 0));"
+            "const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };"
+            "const ready = async () => { a.init(); listeners.pointerup(); await settle(); };"
+            "const short = (src) => decodeURIComponent(src.replace('/static/sounds/', '').replace('/static/voice/', ''));"
+            "const played = () => log.filter((e) => e.op === 'play' && e.src !== 'silence').map((e) => short(e.src));"
+            "const kinds = () => log.filter((e) => e.op === 'play' && e.src !== 'silence' && !e.el).map((e) => (e.to === 'analyser' ? 'v' : 'o'));"
+            "const on = () => sources.filter((s) => s.on && s.buffer.url !== 'silence').map((s) => short(s.buffer.url));"
+            "const src = (file) => sources.filter((s) => s.buffer && short(s.buffer.url) === file).pop();"
+            "const end = async (file) => { const s = src(file); s.on = false; s.onended(); await settle(); };"
+            "const release = async (url) => { held[url](); await settle(); };"
+            "const clear = () => { log.length = 0; };"
+            "const man = (...files) => ({ voice_id: 'v', model_id: 'm', output_format: 'mp3',"
+            " clips: Object.fromEntries(files.map((f) => [f, { id: f, text: f, made: '2026-10-24' }])) });"
+            "const put = (ids) => ids.map((id) => (id ? { letter: 'x', tileId: id } : null));"
+            "const CAT = '/static/voice/words/animals/cat.mp3';"
+            "const st = (o = {}) => ({ screen: 'play', theme: 'animals', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3,"
+            " speaking: false, muted: false, pressed: null, lockedTaps: 0, nudges: 0, tuned: true,"
+            " round: { index: 0, size: 5, results: [] },"
+            " current: { word: 'cat', audio: CAT, status: 'playing', placed: put(['t1', 't2', null]) }, ...o });"
+            "const correct = (o = {}) => st({ current: { word: 'cat', audio: CAT, status: 'correct', placed: put(['t1', 't2', 't3']) },"
+            " round: { index: 0, size: 5, results: [{ correct: true }] }, ...o });"
+            "const three = { index: 2, size: 5, results: [{ correct: true }, { correct: true }, { correct: true }] };"
+            "const streak = (o = {}) => st({ round: { ...three, results: [] }, ...o });"
+            "const streakDone = (o = {}) => st({ current: { word: 'cat', audio: CAT, status: 'correct', placed: put(['t1', 't2', 't3']) },"
+            " round: three, ...o });"
+            # a word showing, its clips loaded, then checked correct
+            "const check = async (o = {}) => { S.setState(st(o)); await settle(); clear(); S.setState(correct(o)); await settle(); };"
+            "const checkStreak = async (o = {}) => { S.setState(streak(o)); await settle(); clear(); S.setState(streakDone(o)); await settle(); };"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    # --- pure helpers ---
+
+    def test_the_manifest_lists_its_clips_and_a_broken_one_lists_none(self):
+        self.assertEqual(self.run_node(
+            "out([a.VOICE_BASE, a.MANIFEST_URL, a.listedClips(man('words/animals/cat.mp3', 'robot/correct-01.mp3')),"
+            " [null, undefined, 3, 'x', [], {}, { clips: null }, { clips: [] }, { clips: 'x' }, { clip: { a: 1 } }].map((m) => a.listedClips(m)),"
+            " a.listedClips({ clips: {} })]);"),
+            ['/static/voice/', '/static/voice/manifest.json', ['words/animals/cat.mp3', 'robot/correct-01.mp3'],
+             [[], [], [], [], [], [], [], [], [], []], []])
+
+    def test_urls_pools_and_gags(self):
+        files = ['words/animals/cat.mp3', 'letters/a.mp3', 'robot/correct-01.mp3', 'robot/correct-02.mp3',
+                 'robot/streak-01.mp3', 'robot/end-low-01.mp3', 'robot/picture-surprise-02.mp3', 'robot/correct.mp3',
+                 'gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'gags/animals/dog-2.mp3', 'gags/animals/bat.mp3',
+                 'gags/food/cat.mp3', 'hebrew/animals/cat.mp3']
+        res = self.run_node(
+            f"const files = {json.dumps(files)};"
+            "out([a.voiceUrl('gags/animals/cat-2.mp3'), a.voiceUrl('robot/a b.mp3', '/x/'),"
+            " files.map((f) => a.poolOf(f)),"
+            " a.poolClips(files, 'correct'), a.poolClips(files, 'streak'), a.poolClips(files, 'end-low'), a.poolClips(files, 'wrong'),"
+            " a.poolClips([], 'correct'),"
+            " a.gagClips(files, 'animals', 'cat'), a.gagClips(files, 'animals', 'dog'), a.gagClips(files, 'animals', 'bat'),"
+            " a.gagClips(files, 'animals', 'ant'), a.gagClips(files, 'food', 'cat'), a.gagClips(files, null, 'cat'),"
+            " a.gagClips(files, 'animals', null), a.gagClips([], 'animals', 'cat'),"
+            " a.linePools(), a.linePools({ x: { lines: ['gag', 'p'] }, y: { lines: ['p', 'q'] }, z: {} })]);")
+        self.assertEqual(res, [
+            '/static/voice/gags/animals/cat-2.mp3', '/x/robot/a%20b.mp3',
+            [None, None, 'correct', 'correct', 'streak', 'end-low', 'picture-surprise', None, None, None, None, None, None, None],
+            ['robot/correct-01.mp3', 'robot/correct-02.mp3'], ['robot/streak-01.mp3'], ['robot/end-low-01.mp3'], [], [],
+            # the first gag and the second when it exists, only the ones listed
+            ['gags/animals/cat.mp3', 'gags/animals/cat-2.mp3'], ['gags/animals/dog-2.mp3'], ['gags/animals/bat.mp3'],
+            [], ['gags/food/cat.mp3'], [], [], [],
+            # the pools the moment table's lines name (B-223: correct, streak)
+            ['correct', 'streak'], ['p', 'q']])
+
+    def test_the_moment_table_says_the_word_on_a_correct_check(self):
+        # character.js MOMENTS: correct and streak say the word, then the
+        # first of their lines with a clip; the prototype clip stays as
+        # their sound; no other moment says the word
+        self.assertEqual(self.run_node(
+            "out([C.MOMENTS.correct.word, C.MOMENTS.correct.lines, C.MOMENTS.correct.sound,"
+            " C.MOMENTS.streak.word, C.MOMENTS.streak.lines, C.MOMENTS.streak.sound,"
+            " Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].word || C.MOMENTS[m].lines)]);"),
+            [True, ['gag', 'correct'], 'correct', True, ['streak', 'gag', 'correct'], 'correct', ['correct', 'streak']])
+
+    def test_say_plan_order_and_fallbacks(self):
+        res = self.run_node(
+            "const W = 'w', G = ['g1', 'g2'], P = { correct: ['c1', 'c2', 'c3'], streak: ['s1', 's2'] };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u);"
+            "const r0 = () => 0, r9 = () => 0.99;"
+            "out(["
+            # correct: the word, then a gag at random
+            " a.sayPlan('correct', { word: W, gags: G, pools: P }, all, r0), a.sayPlan('correct', { word: W, gags: G, pools: P }, all, r9),"
+            # no gag: a correct line; nor a correct line: the prototype clip
+            " a.sayPlan('correct', { word: W, gags: [], pools: P }, all, r9), a.sayPlan('correct', { word: W, gags: [], pools: { streak: ['s1'] } }, all, r0),"
+            " a.sayPlan('correct', { word: W }, all), a.sayPlan('correct', {}, all),"
+            # streak: a streak line, else the gag, else a correct line, else the prototype
+            " a.sayPlan('streak', { word: W, gags: G, pools: P }, all, r9), a.sayPlan('streak', { word: W, gags: G, pools: { correct: ['c1'] } }, all, r0),"
+            " a.sayPlan('streak', { word: W, gags: [], pools: { correct: ['c1'] } }, all, r0), a.sayPlan('streak', { word: W, gags: [], pools: {} }, all),"
+            # a clip not ready is skipped: the word, a gag, a whole group
+            " a.sayPlan('correct', { word: W, gags: G, pools: P }, not('w', 'g1'), r0), a.sayPlan('correct', { word: W, gags: G, pools: P }, not('g1', 'g2'), r0),"
+            " a.sayPlan('streak', { word: W, gags: G, pools: P }, not('s1', 's2', 'g1', 'g2', 'c1', 'c2', 'c3', 'w')),"
+            # a moment that does not say the word: no word, its own sound
+            " a.sayPlan('wrong', { word: W, gags: G, pools: P }, all), a.sayPlan('nope', { word: W }, all)]);")
+        self.assertEqual(res, [
+            {'word': 'w', 'line': 'g1', 'sound': None}, {'word': 'w', 'line': 'g2', 'sound': None},
+            {'word': 'w', 'line': 'c3', 'sound': None}, {'word': 'w', 'line': None, 'sound': 'correct'},
+            {'word': 'w', 'line': None, 'sound': 'correct'}, {'word': None, 'line': None, 'sound': 'correct'},
+            {'word': 'w', 'line': 's2', 'sound': None}, {'word': 'w', 'line': 'g1', 'sound': None},
+            {'word': 'w', 'line': 'c1', 'sound': None}, {'word': 'w', 'line': None, 'sound': 'correct'},
+            {'word': None, 'line': 'g2', 'sound': None}, {'word': 'w', 'line': 'c1', 'sound': None},
+            {'word': None, 'line': None, 'sound': 'correct'},
+            {'word': None, 'line': None, 'sound': 'error'}, {'word': None, 'line': None, 'sound': None}])
+
+    # --- the manifest at init ---
+
+    def test_init_fetches_the_manifest_once_and_the_line_pools_clips(self):
+        # once, at init; then the clips of the pools the moments name
+        # (correct, streak) are downloaded and decoded; other pools, gags
+        # and words wait (a word's own come when it starts)
+        res = self.run_node(
+            "MAN = man('words/animals/cat.mp3', 'robot/correct-01.mp3', 'robot/streak-01.mp3', 'robot/wrong-01.mp3',"
+            " 'gags/animals/cat.mp3', 'letters/a.mp3');"
+            "await ready(); const voice = fetched.filter((u) => u.startsWith('/static/voice/'));"
+            "out([voice, decodes.filter((u) => u.startsWith('/static/voice/')), errors]);")
+        self.assertEqual(res, [
+            ['/static/voice/manifest.json', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'],
+            ['/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'], []])
+
+    def test_a_missing_or_broken_manifest_is_empty_with_no_error(self):
+        # 404, JSON that fails, a response without json(), a fetch that
+        # throws, the wrong shape: nothing listed, nothing thrown or logged;
+        # a correct check still says the word, then the prototype clip
+        res = self.run_node(
+            "const cases = [undefined, new Error('bad json'), NOJSON, { clips: ['robot/correct-01.mp3'] }, 'x'];"
+            "const res = [];"
+            "for (const m of cases) {"
+            " MAN = m; fetched.length = 0; a.init(); await settle();"
+            " res.push(fetched.filter((u) => u.startsWith('/static/voice/')));"
+            "}"
+            "const f = globalThis.fetch; globalThis.fetch = (u) => { if (u.endsWith('manifest.json')) throw new Error('no'); return f(u); };"
+            "a.init(); await settle(); globalThis.fetch = f; listeners.pointerup(); await settle();"
+            "S.subscribe(a.renderSound); Math.random = () => 0; await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([res, atCheck, played(), errors]);")
+        self.assertEqual(res, [[['/static/voice/manifest.json']] * 5, ['words/animals/cat.mp3'],
+                               ['words/animals/cat.mp3', 'correct/bingo.mp3'], []])
+
+    def test_the_real_manifest_today(self):
+        # static/voice/manifest.json as it is: the 130 words and 26
+        # letters, no gag and no shared line yet, so a correct check says
+        # the word, then the prototype correct clip, as before B-223
+        manifest = json.loads(self.MANIFEST.read_text())
+        res = self.run_node(
+            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound); Math.random = () => 0.99;"
+            "const listed = a.listedClips(MAN);"
+            "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
+            " a.gagClips(listed, 'animals', 'cat'), listed.includes('words/animals/cat.mp3'), atCheck, played()]);")
+        self.assertEqual(res[:5], [156, 130, [0, 0], [], True])
+        self.assertEqual(res[5:], [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/you have a spelling superpower.mp3']])
+
+    # --- a new word ---
+
+    def test_a_new_word_fetches_and_decodes_its_clip_and_gags(self):
+        # when the word starts (a new word, renderSound): its own clip and
+        # its listed gags, fetched and decoded; a re-render fetches nothing
+        # again; the next word lets them go and fetches its own; the same
+        # word again in a new round keeps its clips
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'gags/animals/dog.mp3', 'gags/food/cat.mp3');"
+            "await ready(); S.subscribe(a.renderSound); const mark = () => { const n = fetched.length; return () => fetched.slice(n); };"
+            "const voice = (l) => l.filter((u) => u.startsWith('/static/voice/'));"
+            "let since = mark(); S.setState(st()); await settle(); const first = [voice(since()), voice(decodes)];"
+            "since = mark(); S.setState(st()); await settle(); const again = since();"
+            "since = mark(); S.setState(st({ round: { index: 1, size: 5, results: [{ correct: true }] },"
+            " current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing', placed: put([null, null, null]) } }));"
+            "await settle(); const next = since();"
+            "since = mark(); S.setState(st({ roundsStarted: 2, round: { index: 0, size: 5, results: [] },"
+            " current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing', placed: put([null, null, null]) } }));"
+            "await settle(); const same = since();"
+            "since = mark(); S.setState({ screen: 'theme', current: { word: null, placed: [] } }); await settle();"
+            "out([first, again, next, same, since(), played()]);")
+        self.assertEqual(res, [
+            [['/static/voice/words/animals/cat.mp3', '/static/voice/gags/animals/cat.mp3', '/static/voice/gags/animals/cat-2.mp3'],
+             ['/static/voice/words/animals/cat.mp3', '/static/voice/gags/animals/cat.mp3', '/static/voice/gags/animals/cat-2.mp3']],
+            [], ['/static/voice/words/animals/dog.mp3', '/static/voice/gags/animals/dog.mp3'], [], [], []])
+
+    def test_before_the_first_gesture_they_are_fetched_and_decode_on_it(self):
+        # a word shown before any gesture (the dev hook): fetched, not
+        # decoded; the first gesture decodes them, and a check after it
+        # says the word
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); a.init(); await settle(); S.subscribe(a.renderSound);"
+            "S.setState(st()); await settle(); const before = [fetched.filter((u) => u.startsWith('/static/voice/')).length, decodes.length];"
+            "listeners.pointerup(); await settle();"
+            "clear(); S.setState(correct()); await settle(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([before, decodes.filter((u) => u.startsWith('/static/voice/')), atCheck, played()]);")
+        self.assertEqual(res, [[3, 0], ['/static/voice/words/animals/cat.mp3', '/static/voice/gags/animals/cat.mp3'],
+                               ['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'gags/animals/cat.mp3']])
+
+    def test_the_manifest_after_the_word_still_brings_its_gags(self):
+        # the manifest arriving after the word started (a slow network):
+        # the word showing gets its gags then
+        res = self.run_node(
+            "let open; const f = globalThis.fetch;"
+            "globalThis.fetch = (u) => (u.endsWith('manifest.json') ? new Promise((r) => { open = () => { r(f(u)); }; }) : f(u));"
+            "MAN = man('gags/animals/cat.mp3'); a.init(); listeners.pointerup(); S.subscribe(a.renderSound);"
+            "S.setState(st()); await settle(); const before = fetched.filter((u) => u.startsWith('/static/voice/'));"
+            "open(); await settle(); clear(); S.setState(correct()); await settle(); await end('words/animals/cat.mp3');"
+            "out([before, played()]);")
+        self.assertEqual(res, [['/static/voice/words/animals/cat.mp3'], ['words/animals/cat.mp3', 'gags/animals/cat.mp3']])
+
+    # --- the correct check ---
+
+    def test_correct_says_the_word_then_the_gag_both_his_voice(self):
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'robot/correct-01.mp3');"
+            "await ready(); S.subscribe(a.renderSound);"
+            "const res = [];"
+            "for (const r of [0, 0.99]) {"
+            " Math.random = () => r; await check(); const atCheck = [played(), on(), kinds(), a.voiceWave() && a.voiceWave().length];"
+            " await end('words/animals/cat.mp3'); const line = played()[1];"
+            " res.push([atCheck, played(), kinds(), on(), a.voiceWave() && a.voiceWave()[0]]);"
+            " await end(line); res.push([on(), a.voiceWave()]);"
+            " S.setState({ round: { index: 1, size: 5, results: [{ correct: true }] }, current: { word: null, placed: [] }, screen: 'theme' });"
+            "}"
+            "out(res);")
+        self.assertEqual(res, [
+            [[['words/animals/cat.mp3'], ['words/animals/cat.mp3'], ['v'], 512],
+             ['words/animals/cat.mp3', 'gags/animals/cat.mp3'], ['v', 'v'], ['gags/animals/cat.mp3'], 200],
+            [[], None],
+            [[['words/animals/cat.mp3'], ['words/animals/cat.mp3'], ['v'], 512],
+             ['words/animals/cat.mp3', 'gags/animals/cat-2.mp3'], ['v', 'v'], ['gags/animals/cat-2.mp3'], 200],
+            [[], None]])
+
+    def test_correct_without_a_gag_says_a_correct_line_else_the_prototype(self):
+        res = self.run_node(
+            "MAN = man('robot/correct-01.mp3', 'robot/correct-02.mp3', 'robot/streak-01.mp3', 'gags/animals/dog.mp3');"
+            "await ready(); S.subscribe(a.renderSound); Math.random = () => 0.6;"
+            "await check(); await end('words/animals/cat.mp3'); const pool = played();"
+            "out(pool);")
+        self.assertEqual(res, ['words/animals/cat.mp3', 'robot/correct-02.mp3'])
+        res = self.run_node(
+            "MAN = man('robot/streak-01.mp3', 'words/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "Math.random = () => 0;"
+            "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([atCheck, played(), kinds()]);")
+        # no gag, no correct line: the prototype correct clip, after the word
+        self.assertEqual(res, [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/bingo.mp3'], ['v', 'v']])
+
+    def test_streak_says_the_word_then_a_streak_line_else_the_gag_else_a_correct_line(self):
+        files = ['robot/streak-01.mp3', 'gags/animals/cat.mp3', 'robot/correct-01.mp3']
+        res = [self.run_node(
+            f"MAN = man(...{json.dumps(files[k:])}); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "await checkStreak(); const atCheck = played(); await end('words/animals/cat.mp3'); out([atCheck, played(), kinds()]);")
+            for k in range(len(files) + 1)]
+        self.assertEqual(res, [
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'robot/streak-01.mp3'], ['v', 'v']],
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'gags/animals/cat.mp3'], ['v', 'v']],
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'robot/correct-01.mp3'], ['v', 'v']],
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/bingo.mp3'], ['v', 'v']]])
+        # the streak is momentsFor's: the third correct in a row
+        self.assertEqual(self.run_node(
+            "out([C.momentsFor(C.snapshot(streak()), C.snapshot(streakDone())), C.momentsFor(C.snapshot(st()), C.snapshot(correct()))]);"),
+            [['streak'], ['correct']])
+
+    def test_a_clip_not_ready_at_the_check_is_skipped_never_waited_for(self):
+        # the word still decoding: the line comes at once, and nothing
+        # starts when the word's decode ends later; the gag still
+        # decoding: the next choice (a correct line); a word that failed
+        # to download: skipped too
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3', 'robot/correct-01.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "hold.add(CAT); await check(); const word = played(); await release(CAT); const later = played();"
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] } }); hold.clear();"
+            "hold.add('/static/voice/gags/animals/cat.mp3'); S.setState(st({ roundsStarted: 2 })); await settle(); clear();"
+            "S.setState(correct({ roundsStarted: 2 })); await settle(); await end('words/animals/cat.mp3'); const gag = played();"
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] } }); missing.add('/static/voice/words/animals/dog.mp3');"
+            "const dog = { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', placed: put([null, null, null]) };"
+            "S.setState(st({ roundsStarted: 3, current: { ...dog, status: 'playing' } })); await settle(); clear();"
+            "S.setState(st({ roundsStarted: 3, current: { ...dog, status: 'correct' }, round: { index: 0, size: 5, results: [{ correct: true }] } }));"
+            "await settle();"
+            "out([word, later, gag, played()]);")
+        self.assertEqual(res, [['gags/animals/cat.mp3'], ['gags/animals/cat.mp3'],
+                               ['words/animals/cat.mp3', 'robot/correct-01.mp3'], ['robot/correct-01.mp3']])
+
+    # --- nothing over the word; what cuts the line ---
+
+    def test_nothing_of_his_starts_over_the_word(self):
+        # while he says the word: his clips due are dropped (the word
+        # plays on, whole), effects still play; the line comes only when
+        # the word has ended
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "await check(); ['error', 'tada', 'locked', 'correct'].forEach(a.play);"
+            "S.setState({ lockedTaps: 1 }); await settle(); const dropped = [played(), on()];"
+            "a.play('swipe'); const fx = on();"
+            "await end('words/animals/cat.mp3'); const after = on();"
+            "out([dropped, fx, after, log.filter((e) => e.op === 'stop').map((e) => short(e.src))]);")
+        self.assertEqual(res[0], [['words/animals/cat.mp3'], ['words/animals/cat.mp3']])
+        # the swipe, an effect, plays over the word
+        self.assertEqual([res[1][0], res[1][1].split('/')[0], len(res[1])], ['words/animals/cat.mp3', 'swipe', 2])
+        self.assertIn('gags/animals/cat.mp3', res[2])
+        self.assertEqual(res[3], [])       # nothing was stopped
+
+    def test_the_line_is_his_voice_clip_like_any_other(self):
+        # cut by the next voice clip, by a speaker tap, by leaving the word
+        # (the next word, the round end with its tada, the back arrow)
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "const res = []; let n = 1;"
+            "const say = async () => { S.setState({ screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } });"
+            " await check({ roundsStarted: ++n }); await end('words/animals/cat.mp3'); };"
+            "await say(); a.play('error'); res.push(on().map((f) => f.split('/')[0]));"
+            "await say(); S.setState({ speaking: true }); a.speakWord(CAT, () => {}); res.push([on(), made[made.length - 1].paused]);"
+            "S.setState({ speaking: false });"
+            "await say(); S.setState(st({ roundsStarted: n, round: { index: 1, size: 5, results: [{ correct: true }] },"
+            " current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing', placed: put([null, null, null]) } }));"
+            "res.push(on());"
+            "await say(); S.setState({ ...correct({ roundsStarted: n }), screen: 'round-end', round: { index: 4, size: 5,"
+            " results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) } }); res.push(on().map((f) => f.split('/')[0]));"
+            "await say(); S.setState({ screen: 'stages', current: { word: null, placed: [] } }); res.push(on());"
+            "out(res);")
+        self.assertEqual(res, [['error'], [[], False], [], ['celebration'], []])
+
+    def test_a_speaker_tap_or_leaving_while_he_says_the_word_drops_the_line(self):
+        # a tap on the speaker while he says the word: the word starts again
+        # from the speaker (the <audio> element), his line never comes;
+        # leaving the word while he says it: his word stops, no line
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "await check(); S.setState({ speaking: true }); a.speakWord(CAT, () => {}); await settle();"
+            "const tap = [played(), on(), made.length];"
+            "S.setState({ speaking: false, screen: 'theme', current: { word: null, placed: [] } });"
+            "await check({ roundsStarted: 2 }); S.setState({ screen: 'stages', current: { word: null, placed: [] } }); await settle();"
+            "out([tap, played(), on()]);")
+        self.assertEqual(res, [[['words/animals/cat.mp3', 'words/animals/cat.mp3'], [], 1],
+                               ['words/animals/cat.mp3'], []])
+
+    def test_nothing_over_the_speakers_word(self):
+        # the word playing from the speaker at the check: he says nothing
+        # (no second word over it, and his line is dropped, not queued)
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "S.setState(st()); await settle(); S.setState({ speaking: true }); a.speakWord(CAT, () => {}); clear();"
+            "S.setState({ ...correct(), speaking: true }); await settle(); const atCheck = played();"
+            "made[made.length - 1].on.ended(); S.setState({ speaking: false }); await settle();"
+            "out([atCheck, played()]);")
+        self.assertEqual(res, [[], []])
+
+    def test_muted_he_says_nothing_and_the_mute_stops_his_say(self):
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "await check({ muted: true }); const muted = played();"
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] }, muted: false });"
+            "await check({ roundsStarted: 2 }); S.setState({ muted: true }); await settle(); const cut = [on(), played()];"
+            "S.setState({ muted: false }); await settle();"
+            "out([muted, cut, played(), on()]);")
+        self.assertEqual(res, [[], [[], ['words/animals/cat.mp3']], ['words/animals/cat.mp3'], []])
+
+    def test_the_speaker_still_plays_the_word_as_before(self):
+        # speakWord (BACKLOG B-215) is unchanged: an <audio> element of the
+        # word's file, not through the context or his analyser
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.setState({ speaking: true });"
+            "let ended = 0; a.speakWord(CAT, () => ended++); const el = made[made.length - 1];"
+            "const wave = a.voiceWave(); el.on.ended();"
+            "out([el.src, el.paused, wave, ended, sources.filter((s) => s.buffer && s.buffer.url === CAT).length]);")
+        self.assertEqual(res, ['/static/voice/words/animals/cat.mp3', False, None, 1, 0])
+
+    def test_only_audio_js_reads_static_voice_and_nothing_writes_there(self):
+        # the manifest and the clips are read by audio.js alone, with GET
+        # fetches; static/voice/ is content (CLAUDE.md)
+        js_dir = self.ROOT / 'static' / 'js'
+        strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
+        readers = [f.name for f in sorted(js_dir.rglob('*.js')) if '/static/voice/' in strip(f.read_text())]
+        self.assertEqual(readers, ['audio.js'])
+        code = strip(self.MODULE.read_text())
+        self.assertNotRegex(code, r"method\s*:")
+        self.assertEqual(code.count('fetch('), 2)   # the clips' download and the manifest

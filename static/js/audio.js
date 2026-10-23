@@ -1,5 +1,5 @@
 // audio.js — the only place sounds play (CLAUDE.md, DESIGN "Sound",
-// BACKLOG B-108, B-114). Two kinds of sound:
+// BACKLOG B-108, B-114). Its sounds:
 //   - the target word: the per-word `audio` file from the content JSON,
 //     played when the kid taps the speaker on the console (speakWord);
 //   - the robot's voice and the block swipe: pools of the existing clips
@@ -8,6 +8,13 @@
 //     renderSound, a state subscriber, for the moments character.js's
 //     table (MOMENTS[moment].sound) gives a state change. There is no
 //     second trigger list here;
+//   - his new voice (BACKLOG M4b, B-223): the clips tools/voices.py makes
+//     into static/voice/ (read-only content, never written here), listed
+//     in static/voice/manifest.json, fetched once at init. On a correct
+//     check (the moments with MOMENTS[moment].word) he says the word
+//     himself, from the word's `audio` decoded when the word started,
+//     then his line after it (sayPlan: the word's gag or a line of his
+//     pools, else the prototype clip), both his voice (say);
 //   - the TV's tune-in hiss and channel click (BACKLOG B-214): made in
 //     code, no sound file (hiss), played when tv.js starts a tune-in.
 // `state.muted` (localStorage `flip.muted`, read and written only here
@@ -18,10 +25,15 @@
 // first gesture and Audio elements only inside speakWord().
 
 import { state } from './state.js';
-import { snapshot, momentsFor, soundsFor, NONE } from './character.js';
+import { snapshot, momentsFor, soundsFor, NONE, MOMENTS } from './character.js';
 
 export const SOUND_BASE = '/static/sounds/';
 export const MUTED_KEY = 'flip.muted';
+// His new voice (BACKLOG B-223): the folder tools/voices.py writes and the
+// manifest listing every clip in it, { voice_id, model_id, output_format,
+// clips: { "<file relative to static/voice/>": { id, text, made } } }.
+export const VOICE_BASE = '/static/voice/';
+export const MANIFEST_URL = `${VOICE_BASE}manifest.json`;
 
 // The clips of each pool (DESIGN "Sound": correct -> correct/, wrong ->
 // error/, round end -> celebration/tada.mp3, block into slot -> swipe/).
@@ -68,12 +80,14 @@ export const FILES = {
     locked: { dir: 'error', names: ['hmm no.mp3'] },
 };
 
-// The robot's voice (correct, error, tada, locked): one clip at a time, a
-// new one cuts the one playing, and none starts over the target word
-// (DESIGN "Sound", CHARACTER "Rules"). The swipe is an effect, not his
-// voice: it plays whenever a block goes into a slot and may overlap
-// anything. So is the TV's hiss (B-214; made in code, not a pool).
-export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx', locked: 'voice', hiss: 'fx' };
+// The robot's voice (correct, error, tada, locked; and on a correct check,
+// B-223, the word he says, `word`, and his line after it, `line`): one
+// clip at a time, a new one cuts the one playing, and none starts over the
+// target word, the speaker's or the one he says (DESIGN "Sound",
+// CHARACTER "Rules"). The swipe is an effect, not his voice: it plays
+// whenever a block goes into a slot and may overlap anything. So is the
+// TV's hiss (B-214; made in code, not a pool).
+export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'voice', swipe: 'fx', locked: 'voice', hiss: 'fx', word: 'voice', line: 'voice' };
 
 // The TV's tune-in hiss (BACKLOG B-214, design/reference/tv-motion.html
 // hiss()): white noise `tail` s longer than the hiss, its first samples
@@ -121,6 +135,72 @@ export function pickIndex(size, rand = Math.random) {
     return Math.min(size - 1, Math.floor(rand() * size));
 }
 
+// --- His new voice: the manifest (BACKLOG B-223) ---
+
+// The files a manifest lists (the keys of its `clips`, relative to
+// static/voice/). A missing or broken manifest (null, not an object, no
+// `clips` map) lists none.
+export function listedClips(manifest) {
+    const isMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+    if (!isMap(manifest) || !isMap(manifest.clips)) return [];
+    return Object.keys(manifest.clips);
+}
+
+// URL of listed file `file`, each part of its path URL-encoded.
+export function voiceUrl(file, base = VOICE_BASE) {
+    return base + file.split('/').map(encodeURIComponent).join('/');
+}
+
+// The pool of one of his shared lines' files: `robot/<line id>.mp3`, the
+// pool being the id without its `-NN` (robot/correct-02.mp3 -> 'correct',
+// robot/end-low-01.mp3 -> 'end-low'); null for any other file.
+export function poolOf(file) {
+    const m = /^robot\/(.+)-\d+\.mp3$/.exec(file);
+    return m ? m[1] : null;
+}
+
+// The files of pool `pool` that `files` lists, in their order.
+export function poolClips(files, pool) {
+    return files.filter((file) => poolOf(file) === pool);
+}
+
+// A word's gag clips that `files` lists: `gags/<theme>/<word>.mp3`, and
+// its second gag `gags/<theme>/<word>-2.mp3` when it exists.
+export function gagClips(files, theme, word) {
+    if (!theme || !word) return [];
+    return [`gags/${theme}/${word}.mp3`, `gags/${theme}/${word}-2.mp3`].filter((file) => files.includes(file));
+}
+
+// The pools of his lines the moment table names (MOMENTS[m].lines, the
+// word's own 'gag' aside), downloaded once the manifest is in.
+export function linePools(moments = MOMENTS) {
+    const pools = new Set();
+    for (const spec of Object.values(moments)) {
+        for (const name of spec.lines || []) if (name !== 'gag') pools.add(name);
+    }
+    return [...pools];
+}
+
+// What he says on `moment` when it says the word (MOMENTS[moment].word:
+// a correct check, correct or streak): the word, then one line. `clips`
+// is { word: the word's audio URL, gags: its gag clips' URLs, pools: {
+// pool: its clips' URLs } }; `ready(url)` tells whether a clip is decoded
+// now: one that is not is skipped, never waited for. The line is a random
+// ready clip of the first of MOMENTS[moment].lines that has one ('gag':
+// the word's gags; any other name: that pool), else, with none, the
+// moment's prototype pool (MOMENTS[moment].sound) as `sound`. Returns
+// { word: URL or null, line: URL or null, sound: pool kind or null };
+// the word, when there is one, is said first and the line after it.
+export function sayPlan(moment, clips = {}, ready = () => true, rand = Math.random) {
+    const spec = MOMENTS[moment] || {};
+    const word = spec.word && clips.word && ready(clips.word) ? clips.word : null;
+    for (const name of spec.lines || []) {
+        const group = ((name === 'gag' ? clips.gags : (clips.pools || {})[name]) || []).filter((url) => ready(url));
+        if (group.length) return { word, line: group[pickIndex(group.length, rand)], sound: null };
+    }
+    return { word, line: null, sound: spec.sound || null };
+}
+
 // The remembered mute flag: true only when the key holds 'true'; missing,
 // anything else, or storage that cannot be read (private mode, no
 // localStorage) is sound on, the DESIGN default.
@@ -152,18 +232,28 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 // until a reload. So: init() downloads every clip once; the first user
 // gesture creates one AudioContext, opens its output and decodes the
 // clips into memory; play() then starts a decoded buffer at once.
-// The target word stays an <audio> element (speakWord): one file per
-// word, started by the kid's own tap on the speaker. It is not routed
-// through the AudioContext (no MediaElementSource), so it plays however
-// the context is (suspended, interrupted, iOS 16's silent switch) and the
-// robot's analyser never hears it (BACKLOG B-210).
+// The target word the speaker plays stays an <audio> element (speakWord):
+// one file per word, started by the kid's own tap on the speaker. It is
+// not routed through the AudioContext (no MediaElementSource), so it
+// plays however the context is (suspended, interrupted, iOS 16's silent
+// switch) and the robot's analyser never hears it (BACKLOG B-210). On a
+// correct check he says the word himself (B-223): the same file, fetched
+// and decoded as the word starts (loadWord), played as his voice (say).
 //
 // Audio engine handles, not game state (CLAUDE.md "audio.js"): no other
 // module reads them and nothing decides game logic from them.
 let ctx = null;             // the AudioContext, made on the first gesture
 const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
 const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
-const live = new Set();     // sources now playing: the pooled clips and the TV's hiss (B-214), { src, kind }
+const live = new Set();     // sources now playing: the pooled clips, his say (B-223) and the TV's hiss (B-214), { src, kind, say }
+// His new voice (BACKLOG B-223): the files static/voice/manifest.json
+// lists (none until it is in, and none for a missing or broken one), and
+// per clip URL { bytes: Promise of its bytes or null, buffer: its decoded
+// AudioBuffer or null, decoding }: the clips of his line pools (kept), and
+// the current word's own clip and gags (let go on a new word).
+let listed = [];
+const lineClips = new Map();
+const wordClips = new Map();
 // The robot's voice (the voice channel) plays through an AnalyserNode on
 // its way out, so he can show it (BACKLOG B-210: character.js
 // renderTalk, which main.js hands voiceWave() every frame). The swipe
@@ -190,11 +280,77 @@ function download(url) {
     }
 }
 
+// A clip of his new voice: its download starts now, and its decode too
+// once the context exists (else on the first gesture, decodeAll).
+function fetchClip(url) {
+    const clip = { bytes: download(url), buffer: null, decoding: false };
+    decodeClip(clip);
+    return clip;
+}
+
+// Decode a clip of his new voice once; one that fails to download or
+// decode stays without a buffer (never ready: skipped).
+function decodeClip(clip) {
+    if (!ctx || clip.decoding) return;
+    clip.decoding = true;
+    clip.bytes
+        .then((data) => (data ? ctx.decodeAudioData(data) : null))
+        .then((buf) => { if (buf) clip.buffer = buf; })
+        .catch(() => {});
+}
+
+// The decoded buffer of a clip of his new voice, or null while not ready.
+function bufferOf(url) {
+    const clip = wordClips.get(url) || lineClips.get(url);
+    return (clip && clip.buffer) || null;
+}
+
+// The manifest, fetched once (init): then the clips of his line pools are
+// downloaded, and the word showing, if any, gets its gags. A missing or
+// broken manifest counts as an empty one, with no console error.
+function loadManifest() {
+    let got;
+    try {
+        got = fetch(MANIFEST_URL).then((r) => (r.ok ? r.json() : null));
+    } catch (e) {
+        got = Promise.resolve(null);
+    }
+    return got.catch(() => null).then((manifest) => {
+        listed = listedClips(manifest);
+        for (const pool of linePools()) {
+            for (const file of poolClips(listed, pool)) {
+                const url = voiceUrl(file);
+                if (!lineClips.has(url)) lineClips.set(url, fetchClip(url));
+            }
+        }
+        loadWord(state);
+    }).catch(() => {});
+}
+
+// The word now showing (BACKLOG B-223): its own clip (its `audio`) and its
+// gags are fetched and decoded now, as it starts, so they are ready at its
+// check; the clips of the word before are let go. Off the play screen,
+// none.
+function loadWord(s) {
+    const { current } = s;
+    const onWord = s.screen === 'play' && current && current.word;
+    const want = onWord
+        ? [current.audio, ...gagClips(listed, s.theme, current.word).map((file) => voiceUrl(file))].filter(Boolean)
+        : [];
+    for (const url of [...wordClips.keys()]) {
+        if (!want.includes(url)) wordClips.delete(url);
+    }
+    for (const url of want) {
+        if (!wordClips.has(url)) wordClips.set(url, fetchClip(url));
+    }
+}
+
 // Start downloading every clip and wait for the first gesture. Nothing
 // plays and no AudioContext exists yet, so loading the page raises no
 // autoplay-policy warning. A clip that fails to download is left out of
 // its pool. A file named by two pools ('hmm no' is in error and locked)
-// is downloaded once; both pools share its bytes.
+// is downloaded once; both pools share its bytes. His new voice's
+// manifest is fetched once (BACKLOG B-223).
 export function init() {
     const byUrl = new Map();    // url -> its download, for this call only
     for (const kind of Object.keys(FILES)) {
@@ -204,6 +360,7 @@ export function init() {
             return byUrl.get(url);
         });
     }
+    loadManifest();
     // iOS 17+: play like a media app (heard with the silent switch on, as
     // the <audio> clips were). Older iOS and other browsers lack it.
     try {
@@ -252,7 +409,8 @@ function unlock() {
 
 // Decode each download once (decodeAudioData takes over the bytes it is
 // given, so shared bytes cannot be decoded twice) and give the buffer to
-// every pool slot that names the file.
+// every pool slot that names the file. His new voice's clips fetched
+// before the context existed decode now too.
 function decodeAll() {
     const decoded = new Map();  // download -> its decode, for this call only
     for (const kind of Object.keys(bytes)) {
@@ -263,6 +421,7 @@ function decodeAll() {
                 .catch(() => {});   // an undecodable clip is left out of its pool
         });
     }
+    for (const clip of [...lineClips.values(), ...wordClips.values()]) decodeClip(clip);
 }
 
 function stopSource(entry) {
@@ -281,34 +440,95 @@ function stopVoice() {
     }
 }
 
-// Play a random clip of pool `kind` ('correct', 'error', 'tada', 'swipe',
-// 'locked').
-// Muted, before the first gesture, or while the pool is still decoding:
-// nothing. A voice clip cuts the voice clip playing, and does not start
-// while the target word plays (`state.speaking`): the word is spoken
-// clean and is never cut. The swipe may overlap anything.
-export function play(kind) {
-    if (state.muted || !ctx || !buffers[kind]) return;
-    if (CHANNEL[kind] === 'voice') {
-        if (state.speaking) return;
-        stopVoice();
-    }
-    const ready = buffers[kind].filter(Boolean);
-    if (ready.length === 0) return;
+// Whether he is saying the word now (BACKLOG B-223, say).
+function saying() {
+    return [...live].some((entry) => entry.kind === 'word');
+}
+
+// Start `buffer` now as a clip of `kind`: his voice (CHANNEL) through the
+// analyser, an effect straight out. `say`: part of his say on a correct
+// check (B-223), which leaving the word stops (stopSay). `then` runs when
+// the clip has played to its end, never when it was stopped (stopSource
+// takes it out of `live` first).
+function start(buffer, kind, say = false, then = null) {
     try {
         if (ctx.state !== 'running') {
             const p = ctx.resume();
             if (p && p.catch) p.catch(() => {});
         }
         const src = ctx.createBufferSource();
-        src.buffer = ready[pickIndex(ready.length)];
+        src.buffer = buffer;
         src.connect(CHANNEL[kind] === 'voice' && analyser ? analyser : ctx.destination);
-        const entry = { src, kind };
+        const entry = { src, kind, say };
         live.add(entry);
-        src.onended = () => live.delete(entry);
+        src.onended = () => {
+            if (live.delete(entry) && then) then();
+        };
         src.start(0);
     } catch (e) {
         // stay silent, no console error
+    }
+}
+
+// A random decoded clip of pool `kind`, started (`say` as for start), or
+// nothing while none is decoded.
+function startPool(kind, say = false) {
+    const ready = (buffers[kind] || []).filter(Boolean);
+    if (ready.length) start(ready[pickIndex(ready.length)], kind, say);
+}
+
+// Play a random clip of pool `kind` ('correct', 'error', 'tada', 'swipe',
+// 'locked').
+// Muted, before the first gesture, or while the pool is still decoding:
+// nothing. A voice clip cuts the voice clip playing, and does not start
+// while the target word plays (`state.speaking`, or the word he says on a
+// correct check, B-223): the word is spoken clean and is never cut. The
+// swipe may overlap anything.
+export function play(kind) {
+    if (state.muted || !ctx || !buffers[kind]) return;
+    if (CHANNEL[kind] === 'voice') {
+        if (state.speaking || saying()) return;
+        stopVoice();
+    }
+    startPool(kind);
+}
+
+// His say on a correct check (BACKLOG B-223; `moment` one with
+// MOMENTS[moment].word, read from state `s`): the word, clean and
+// complete, from its own clip, then, when it has played to its end, one
+// line (sayPlan: the clips decoded now; a clip not ready is skipped, so
+// with the word not ready the line comes at once). Both are his voice,
+// through the analyser. Nothing over the speaker's word: while it plays
+// (`state.speaking`) he says nothing. The line is his voice clip like any
+// other: the next voice clip, a speaker tap (speakWord) or leaving the
+// word (stopSay) cuts it. While he says the word a voice clip due is
+// dropped (play), and a speaker tap or leaving the word stops the word
+// and drops the line. Muted or before the first gesture: nothing.
+function say(moment, s) {
+    if (state.muted || !ctx || state.speaking) return;
+    const { current } = s;
+    const urls = (files) => files.map((file) => voiceUrl(file));
+    const plan = sayPlan(moment, {
+        word: current.audio || null,
+        gags: urls(gagClips(listed, s.theme, current.word)),
+        pools: Object.fromEntries(linePools().map((pool) => [pool, urls(poolClips(listed, pool))])),
+    }, (url) => !!bufferOf(url));
+    stopVoice();
+    const line = () => {
+        if (state.muted || state.speaking) return;
+        const buf = plan.line && bufferOf(plan.line);
+        if (buf) start(buf, 'line', true);
+        else if (plan.sound) startPool(plan.sound, true);
+    };
+    if (plan.word) start(bufferOf(plan.word), 'word', true, line);
+    else line();
+}
+
+// Leaving the word (a new word, the round end, the back arrow): what he
+// says of it stops, the word and the line after it (B-223).
+function stopSay() {
+    for (const entry of [...live]) {
+        if (entry.say) stopSource(entry);
     }
 }
 
@@ -360,8 +580,9 @@ export function hiss(ms) {
 // This frame's samples of the robot's voice (bytes, 128 = silence), or
 // null while none of his clips plays (also while muted: nothing plays).
 // main.js passes it to character.js renderTalk every frame; the array is
-// refilled on each call. The target word is not his voice clip and does
-// not pass the analyser (see speakWord).
+// refilled on each call. The word he says on a correct check (B-223) is
+// his voice; the speaker's word is not and does not pass the analyser
+// (see speakWord).
 export function voiceWave() {
     if (!analyser) return null;
     let talking = false;
@@ -375,7 +596,9 @@ export function voiceWave() {
 
 // Play the word clip at `url`; `onEnd` runs once when it ends or fails to
 // play (missing file, decode error, playback refused), or at once when
-// muted. The word cuts the robot's voice. A clip stopped by stopWord() or
+// muted. The word cuts the robot's voice (also his say on a correct
+// check, B-223: the word starts again from the speaker, and his line
+// after it is dropped). A clip stopped by stopWord() or
 // replaced by a new speakWord() never calls its `onEnd`: whoever stopped
 // it has already moved on. The target word is never cut by another clip;
 // a new tap on the speaker starts it again from the beginning.
@@ -426,15 +649,25 @@ function silence() {
 let last = { snap: NONE, muted: false };
 
 // State subscriber: plays the clip of each moment the state change makes
-// (character.js's table), on every screen (the round-end tada too). On
-// mute everything playing stops; while muted nothing plays.
+// (character.js's table), on every screen (the round-end tada too); a
+// moment that says the word (MOMENTS[moment].word, a correct check,
+// B-223) is said (say). A new word (or none) stops what he was saying of
+// the last one and loads its own clips (loadWord), muted or not. On mute
+// everything playing stops; while muted nothing plays.
 export function renderSound(state) {
     const snap = snapshot(state);
     const prev = last;
     last = { snap, muted: state.muted };
+    if (snap.key !== prev.snap.key) {
+        stopSay();
+        loadWord(state);
+    }
     if (state.muted) {
         if (!prev.muted) silence();
         return;
     }
-    for (const kind of soundsFor(momentsFor(prev.snap, snap))) play(kind);
+    for (const moment of momentsFor(prev.snap, snap)) {
+        if (MOMENTS[moment].word) say(moment, state);
+        else for (const kind of soundsFor([moment])) play(kind);
+    }
 }

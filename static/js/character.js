@@ -14,10 +14,12 @@
 //
 // The sound column is the robot's voice: audio.js (B-108), the only place
 // sounds play, asks momentsFor() and soundsFor() which clip a state change
-// calls for and plays it from its pools; nothing else triggers a clip.
-// While one of his clips plays, audio.js's AnalyserNode hears it and
-// main.js hands its samples to renderTalk() every frame (B-210, the
-// talking effects below).
+// calls for and plays it from its pools, and on a correct check (the
+// `word` and `lines` columns, B-223) says the word and then his line;
+// nothing else triggers a clip. While one of his clips plays (the word he
+// says on a correct check too, not the speaker's), audio.js's
+// AnalyserNode hears it and main.js hands its samples to renderTalk()
+// every frame (B-210, the talking effects below).
 
 import { starsFor } from './score.js';
 import { domeAction } from './controls.js';
@@ -161,6 +163,13 @@ export const FX = {
 
 // Moment -> the steps he takes and the clip that goes with it (audio.js's
 // pools: 'swipe', 'error', 'correct', 'tada', 'locked'; null for none).
+// A moment with `word: true` (a correct check: correct, streak; BACKLOG
+// B-223) is said: the target word first, clean and complete, from the
+// word's own clip, then, when it ends, one line, a random clip of the
+// first of its `lines` that has one ready ('gag': the word's own gag
+// lines; any other name: that pool of his new lines, content/voice/
+// robot-lines.json); with none of them, its `sound`, the prototype clip.
+// audio.js (sayPlan) plays it.
 // A step comes `at` seconds into the moment and sets any of: `sink`
 // (puppet px down, 0 = up), `head` (turn), `eyes`, `brows`, `hands` (the
 // tables above), `look` (where the eyes look, visor units), `pop` (1, 2,
@@ -310,6 +319,8 @@ export const MOMENTS = {
             { at: 1.7, hands: 'rest', eyes: 'idle', brows: 'calm' },
         ],
         sound: 'correct',
+        word: true,
+        lines: ['gag', 'correct'],
     },
     streak: {
         steps: [
@@ -318,6 +329,8 @@ export const MOMENTS = {
             { at: 1.85, hands: 'rest', eyes: 'idle', brows: 'calm' },
         ],
         sound: 'correct',
+        word: true,
+        lines: ['streak', 'gag', 'correct'],
     },
     roundEndGood: {
         steps: [

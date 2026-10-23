@@ -164,7 +164,7 @@ shadow lifts, 120ms.
 
 ## Sound
 On by default, mute toggle remembered. Existing clips in `static/sounds/`:
-correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`,
+correct → the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong → `error/`, round end → `celebration/tada.mp3`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`,
 block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays the error clip only). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops

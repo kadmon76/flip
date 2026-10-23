@@ -75,7 +75,7 @@ Pose and movement change together; never more than one change per 300ms.
 `prefers-reduced-motion`: pose swaps only, no sliding.
 
 ## Moment map
-| Moment | Pose / movement | Sound (M1: existing clips only) | How often |
+| Moment | Pose / movement | Sound | How often |
 |---|---|---|---|
 | Round start | waves with both hands, eyebrows up, pops up; then hands to rest | — | always |
 | Picture shown | looks up at the TV, one of three at random: surprise (wide eyes, gasp, pop), giggle (happy eyes, fist at his mouth, head wiggle), shock (dot eyes, worried, arms out, pop, then wide eyes); then rest, head a little turned | — | always (a third each) |
@@ -90,13 +90,22 @@ Pose and movement change together; never more than one change per 300ms.
 | Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | always |
 | Boost given (`boostGiven`, B-219: a boost the kid paid for) | as his letter lands in its slot (or as the clean-up's extra blocks have puffed away): his second-miss letter's steps, happy, small pop, points up at it | — | every boost |
 | Third miss | covers his eyes (dot eyes, worried), then relief (happy eyes) as the blocks fly in | error clip | always |
-| Correct | fist pump, happy eyes, pop | correct clip | always |
-| 3 correct in a row | two fists pumping, double pop, cap sparks | correct clip | always |
+| Correct | fist pump, happy eyes, pop | he says the word, clean and complete (the word's own clip, as his voice), then one line: the word's gag (`gags/<theme>/<word>.mp3`, or its `-2`, at random), else a line of pool `correct`; with neither, a correct clip after the word (B-223) | always |
+| 3 correct in a row | two fists pumping, double pop, cap sparks | he says the word as on Correct, then a line of pool `streak`, else the word's gag, else a line of pool `correct`; with none, a correct clip after the word (B-223) | always |
 | Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | tada | always |
 | Speaker locked (from B-219: a boost the kid can't afford; the speaker always plays the word since B-215) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | every time |
 
-Voice lines (the ~60-line pool, pre-generated AI voice, his own quirks
-after the target word) are a later item; M1 uses the existing clips.
+Voice lines: his new voice (pre-generated AI voice; `tools/voices.py`
+makes the clips into `static/voice/`, read-only content, and
+`static/voice/manifest.json` lists them; the lines are
+`content/voice/robot-lines.json`'s pools and each word's gag in
+`content/voice/word-lines.json`) arrives in batches. The game plays what
+the manifest lists; a moment with no new clip yet keeps its existing clip
+from `static/sounds/`. On a correct check he says the word himself, then
+his line after it (B-223, the two Correct rows above); the word he says
+and his lines are his voice, so he talks with them (Talking, above),
+while the word the speaker plays is not. His shared lines on the other
+moments, the Hebrew guess and the letter names are B-224.
 
 ## Rules
 - The target word is always spoken clean and complete; a quirk may
