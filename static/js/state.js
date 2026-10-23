@@ -92,6 +92,10 @@ export const state = {
         // word, boost.js PER_WORD).
         filledOnce: [],
         boosts: 0,
+        // The boost the word took last ('remember', 'first' or 'cleanup';
+        // main.js pay), for the robot's line on it (BACKLOG B-224); null
+        // (or absent) before any.
+        boostKind: null,
     },
     lives: 3,                   // attempts left for the current word
     // Console control held down (DESIGN "Controls and states"): 'dome' for
@@ -100,7 +104,8 @@ export const state = {
     pressed: null,
     speaking: false,            // the word's audio is playing (speaker-on)
     // Times the robot shakes his head (his `speakerLocked` moment in
-    // character.js, with its "hmm no" in audio.js): each one more plays it
+    // character.js, with his `no-gears` line, else its "hmm no", in
+    // audio.js, BACKLOG B-224): each one more plays it
     // once, so only the change matters; counted over the session. Since
     // BACKLOG B-215 the speaker always plays the word; main.js adds one
     // when the kid picks a boost he can't afford (BACKLOG B-219), and the

@@ -573,3 +573,10 @@ Build order: life → win.
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
 - A dome-aimed point pose for the robot's dome nudge (B-212 reuses `point`, turned 32° down, while the dome is ~13° down from his hand at 360); tune it on `design/reference/robot-puppet.html` with the human.
 - `tools/shot.mjs`: a `--reduced-motion` flag (`Emulation.setEmulatedMedia`) and a `--step-timeout <ms>` option, so reduced-motion shots and long real-flow runs don't need a throwaway copy (B-210, B-211, B-212 used one).
+- His `greet` lines (theme screen, first open; `content/voice/robot-lines.json`): not wired by B-224; he is not on the theme screen yet.
+- His `murmur` lines (a block placed, neutral, never a hint): not wired by B-224; needs a rule for how often, so they don't come with every block.
+- His `reveal-close` lines (third miss, after the letters fly in): not wired by B-224, which plays `reveal-open` at the miss; needs a second line timed to the reveal's end.
+- His `sticker` lines (a new sticker): not wired by B-224; no moment for a new sticker yet (it shows only on the round end, where he is not drawn).
+- His `stage` lines (a stage cleared): not wired by B-224; no stage-up moment yet (the round end's bulb pop, B-216, has no robot).
+- His `gear` lines (the first gear of a session): not wired by B-224; no moment for it yet.
+- His `boost-slow` line (the slow say boost, before the slow word): not wired by B-224; waits for the slow say boost (above).

@@ -12,14 +12,17 @@
 // never mutates state. Everything above "Render" is pure (no DOM) and a
 // Django test runs it through node.
 //
-// The sound column is the robot's voice: audio.js (B-108), the only place
-// sounds play, asks momentsFor() and soundsFor() which clip a state change
-// calls for and plays it from its pools, and on a correct check (the
-// `word` and `lines` columns, B-223) says the word and then his line;
-// nothing else triggers a clip. While one of his clips plays (the word he
-// says on a correct check too, not the speaker's), audio.js's
-// AnalyserNode hears it and main.js hands its samples to renderTalk()
-// every frame (B-210, the talking effects below).
+// The sound and lines columns are the robot's voice: audio.js (B-108), the
+// only place sounds play, asks momentsFor() which moments a state change
+// is and plays, per moment, a line of the pool its `lines` column names
+// (his new voice, B-224; on a correct check the word first, the `word`
+// column, B-223), else the prototype clip of its `sound` column, then the
+// name of the letter he placed (the `letter` column); nothing else
+// triggers a clip, except his idle peeks, which renderRobot tells main.js
+// about (`onPeek`). While one of his clips plays (the word he says on a
+// correct check too, not the speaker's), audio.js's AnalyserNode hears it
+// and main.js hands its samples to renderTalk() every frame (B-210, the
+// talking effects below).
 
 import { starsFor } from './score.js';
 import { domeAction } from './controls.js';
@@ -163,13 +166,27 @@ export const FX = {
 
 // Moment -> the steps he takes and the clip that goes with it (audio.js's
 // pools: 'swipe', 'error', 'correct', 'tada', 'locked'; null for none).
-// A moment with `word: true` (a correct check: correct, streak; BACKLOG
-// B-223) is said: the target word first, clean and complete, from the
-// word's own clip, then, when it ends, one line, a random clip of the
-// first of its `lines` that has one ready ('gag': the word's own gag
-// lines; any other name: that pool of his new lines, content/voice/
-// robot-lines.json); with none of them, its `sound`, the prototype clip.
-// audio.js (sayPlan) plays it.
+// His voice (BACKLOG M4b; audio.js sayPlan plays it):
+//   - `lines` (B-224): the pools of his new lines the moment plays, in
+//     order: a random clip of the first that has one ready ('gag': the
+//     word's own gag lines; 'hebrew': the word's Hebrew guess; any other
+//     name: that pool of his shared lines, content/voice/robot-lines.json);
+//     with none of them, its `sound` when that is his voice (the
+//     prototype clip), or nothing. A moment with variants has `lines` per
+//     variant (the picture's line is the one of his look); `lines` may be
+//     { by, ... }, the lines picked by a fact of the moment (linesOf):
+//     the round end's stars, the boost's kind. The swipe and the tada are
+//     effects: they play whatever his line is.
+//   - `word: true` (a correct check: correct, streak; B-223): the target
+//     word first, clean and complete, from the word's own clip, then,
+//     when it ends, his line.
+//   - `letter` (B-224): after his line he says the name of the letter he
+//     just put in a slot (letterGiven: the snapshot field holding its
+//     slot), or the name alone with no line.
+//   - `ifQuiet: true` (B-224): a moment that comes on its own (the
+//     picture at the TV's lock, kid idle and his peeks, the dome nudge),
+//     not from the kid's action: its line never cuts his voice; due while
+//     a clip of his plays, it is dropped.
 // A step comes `at` seconds into the moment and sets any of: `sink`
 // (puppet px down, 0 = up), `head` (turn), `eyes`, `brows`, `hands` (the
 // tables above), `look` (where the eyes look, visor units), `pop` (1, 2,
@@ -201,10 +218,11 @@ export const FX = {
 // word is answered and the dome, which now means "next", has not been
 // pressed for a while) is the reference's "All slots filled" pointing at
 // the dome, with a pop and the pointing finger wagging, then his rest
-// pose; no clip (none of the existing ones says "go on"). boostGiven
-// (BACKLOG B-219: a boost the kid paid for, his letter landing in its
-// slot, or the extra blocks gone) takes hintGiven's steps, as his letter
-// lands (boostLands).
+// pose; no prototype clip (none of the existing ones says "go on"), a
+// `press` line of his new voice (B-224). boostGiven (BACKLOG B-219: a
+// boost the kid paid for, his letter landing in its slot, or the extra
+// blocks gone) takes hintGiven's steps, as his letter lands (boostLands);
+// his line and the letter's name start then too (waitFor).
 const LETTER_PLACED = [
     { at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest', look: [-26, 22] },
     { at: 0.6, look: [0, 0] },
@@ -224,6 +242,7 @@ export const MOMENTS = {
             { at: 0.6, brows: 'calm', hands: 'rest' },
         ],
         sound: null,
+        lines: ['start'],
     },
     picture: {
         variants: {
@@ -233,6 +252,7 @@ export const MOMENTS = {
                     { at: 0, sink: 0, head: -10, look: [0, -22], eyes: 'wide', brows: 'up', hands: 'gasp', pop: 1 },
                     { at: 1.4, hands: 'rest', eyes: 'idle', brows: 'calm', head: -4 },
                 ],
+                lines: ['hebrew', 'picture-surprise'],
             },
             giggle: {
                 chance: 1 / 3,
@@ -241,6 +261,7 @@ export const MOMENTS = {
                     { at: 0.2, fx: 'giggle' },
                     { at: 1.8, hands: 'rest', eyes: 'idle', brows: 'calm', head: -4 },
                 ],
+                lines: ['hebrew', 'picture-giggle'],
             },
             shock: {
                 chance: 1 / 3,
@@ -249,9 +270,11 @@ export const MOMENTS = {
                     { at: 0.5, eyes: 'wide' },
                     { at: 1.9, hands: 'rest', eyes: 'idle', brows: 'calm', head: -4 },
                 ],
+                lines: ['hebrew', 'picture-shock'],
             },
         },
         sound: null,
+        ifQuiet: true,
     },
     blockPlaced: { steps: LETTER_PLACED, sound: 'swipe' },
     blockReturned: { steps: LETTER_PLACED, sound: null },
@@ -271,6 +294,7 @@ export const MOMENTS = {
             },
         },
         sound: 'swipe',
+        lines: ['press'],
     },
     filled: { steps: LETTER_PLACED, sound: 'swipe' },
     kidIdle: {
@@ -280,6 +304,8 @@ export const MOMENTS = {
             { at: 1.4, peek: true },
         ],
         sound: null,
+        lines: ['idle'],
+        ifQuiet: true,
     },
     wake: {
         steps: [
@@ -287,6 +313,7 @@ export const MOMENTS = {
             { at: 0.5, eyes: 'idle', brows: 'calm' },
         ],
         sound: null,
+        lines: ['wake'],
     },
     wrong: {
         steps: [
@@ -294,6 +321,7 @@ export const MOMENTS = {
             { at: 1.8, hands: 'rest', eyes: 'idle', brows: 'calm', head: 0 },
         ],
         sound: 'error',
+        lines: ['wrong', 'mumble'],
     },
     wrongPeek: {
         steps: [
@@ -304,6 +332,7 @@ export const MOMENTS = {
             { at: 2.5, sink: 0, hands: 'rest', eyes: 'idle', brows: 'calm', head: 0, look: [0, 0] },
         ],
         sound: 'error',
+        lines: ['mumble'],
     },
     thirdMiss: {
         steps: [
@@ -311,6 +340,7 @@ export const MOMENTS = {
             { at: 0.9, hands: 'rest', eyes: 'happy', brows: 'happy', head: 5 },
         ],
         sound: 'error',
+        lines: ['reveal-open'],
     },
     correct: {
         steps: [
@@ -339,17 +369,24 @@ export const MOMENTS = {
             { at: 2.5, hands: 'rest' },
         ],
         sound: 'tada',
+        lines: { by: 'stars', 2: ['end-mid'], 3: ['end-high'] },
     },
-    roundEnd: { steps: [{ at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest' }], sound: 'tada' },
+    roundEnd: { steps: [{ at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest' }], sound: 'tada', lines: ['end-low'] },
     speakerLocked: {
         steps: [
             { at: 0, sink: 0, eyes: 'idle', brows: 'frown', hands: 'shrug', shake: true },
             { at: 1.6, hands: 'rest', brows: 'calm' },
         ],
         sound: 'locked',
+        lines: ['no-gears'],
     },
-    hintGiven: { steps: LETTER_GIVEN, sound: null },
-    boostGiven: { steps: LETTER_GIVEN, sound: null },
+    hintGiven: { steps: LETTER_GIVEN, sound: null, lines: ['hint'], letter: 'hint' },
+    boostGiven: {
+        steps: LETTER_GIVEN,
+        sound: null,
+        lines: { by: 'boostKind', remember: ['boost-slot'], first: ['boost-first'], cleanup: ['boost-clean'] },
+        letter: 'boost',
+    },
     domeNudge: {
         steps: [
             { at: 0, sink: 0, head: 6, eyes: 'wide', brows: 'up', hands: 'point', look: [26, 22], pop: 1 },
@@ -357,13 +394,18 @@ export const MOMENTS = {
             { at: 2, hands: 'rest', eyes: 'idle', brows: 'calm', head: 0, look: [0, 0] },
         ],
         sound: null,
+        lines: ['press'],
+        ifQuiet: true,
     },
 };
 
 // The kid-idle peek (kidIdle's `peek` step): PEEK.wait seconds after it,
 // and every PEEK.every seconds after that until the next moment, he comes
 // up from his sink to his eyes, looks left, right and ahead, eyebrows up,
-// and sinks again. His hands stay hidden (the sink hides them).
+// and sinks again. His hands stay hidden (the sink hides them). As he
+// comes up he whispers a line of his `lines` (BACKLOG B-224; audio.js
+// peekLine, through renderRobot's `onPeek`), only while he is quiet
+// (`ifQuiet`, as the moments above).
 export const PEEK = {
     wait: 1.6,
     every: 4.8,
@@ -373,6 +415,8 @@ export const PEEK = {
         { at: 1.6, look: [0, -10] },
         { at: 2.2, sink: 150, brows: 'calm' },
     ],
+    lines: ['peek'],
+    ifQuiet: true,
 };
 
 export const CHANGE_MS = 300;     // never more than one change per 300ms
@@ -433,8 +477,21 @@ const round3 = (t) => Math.round(t * 1000) / 1000;
 // comes on its own, when the TV has tuned in). `picks` names the variant
 // per moment.
 export function scriptFor(moments, picks = {}) {
+    return planOf(moments, picks).script;
+}
+
+// When each of `moments` starts in its script (scriptFor), seconds from
+// the first: his voice says each moment's line no sooner (BACKLOG B-224:
+// his letter's name with his pointing at it, when the second miss's peek
+// is over).
+export function startsOf(moments, picks = {}) {
+    return planOf(moments, picks).starts;
+}
+
+function planOf(moments, picks) {
     let out = [];
     let start = 0;
+    const starts = [];
     moments.forEach((m, i) => {
         const steps = stepsOf(m, picks[m]);
         if (i > 0) {
@@ -443,8 +500,9 @@ export function scriptFor(moments, picks = {}) {
             out = out.filter((s) => s.at < start);
         }
         out.push(...steps.map((s) => ({ ...s, at: round3(start + s.at) })));
+        starts.push(start);
     });
-    return out;
+    return { script: out, starts };
 }
 
 // When the first step of a new moment may come (ms from now) if his last
@@ -658,6 +716,9 @@ export function snapshot(state) {
         // boosts the word has taken (one more: boostGiven)
         boost: onWord ? current.placed.findIndex((p) => !!p && !!p.boost) : -1,
         boosts: onWord ? current.boosts || 0 : 0,
+        // which boost the word took last ('remember', 'first', 'cleanup';
+        // main.js pay), for his line (BACKLOG B-224), or null
+        boostKind: onWord ? current.boostKind || null : null,
         // his nudges toward the dome on this word (BACKLOG B-212)
         nudges: onWord ? state.nudges || 0 : 0,
         // the TV has tuned in to this word's picture (BACKLOG B-214)
@@ -742,9 +803,73 @@ export function boostLands(prev, now, reduced = false) {
 }
 
 // The clips `moments` call for, in order (MOMENTS' sound column; moments
-// without one add nothing). audio.js plays them.
+// without one add nothing).
 export function soundsFor(moments) {
     return moments.map((m) => MOMENTS[m].sound).filter(Boolean);
+}
+
+// --- His lines (BACKLOG B-224) ---
+
+// The pools of his lines moment `moment` plays, in order (MOMENTS' lines
+// column): its variant's when it has variants (`how.variant`, else its
+// first), and for lines picked by a fact ({ by, ... }) the ones of
+// `how[by]` (`stars`: the round end's stars; `boostKind`: the boost);
+// [] for none.
+export function linesOf(moment, how = {}) {
+    const spec = MOMENTS[moment];
+    if (!spec) return [];
+    let lines = spec.lines;
+    if (spec.variants) {
+        const v = spec.variants[how.variant] || Object.values(spec.variants)[0];
+        lines = v.lines || lines;
+    }
+    if (lines && !Array.isArray(lines)) lines = lines[how[lines.by]];
+    return Array.isArray(lines) ? [...lines] : [];
+}
+
+// The letter he has just put in a slot on moment `moment` (between
+// snapshots `prev` and `now`; `word` the word): with MOMENTS[moment].letter
+// the snapshot field holding its slot ('hint': his second-miss letter;
+// 'boost': a boost's letter), that slot's letter when it is new there;
+// null otherwise (the clean-up places none).
+export function letterGiven(moment, prev, now, word) {
+    const field = MOMENTS[moment] && MOMENTS[moment].letter;
+    if (!field || !word || !now) return null;
+    const k = now[field];
+    if (!Number.isInteger(k) || k < 0 || k >= word.length || (prev && prev[field] === k)) return null;
+    return word[k];
+}
+
+// A number in [0, 1) from `text`, always the same for the same text
+// (FNV-1a with a final mix).
+export function rollOf(text) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    h ^= h >>> 16;
+    h = Math.imul(h, 0x85ebca6b);
+    h ^= h >>> 13;
+    h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+}
+
+// The variants `moments` play on snapshot `now` that his voice must agree
+// with: the picture's look is picked by its word's key (rollOf, each look
+// a third of the time), so renderRobot's look and audio.js's line
+// (picture-<look>) are the same one without either telling the other.
+// Other moments' variants are picked at random as they play.
+export function picksFor(moments, now) {
+    return moments.includes('picture') && now && now.key ? { picture: pickVariant('picture', rollOf(now.key)) } : {};
+}
+
+// Seconds from the state change until `moments` start (his steps and his
+// line): a boost's moment waits for what it did to land (boostLands); the
+// others start at once.
+export function waitFor(moments, prev, now, reduced = false) {
+    return moments.includes('boostGiven') ? boostLands(prev, now, reduced) : 0;
 }
 
 // Ms until the kid has been idle IDLE_MS on this word (0 = now), counted
@@ -773,7 +898,7 @@ export function nudgeWait(state) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, nudges: 0, tuned: false, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, tuned: false, streak: 0, stars: null };
 
 // --- Render ---
 
@@ -970,8 +1095,9 @@ function flourish(d, name, reduced) {
 }
 
 // Apply one step of a moment (the reference's building blocks: sink,
-// head, eyes, brows, hands, look, pop, shake, flourish, peek).
-function applyStep(step) {
+// head, eyes, brows, hands, look, pop, shake, flourish, peek). `onPeek` is
+// told each time he peeks (renderRobot's).
+function applyStep(step, onPeek = null) {
     const d = parts();
     if (!d) return;
     const reduced = reducedMotion();
@@ -986,17 +1112,20 @@ function applyStep(step) {
     if (s.pop) pop(d, s.pop);
     if (s.shake) shake(d);
     if (s.fx) flourish(d, s.fx, reduced);
-    if (s.peek) gsap.delayedCall(PEEK.wait, peekOnce);
+    if (s.peek) gsap.delayedCall(PEEK.wait, peekOnce, [onPeek]);
 }
 
 // One round of the idle peek, then the next one PEEK.every seconds on,
-// until a new moment (playMoments) or leaving the screen stops it.
-function peekOnce() {
+// until a new moment (playMoments) or leaving the screen stops it. As he
+// comes up `onPeek` is told (main.js hands audio.js's peekLine, his
+// whisper; BACKLOG B-224).
+function peekOnce(onPeek = null) {
+    if (onPeek) onPeek();
     for (const step of PEEK.steps) {
         if (step.at === 0) applyStep(step);
         else gsap.delayedCall(step.at, applyStep, [step]);
     }
-    gsap.delayedCall(PEEK.every, peekOnce);
+    gsap.delayedCall(PEEK.every, peekOnce, [onPeek]);
 }
 
 // Steps still waiting (and the idle peeking) are dropped.
@@ -1009,10 +1138,11 @@ function dropWaiting() {
 // picked at random unless `picks` names it, its first step no sooner than
 // CHANGE_MS after his last change, nor than `delay` seconds from now (a
 // boost's letter landing, boostLands). A newer moment replaces the steps
-// an older one still had waiting. renderRobot calls it on a transition;
-// exported so a screenshot script can show a moment the play screen never
-// does (the round end).
-export function playMoments(moments, picks = {}, delay = 0) {
+// an older one still had waiting. `onPeek` is told of each idle peek
+// (applyStep). renderRobot calls it on a transition; exported so a
+// screenshot script can show a moment the play screen never does (the
+// round end).
+export function playMoments(moments, picks = {}, delay = 0, onPeek = null) {
     const chosen = {};
     for (const m of moments) chosen[m] = picks[m] || pickVariant(m, Math.random());
     const script = scriptFor(moments, chosen);
@@ -1020,8 +1150,8 @@ export function playMoments(moments, picks = {}, delay = 0) {
     dropWaiting();
     for (const step of script) {
         const t = wait + step.at;
-        if (t === 0) applyStep(step);
-        else gsap.delayedCall(t, applyStep, [step]);
+        if (t === 0) applyStep(step, onPeek);
+        else gsap.delayedCall(t, applyStep, [step, onPeek]);
     }
 }
 
@@ -1128,7 +1258,9 @@ function stopLife() {
     d.robot.dataset.head = '0';
 }
 
-export function renderRobot(state) {
+// `onPeek` (main.js: audio.js peekLine) is told each time he peeks over
+// the edge while sunk (BACKLOG B-224: his whisper).
+export function renderRobot(state, onPeek = null) {
     const now = snapshot(state);
     const prev = last.snap;
     const moments = momentsFor(prev, now);
@@ -1141,8 +1273,9 @@ export function renderRobot(state) {
     }
     if (!wasOnPlay) startLife();
     if (!moments.length) return;
-    // a boost's moment waits for its letter to land (BACKLOG B-219)
-    playMoments(moments, {}, moments.includes('boostGiven') ? boostLands(prev, now, reducedMotion()) : 0);
+    // a boost's moment waits for its letter to land (BACKLOG B-219); the
+    // picture's look is the one audio.js's line goes with (B-224)
+    playMoments(moments, picksFor(moments, now), waitFor(moments, prev, now, reducedMotion()), onPeek);
 }
 
 // --- Following a dragged block (drag.js) ---

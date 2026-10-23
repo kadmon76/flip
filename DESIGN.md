@@ -163,13 +163,20 @@ a block snapping into a slot and for star pops. Block pick-up: scale 1.08,
 shadow lifts, 120ms.
 
 ## Sound
-On by default, mute toggle remembered. Existing clips in `static/sounds/`:
-correct → the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong → `error/`, round end → `celebration/tada.mp3`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`,
-block into slot → `swipe/` (not a block back to the bench or the reset
-lever; the reveal fly-in plays the error clip only). One voice clip at a
+On by default, mute toggle remembered. The robot's voice: on each moment
+a line of his new voice from the pool CHARACTER.md's moment map names
+("His lines", B-224; the clips `static/voice/manifest.json` lists; on a
+new picture the word's Hebrew guess when it has one; after his letter
+lands, the second miss or a letter boost, its name, `letters/`), and
+where the pool has no clip yet the existing clip in `static/sounds/`, or
+nothing where the moment has none:
+correct → the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong (also the second miss and the reveal) → `error/`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`.
+Round end → `celebration/tada.mp3`, an effect under his end line (B-224).
+Block into slot → `swipe/` (not a block back to the bench or the reset
+lever; the reveal fly-in plays no swipe, only his `reveal-open` line or the error clip). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
+dropped. The swipe, the round end's tada and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)

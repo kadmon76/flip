@@ -19,7 +19,7 @@ import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.j
 import { renderFeedback } from './feedback.js';
 import { renderTv } from './tv.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
-import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
@@ -437,10 +437,10 @@ function onBoostClose() {
 
 // A boost tapped in the tray. One the kid can't afford is not spent: the
 // tray closes and `lockedTaps` goes up by one (the robot shakes his head
-// with his "hmm no", character.js speakerLocked; the gear counter
-// flickers, feedback.js). "Remember this one" makes the slots that aren't
-// locked glow for the kid to pick one (onBoostSlot); "First letter" and
-// "Clean-up" happen at once.
+// with his `no-gears` line, else "hmm no", character.js speakerLocked;
+// the gear counter flickers, feedback.js). "Remember this one" makes the
+// slots that aren't locked glow for the kid to pick one (onBoostSlot);
+// "First letter" and "Clean-up" happen at once.
 function onBoostPick(kind) {
     if (state.screen !== 'play' || state.boostMenu !== 'tray') return;
     const { current } = state;
@@ -470,13 +470,14 @@ function onBoostSlot(index) {
 
 // The boost happens: its gears are taken (gears.js spend) and `next`
 // (the word after it) is shown, in one setState with the count after it.
-// The robot's boostGiven (character.js) and the motion (feedback.js) key
-// on the change. Not enough gears in the store after all: nothing is
-// spent, as onBoostPick.
+// The word notes which boost it took (`boostKind`: his line, B-224). The
+// robot's boostGiven (character.js) and the motion (feedback.js) key on
+// the change. Not enough gears in the store after all: nothing is spent,
+// as onBoostPick.
 function pay(kind, next) {
     const gears = spendGears(COSTS[kind]);
     if (gears === null) setState({ boostMenu: null, lockedTaps: state.lockedTaps + 1 });
-    else setState({ boostMenu: null, gears, current: next });
+    else setState({ boostMenu: null, gears, current: { ...next, boostKind: kind } });
 }
 
 // --- The TV (BACKLOG B-214, tv.js) ---
@@ -689,7 +690,7 @@ subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places
 subscribe(renderFeedback);    // after the card render: keys off its DOM (and the boost tray's)
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
 subscribe(renderControls);
-subscribe(renderRobot);
+subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
 subscribe(renderRoundEnd);
 subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter
 subscribe(renderGallery);

@@ -1391,18 +1391,22 @@ class CharacterTests(TestCase):
         self.assertEqual(steps('roundStart'), [
             {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'up', 'hands': 'wave', 'pop': 1},
             {'at': 0.6, 'brows': 'calm', 'hands': 'rest'}])
+        # each look's line (B-224): the word's Hebrew guess, else its pool
         self.assertEqual(variants('picture'), {
             'surprise': {'chance': 1 / 3, 'steps': [
                 {'at': 0, 'sink': 0, 'head': -10, 'look': [0, -22], 'eyes': 'wide', 'brows': 'up', 'hands': 'gasp', 'pop': 1},
-                {'at': 1.4, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+                {'at': 1.4, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
+                'lines': ['hebrew', 'picture-surprise']},
             'giggle': {'chance': 1 / 3, 'steps': [
                 {'at': 0, 'sink': 0, 'head': -8, 'look': [0, -22], 'eyes': 'happy', 'brows': 'happy', 'hands': 'giggle'},
                 {'at': 0.2, 'fx': 'giggle'},
-                {'at': 1.8, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+                {'at': 1.8, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
+                'lines': ['hebrew', 'picture-giggle']},
             'shock': {'chance': 1 / 3, 'steps': [
                 {'at': 0, 'sink': 0, 'head': -12, 'look': [0, -24], 'eyes': 'dots', 'brows': 'worried', 'hands': 'shock', 'pop': 1},
                 {'at': 0.5, 'eyes': 'wide'},
-                {'at': 1.9, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+                {'at': 1.9, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
+                'lines': ['hebrew', 'picture-shock']},
         })
         for m in ('blockPlaced', 'blockReturned', 'filled'):
             self.assertEqual(steps(m), LP, m)
@@ -1457,9 +1461,11 @@ class CharacterTests(TestCase):
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
             'boostGiven', 'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
+        # (B-224: a whisper of pool `peek`, only while he is quiet)
         self.assertEqual(self.run_node("out(c.PEEK);"), {'wait': 1.6, 'every': 4.8, 'steps': [
             {'at': 0, 'sink': 104, 'look': [-26, -8], 'brows': 'up'}, {'at': 0.9, 'look': [26, -8]},
-            {'at': 1.6, 'look': [0, -10]}, {'at': 2.2, 'sink': 150, 'brows': 'calm'}]})
+            {'at': 1.6, 'look': [0, -10]}, {'at': 2.2, 'sink': 150, 'brows': 'calm'}],
+            'lines': ['peek'], 'ifQuiet': True})
 
     def test_every_part_a_step_names_exists(self):
         # every eyes / brows / hands / fx / pop a step names is in its
@@ -2209,6 +2215,35 @@ class PuppetRenderTests(TestCase):
         self.assertIn('applyStep', res['dropped'])
         self.assertEqual(res['again'], [])
 
+    def test_his_peeks_tell_on_peek_and_his_look_is_picked_by_the_word(self):
+        # BACKLOG B-224: renderRobot(state, onPeek): each idle peek tells
+        # onPeek as he comes up (main.js hands it audio.js peekLine, his
+        # whisper), and the next peek still will; the picture's look is
+        # picked by the word's key (picksFor), the look audio.js's line
+        # (picture-<look>) goes with
+        res = self.run_node(
+            "c.renderRobot(theme); c.renderRobot(st()); take();"
+            "const due = []; const real = globalThis.gsap.delayedCall;"
+            "globalThis.gsap.delayedCall = (t, fn, args) => due.push([t, fn, args || []]);"
+            "let peeks = 0; const onPeek = () => { peeks++; };"
+            "c.renderRobot(st({ idleBeat: 'sunk' }), onPeek);"
+            "const step = due.find(([, fn, args]) => fn.name === 'applyStep' && args[0].peek); due.length = 0; step[1](...step[2]);"
+            "const first = due.find(([, fn]) => fn.name === 'peekOnce'); due.length = 0; const before = peeks; first[1](...first[2]);"
+            "const next = due.find(([, fn]) => fn.name === 'peekOnce');"
+            "const peek = [first[0], before, peeks, next[0], next[2][0] === onPeek, due.filter(([, fn]) => fn.name === 'applyStep').length];"
+            "globalThis.gsap.delayedCall = real; const hands = { surprise: 'gasp', giggle: 'giggle', shock: 'shock' }; const looks = [];"
+            "for (const w of ['cat', 'dog', 'fox', 'bus', 'egg', 'sofa', 'lemon', 'key']) {"
+            " const on = (tuned) => st({ tuned, current: { word: w, status: 'playing', placed: put('-'.repeat(w.length)) } });"
+            " c.renderRobot(theme); c.renderRobot(on(false)); take(); c.renderRobot(on(true));"
+            " const first = take().find((e) => e[0] === 'delayedCall' && e[2] === 'applyStep')[3][0];"
+            " looks.push([first.hands, hands[c.picksFor(['picture'], c.snapshot(on(true))).picture]]); }"
+            "out([peek, looks]);")
+        peek, looks = res
+        self.assertEqual(peek, [1.6, 0, 1, 4.8, True, 3])
+        for shown, picked in looks:
+            self.assertEqual(shown, picked)
+        self.assertGreater(len({shown for shown, _ in looks}), 1)
+
     def test_wiring(self):
         js = self.ROOT / 'static' / 'js'
         code = lambda f: re.sub(r'/\*.*?\*/|//[^\n]*', '', (js / f).read_text(), flags=re.S)
@@ -2331,11 +2366,12 @@ class AudioTests(TestCase):
             [0, 5, 9, 9, 0, -1])
 
     def test_channels(self):
-        # the TV's tune-in hiss (B-214) is an effect, like the swipe; the
-        # word he says on a correct check and his line after it (B-223)
-        # are his voice
+        # the TV's tune-in hiss (B-214) is an effect, like the swipe, and
+        # so is the round end's tada (B-224: under his end line); the
+        # word he says on a correct check and his lines (B-223, B-224) are
+        # his voice
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'fx', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
                           'word': 'voice', 'line': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
@@ -2401,7 +2437,8 @@ class AudioTests(TestCase):
             "const word = made[made.length - 1]; const voiceCut = sounding();"
             "clear(); a.play('correct'); a.play('tada'); a.play('swipe');"
             "out([voiceCut, kinds(), word.paused, ended]);"),
-            [[], ['swipe'], False, 0])
+            # the effects (the tada since B-224, the swipe) may overlap it
+            [[], ['tada', 'swipe'], False, 0])
 
     def test_muted_means_no_sound_at_all(self):
         self.assertEqual(self.run_node(
@@ -8853,6 +8890,20 @@ class BoostTests(TestCase):
         self.assertEqual(first[1], ['boostMenu', 'boostMenu,lockedTaps'])
         self.assertEqual(store, [None, 5, 1, 'd c u k', [2]])
 
+    def test_a_boost_notes_its_kind_for_his_line(self):
+        # BACKLOG B-224: pay notes which boost the word took (`boostKind`),
+        # for the robot's line on it (character.js snapshot); nothing when
+        # the boost is not paid
+        res = self.run_main(
+            "const duck = word('duck', 'dcuk', { extras: 'bz' });"
+            "reset(duck, 9); onBoost(); onBoostPick('remember'); onBoostSlot(1); const r = state.current.boostKind;"
+            "reset(duck, 9); onBoost(); onBoostPick('first'); const f = state.current.boostKind;"
+            "reset(duck, 9); onBoost(); onBoostPick('cleanup'); const c = state.current.boostKind;"
+            "reset(duck, 1); onBoost(); onBoostPick('first'); const none = state.current.boostKind;"
+            "reset(duck, 5); stored = 1; onBoost(); onBoostPick('cleanup'); const short = state.current.boostKind;"
+            "out([r, f, c, none === undefined, short === undefined]);")
+        self.assertEqual(res, ['remember', 'first', 'cleanup', True, True])
+
     def test_no_tray_while_the_button_is_off_or_a_control_is_held(self):
         res = self.run_main(
             "const go = (cur, o = {}) => { reset(cur, 9); Object.assign(state, o); onBoost(); return state.boostMenu; };"
@@ -8917,7 +8968,15 @@ class BoostTests(TestCase):
         self.assertEqual(snaps, [1, 1, -1, -1, 0])
         self.assertEqual(shake, ['speakerLocked'])                  # can't afford: his head-shake
         robot = self.function('renderRobot', 'character.js')
-        self.assertIn("playMoments(moments, {}, moments.includes('boostGiven') ? boostLands(prev, now, reducedMotion()) : 0);", robot)
+        # (B-224: waitFor is the same wait, shared with audio.js's line)
+        self.assertIn('playMoments(moments, picksFor(moments, now), waitFor(moments, prev, now, reducedMotion()), onPeek);', robot)
+        self.assertEqual(self.run_node(
+            "const c = await import('" + (self.JS / 'character.js').as_uri() + "');"
+            "const st = (cur) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0, nudges: 0,"
+            " tuned: true, round: { index: 0, size: 5, results: [] }, current: cur });"
+            "const snap = (cur) => c.snapshot(st(cur)); const a = word('duck', 'dcuk', { status: 'wrong' }); const b = B.giveLetter(a, 1);"
+            "out([c.waitFor(['boostGiven'], snap(a), snap(b)), c.waitFor(['boostGiven'], snap(a), snap(b), true),"
+            " c.waitFor(['wrong'], snap(a), snap(b)), c.waitFor([], snap(a), snap(b))]);"), [0.6, 0.4, 0, 0])
         self.assertIn('const wait = Math.max(startDelay(performance.now() - last.changedAt) / 1000, delay);',
                       self.function('playMoments', 'character.js'))
 
@@ -9297,7 +9356,7 @@ class CorrectWordVoiceTests(TestCase):
             " a.gagClips(files, 'animals', 'cat'), a.gagClips(files, 'animals', 'dog'), a.gagClips(files, 'animals', 'bat'),"
             " a.gagClips(files, 'animals', 'ant'), a.gagClips(files, 'food', 'cat'), a.gagClips(files, null, 'cat'),"
             " a.gagClips(files, 'animals', null), a.gagClips([], 'animals', 'cat'),"
-            " a.linePools(), a.linePools({ x: { lines: ['gag', 'p'] }, y: { lines: ['p', 'q'] }, z: {} })]);")
+            " a.linePools(), a.linePools({ x: { lines: ['gag', 'p'] }, y: { lines: ['p', 'q', 'hebrew'] }, z: {} }, {})]);")
         self.assertEqual(res, [
             '/static/voice/gags/animals/cat-2.mp3', '/x/robot/a%20b.mp3',
             [None, None, 'correct', 'correct', 'streak', 'end-low', 'picture-surprise', None, None, None, None, None, None, None],
@@ -9305,8 +9364,10 @@ class CorrectWordVoiceTests(TestCase):
             # the first gag and the second when it exists, only the ones listed
             ['gags/animals/cat.mp3', 'gags/animals/cat-2.mp3'], ['gags/animals/dog-2.mp3'], ['gags/animals/bat.mp3'],
             [], ['gags/food/cat.mp3'], [], [], [],
-            # the pools the moment table's lines name (B-223: correct, streak)
-            ['correct', 'streak'], ['p', 'q']])
+            # the pools the moment table's lines name (B-223: correct,
+            # streak; B-224: every moment's, PEEK's), not the word's own
+            # clips (gag, hebrew)
+            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'wrong', 'mumble', 'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
 
     def test_the_moment_table_says_the_word_on_a_correct_check(self):
         # character.js MOMENTS: correct and streak say the word, then the
@@ -9315,7 +9376,7 @@ class CorrectWordVoiceTests(TestCase):
         self.assertEqual(self.run_node(
             "out([C.MOMENTS.correct.word, C.MOMENTS.correct.lines, C.MOMENTS.correct.sound,"
             " C.MOMENTS.streak.word, C.MOMENTS.streak.lines, C.MOMENTS.streak.sound,"
-            " Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].word || C.MOMENTS[m].lines)]);"),
+            " Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].word)]);"),
             [True, ['gag', 'correct'], 'correct', True, ['streak', 'gag', 'correct'], 'correct', ['correct', 'streak']])
 
     def test_say_plan_order_and_fallbacks(self):
@@ -9337,30 +9398,35 @@ class CorrectWordVoiceTests(TestCase):
             " a.sayPlan('streak', { word: W, gags: G, pools: P }, not('s1', 's2', 'g1', 'g2', 'c1', 'c2', 'c3', 'w')),"
             # a moment that does not say the word: no word, its own sound
             " a.sayPlan('wrong', { word: W, gags: G, pools: P }, all), a.sayPlan('nope', { word: W }, all)]);")
+        # (B-224 adds fx and letter, none on these)
+        plan = lambda word, line, sound: {'fx': None, 'word': word, 'line': line, 'sound': sound, 'letter': None}
         self.assertEqual(res, [
-            {'word': 'w', 'line': 'g1', 'sound': None}, {'word': 'w', 'line': 'g2', 'sound': None},
-            {'word': 'w', 'line': 'c3', 'sound': None}, {'word': 'w', 'line': None, 'sound': 'correct'},
-            {'word': 'w', 'line': None, 'sound': 'correct'}, {'word': None, 'line': None, 'sound': 'correct'},
-            {'word': 'w', 'line': 's2', 'sound': None}, {'word': 'w', 'line': 'g1', 'sound': None},
-            {'word': 'w', 'line': 'c1', 'sound': None}, {'word': 'w', 'line': None, 'sound': 'correct'},
-            {'word': None, 'line': 'g2', 'sound': None}, {'word': 'w', 'line': 'c1', 'sound': None},
-            {'word': None, 'line': None, 'sound': 'correct'},
-            {'word': None, 'line': None, 'sound': 'error'}, {'word': None, 'line': None, 'sound': None}])
+            plan('w', 'g1', None), plan('w', 'g2', None),
+            plan('w', 'c3', None), plan('w', None, 'correct'),
+            plan('w', None, 'correct'), plan(None, None, 'correct'),
+            plan('w', 's2', None), plan('w', 'g1', None),
+            plan('w', 'c1', None), plan('w', None, 'correct'),
+            plan(None, 'g2', None), plan('w', 'c1', None),
+            plan(None, None, 'correct'),
+            plan(None, None, 'error'), plan(None, None, None)])
 
     # --- the manifest at init ---
 
     def test_init_fetches_the_manifest_once_and_the_line_pools_clips(self):
         # once, at init; then the clips of the pools the moments name
-        # (correct, streak) are downloaded and decoded; other pools, gags
-        # and words wait (a word's own come when it starts)
+        # (B-223: correct, streak; B-224: wrong and the others) are
+        # downloaded and decoded; pools no moment names (greet), gags,
+        # Hebrew guesses, letters and words wait (a word's own come when
+        # it starts)
         res = self.run_node(
             "MAN = man('words/animals/cat.mp3', 'robot/correct-01.mp3', 'robot/streak-01.mp3', 'robot/wrong-01.mp3',"
-            " 'gags/animals/cat.mp3', 'letters/a.mp3');"
+            " 'robot/greet-01.mp3', 'gags/animals/cat.mp3', 'hebrew/animals/cat.mp3', 'letters/a.mp3');"
             "await ready(); const voice = fetched.filter((u) => u.startsWith('/static/voice/'));"
             "out([voice, decodes.filter((u) => u.startsWith('/static/voice/')), errors]);")
         self.assertEqual(res, [
-            ['/static/voice/manifest.json', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'],
-            ['/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'], []])
+            ['/static/voice/manifest.json', '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3',
+             '/static/voice/robot/streak-01.mp3'],
+            ['/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'], []])
 
     def test_a_missing_or_broken_manifest_is_empty_with_no_error(self):
         # 404, JSON that fails, a response without json(), a fetch that
@@ -9391,7 +9457,7 @@ class CorrectWordVoiceTests(TestCase):
             "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
             " a.gagClips(listed, 'animals', 'cat'), listed.includes('words/animals/cat.mp3'), atCheck, played()]);")
-        self.assertEqual(res[:5], [156, 130, [0, 0], [], True])
+        self.assertEqual(res[:5], [156, 130, [0] * 21, [], True])
         self.assertEqual(res[5:], [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/you have a spelling superpower.mp3']])
 
     # --- a new word ---
@@ -9527,11 +9593,12 @@ class CorrectWordVoiceTests(TestCase):
         # the word has ended
         res = self.run_node(
             "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
-            "await check(); ['error', 'tada', 'locked', 'correct'].forEach(a.play);"
+            "await check(); ['error', 'locked', 'correct'].forEach(a.play);"
             "S.setState({ lockedTaps: 1 }); await settle(); const dropped = [played(), on()];"
             "a.play('swipe'); const fx = on();"
             "await end('words/animals/cat.mp3'); const after = on();"
             "out([dropped, fx, after, log.filter((e) => e.op === 'stop').map((e) => short(e.src))]);")
+        # (the tada, an effect since B-224, is not his voice)
         self.assertEqual(res[0], [['words/animals/cat.mp3'], ['words/animals/cat.mp3']])
         # the swipe, an effect, plays over the word
         self.assertEqual([res[1][0], res[1][1].split('/')[0], len(res[1])], ['words/animals/cat.mp3', 'swipe', 2])
@@ -9554,8 +9621,11 @@ class CorrectWordVoiceTests(TestCase):
             "res.push(on());"
             "await say(); S.setState({ ...correct({ roundsStarted: n }), screen: 'round-end', round: { index: 4, size: 5,"
             " results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) } }); res.push(on().map((f) => f.split('/')[0]));"
-            "await say(); S.setState({ screen: 'stages', current: { word: null, placed: [] } }); res.push(on());"
+            "await say(); S.setState({ screen: 'stages', current: { word: null, placed: [] } });"
+            " res.push(on().filter((f) => !f.startsWith('celebration/')));"
             "out(res);")
+        # (the round end's tada, an effect since B-224, plays on; only his
+        # voice is checked after it)
         self.assertEqual(res, [['error'], [[], False], [], ['celebration'], []])
 
     def test_a_speaker_tap_or_leaving_while_he_says_the_word_drops_the_line(self):
@@ -9613,3 +9683,511 @@ class CorrectWordVoiceTests(TestCase):
         code = strip(self.MODULE.read_text())
         self.assertNotRegex(code, r"method\s*:")
         self.assertEqual(code.count('fetch('), 2)   # the clips' download and the manifest
+
+
+class MomentLinesTests(TestCase):
+    """BACKLOG B-224: character.js's moment table names, per moment, the
+    pool of his new lines (`lines`); audio.js plays a random clip of it that
+    the manifest lists, else the moment's prototype clip (or nothing). The
+    picture: the word's Hebrew guess, else his look's pool; the round end by
+    its stars, the tada an effect under the line; a boost by its kind. After
+    his letter lands (hintGiven, boostGiven) its name, after his line or
+    alone. One clip at a time, never over the word, nothing while muted; a
+    line that can't play now is dropped; a moment that comes on its own
+    (`ifQuiet`) never cuts him. His idle peeks whisper (peekLine). Run
+    through node with CorrectWordVoiceTests' stand-ins and stand-in
+    manifests."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+    STATE = ROOT / 'static' / 'js' / 'state.js'
+    CHARACTER = ROOT / 'static' / 'js' / 'character.js'
+    MANIFEST = ROOT / 'static' / 'voice' / 'manifest.json'
+    ROBOT_LINES = ROOT / 'content' / 'voice' / 'robot-lines.json'
+
+    # the pools the table names (B-223's correct and streak among them)
+    POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'wrong', 'mumble',
+             'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
+             'boost-first', 'boost-clean', 'peek']
+    # BACKLOG B-224: the pools not wired here (each a "Later / not now" line)
+    UNWIRED = ['greet', 'murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow']
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    # On top of CorrectWordVoiceTests' harness: a source records the time
+    # it was started for (`when(file)`, the context's clock standing at
+    # 100); `P('ca-')` placed slots (tile t<i>), `W(cur, o)` a play-screen
+    # state on "cat" (`cur` merged into its word), `ends(n)` a finished
+    # round with n words right; `hush()` silences everything (a mute and
+    # unmute); `go(from, to)` the files started by the change from `from`
+    # to `to`, with nothing playing before it; `lineMan(...)` a manifest
+    # listing one clip of every pool the table names, plus `extra`.
+    def run_node(self, body):
+        prelude = (
+            f"const POOLS = {json.dumps(self.POOLS)};"
+            "{ const cbs = AudioContext.prototype.createBufferSource;"
+            "  AudioContext.prototype.createBufferSource = function () { const s = cbs.call(this); const go = s.start;"
+            "   s.start = (w) => { s.when = w; go(); }; return s; }; }"
+            "Object.defineProperty(AudioContext.prototype, 'currentTime', { get() { return 100; }, configurable: true });"
+            "const when = (file) => { const x = src(file); return x ? x.when : null; };"
+            "const P = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const W = (cur = {}, o = {}) => st({ current: { word: 'cat', audio: CAT, status: 'playing', placed: P('---'), ...cur }, ...o });"
+            "const DONE = { index: 0, size: 5, results: [{ correct: true }] };"
+            "const ends = (n) => ({ index: 4, size: 5, results: [0, 1, 2, 3, 4].map((i) => ({ correct: i < n })) });"
+            "const END = (n) => ({ ...W(), screen: 'round-end', round: ends(n) });"
+            "const STAGES = { screen: 'stages', current: { word: null, placed: [] } };"
+            "const lineMan = (...extra) => man(...POOLS.map((p) => `robot/${p}-01.mp3`), ...extra);"
+            "const hush = async () => { S.setState({ muted: true }); await settle(); S.setState({ muted: false }); await settle(); };"
+            "const go = async (from, to) => { await hush(); S.setState(from); await settle(); await hush(); clear();"
+            " S.setState(to); await settle(); return played(); };"
+            # the second miss on "cat": his letter "a" in slot 1
+            "const MISS2 = [W({ placed: P('tac') }, { lives: 2 }),"
+            " W({ status: 'wrong', placed: [P('t')[0], { letter: 'a', tileId: 't9', locked: true, hint: true }, P('--c')[2]] }, { lives: 1 })];"
+            # boosts on "cat" (as boost.js leaves them): Remember this one
+            # on slot 2 ("t", the block there hops back first), First
+            # letter ("c" from slot 2 into slot 0), Clean-up
+            "const BOOST = {"
+            " remember: [W({ placed: P('tac') }), W({ placed: [P('t')[0], P('-a')[1], { letter: 't', tileId: 't0', locked: true, boost: true }],"
+            "  boosts: 1, boostKind: 'remember' })],"
+            " first: [W({ placed: P('tac') }), W({ placed: [{ letter: 'c', tileId: 't2', locked: true, boost: true }, P('-a')[1], null],"
+            "  boosts: 1, boostKind: 'first' })],"
+            " cleanup: [W({ placed: P('tac') }), W({ placed: P('tac'), boosts: 1, boostKind: 'cleanup' })] };"
+            # every moment with a line, from -> to
+            "const T = {"
+            " roundStart: [STAGES, W({}, { tuned: false })],"
+            " picture: [W({}, { tuned: false }), W({}, { tuned: true })],"
+            " filledEarly: [W({ placed: P('ca-') }), W({ placed: P('cat') })],"
+            " domeNudge: [W({ status: 'correct', placed: P('cat') }, { round: DONE }), W({ status: 'correct', placed: P('cat') }, { round: DONE, nudges: 1 })],"
+            " kidIdle: [W(), W({}, { idleBeat: 'sunk' })],"
+            " wake: [W({}, { idleBeat: 'sunk' }), W({}, { idleBeat: 'over' })],"
+            " wrong: [W({ placed: P('tac') }), W({ status: 'wrong', placed: P('tac') }, { lives: 2 })],"
+            " secondMiss: MISS2,"
+            " thirdMiss: [W({ placed: P('tac') }, { lives: 1 }), W({ status: 'revealed', placed: P('cat') }, { lives: 0 })],"
+            " end3: [W(), END(5)], end2: [W(), END(4)], end1: [W(), END(2)], end0: [W(), END(0)],"
+            " speakerLocked: [W({ placed: P('tac') }), W({ placed: P('tac') }, { lockedTaps: 1 })],"
+            " boostRemember: BOOST.remember, boostFirst: BOOST.first, boostCleanup: BOOST.cleanup };"
+            "const look = () => C.picksFor(['picture'], C.snapshot(W({}, { tuned: true }))).picture;"
+        )
+        return CorrectWordVoiceTests.run_node(self, prelude + body)
+
+    # --- the table (character.js) ---
+
+    def test_the_table_names_a_pool_per_moment(self):
+        # the starting map (BACKLOG B-224, DECISIONS)
+        res = self.run_node(
+            "const L = C.linesOf;"
+            "out({ roundStart: L('roundStart'), surprise: L('picture', { variant: 'surprise' }),"
+            " giggle: L('picture', { variant: 'giggle' }), shock: L('picture', { variant: 'shock' }), firstLook: L('picture'),"
+            " filledEarly: L('filledEarly'), domeNudge: L('domeNudge'), kidIdle: L('kidIdle'), peek: C.PEEK.lines, wake: L('wake'),"
+            " wrong: L('wrong'), wrongPeek: L('wrongPeek'), hintGiven: L('hintGiven'), thirdMiss: L('thirdMiss'),"
+            " stars: [0, 1, 2, 3].map((n) => L(n >= 2 ? 'roundEndGood' : 'roundEnd', { stars: n })),"
+            " speakerLocked: L('speakerLocked'),"
+            " boosts: ['remember', 'first', 'cleanup', null].map((k) => L('boostGiven', { boostKind: k })),"
+            " correct: L('correct'), streak: L('streak'),"
+            " none: ['blockPlaced', 'blockReturned', 'filled', 'nope'].map((m) => L(m)),"
+            " ifQuiet: Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].ifQuiet), peekQuiet: C.PEEK.ifQuiet,"
+            " letter: Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].letter).map((m) => [m, C.MOMENTS[m].letter]),"
+            " sounds: Object.fromEntries(Object.keys(C.MOMENTS).map((m) => [m, C.MOMENTS[m].sound])) });")
+        self.assertEqual(res['roundStart'], ['start'])
+        for v in ('surprise', 'giggle', 'shock'):
+            self.assertEqual(res[v], ['hebrew', f'picture-{v}'])
+        self.assertEqual(res['firstLook'], ['hebrew', 'picture-surprise'])
+        self.assertEqual([res['filledEarly'], res['domeNudge']], [['press'], ['press']])
+        self.assertEqual([res['kidIdle'], res['peek'], res['wake']], [['idle'], ['peek'], ['wake']])
+        self.assertEqual([res['wrong'], res['wrongPeek']], [['wrong', 'mumble'], ['mumble']])
+        self.assertEqual([res['hintGiven'], res['thirdMiss']], [['hint'], ['reveal-open']])
+        self.assertEqual(res['stars'], [['end-low'], ['end-low'], ['end-mid'], ['end-high']])
+        self.assertEqual(res['speakerLocked'], ['no-gears'])
+        self.assertEqual(res['boosts'], [['boost-slot'], ['boost-first'], ['boost-clean'], []])
+        self.assertEqual([res['correct'], res['streak']], [['gag', 'correct'], ['streak', 'gag', 'correct']])
+        self.assertEqual(res['none'], [[], [], [], []])
+        # the moments that come on their own; the letter's slot field
+        self.assertEqual(res['ifQuiet'], ['picture', 'kidIdle', 'domeNudge'])
+        self.assertTrue(res['peekQuiet'])
+        self.assertEqual(res['letter'], [['hintGiven', 'hint'], ['boostGiven', 'boost']])
+        # the prototype column is as it was (the tada is now an effect)
+        self.assertEqual(res['sounds'], {
+            'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
+            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
+            'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'speakerLocked': 'locked',
+            'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
+
+    def test_the_pools_are_the_contents_and_the_unwired_ones_are_listed_later(self):
+        # every pool the table names is one of content/voice/robot-lines.json's;
+        # the ones it does not name are B-224's list, each with a line in
+        # BACKLOG "Later / not now"
+        content = set(json.loads(self.ROBOT_LINES.read_text())['pools'])
+        pools = self.run_node("out(a.linePools());")
+        self.assertEqual(pools, self.POOLS)
+        self.assertLessEqual(set(pools), content)
+        self.assertEqual(content - set(pools), set(self.UNWIRED))
+        backlog = (self.ROOT / 'BACKLOG.md').read_text()
+        later = backlog[backlog.index('## Later / not now'):]
+        for pool in self.UNWIRED:
+            self.assertEqual(len(re.findall(rf'^- .*`{re.escape(pool)}`', later, flags=re.M)), 1, pool)
+
+    # --- pure helpers (audio.js) ---
+
+    def test_the_hebrew_guess_the_letter_clip_and_pick_line(self):
+        files = ['hebrew/animals/cat.mp3', 'hebrew/food/egg.mp3', 'letters/a.mp3', 'letters/z.mp3', 'gags/animals/cat.mp3',
+                 'robot/wrong-01.mp3', 'robot/mumble-01.mp3', 'robot/mumble-02.mp3']
+        res = self.run_node(
+            f"const files = {json.dumps(files)};"
+            "const clips = { gags: ['g'], hebrew: ['h'], pools: { wrong: ['w1', 'w2'], mumble: ['m1'] } };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u);"
+            "out([a.hebrewClips(files, 'animals', 'cat'), a.hebrewClips(files, 'animals', 'dog'), a.hebrewClips(files, 'food', 'cat'),"
+            " a.hebrewClips(files, null, 'cat'), a.hebrewClips(files, 'animals', null), a.hebrewClips([], 'animals', 'cat'),"
+            " ['a', 'z', 'A', 'b', '', 'ab', '1', null, undefined, 3].map((l) => a.letterClip(files, l)),"
+            " a.WORD_LINES,"
+            " a.pickLine(['hebrew', 'wrong'], clips, all), a.pickLine(['wrong', 'mumble'], clips, all, () => 0.99),"
+            " a.pickLine(['wrong', 'mumble'], clips, not('w1', 'w2')), a.pickLine(['gag'], clips, all),"
+            " a.pickLine(['wrong'], clips, not('w1', 'w2')), a.pickLine([], clips, all), a.pickLine(['nope'], {}, all)]);")
+        self.assertEqual(res, [
+            ['hebrew/animals/cat.mp3'], [], [], [], [], [],
+            ['letters/a.mp3', 'letters/z.mp3', 'letters/a.mp3', None, None, None, None, None, None, None],
+            {'gag': 'gags', 'hebrew': 'hebrew'},
+            # the first group with a ready clip, a random clip of it
+            'h', 'w2', 'm1', 'g', None, None, None])
+
+    def test_say_plan_for_each_kind_of_moment(self):
+        res = self.run_node(
+            "const pools = { 'picture-giggle': ['pg'], press: ['pr'], wrong: ['w'], mumble: ['m'], hint: ['hi'],"
+            " 'end-high': ['eh'], 'end-low': ['el'], 'boost-first': ['bf'] };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u); const r0 = () => 0;"
+            "const plan = (m, c, how = {}, ready = all) => a.sayPlan(m, { word: 'W', gags: [], hebrew: [], pools, ...c }, ready, r0, how);"
+            "out({"
+            " pictureHe: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }), picture: plan('picture', {}, { variant: 'giggle' }),"
+            " pictureNone: plan('picture', {}, { variant: 'shock' }), pictureNotReady: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }, not('he')),"
+            " filledEarly: plan('filledEarly', {}), filledNone: plan('filledEarly', { pools: {} }),"
+            " wrong: plan('wrong', {}), wrongMumble: plan('wrong', {}, {}, not('w')), wrongNone: plan('wrong', { pools: {} }),"
+            " hint: plan('hintGiven', { letter: 'L' }), hintAlone: plan('hintGiven', { letter: 'L', pools: {} }),"
+            " hintNoLetter: plan('hintGiven', { letter: 'L' }, {}, not('L')),"
+            " end3: plan('roundEndGood', {}, { stars: 3 }), end2: plan('roundEndGood', {}, { stars: 2 }), end0: plan('roundEnd', {}, { stars: 0 }),"
+            " boostFirst: plan('boostGiven', { letter: 'L' }, { boostKind: 'first' }), boostSlot: plan('boostGiven', { letter: 'L' }, { boostKind: 'remember' }),"
+            " locked: plan('speakerLocked', {}), roundStart: plan('roundStart', {}), placed: plan('blockPlaced', { letter: 'L' }),"
+            " chain: a.voiceChain([plan('wrongPeek', {}), plan('hintGiven', { letter: 'L' })]),"
+            " chainProto: a.voiceChain([plan('wrongPeek', { pools: {} }), plan('hintGiven', { letter: 'L', pools: {} })]),"
+            " chainWord: a.voiceChain([plan('correct', { gags: ['g'] })]), chainFx: a.voiceChain([plan('roundEnd', { pools: {} })]),"
+            " chainAt: a.voiceChain([plan('wrongPeek', {}), plan('hintGiven', { letter: 'L' })], [0.6, 3.1]),"
+            " startsAt: a.voiceChain([plan('wrongPeek', { pools: {} }), plan('hintGiven', { letter: 'L', pools: {} })], [0, 2.5]),"
+            " starts: [C.startsOf(['wrongPeek', 'hintGiven']), C.startsOf(['roundStart', 'picture'], { picture: 'giggle' }),"
+            "  C.startsOf(['wrong']), C.startsOf([])] });")
+        p = lambda fx=None, word=None, line=None, sound=None, letter=None: {
+            'fx': fx, 'word': word, 'line': line, 'sound': sound, 'letter': letter}
+        # the picture: the word's Hebrew guess, else his look's pool, else nothing
+        self.assertEqual(res['pictureHe'], p(line='he'))
+        self.assertEqual(res['picture'], p(line='pg'))
+        self.assertEqual(res['pictureNone'], p())
+        self.assertEqual(res['pictureNotReady'], p(line='pg'))
+        # the swipe is an effect: it plays with his line, or alone
+        self.assertEqual(res['filledEarly'], p(fx='swipe', line='pr'))
+        self.assertEqual(res['filledNone'], p(fx='swipe'))
+        # wrong, else mumble, else the prototype clip
+        self.assertEqual([res['wrong'], res['wrongMumble'], res['wrongNone']], [p(line='w'), p(line='m'), p(sound='error')])
+        # his letter: its name after his line, or alone; not ready: none
+        self.assertEqual([res['hint'], res['hintAlone'], res['hintNoLetter']], [p(line='hi', letter='L'), p(letter='L'), p(line='hi')])
+        # the round end by its stars; the tada an effect with it
+        self.assertEqual([res['end3'], res['end2'], res['end0']], [p(fx='tada', line='eh'), p(fx='tada'), p(fx='tada', line='el')])
+        self.assertEqual([res['boostFirst'], res['boostSlot']], [p(line='bf', letter='L'), p(letter='L')])
+        self.assertEqual([res['locked'], res['roundStart'], res['placed']], [p(sound='locked'), p(), p(fx='swipe')])
+        # one after the other: the line (or prototype), then the letter
+        self.assertEqual(res['chain'], [{'url': 'm', 'kind': 'line'}, {'url': 'hi', 'kind': 'line'}, {'url': 'L', 'kind': 'line'}])
+        self.assertEqual(res['chainProto'], [{'pool': 'error'}, {'url': 'L', 'kind': 'line'}])
+        self.assertEqual(res['chainWord'], [{'url': 'W', 'kind': 'word'}, {'url': 'g', 'kind': 'line'}])
+        self.assertEqual(res['chainFx'], [])
+        # each moment's first clip no sooner than the moment starts in his
+        # script (character.js startsOf: his letter when his peek is over)
+        self.assertEqual(res['chainAt'], [{'url': 'm', 'kind': 'line', 'at': 0.6}, {'url': 'hi', 'kind': 'line', 'at': 3.1},
+                                          {'url': 'L', 'kind': 'line'}])
+        self.assertEqual(res['startsAt'], [{'pool': 'error'}, {'url': 'L', 'kind': 'line', 'at': 2.5}])
+        self.assertEqual(res['starts'], [[0, 2.5], [0, 0.6], [0], []])
+
+    def test_the_letter_he_placed_and_his_look_on_a_picture(self):
+        res = self.run_node(
+            "const snap = (s) => C.snapshot(s);"
+            "const [m0, m1] = MISS2.map(snap);"
+            "const lt = (k) => BOOST[k].map(snap);"
+            "const picks = [];"
+            "for (let r = 1; r <= 4; r++) for (let i = 0; i < 5; i++) for (const w of ['cat', 'dog', 'fox', 'bus', 'egg', 'key', 'sofa', 'lemon'])"
+            " picks.push(C.picksFor(['picture'], { key: `${r}:${i}:${w}` }).picture);"
+            "const count = (v) => picks.filter((x) => x === v).length;"
+            "out([C.letterGiven('hintGiven', m0, m1, 'cat'), C.letterGiven('hintGiven', m1, m1, 'cat'),"
+            " C.letterGiven('boostGiven', ...lt('remember'), 'cat'), C.letterGiven('boostGiven', ...lt('first'), 'cat'),"
+            " C.letterGiven('boostGiven', ...lt('cleanup'), 'cat'), C.letterGiven('wrongPeek', m0, m1, 'cat'),"
+            " C.letterGiven('hintGiven', m0, m1, null), C.letterGiven('hintGiven', m0, { ...m1, hint: 7 }, 'cat'),"
+            " lt('remember')[1].boostKind, snap(W()).boostKind, C.NONE.boostKind,"
+            " C.momentsFor(...lt('first')), C.momentsFor(m0, m1),"
+            " [count('surprise'), count('giggle'), count('shock')],"
+            " C.picksFor(['picture'], { key: '1:0:cat' }), C.picksFor(['picture'], { key: '1:0:cat' }),"
+            " C.picksFor(['roundStart'], { key: '1:0:cat' }), C.picksFor(['picture'], { key: null }),"
+            " [0, 1, 7].map((n) => C.rollOf('x' + n)).every((r) => r >= 0 && r < 1)]);")
+        self.assertEqual(res[:8], ['a', None, 't', 'c', None, None, None, None])
+        self.assertEqual(res[8:11], ['remember', None, None])
+        self.assertEqual(res[11:13], [['boostGiven'], ['wrongPeek', 'hintGiven']])
+        # a third each, about (160 words' pictures)
+        for n in res[13]:
+            self.assertTrue(35 <= n <= 72, res[13])
+        # the same key, the same look; only the picture's is picked so
+        self.assertEqual(res[14], res[15])
+        self.assertIn(res[14]['picture'], ['surprise', 'giggle', 'shock'])
+        self.assertEqual(res[16:], [{}, {}, True])
+
+    # --- what plays (audio.js renderSound) ---
+
+    def test_each_moment_says_a_line_of_its_pool(self):
+        res = self.run_node(
+            "MAN = lineMan('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "Math.random = () => 0; const res = {};"
+            "for (const [k, [from, to]] of Object.entries(T)) res[k] = [await go(from, to), kinds()];"
+            "out([res, look()]);")
+        res, look = res
+        line = lambda pool: [[f'robot/{pool}-01.mp3'], ['v']]
+        expect = {
+            'roundStart': line('start'), 'picture': line(f'picture-{look}'),
+            'filledEarly': [['swipe/swipe1.mp3', 'robot/press-01.mp3'], ['o', 'v']],
+            'domeNudge': line('press'), 'kidIdle': line('idle'), 'wake': line('wake'), 'wrong': line('wrong'),
+            'secondMiss': line('mumble'), 'thirdMiss': line('reveal-open'),
+            'end3': [['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v']],
+            'end2': [['celebration/tada.mp3', 'robot/end-mid-01.mp3'], ['o', 'v']],
+            'end1': [['celebration/tada.mp3', 'robot/end-low-01.mp3'], ['o', 'v']],
+            'end0': [['celebration/tada.mp3', 'robot/end-low-01.mp3'], ['o', 'v']],
+            'speakerLocked': line('no-gears'), 'boostRemember': line('boost-slot'), 'boostFirst': line('boost-first'),
+            'boostCleanup': line('boost-clean'),
+        }
+        self.assertEqual(res, expect)
+
+    def test_with_no_clip_in_the_pool_the_prototype_sound_or_nothing(self):
+        # static/voice/manifest.json as it is today: no shared line yet, so
+        # every moment plays what it played before B-224 (nothing where it
+        # had nothing; the tada now as an effect); only the letter names
+        # are new
+        manifest = json.loads(self.MANIFEST.read_text())
+        res = self.run_node(
+            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound);"
+            "Math.random = () => 0; const res = {};"
+            "for (const [k, [from, to]] of Object.entries(T)) res[k] = [await go(from, to), kinds()];"
+            "await go(...MISS2); await end('error/actually that is cleverly wrong.mp3'); const miss = [played(), kinds(), when('letters/a.mp3')];"
+            "const boost = []; for (const k of ['remember', 'first', 'cleanup']) { await go(...BOOST[k]); boost.push([played(), on().map(when)]); }"
+            "out([res, miss, boost]);")
+        res, miss, boost = res
+        err = [['error/actually that is cleverly wrong.mp3'], ['v']]
+        self.assertEqual(res, {
+            'roundStart': [[], []], 'picture': [[], []], 'filledEarly': [['swipe/swipe1.mp3'], ['o']],
+            'domeNudge': [[], []], 'kidIdle': [[], []], 'wake': [[], []], 'wrong': err, 'secondMiss': err, 'thirdMiss': err,
+            'end3': [['celebration/tada.mp3'], ['o']], 'end2': [['celebration/tada.mp3'], ['o']],
+            'end1': [['celebration/tada.mp3'], ['o']], 'end0': [['celebration/tada.mp3'], ['o']],
+            'speakerLocked': [['error/hmm no.mp3'], ['v']],
+            # his letter's name alone, as it lands (below); the clean-up: nothing
+            'boostRemember': [['letters/t.mp3'], ['v']], 'boostFirst': [['letters/c.mp3'], ['v']], 'boostCleanup': [[], []]})
+        # the second miss: the error clip, then his letter's name
+        self.assertEqual(miss[:2], [['error/actually that is cleverly wrong.mp3', 'letters/a.mp3'], ['v', 'v']])
+        self.assertAlmostEqual(miss[2], 102.5)      # when his peek is over
+        # a boost's letter: its name when it lands (the hop and the fly-in,
+        # 0.6s, boostLands), the context's clock at 100
+        self.assertEqual([b[0] for b in boost], [['letters/t.mp3'], ['letters/c.mp3'], []])
+        self.assertAlmostEqual(boost[0][1][0], 100.6)
+        self.assertAlmostEqual(boost[1][1][0], 100.6)
+
+    def test_the_picture_says_the_hebrew_guess_else_the_line_of_his_look(self):
+        res = self.run_node(
+            "MAN = lineMan('hebrew/animals/cat.mp3', 'hebrew/animals/dog.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "const he = await go(...T.picture);"
+            "const dog = (o = {}) => st({ current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing',"
+            " placed: P('---') }, round: { index: 1, size: 5, results: [{ correct: true }] }, ...o });"
+            "const dogHe = await go(dog({ tuned: false }), dog());"
+            # the word's guess not decoded yet: skipped, never waited for
+            "S.setState(STAGES); hold.add('/static/voice/hebrew/animals/cat.mp3'); await settle();"
+            "const later = await go(W({}, { roundsStarted: 2, tuned: false }), W({}, { roundsStarted: 2 }));"
+            "const lookLater = C.picksFor(['picture'], C.snapshot(W({}, { roundsStarted: 2 }))).picture;"
+            "await release('/static/voice/hebrew/animals/cat.mp3'); const after = played();"
+            "out([he, dogHe, later, lookLater, after, fetched.filter((u) => u.includes('/hebrew/'))]);")
+        he, dog_he, later, look_later, after, fetched = res
+        self.assertEqual(he, ['hebrew/animals/cat.mp3'])
+        self.assertEqual(dog_he, ['hebrew/animals/dog.mp3'])
+        self.assertEqual(later, [f'robot/picture-{look_later}-01.mp3'])
+        self.assertEqual(after, later)          # nothing starts when it decodes
+        # fetched with its word, as it starts: cat, dog, cat again
+        self.assertEqual(fetched, ['/static/voice/hebrew/animals/cat.mp3', '/static/voice/hebrew/animals/dog.mp3',
+                                   '/static/voice/hebrew/animals/cat.mp3'])
+        # a word without a guess: the line of his look, which is the look
+        # the robot shows (character.js renderRobot picks it the same way)
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); const out1 = await go(...T.picture);"
+            "out([out1, look()]);")
+        self.assertEqual(res[0], [f'robot/picture-{res[1]}-01.mp3'])
+        robot = re.sub(r'/\*.*?\*/|//[^\n]*', '', self.CHARACTER.read_text(), flags=re.S)
+        self.assertIn('playMoments(moments, picksFor(moments, now), waitFor(moments, prev, now, reducedMotion()), onPeek);', robot)
+
+    def test_his_letter_s_name_after_his_line_or_alone(self):
+        res = self.run_node(
+            "MAN = lineMan('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3'); await ready(); S.subscribe(a.renderSound);"
+            # the second miss: mumble, then his hint line, then the letter
+            "await go(...MISS2); const s1 = played(); await end('robot/mumble-01.mp3'); const s2 = [...played(), when('robot/hint-01.mp3')];"
+            "await end('robot/hint-01.mp3'); const s3 = [played(), kinds(), on()]; await end('letters/a.mp3'); const s4 = on();"
+            "const boost = {}; for (const k of ['remember', 'first', 'cleanup']) {"
+            " const first = await go(...BOOST[k]); const at = when(first[0]);"
+            " await end(first[0]); boost[k] = [first, at, played(), kinds()]; }"
+            "out([s1, s2, s3, s4, boost]);")
+        s1, s2, s3, s4, boost = res
+        self.assertEqual(s1, ['robot/mumble-01.mp3'])
+        # his hint line when his peek is over (2.5s after the miss), with
+        # his pointing at the letter
+        self.assertEqual(s2[:2], ['robot/mumble-01.mp3', 'robot/hint-01.mp3'])
+        self.assertAlmostEqual(s2[2], 102.5)
+        self.assertEqual(s3, [['robot/mumble-01.mp3', 'robot/hint-01.mp3', 'letters/a.mp3'], ['v', 'v', 'v'], ['letters/a.mp3']])
+        self.assertEqual(s4, [])
+        # a boost: his line as its letter lands (0.6s: the block in its
+        # slot hops back, the letter flies in; the clean-up's puff 0.3s),
+        # then the letter's name; the clean-up has none
+        self.assertEqual(boost['remember'][0], ['robot/boost-slot-01.mp3'])
+        self.assertAlmostEqual(boost['remember'][1], 100.6)
+        self.assertEqual(boost['remember'][2:], [['robot/boost-slot-01.mp3', 'letters/t.mp3'], ['v', 'v']])
+        self.assertEqual(boost['first'][0], ['robot/boost-first-01.mp3'])
+        self.assertAlmostEqual(boost['first'][1], 100.6)
+        self.assertEqual(boost['first'][2:], [['robot/boost-first-01.mp3', 'letters/c.mp3'], ['v', 'v']])
+        self.assertEqual(boost['cleanup'][0], ['robot/boost-clean-01.mp3'])
+        self.assertAlmostEqual(boost['cleanup'][1], 100.3)
+        self.assertEqual(boost['cleanup'][2:], [['robot/boost-clean-01.mp3'], ['v']])
+
+    def test_a_word_loads_the_names_of_its_letters(self):
+        # with the word, as it starts (B-223's loadWord): its letters'
+        # names that the manifest lists, once each; the next word's own
+        res = self.run_node(
+            "MAN = man('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3', 'letters/o.mp3', 'letters/d.mp3');"
+            "await ready(); S.subscribe(a.renderSound); const voice = () => fetched.filter((u) => u.includes('/letters/'));"
+            "S.setState(W()); await settle(); const cat = voice(); fetched.length = 0;"
+            "S.setState(st({ round: { index: 1, size: 5, results: [{ correct: true }] }, current: { word: 'good',"
+            " audio: '/static/voice/words/x/good.mp3', status: 'playing', placed: P('----') } })); await settle();"
+            "out([cat, voice(), decodes.filter((u) => u.includes('/letters/'))]);")
+        self.assertEqual(res, [
+            ['/static/voice/letters/c.mp3', '/static/voice/letters/a.mp3', '/static/voice/letters/t.mp3'],
+            ['/static/voice/letters/o.mp3', '/static/voice/letters/d.mp3'],
+            ['/static/voice/letters/c.mp3', '/static/voice/letters/a.mp3', '/static/voice/letters/t.mp3',
+             '/static/voice/letters/o.mp3', '/static/voice/letters/d.mp3']])
+
+    # --- his voice's rules ---
+
+    def test_a_moment_that_comes_on_its_own_never_cuts_him(self):
+        # the dome nudge while he says the word and his gag: dropped (the
+        # gag plays on, whole); when he is quiet, it plays. The picture
+        # while his round-start line plays, kid idle while his wrong line
+        # plays: dropped. A moment from the kid's action (his head-shake)
+        # cuts the line playing, as any voice clip does.
+        res = self.run_node(
+            "MAN = lineMan('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const done = (n) => correct({ nudges: n });"
+            "await check(); S.setState(done(1)); await settle(); const overWord = [played(), on()];"
+            "await end('words/animals/cat.mp3'); S.setState(done(2)); await settle();"
+            "const overGag = [played(), on(), log.filter((e) => e.op === 'stop' && short(e.src).startsWith('gags/')).length];"
+            "await end('gags/animals/cat.mp3'); S.setState(done(3)); await settle(); const quiet = on();"
+            "S.setState(done(4)); await settle(); const overPress = on();"
+            "S.setState({ ...done(4), lockedTaps: 1 }); await settle(); const cut = on();"
+            "await hush(); S.setState(STAGES); await settle(); clear(); S.setState(W({}, { roundsStarted: 2, tuned: false })); await settle();"
+            "S.setState(W({}, { roundsStarted: 2 })); await settle(); const picture = [played(), on()];"
+            "await go(...T.wrong); S.setState(W({ status: 'wrong', placed: P('tac') }, { lives: 2, idleBeat: 'sunk' })); await settle();"
+            "const idle = on();"
+            "out([overWord, overGag, quiet, overPress, cut, picture, idle]);")
+        over_word, over_gag, quiet, over_press, cut, picture, idle = res
+        self.assertEqual(over_word, [['words/animals/cat.mp3'], ['words/animals/cat.mp3']])
+        self.assertEqual(over_gag, [['words/animals/cat.mp3', 'gags/animals/cat.mp3'], ['gags/animals/cat.mp3'], 0])
+        self.assertEqual(quiet, ['robot/press-01.mp3'])
+        self.assertEqual(over_press, ['robot/press-01.mp3'])     # its own line plays on, not started again
+        self.assertEqual(cut, ['robot/no-gears-01.mp3'])
+        self.assertEqual(picture, [['robot/start-01.mp3'], ['robot/start-01.mp3']])
+        self.assertEqual(idle, ['robot/wrong-01.mp3'])
+
+    def test_one_clip_at_a_time_never_over_the_word_and_nothing_muted(self):
+        res = self.run_node(
+            "MAN = lineMan('letters/a.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            # one at a time: the wrong line cuts the press line
+            "await go(...T.filledEarly); S.setState(W({ status: 'wrong', placed: P('cat') }, { lives: 2 })); await settle();"
+            "const one = [on(), log.filter((e) => e.op === 'stop').map((e) => short(e.src))];"
+            # the speaker's word playing: no line of his starts, of any moment
+            "const res = [];"
+            "for (const k of ['wrong', 'picture', 'speakerLocked', 'secondMiss']) {"
+            " await hush(); S.setState(T[k][0]); await settle(); await hush(); S.setState({ speaking: true }); a.speakWord(CAT, () => {});"
+            " clear(); S.setState({ ...T[k][1], speaking: true }); await settle(); res.push(played()); S.setState({ speaking: false }); }"
+            # muted: nothing, of any moment
+            "const muted = [];"
+            "for (const [k, [from, to]] of Object.entries(T)) { await hush(); S.setState({ ...from, muted: true }); await settle(); clear();"
+            " S.setState({ ...to, muted: true }); await settle(); muted.push(played().length); }"
+            "out([one, res, muted]);")
+        one, speaking, muted = res
+        # (the swipe, an effect, plays on)
+        self.assertEqual(one, [['swipe/swipe1.mp3', 'robot/wrong-01.mp3'], ['robot/press-01.mp3']])
+        self.assertEqual(speaking, [[], [], [], []])
+        self.assertEqual(set(muted), {0})
+
+    def test_a_line_that_cannot_play_now_is_dropped_not_queued(self):
+        # not decoded yet: the next of its pools (wrong -> mumble), else the
+        # prototype clip; nothing starts when it decodes later. His letter's
+        # name not decoded: dropped from the chain.
+        res = self.run_node(
+            "['wrong-01', 'mumble-01', 'hint-01'].forEach((id) => hold.add(`/static/voice/robot/${id}.mp3`));"
+            "hold.add('/static/voice/letters/a.mp3');"
+            "MAN = lineMan('letters/a.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const wrong = await go(...T.wrong);"
+            "await release('/static/voice/robot/mumble-01.mp3'); const mumble = await go(...T.wrong);"
+            "const miss = await go(...MISS2); await end('robot/mumble-01.mp3'); const missAll = played();"
+            "await release('/static/voice/robot/wrong-01.mp3'); await release('/static/voice/robot/hint-01.mp3');"
+            "await release('/static/voice/letters/a.mp3'); const after = played();"
+            "out([wrong, mumble, missAll, after]);")
+        self.assertEqual(res, [['error/actually that is cleverly wrong.mp3'], ['robot/mumble-01.mp3'],
+                               ['robot/mumble-01.mp3'], ['robot/mumble-01.mp3']])
+
+    def test_the_round_end_s_tada_is_an_effect_under_his_line(self):
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "await go(...T.end3); const both = [on(), kinds(), on().map(when)];"
+            "await end('robot/end-high-01.mp3'); const after = on();"
+            "out([both, after]);")
+        self.assertEqual(res, [[['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v'], [0, 0]], ['celebration/tada.mp3']])
+
+    def test_leaving_the_word_stops_his_voice(self):
+        # whatever he is saying of the word stops when it is left: the
+        # next word, the round end (its tada and line start), the back arrow
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const next = W({}, { round: { index: 1, size: 5, results: [{ correct: true }] }, tuned: false });"
+            "await go(...T.domeNudge); const pressing = on(); S.setState(next); await settle(); const atNext = on();"
+            "await go(...T.wrong); S.setState(END(4)); await settle(); const atEnd = on();"
+            "await go(...T.wrong); S.setState(STAGES); await settle(); const back = on();"
+            "out([pressing, atNext, atEnd, back]);")
+        self.assertEqual(res, [['robot/press-01.mp3'], [], ['celebration/tada.mp3', 'robot/end-mid-01.mp3'], []])
+
+    def test_his_peeks_whisper_only_while_he_is_quiet(self):
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "await go(...T.kidIdle); await end('robot/idle-01.mp3'); clear();"
+            "a.peekLine(); const first = [played(), kinds()]; a.peekLine(); const again = [played(), on()];"
+            "await end('robot/peek-01.mp3'); await go(...T.wrong); clear(); a.peekLine(); const overWrong = [played(), on()];"
+            "await hush(); S.setState({ muted: true }); clear(); a.peekLine(); const muted = played(); S.setState({ muted: false });"
+            "S.setState({ speaking: true }); a.peekLine(); const speaking = played(); S.setState({ speaking: false });"
+            "S.setState(END(5)); await hush(); clear(); a.peekLine(); const off = played();"
+            "out([first, again, overWrong, muted, speaking, off]);")
+        self.assertEqual(res, [[['robot/peek-01.mp3'], ['v']], [['robot/peek-01.mp3'], ['robot/peek-01.mp3']],
+                               [[], ['robot/wrong-01.mp3']], [], [], []])
+        # no peek clip listed: nothing
+        self.assertEqual(self.run_node(
+            "MAN = man('robot/idle-01.mp3'); await ready(); S.subscribe(a.renderSound); await go(...T.kidIdle);"
+            "await end('robot/idle-01.mp3'); clear(); a.peekLine(); out(played());"), [])
+
+    def test_the_wiring(self):
+        strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
+        js = self.ROOT / 'static' / 'js'
+        main = strip((js / 'main.js').read_text())
+        self.assertIn("import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';", main)
+        self.assertIn('subscribe((s) => renderRobot(s, peekLine));', main)
+        self.assertNotIn('subscribe(renderRobot);', main)
+        audio = strip(self.MODULE.read_text())
+        self.assertIn("import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf } from './character.js';", audio)
+        # leaving the word stops his voice (no say flag any more)
+        render = audio[audio.index('export function renderSound('):]
+        self.assertIn('stopVoice();\n        loadWord(state);', render)
+        self.assertNotIn('stopSay', audio)
+        # character.js still never touches state or sound
+        character = strip(self.CHARACTER.read_text())
+        for word in ('setState', 'AudioContext', 'new Audio', "from './audio.js'"):
+            self.assertNotIn(word, character)
