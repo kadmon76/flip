@@ -36,6 +36,21 @@
 //   while it swells to `scale` and settles back, within `duration`, ease-out
 //   (no overshoot: DESIGN "Motion" keeps that for snaps and star pops).
 //   Reduced motion: no pop and no fade, the bulb is simply lit.
+// - `gearFly`: on a correct word (BACKLOG B-218, celebrate.js) one small
+//   cog (`size` px) per gear the word earns pops out of the TV, the
+//   cogs `spread` px apart, rising `height` px in `rise`, then drops
+//   into the console's gear counter, landing `duration` after it set off,
+//   one `stagger` after the other. `gearFlip`: as each cog lands, the
+//   counter's changed digits flip up (scaleY 0 -> 1) and its cog turns a
+//   tooth, within `duration`. Both together end within 600ms. Reduced
+//   motion: no cogs and no flip, the count just changes.
+// - `puff`: the clean-up boost (BACKLOG B-219, feedback.js) takes the extra
+//   blocks away: each swells to `scale` and fades out while `count` small
+//   puffs of smoke spread `distance` px from it, within `duration`.
+//   Reduced motion: the block only fades out (`fade`), no smoke.
+// - `trayIn`: the boost tray (BACKLOG B-219) opens: it rises `distance` px
+//   and grows from `scale` to full size as it fades in, from its notch,
+//   within `duration`. Reduced motion: a fade in.
 export const MOTION = {
     pickup: { duration: 0.12, ease: 'power2.out', scale: 1.08 },
     snap: { duration: 0.2, ease: 'back.out(1.4)', scale: 1 },
@@ -53,6 +68,10 @@ export const MOTION = {
     clunk: { duration: 0.2, ease: 'power2.out', scale: 0.8, press: 0.09, fade: 0.2 },
     jointGlow: { duration: 0.6, ease: 'power1.inOut', scale: 1 },
     bulbPop: { duration: 0.3, ease: 'power2.out', scale: 1.5 },
+    gearFly: { duration: 0.36, ease: 'power2.in', scale: 1, stagger: 0.1, rise: 0.1, height: 22, size: 22, spread: 18 },
+    gearFlip: { duration: 0.12, ease: 'power2.out', scale: 1 },
+    puff: { duration: 0.3, ease: 'power2.out', scale: 1.3, count: 6, distance: 30, fade: 0.2 },
+    trayIn: { duration: 0.15, ease: 'power2.out', scale: 0.9, distance: 6, fade: 0.15 },
 };
 
 // Spec for one motion. With `reduced` (prefers-reduced-motion) every

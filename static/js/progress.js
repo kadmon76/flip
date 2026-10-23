@@ -1,7 +1,9 @@
 // progress.js — how far the kid got in each theme (BACKLOG B-216,
 // PROGRESSION.md "Stages"): the words checked correct at least once
-// (`solved`) and the stages cleared (`cleared`), per theme, so a tapped
-// theme plays its current stage and a cleared stage opens the next one.
+// (`solved`) and the stages cleared (`cleared`), per theme, so the stage
+// map shows which stages are open (stations, BACKLOG B-217), play again
+// plays the theme's current stage, and a cleared stage opens the next
+// one.
 // Persisted in localStorage `flip.progress.v1`, read and written only
 // here, as stickers.js owns the sticker book and missed.js the missed
 // words. No DOM and no module state: every call reads the store, so a
@@ -16,11 +18,16 @@
 // stages, duplicates) is dropped on read: every theme read is a clean
 // { solved, cleared }, `cleared` in STAGES order.
 //
-// main.js reads a theme's progress in startRound (currentStage: which
-// stage the round plays; its `solved` words for round.js pickRound) and
-// records a finished round once, in onNext's round-end branch (record),
-// as it records the missed words; a round left with the back button
-// records nothing.
+// main.js reads a theme's progress in startRound (the stage picked on
+// the stage map, or for play again currentStage; its `solved` words for
+// round.js pickRound) and records a finished round once, in onNext's
+// round-end branch (record), as it records the missed words; a round
+// left with the back button records nothing. It keeps a copy of load()
+// in state.progress (read at start-up and again after each record), from
+// which the theme cards' bulbs and the stage map (stations) render
+// (BACKLOG B-217). A replay of a cleared stage clears nothing new:
+// afterRound clears only the round's own stage, which is already
+// cleared.
 
 import { STAGES, isStage, stagesOf } from './stage.js';
 
@@ -94,17 +101,40 @@ export function forTheme(theme) {
     return load()[theme] || empty();
 }
 
-// The stage a round of the theme plays (pure): the first stage of
+// The stations of a theme's stage map (BACKLOG B-217, PROGRESSION.md
+// "Replay"; pure): one per stage of `stages` (stage.js stagesOf of the
+// theme's data: the stages it has words in), in STAGES order, each
+// { stage, cleared, start, open }. `cleared`: the stage is in the
+// progress's cleared stages. `start`: the theme's current stage, the
+// first stage not cleared, or with all of them cleared the last one; the
+// map's one obvious start, and what play again plays (currentStage).
+// `open`: cleared or the start, the stages the kid can play (a replay,
+// or the current stage); the others are not open yet. A theme whose data
+// has no stage plays stage 1 (as stage.js stageRules reads anything
+// else), so its map has that one station. Anything odd in `progress` is
+// dropped as load() drops it.
+export function stations(stages, progress) {
+    const listed = Array.isArray(stages) ? STAGES.filter((s) => stages.includes(s)) : [];
+    const all = listed.length ? listed : [STAGES[0]];
+    const cleared = (clean(progress) || empty()).cleared;
+    const first = all.find((s) => !cleared.includes(s));
+    const start = first === undefined ? all[all.length - 1] : first;
+    return all.map((stage) => ({
+        stage,
+        cleared: cleared.includes(stage),
+        start: stage === start,
+        open: stage === start || cleared.includes(stage),
+    }));
+}
+
+// The stage a round of the theme plays when none is picked on the stage
+// map (play again; pure): the start of its stations, the first stage of
 // stagesOf(data) (the stages the theme's data has words in, in order; a
 // stage with no words is skipped) that `progress` has not cleared; with
 // all of them cleared, the last one. Data with no word in any stage
 // plays stage 1, as stage.js stageRules reads anything else.
 export function currentStage(data, progress) {
-    const stages = stagesOf(data);
-    if (!stages.length) return STAGES[0];
-    const cleared = (clean(progress) || empty()).cleared;
-    const open = stages.find((s) => !cleared.includes(s));
-    return open === undefined ? stages[stages.length - 1] : open;
+    return stations(stagesOf(data), progress).find((s) => s.start).stage;
 }
 
 // A theme's progress after a finished round of `stage` (pure):

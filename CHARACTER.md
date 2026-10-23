@@ -88,6 +88,7 @@ Pose and movement change together; never more than one change per 300ms.
 | Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | always |
 | Wrong check that leaves one bulb lit | ducks to his eyes (no hands), looks left and right, shivers, comes back | error clip | always |
 | Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | always |
+| Boost given (`boostGiven`, B-219: a boost the kid paid for) | as his letter lands in its slot (or as the clean-up's extra blocks have puffed away): his second-miss letter's steps, happy, small pop, points up at it | — | every boost |
 | Third miss | covers his eyes (dot eyes, worried), then relief (happy eyes) as the blocks fly in | error clip | always |
 | Correct | fist pump, happy eyes, pop | correct clip | always |
 | 3 correct in a row | two fists pumping, double pop, cap sparks | correct clip | always |

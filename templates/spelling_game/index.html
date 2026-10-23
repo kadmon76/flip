@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=29">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=32">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -35,9 +35,14 @@
          The back button (BACKLOG B-201) shows on the play screen only
          (CSS keyed on body[data-screen]): the sticker book's line arrow
          as a cream glyph with no face, left of the mute toggle; main.js
-         drops the round and goes to the theme screen. -->
+         drops the round and goes to the theme's stage screen (B-217).
+         The gear counter (BACKLOG B-218) shows on the theme screen only,
+         between the logo and the mute toggle: cogs.js fills it with a
+         brass cog drawn in code and the kid's gears in split-flap digits;
+         it takes no taps. -->
     <header class="app-header">
         <span class="app-title" role="img" aria-label="flip"><span class="flap">f</span><span class="flap">l</span><span class="flap">i</span><span class="flap">p</span></span>
+        <span id="theme-gears" class="gear-counter header-gears" role="img" aria-label="gears"></span>
         <button id="play-back-btn" class="play-back-btn" type="button" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19.5 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>
         </button>
@@ -59,9 +64,10 @@
          readers only, never shown. -->
 
     <!-- Theme screen: one card per theme showing the theme's picture
-         (main.js) and the sticker book button (star sticker). No level
-         picker: a tapped theme plays a round of its stage (BACKLOG
-         B-215, PROGRESSION.md "Stages"). -->
+         and under it a row of bulbs, one per stage, lit when cleared
+         (main.js), and the sticker book button (star sticker). No level
+         picker: a tapped card opens the theme's stage screen (BACKLOG
+         B-215, B-217, PROGRESSION.md "Stages"). -->
     <div id="screen-theme" class="screen">
         <div id="theme-buttons"></div>
         <div class="actions">
@@ -69,6 +75,23 @@
                 <span class="sticker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
             </button>
         </div>
+    </div>
+
+    <!-- Stage screen (BACKLOG B-217, PROGRESSION.md "Replay"): Back on
+         the left (the sticker book's arrow; to the theme screen), the
+         theme's picture in a small card at the top, then one station per
+         stage (stagemap.js fills #stage-stations: a cream button with the
+         stage number as a split-flap digit, or for `long` the brass joint
+         between two chunks, and a bulb). Cleared and current stations
+         start a round of their stage; not open ones are disabled. -->
+    <div id="screen-stages" class="screen" style="display: none;">
+        <div class="stages-top">
+            <button id="stages-back-btn" class="panel-btn" type="button" aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19.5 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>
+            </button>
+            <div id="stages-pic" class="stages-pic panel" role="img" aria-label="Theme"><img id="stages-picture" src="" alt="" /></div>
+        </div>
+        <div id="stage-stations" class="stations" role="group" aria-label="Stages"></div>
     </div>
 
     <!-- Play screen: the lab scene (DESIGN.md "Layout", v5). The TV
@@ -114,7 +137,12 @@
              the rail and the bench blocks; .robot-hands holds his two
              mittens (every shape stacked, one shown) in a layer over the
              console's top edge, still under the controls and the blocks
-             (game.css). character.js moves the parts. -->
+             (game.css). character.js moves the parts.
+             #console-gears (BACKLOG B-218) is the gear counter on the
+             plate between the speaker and the dome, a brass cog drawn in
+             code and the kid's gears in split-flap digits (cogs.js), and
+             the boost button (BACKLOG B-219): on or off (disabled, dimmed)
+             from state (boosttray.js); a tap opens the boost tray. -->
         <div class="console">
             <div class="robot eyes-idle brows-calm hands-rest" data-head="0" aria-hidden="true">
                 <div class="puppet">
@@ -215,6 +243,7 @@
                     <img class="speaker-cap" src="{% static 'images/ui/speaker-cap.png' %}" alt="" />
                 </span>
             </button>
+            <button id="console-gears" class="gear-counter console-gears" type="button" aria-label="gears" disabled></button>
             <button id="check-btn" class="ctl" type="button" aria-label="Check" disabled>
                 <span class="sprite">
                     <img class="dome-off" src="{% static 'images/ui/dome-off.png' %}" alt="" />
@@ -227,8 +256,9 @@
 
     <!-- Round-end screen: the stars, the theme's stages as a row of
          bulbs (lit = cleared, BACKLOG B-216), then a cream panel with the
-         score (split-flap), the new-sticker count (a sticker and "+N")
-         and the five words, each with its picture, a sticker if it is new
+         score (split-flap), the new-sticker count (a sticker and "+N"),
+         the round's gears (a cog and "+N" in split-flaps, cogs.js, BACKLOG
+         B-218) and the five words, each with its picture, a sticker if it is new
          in the book and a lit or dark bulb; then themes and play again
          (BACKLOG B-107, B-111, B-116). main.js fills the stars (class
          "earned"), #round-stages, #round-score, #round-new and
@@ -255,6 +285,7 @@
             <div class="round-totals">
                 <h2 id="round-score" class="flaps"></h2>
                 <p id="round-new" class="round-new"></p>
+                <p id="round-gears" class="gear-counter round-gears" role="img" aria-label="gears"></p>
             </div>
             <ul id="round-words" class="round-words"></ul>
         </div>
@@ -285,6 +316,21 @@
             <span class="sticker off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
         </div>
         <div id="gallery-themes" class="gallery-themes"></div>
+    </div>
+
+    <!-- The boost tray (BACKLOG B-219, boosttray.js; PROGRESSION.md
+         "Boosts"), hidden until the boost button is tapped on the play
+         screen: a clear scrim over the whole page (a tap on it closes the
+         tray; nothing under it takes a tap), the small brass tray placed
+         over the bench above the console, one key per boost that applies
+         now (an icon drawn in code and its cost as small cogs), and, after
+         "Remember this one", a glowing clear button over each slot that
+         isn't locked. Under the frame, over everything else. No text:
+         the boosts are only in aria-label. -->
+    <div id="boost-layer" class="boost-layer" hidden>
+        <div id="boost-scrim" class="boost-scrim"></div>
+        <div id="boost-tray" class="boost-tray" role="group" aria-label="Boosts" hidden></div>
+        <div id="boost-picks" class="boost-picks" role="group" aria-label="Slots" hidden></div>
     </div>
 
     <!-- Bakelite frame over every screen (DESIGN.md "Layout", "Other

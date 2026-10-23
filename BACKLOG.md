@@ -443,7 +443,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - When every stage is cleared, all stations are lit and the last one also gets the current station's glow, so there is still one obvious start.
   - Theme cards show the theme's progress as a small row of bulbs under the picture (lit = cleared).
   - Screenshots: `stages-new-theme.png` (only stage 1 open), `stages-mid.png` (two cleared, the third current), `stages-all-cleared.png`, `theme-cards-progress.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/80
 
 ### B-218 Gears: earn them, see them; stickers for clean words
 - why: gears are what the kid earns by playing and spends on boosts; stickers become the reward for a clean spelling (PROGRESSION.md "Gears", "Repetition and stickers").
@@ -456,7 +456,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - Round-end shows the round's gears: the cog and "+N" in split-flap digits. Numbers only.
   - DESIGN.md: the cog counter on the play screen is a new scene object drawn in code; record it as an exception to "The layer model" (like the interim screens' CSS panels) until the Claude Design pass replaces it.
   - Screenshots: `gears-play.png`, `gears-fly.png` (mid-flight), `gears-theme.png`, `round-end-gears.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/80
 
 ### B-219 Boosts: pay gears, the robot remembers a letter
 - why: help the kid chooses and pays for, so the free help can fade (PROGRESSION.md "Boosts", "Guardrails").
@@ -471,7 +471,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - `boost.js` holds the pure rules (which boosts are offered, the costs, the per-word limit) tested through `node`; CLAUDE.md's architecture list names it.
   - DESIGN.md: the boost tray is a new scene object drawn in code; record it as an exception to "The layer model" until the Claude Design pass, next to B-218's counter.
   - Screenshots: `boost-off.png`, `boost-tray.png`, `boost-pick-slot.png`, `boost-placed.png`, `boost-no-gears.png`, `boost-cleanup.png` (a stage with extras, through the dev hook). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/80
 
 ### B-220 Struggle help: easier words after three hard ones
 - why: a kid who keeps missing gets an easy win before they give up (PROGRESSION.md "Guardrails").
@@ -530,6 +530,7 @@ Build order: life → win.
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
 - Fold `feedback.js` (B-109, wiggle) and `celebrate.js` (B-110, pulse/confetti/star pop) into one transition-keyed module once both PRs land; the CLAUDE.md lines added from issues #19 and #21 each claim the correct-check effects until then.
 - Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.
+- A clink as each cog lands in the gear counter (B-218's flight is silent; needs a clip, or an effect made in code in audio.js like the TV hiss).
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
 - Wrong-box tint (from closed PR #18, B-109): boxes holding a wrong letter keep an error-colour tint until the kid next moves a block; main has the wiggle and the bulb flicker but no tint.

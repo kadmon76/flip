@@ -31,8 +31,15 @@ export function renderCard(state) {
     const spots = renderSpots(bench.length);
 
     removeStaleTiles(current.tray);
+    // A block the clean-up boost took away (`gone`, BACKLOG B-219, boost.js
+    // cleanUp) keeps its element until the word ends, hidden where it was
+    // (class `gone`, game.css: out of the layout, no taps) and never moved
+    // or dragged again; feedback.js puffs it away.
+    const gone = new Set();
     current.tray.forEach((t) => {
         if (!tiles.has(t.id)) tiles.set(t.id, createTile(t));
+        tiles.get(t.id).classList.toggle('gone', !!t.gone);
+        if (t.gone) gone.add(t.id);
     });
 
     // Placed tiles live inside their box, upright; a locked one (class
@@ -49,13 +56,14 @@ export function renderCard(state) {
 
     // …unused tiles lie on the bench, each in its own spot (tray order),
     // tilted as the layout says. A used tile leaves its spot empty, so the
-    // other blocks never shuffle and a returned block lands where it was.
+    // other blocks never shuffle and a returned block lands where it was;
+    // so does a gone one.
     const spotEls = $('letter-tray').children;
     bench.forEach((t, i) => {
-        if (!t.used) mount(tiles.get(t.id), spotEls[i], spots[i].rot);
+        if (!t.used && !t.gone) mount(tiles.get(t.id), spotEls[i], spots[i].rot);
     });
 
-    setDragEnabled(current.status === 'playing' || current.status === 'wrong', locked);
+    setDragEnabled(current.status === 'playing' || current.status === 'wrong', new Set([...locked, ...gone]));
 }
 
 // No alt text: it would be English on screen if the picture failed to

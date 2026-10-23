@@ -1438,6 +1438,8 @@ class CharacterTests(TestCase):
         self.assertEqual(steps('hintGiven'), [
             {'at': 0, 'sink': 0, 'head': 0, 'look': [0, 0], 'eyes': 'happy', 'brows': 'happy', 'hands': 'pointUp', 'pop': 'small'},
             {'at': 1.2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm'}])
+        # a boost the kid paid for (B-219): hintGiven's steps, no clip
+        self.assertEqual(steps('boostGiven'), steps('hintGiven'))
         # his nudge toward the dome on an answered word (B-212): the
         # pointing of "All slots filled", a pop, the finger wagging, rest
         self.assertEqual(steps('domeNudge'), [
@@ -1446,7 +1448,7 @@ class CharacterTests(TestCase):
         self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
             'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
-            'domeNudge'])
+            'boostGiven', 'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
         self.assertEqual(self.run_node("out(c.PEEK);"), {'wait': 1.6, 'every': 4.8, 'steps': [
             {'at': 0, 'sink': 104, 'look': [-26, -8], 'brows': 'up'}, {'at': 0.9, 'look': [26, -8]},
@@ -1554,7 +1556,7 @@ class CharacterTests(TestCase):
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
-            'speakerLocked': ['locked'], 'hintGiven': [], 'domeNudge': [],
+            'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
@@ -1820,7 +1822,8 @@ class PuppetTests(TestCase):
             'roundStart': ['wave'], 'picture': ['gasp', 'giggle', 'shock'], 'blockPlaced': ['rest'], 'blockReturned': ['rest'],
             'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
-            'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'domeNudge': ['point']})
+            'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
+            'domeNudge': ['point']})
 
     def test_the_hands_hide_before_they_sink_and_show_after_they_rise(self):
         # BACKLOG B-210 review: going below hideHands (40) the hands vanish
@@ -3037,20 +3040,26 @@ class PlayBackTests(TestCase):
         shown = re.findall(r'\n([^{}\n]*\.play-back-btn[^{}\n]*?)\s*{[^}]*display: (?!none)', css)
         self.assertEqual(shown, ['body[data-screen="play"] .play-back-btn'])
 
-    def test_tap_drops_the_round_and_goes_to_the_theme_screen(self):
+    def test_tap_drops_the_round_and_goes_to_the_stage_screen(self):
+        # since B-217 the back arrow goes to the theme's stage screen (the
+        # theme stays); the round is dropped as before (leaveRound, which
+        # onThemes also uses for the theme screen)
         main = self.main_js()
         self.assertIn("$('play-back-btn').addEventListener('click', onPlayBack);", main)
         self.assertIn("import { add as addSticker, remove as removeSticker } from './stickers.js';", main)
         back = self.function('onPlayBack')
         self.assertIn("if (state.screen !== 'play') return;", back)
         self.assertIn('if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);', back)
-        self.assertTrue(back.rstrip().endswith('onThemes();'))
+        self.assertTrue(back.rstrip().endswith("leaveRound({ screen: 'stages' });"))
+        self.assertNotIn('theme:', back)
         self.assertNotIn('confirm(', main)
-        themes = self.function('onThemes')
-        self.assertLess(themes.index('stopWord();'), themes.index('setState({'))
-        for decl in ("screen: 'theme',", 'data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false },',
+        self.assertIn("leaveRound({ screen: 'theme', theme: null });", self.function('onThemes'))
+        leave = self.function('leaveRound')
+        self.assertLess(leave.index('stopWord();'), leave.index('setState({'))
+        self.assertLess(leave.index('...patch,'), leave.index('data: null,'))
+        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false },',
                      'current: { word: null,', 'speaking: false,', 'pressed: null,', 'idleBeat: null,'):
-            self.assertIn(decl, themes, decl)
+            self.assertIn(decl, leave, decl)
 
 
 class StageTests(TestCase):
@@ -3191,7 +3200,7 @@ class StageTests(TestCase):
 
     def test_the_theme_screen_shows_the_cards_and_the_stickers_button(self):
         html = self.client.get('/').content.decode()
-        theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-play"')]
+        theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-stages"')]
         self.assertLess(theme.index('id="theme-buttons"'), theme.index('<div class="actions">'))
         actions = theme[theme.index('<div class="actions">'):]
         self.assertEqual(re.findall(r'<button id="([^"]+)"', theme), ['stickers-btn'])
@@ -3216,9 +3225,11 @@ class StageTests(TestCase):
         # tested in ProgressTests), read once the data file is in; with
         # nothing cleared it is the first stage with words in its data, or
         # stage 1 for data with none, as B-215 played
+        # (since B-217 a tapped station picks the stage; with none picked,
+        # play again, it is still the current stage)
         start = self.main_function('startRound')
         self.assertIn('const progress = progressFor(name);', start)
-        line = 'const stage = currentStage(data, progress);'
+        line = 'const stage = chosen === null ? currentStage(data, progress) : chosen;'
         self.assertIn(line, start)
         self.assertLess(start.index('await fetch('), start.index('const progress = progressFor(name);'))
         self.assertLess(start.index('const progress = progressFor(name);'), start.index(line))
@@ -3240,7 +3251,7 @@ class StageTests(TestCase):
         main = self.code('main.js')
         self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },',
-                      self.main_function('onThemes'))
+                      self.main_function('leaveRound'))
         for name in ('onCheck', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
 
@@ -3260,7 +3271,9 @@ class StageTests(TestCase):
         self.assertIn('roundsStarted: state.roundsStarted + 1,', last)
         self.assertIn('startingRound: false,', last)
         main = self.code('main.js')
-        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 3)
+        # (since B-217 also cleared when the kid left while the data file
+        # was on its way: StageMapTests)
+        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 4)
         for name in ('onPlayAgain', 'onThemes', 'onNext', 'onPlayBack'):
             self.assertNotIn('startingRound:', self.main_function(name), name)
 
@@ -3271,8 +3284,8 @@ class SpeakerEveryStageTests(TestCase):
     never "hmm no" instead; a word with no audio file keeps the capped
     speaker; mute silences it. `lockedTaps` and the robot's
     `speakerLocked` head-shake with its "hmm no" stay (character.js plays
-    them on a change of the count), but nothing adds to the count until
-    B-219 (a boost the kid can't afford). The pure parts are run through
+    them on a change of the count); since B-219 only a boost the kid
+    can't afford adds to the count. The pure parts are run through
     node in ControlsTests and CharacterTests; this checks the wiring."""
 
     ROOT = Path(__file__).resolve().parent.parent
@@ -3303,12 +3316,21 @@ class SpeakerEveryStageTests(TestCase):
         self.assertIn("import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';",
                       (self.ROOT / 'static' / 'js' / 'main.js').read_text())
 
-    def test_nothing_adds_to_the_count_until_b219(self):
-        # state is written only through setState patches; none changes
-        # lockedTaps now (B-219 adds one for a boost the kid can't afford)
+    def test_only_a_boost_the_kid_cant_afford_adds_to_the_count(self):
+        # state is written only through setState patches; since B-219 only
+        # main.js's boost taps change lockedTaps (a boost the kid can't
+        # afford), never the speaker
         js = self.ROOT / 'static' / 'js'
         for f in sorted(js.glob('*.js')):
-            self.assertNotRegex(self.code(f.name), r'setState\(\{[^}]*\blockedTaps\b', f.name)
+            found = re.findall(r'setState\(\{[^}]*\blockedTaps\b[^}]*\}', self.code(f.name))
+            if f.name != 'main.js':
+                self.assertEqual(found, [], f.name)
+        main = self.code('main.js')
+        self.assertEqual(re.findall(r'setState\(\{[^}]*\blockedTaps\b[^}]*\}', main),
+                         ['setState({ boostMenu: null, lockedTaps: state.lockedTaps + 1 }'] * 2)
+        for name in ('onBoostPick', 'pay'):
+            self.assertIn('lockedTaps: state.lockedTaps + 1', self.main_function(name), name)
+        self.assertNotIn('lockedTaps', self.main_function('onSpeak'))
 
     def test_the_head_shake_and_its_hmm_no_stay(self):
         # character.js still plays speakerLocked on a change of the count,
@@ -3635,7 +3657,8 @@ class StageStartTests(TestCase):
         self.assertIn('const spots = renderSpots(bench.length);', card)
         self.assertIn('bench.forEach((t, i) => {', card)
         self.assertIn("boxes[i].classList.toggle('locked', isLocked(slot));", card)
-        self.assertIn("setDragEnabled(current.status === 'playing' || current.status === 'wrong', locked);", card)
+        # a block the clean-up boost took away (B-219) can't be dragged either
+        self.assertIn("setDragEnabled(current.status === 'playing' || current.status === 'wrong', new Set([...locked, ...gone]));", card)
 
     def test_the_locked_look(self):
         css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
@@ -5047,11 +5070,13 @@ class MissedWordsTests(TestCase):
             self.assertNotIn('recordMissed', self.function(name), name)
 
     def test_stickers_still_only_for_correct_words(self):
+        # since BACKLOG B-218 only for a clean correct word (GearsTests
+        # runs onCheck through node)
         main = self.code('main.js')
         self.assertEqual(main.count('addSticker('), 1)
         check = self.function('onCheck')
         branch = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
-        self.assertIn('results[round.index].newSticker = addSticker(state.theme, current.word);', branch)
+        self.assertIn('results[round.index].newSticker = clean && addSticker(state.theme, current.word);', branch)
         self.assertNotIn('missed', self.code('stickers.js'))
 
 
@@ -5294,9 +5319,10 @@ class LockedLookTests(TestCase):
         # the robot's when it lands (after its travel, which stops its tweens)
         render = self.function('renderFeedback', 'feedback.js')
         self.assertIn('newlyLocked(prev.placed, now.placed)', render)
-        self.assertIn('.filter((i) => !now.placed[i].hint)', render)
+        # the robot's letter and a boost's (B-219) clunk as they land
+        self.assertIn('.filter((i) => !now.placed[i].hint && !now.placed[i].boost)', render)
         self.assertIn('.forEach((i) => clunk(tileEl(now.placed[i].tileId), 0));', render)
-        hint = self.function('hintIn', 'feedback.js')
+        hint = self.function('letterIn', 'feedback.js')
         self.assertLess(hint.index("if (!reduced) el.classList.add('landing');"), hint.index('travel(el, from,'))
         self.assertLess(hint.index('travel(el, from,'), hint.index('if (!reduced) clunk(el, at + flyIn.duration);'))
         # pure, and the clunk never touches state
@@ -5624,8 +5650,9 @@ class NextDomeTests(TestCase):
             self.assertLess(branch.index('setState('), branch.index('armNudge();'))
         miss = check[check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5):]
         self.assertNotIn('armNudge', miss)
-        # back to 0 on every new word, the round end and the theme screen
-        for name, n in (('startRound', 1), ('onNext', 2), ('onThemes', 1)):
+        # back to 0 on every new word, the round end and leaving the round
+        # (leaveRound: the theme screen, or the stage screen, B-217)
+        for name, n in (('startRound', 1), ('onNext', 2), ('leaveRound', 1)):
             self.assertEqual(self.function(name).count('nudges: 0,'), n, name)
         self.assertEqual(len(re.findall(r'\bnudges:', main)), 5)
         # only main.js writes it; character.js reads it and never sets state
@@ -5921,7 +5948,15 @@ class LongWordTests(TestCase):
     def test_the_joint_is_one_small_rule_set_in_the_palette(self):
         css = self.css()
         sets = re.findall(r'\n([^\n{]*\.rail-joint[^\n{]*){', css)
-        self.assertEqual([s.strip() for s in sets], ['.rail-joint', '.rail-joint.end', '.rail-joint.start', '.rail-joint::after'])
+        # BACKLOG B-217: the stage map's long station shows the same joint,
+        # placed and rounded on both sides by one rule that draws nothing
+        # of its own (no colour), so a restyle of the four rules carries over
+        self.assertEqual([s.strip() for s in sets], ['.rail-joint', '.rail-joint.end', '.rail-joint.start', '.rail-joint::after',
+                                                     '.station-long .rail-joint'])
+        station = self.rule('.station-long .rail-joint')
+        self.assertNotIn('var(--', station)
+        self.assertNotIn('#', station)
+        sets = sets[:4]
         body = ''.join(self.rule(s.strip()) for s in sets)
         for colour in ('var(--brass)', 'var(--brass-dark)', 'var(--cream)'):
             self.assertIn(colour, body)
@@ -5932,9 +5967,10 @@ class LongWordTests(TestCase):
         self.assertIn('pointer-events: none;', joint)
         self.assertIn('calc(var(--joint-glow) * 12px)', joint)
         self.assertIn('opacity: var(--joint-glow);', self.rule('.rail-joint::after'))
-        # no other module draws or moves it
+        # no other module draws or moves it (stagemap.js puts one on the
+        # long station, B-217; it never moves it)
         for f in sorted(self.JS.glob('*.js')):
-            if f.name not in ('card.js', 'feedback.js'):
+            if f.name not in ('card.js', 'feedback.js', 'stagemap.js'):
                 self.assertNotIn('rail-joint', self.code(f.name), f.name)
 
 
@@ -6349,8 +6385,9 @@ class TvTuneTests(TestCase):
         self.assertIn('subscribe((s) => renderTv(s, onTuned));', main)
         self.assertLess(main.index('subscribe(renderCard);'), main.index('subscribe((s) => renderTv(s, onTuned));'))
         self.assertIn("if (state.screen === 'play' && !state.tuned) setState({ tuned: true });", self.function('onTuned', 'main.js'))
-        # false on every new word and on the theme screen
-        for name, n in (('startRound', 1), ('onNext', 1), ('onThemes', 1)):
+        # false on every new word and on leaving the round (leaveRound:
+        # the theme screen, or the stage screen, B-217)
+        for name, n in (('startRound', 1), ('onNext', 1), ('leaveRound', 1)):
             self.assertEqual(self.function(name, 'main.js').count('tuned: false,'), n, name)
         self.assertIn('tuned: false,', self.code('state.js'))
         # only main.js writes it; tv.js never sets state and takes its
@@ -6882,9 +6919,9 @@ class ProgressTests(TestCase):
 
     def test_main_plays_the_current_stage_and_records_only_at_the_round_end(self):
         main = self.code('main.js')
-        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress } from './progress.js';", main)
+        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';", main)
         start = self.function('startRound')
-        self.assertIn('const stage = currentStage(data, progress);', start)
+        self.assertIn('const stage = chosen === null ? currentStage(data, progress) : chosen;', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('        data,\n', start)
         # play again starts a round of the theme's current stage: the same
@@ -6905,7 +6942,7 @@ class ProgressTests(TestCase):
         for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound', 'onPlayAgain'):
             self.assertNotIn('recordProgress', self.function(name), name)
         # the data file travels with the round and leaves with it
-        self.assertIn('data: null,', self.function('onThemes'))
+        self.assertIn('data: null,', self.function('leaveRound'))
         state = (self.JS / 'state.js').read_text()
         self.assertIn('\n    data: null,', state)
 
@@ -7193,3 +7230,1463 @@ class RoundEndStagesTests(TestCase):
         self.assertEqual(res, [{'duration': 0.3, 'ease': 'power2.out', 'scale': 1.5},
                                {'duration': 0, 'ease': 'none', 'scale': 1}])
         self.assertIn("if (state.round.justCleared) popBulb(state.round.stage);", self.code('celebrate.js'))
+
+
+class StageMapTests(TestCase):
+    """The stage map (BACKLOG B-217, PROGRESSION.md "Replay"): a tapped
+    theme card opens #screen-stages, one station per stage of the theme's
+    data (progress.js stations: cleared, the start, open; pure, run
+    through node), rendered by stagemap.js (run through node with a
+    stand-in DOM); a cleared or the current station starts a round of its
+    stage, and a replay of a cleared stage clears nothing new; the stage
+    screen's back arrow goes to the theme screen, the play screen's to the
+    stage screen; the theme cards show the theme's stages as bulbs."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"const S = await import('{(self.JS / 'stage.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def content(self, theme):
+        return json.loads((self.ROOT / 'static' / 'data' / f'{theme}.json').read_text())
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        m = re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css())
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    @staticmethod
+    def look(stations):
+        # a station as 'stage:flags': c cleared, s start, o open
+        return [f"{s['stage']}:" + ''.join(f for f, k in (('c', 'cleared'), ('s', 'start'), ('o', 'open')) if s[k])
+                for s in stations]
+
+    # --- progress.js stations (pure) ---
+
+    def test_a_new_theme_two_cleared_and_all_cleared(self):
+        # only stage 1 open on a new theme; two cleared, the third the
+        # start; all cleared: all lit, the last also the start
+        res = self.run_node(
+            "const a = [1, 2, 3, 4, 5]; const t = [1, 3, 4, 'long'];"
+            "out([P.stations(a, { solved: [], cleared: [] }), P.stations(a, { solved: [], cleared: [1, 2] }),"
+            " P.stations(a, { solved: [], cleared: [1, 2, 3, 4, 5] }), P.stations(t, { solved: [], cleared: [1, 3, 4, 'long'] }),"
+            " P.stations(t, { solved: [], cleared: [1] })]);")
+        self.assertEqual([self.look(r) for r in res], [
+            ['1:so', '2:', '3:', '4:', '5:'],
+            ['1:co', '2:co', '3:so', '4:', '5:'],
+            ['1:co', '2:co', '3:co', '4:co', '5:cso'],
+            ['1:co', '3:co', '4:co', 'long:cso'],
+            ['1:co', '3:so', '4:', 'long:'],
+        ])
+        self.assertEqual(set(res[0][0]), {'stage', 'cleared', 'start', 'open'})
+
+    def test_odd_stages_and_progress(self):
+        # no stage: stage 1, as currentStage plays it; stages in STAGES
+        # order, non-stages dropped; odd progress clears nothing; a stage
+        # the data adds before a cleared one (transportation's empty 2)
+        # becomes the start, the cleared one after it stays open
+        res = self.run_node(
+            "out([P.stations([], null), P.stations(null, {}), P.stations(['long', 3, '3', 7, 3, 1], { cleared: [3] }),"
+            " P.stations([1, 2], null), P.stations([1, 2], { cleared: 'x' }), P.stations([1, 2], { cleared: ['1', 'Long'] }),"
+            " P.stations([1, 2, 3, 4], { solved: [], cleared: [1, 3] })]);")
+        self.assertEqual([self.look(r) for r in res], [
+            ['1:so'], ['1:so'], ['1:so', '3:co', 'long:'],
+            ['1:so', '2:'], ['1:so', '2:'], ['1:so', '2:'],
+            ['1:co', '2:so', '3:co', '4:'],
+        ])
+
+    def test_the_start_is_the_current_stage(self):
+        # play again (currentStage) plays the map's start, whatever the
+        # data and the progress
+        datas = [self.content('animals'), self.content('transportation'), {'ox': {'stage': 3}, 'kite': {'stage': 'long'}}, {}]
+        progresses = [None, {'cleared': []}, {'cleared': [1]}, {'cleared': [1, 2]}, {'cleared': [1, 3]},
+                      {'cleared': [1, 2, 3, 4, 5]}, {'cleared': [1, 3, 4, 'long']}, {'cleared': [3, 'long']}]
+        same = self.run_node(
+            f"const datas = {json.dumps(datas)}; const ps = {json.dumps(progresses)};"
+            "out(datas.flatMap((d) => ps.map((p) => P.stations(S.stagesOf(d), p).find((s) => s.start).stage === P.currentStage(d, p)"
+            " && P.stations(S.stagesOf(d), p).filter((s) => s.start).length === 1)));")
+        self.assertEqual(same, [True] * (len(datas) * len(progresses)))
+
+    def test_a_replay_of_a_cleared_stage_clears_nothing_new(self):
+        # animals with stages 1 and 2 cleared, 3 current: a replay of
+        # stage 1 that gets every word right, fill words fish and duck
+        # (all of stage 3) too, records the solved words and clears
+        # nothing (only the round's stage can clear, and it already is);
+        # stage 3 clears at the end of its own round (B-216); a replay
+        # with every word wrong changes nothing and writes nothing
+        data = self.content('animals')
+        res = self.run_node(
+            "const store = new Map(); let writes = 0;"
+            "globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => { writes++; store.set(k, v); } };"
+            f"const data = {json.dumps(data)};"
+            "store.set(P.KEY, JSON.stringify({ animals: { solved: ['cat', 'dog', 'frog'], cleared: [1, 2] } }));"
+            "const words = ['cat', 'dog', 'frog', 'fish', 'duck'];"
+            "const replay = P.record('animals', data, 1, words.map((word) => ({ word, correct: true })));"
+            "const after = P.stations(S.stagesOf(data), P.forTheme('animals'));"
+            "const w = writes;"
+            "const wrong = P.record('animals', data, 2, words.map((word) => ({ word, correct: false })));"
+            "const quiet = writes === w;"
+            "const own = P.record('animals', data, 3, [{ word: 'cat', correct: false }]);"
+            "out([replay, after, wrong, quiet, own]);")
+        replay, after, wrong, quiet, own = res
+        self.assertEqual(replay, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2]},
+                                  'justCleared': False})
+        self.assertEqual(self.look(after), ['1:co', '2:co', '3:so', '4:', '5:'])
+        self.assertEqual(wrong, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2]},
+                                 'justCleared': False})
+        self.assertTrue(quiet)
+        self.assertEqual(own, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2, 3]},
+                               'justCleared': True})
+
+    def test_progress_js_stays_pure_and_currentstage_reads_the_stations(self):
+        code = self.code('progress.js')
+        for word in ('document', 'window', 'setState'):
+            self.assertNotIn(word, code, word)
+        self.assertIn('return stations(stagesOf(data), progress).find((s) => s.start).stage;', self.function('currentStage', 'progress.js'))
+
+    # --- the stage screen's markup and look ---
+
+    def test_the_stage_screen_markup_has_no_text(self):
+        html = self.client.get('/').content.decode()
+        self.assertLess(html.index('<div id="screen-theme"'), html.index('<div id="screen-stages"'))
+        self.assertLess(html.index('<div id="screen-stages"'), html.index('<div id="screen-play"'))
+        screen = html[html.index('<div id="screen-stages"'):html.index('<div id="screen-play"')]
+        screen = re.sub(r'<!--.*?-->', '', screen, flags=re.S)
+        self.assertIn('style="display: none;"', screen[:80])
+        self.assertNotRegex(re.sub(r'<[^>]+>', ' ', screen), r'[A-Za-z0-9]')
+        # Back is the sticker book's arrow, an icon button with its word
+        # only in aria-label
+        back = re.search(r'<button id="stages-back-btn" class="panel-btn" type="button" aria-label="Back">(.*?)</button>',
+                         screen, flags=re.S)
+        self.assertIsNotNone(back)
+        book = re.search(r'<button id="gallery-back-btn"[^>]*>(.*?)</button>', html, flags=re.S).group(1)
+        self.assertEqual(back.group(1).strip(), book.strip())
+        for id_ in ('stages-pic', 'stages-picture', 'stage-stations'):
+            self.assertIn(f'id="{id_}"', screen, id_)
+        self.assertLess(screen.index('id="stages-pic"'), screen.index('id="stage-stations"'))
+        # the protected ids are all still there
+        for id_ in ('screen-theme', 'screen-play', 'screen-round-end', 'screen-gallery', 'letter-boxes', 'letter-tray',
+                    'word-counter', 'check-btn', 'play-again-btn', 'themes-btn', 'round-stars', 'round-score', 'round-new',
+                    'round-words', 'stickers-btn', 'gallery-back-btn', 'gallery-empty', 'gallery-themes', 'reset-btn',
+                    'speak-btn', 'mute-btn', 'play-back-btn'):
+            self.assertIn(f'id="{id_}"', html, id_)
+        self.assertIn("'stages': 'screen-stages',", (self.JS / 'screens.js').read_text())
+        template = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", template).group(1)), 30)
+
+    def test_the_stations_look_and_fit(self):
+        station = self.rule('.station')
+        w = int(re.search(r'\n\s*width: (\d+)px;', station).group(1))
+        h = int(re.search(r'\n\s*height: (\d+)px;', station).group(1))
+        self.assertGreaterEqual(min(w, h), 48)
+        # the zig-zag keeps a station inside the 324px column at 360 wide
+        shift = int(re.search(r'margin-right: (\d+)px;', self.rule('.station:nth-child(odd)')).group(1))
+        self.assertEqual(f'margin-left: {shift}px;', self.rule('.station:nth-child(even)').strip())
+        self.assertLessEqual(w + shift, 324)
+        # six stations and the picture fit under the logo at 360x640:
+        # logo line 70, picture clamp(88px, 100vh - 544px, 120px) in its
+        # row, the screen's 12px gap, six stations with 6px between, the
+        # 22px bottom safe area
+        self.assertIn('width: clamp(88px, 100vh - 544px, 120px);', self.rule('.stages-pic'))
+        for height in (740, 667, 640):
+            pic = max(88, min(120, height - 544))
+            self.assertLessEqual(70 + pic + 12 + 6 * h + 5 * 6 + 22, height, height)
+        self.assertIn('flex-direction: column-reverse;', self.rule('.stations'))      # stage 1 at the bottom
+        # the start raised and glowing; the current bulb pulses (steady
+        # under reduced motion); a station not open is dimmed
+        start = self.rule('.station.is-start')
+        self.assertIn('transform: translate(-1px, -3px);', start)
+        self.assertIn('var(--glow-amber)', start)
+        self.assertIn('animation: station-bulb 1.2s ease-in-out infinite alternate;', self.rule('.station.is-current .bulb::before'))
+        css = self.css()
+        self.assertRegex(css, r'@keyframes station-bulb {\s*from {\s*opacity: 0\.45;\s*}\s*to {\s*opacity: 1;\s*}\s*}')
+        self.assertRegex(css, r'@media \(prefers-reduced-motion: reduce\) {\s*\.station\.is-current \.bulb::before {\s*animation: none;\s*}\s*}')
+        self.assertIn('filter: brightness(0.55) saturate(0.7);', self.rule('.station.is-closed'))
+        # only palette variables
+        new = css[css.index('\n#screen-stages {'):css.index('\n#screen-gallery {')]
+        self.assertNotRegex(new, r'#[0-9a-fA-F]{3,6}\b')
+        self.assertNotIn('rgb', new)
+
+    # --- stagemap.js with a stand-in DOM ---
+
+    DOM = """
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, dataset: {}, className: '', textContent: '', disabled: false, onclick: null, parent: null,
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+                removeAttribute(k) { delete this.attrs[k]; },
+                appendChild(c) { c.parent = this; this.children.push(c); return c; },
+                get lastElementChild() { return this.children[this.children.length - 1]; },
+                set innerHTML(v) { this.children = []; }, };
+            return el;
+        };
+        globalThis.document = { createElement: make, getElementById: (id) => ids[id] };
+        const ids = { 'stages-pic': make('div'), 'stages-picture': make('img'), 'stage-stations': make('div') };
+        const M = await import('STAGEMAP');
+        const picks = [];
+        const onPick = (s) => picks.push(s);
+        const text = (el) => (el.textContent || '') + el.children.map(text).join('');
+        const view = () => ids['stage-stations'].children.map((b) => ({ stage: b.dataset.stage, cls: b.className, disabled: b.disabled,
+            label: b.attrs['aria-label'], tap: !!b.onclick, bulb: b.lastElementChild.className,
+            mark: b.children[0].className, parts: b.children[0].children.map((c) => c.className), text: text(b),
+            hidden: b.children[0].attrs['aria-hidden'] }));
+        const themes = [{ name: 'animals', image: '/cat.webp', stages: [1, 2, 3, 4, 5] }, { name: 'transportation', image: '/bus.webp', stages: [1, 3, 4, 'long'] }];
+        const st = (o) => ({ screen: 'stages', theme: 'animals', themes, progress: {}, ...o });
+    """
+
+    def run_map(self, body):
+        return self.run_node(self.DOM.replace('STAGEMAP', (self.JS / 'stagemap.js').as_uri()) + body)
+
+    def test_the_map_renders_each_station_from_state(self):
+        res = self.run_map(
+            "M.renderStageMap(st({ progress: { animals: { solved: [], cleared: [1, 2] } } }), onPick);"
+            "const mid = view(); const pic = [ids['stages-picture'].attrs.src, ids['stages-pic'].attrs['aria-label']];"
+            "ids['stage-stations'].children.forEach((b) => b.onclick && b.onclick());"
+            "out([mid, pic, picks, ids['stage-stations'].attrs['aria-label']]);")
+        mid, pic, picks, label = res
+        self.assertEqual([s['stage'] for s in mid], ['1', '2', '3', '4', '5'])
+        self.assertEqual([s['cls'] for s in mid], [
+            'station panel is-cleared', 'station panel is-cleared', 'station panel is-current is-start',
+            'station panel is-closed', 'station panel is-closed'])
+        self.assertEqual([s['disabled'] for s in mid], [False, False, False, True, True])
+        self.assertEqual([s['tap'] for s in mid], [True, True, True, False, False])
+        self.assertEqual([s['bulb'] for s in mid], ['bulb', 'bulb', 'bulb', 'bulb off', 'bulb off'])
+        self.assertEqual([s['label'] for s in mid], ['stage 1: cleared', 'stage 2: cleared', 'stage 3: play',
+                                                     'stage 4: not open yet', 'stage 5: not open yet'])
+        # the number as one split-flap digit, the only text; the mark is
+        # hidden from screen readers (the button's label names the stage)
+        self.assertEqual([s['text'] for s in mid], ['1', '2', '3', '4', '5'])
+        self.assertEqual([s['parts'] for s in mid], [['flap']] * 5)
+        self.assertEqual({s['mark'] for s in mid}, {'station-mark flaps'})
+        self.assertEqual({s['hidden'] for s in mid}, {'true'})
+        self.assertEqual(pic, ['/cat.webp', 'animals'])
+        self.assertEqual(picks, [1, 2, 3])                       # a tap on an open station: its stage
+        self.assertEqual(label, 'stages cleared: 2 / 5')
+
+    def test_new_theme_all_cleared_and_the_long_station(self):
+        res = self.run_map(
+            "M.renderStageMap(st({ theme: 'transportation' }), onPick); const fresh = view();"
+            "M.renderStageMap(st({ theme: 'transportation', progress: { transportation: { solved: [], cleared: [1, 3, 4, 'long'] } } }), onPick);"
+            "const all = view(); out([fresh, all]);")
+        fresh, all_ = res
+        self.assertEqual([s['cls'] for s in fresh], ['station panel is-current is-start', 'station panel is-closed',
+                                                     'station panel is-closed', 'station panel is-closed'])
+        self.assertEqual([s['tap'] for s in fresh], [True, False, False, False])
+        self.assertEqual([s['bulb'] for s in fresh], ['bulb', 'bulb off', 'bulb off', 'bulb off'])
+        # every stage cleared: all lit, the last also the start (raised
+        # and glowing), its bulb steady (cleared, not pulsing)
+        self.assertEqual([s['cls'] for s in all_], ['station panel is-cleared'] * 3 + ['station panel is-cleared is-start'])
+        self.assertEqual([s['bulb'] for s in all_], ['bulb'] * 4)
+        self.assertEqual([s['tap'] for s in all_], [True] * 4)
+        # long: two chunks and the B-213 joint between them, no digit
+        long_ = all_[3]
+        self.assertEqual(long_['stage'], 'long')
+        self.assertEqual(long_['mark'], 'station-mark station-long')
+        self.assertEqual(long_['parts'], ['chunk', 'rail-joint', 'chunk'])
+        self.assertEqual(long_['text'], '')
+        self.assertEqual(long_['label'], 'stage long: cleared')
+
+    def test_a_rerender_updates_in_place_and_other_screens_render_nothing(self):
+        res = self.run_map(
+            "M.renderStageMap(st({ screen: 'theme' }), onPick); const off = ids['stage-stations'].children.length;"
+            "M.renderStageMap(st(), onPick); const first = ids['stage-stations'].children.slice();"
+            "M.renderStageMap(st({ progress: { animals: { solved: [], cleared: [1] } } }), onPick);"
+            "const kept = ids['stage-stations'].children.every((b, i) => b === first[i]); const moved = view().map((s) => s.cls);"
+            "M.renderStageMap(st({ theme: 'transportation' }), onPick);"
+            "const rebuilt = ids['stage-stations'].children.map((b) => b.dataset.stage); const other = !first.includes(ids['stage-stations'].children[1]);"
+            "M.renderStageMap(st({ theme: 'nope' }), onPick);"
+            "out([off, kept, moved, rebuilt, other, ids['stage-stations'].children.length]);")
+        off, kept, moved, rebuilt, other, n = res
+        self.assertEqual(off, 0)
+        self.assertTrue(kept)                                    # the pulse is not restarted
+        self.assertEqual(moved[:2], ['station panel is-cleared', 'station panel is-current is-start'])
+        self.assertEqual(rebuilt, ['1', '3', '4', 'long'])
+        self.assertTrue(other)
+        self.assertEqual(n, 4)                                   # an unknown theme renders nothing
+
+    def test_stagemap_js_never_sets_state_and_keeps_no_module_state(self):
+        code = self.code('stagemap.js')
+        self.assertNotIn('setState', code)
+        self.assertNotIn('localStorage', code)
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
+                         ["import { stations } from './progress.js';", "import { renderFlaps } from './flaps.js';"])
+
+    # --- main.js: the flow ---
+
+    def test_a_theme_card_opens_its_stage_screen(self):
+        main = self.code('main.js')
+        self.assertIn('words, stages: stagesOf(data) };', self.function('loadThemes'))
+        cards = self.function('renderThemeButtons')
+        self.assertIn("btn.addEventListener('click', () => onTheme(theme));", cards)
+        self.assertNotIn('startRound', cards)
+        on = self.function('onTheme')
+        self.assertIn("if (state.screen !== 'theme') return;", on)
+        self.assertIn("setState({ screen: 'stages', theme: theme.name });", on)
+        self.assertIn('subscribe((s) => renderStageMap(s, onStation));', main)
+        self.assertIn("$('stages-back-btn').addEventListener('click', onThemes);", main)
+        self.assertIn("leaveRound({ screen: 'theme', theme: null });", self.function('onThemes'))
+
+    def test_a_cleared_or_current_station_starts_a_round_of_its_stage(self):
+        on = self.function('onStation')
+        self.assertIn("if (state.screen !== 'stages') return;", on)
+        self.assertIn('const open = stations(theme.stages, state.progress[theme.name]).some((s) => s.stage === stage && s.open);', on)
+        self.assertIn('if (open) startRound(theme, stage);', on)
+        start = self.function('startRound')
+        self.assertTrue(start.lstrip().startswith('async function startRound({ name, dataUrl }, chosen = null) {'))
+        self.assertIn('const stage = chosen === null ? currentStage(data, progress) : chosen;', start)
+        # play again still plays the theme's current stage (B-216)
+        self.assertIn('if (theme) startRound(theme);', self.function('onPlayAgain'))
+        # the stage picked and the map agree: the start of the stations is
+        # what play again picks (test_the_start_is_the_current_stage), and
+        # the open stations are the cleared ones and the start
+        res = self.run_node(
+            "out([1, 2, 3, 4, 5].map((s) => P.stations([1, 2, 3, 4, 5], { cleared: [1, 2] }).some((x) => x.stage === s && x.open)));")
+        self.assertEqual(res, [True, True, True, False, False])
+
+    def test_progress_is_in_state_read_at_start_up_and_after_each_record(self):
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n    progress: {},', state)
+        self.assertIn("'theme' | 'stages' | 'play' | 'round-end' | 'gallery'", state)
+        main = self.code('main.js')
+        self.assertIn('setState({ progress: loadProgress() });', main)
+        self.assertLess(main.index('setState({ progress: loadProgress() });'), main.index('loadThemes();\n'))
+        nxt = self.function('onNext')
+        self.assertLess(nxt.index('recordProgress('), nxt.index('progress: loadProgress(),'))
+        self.assertLess(nxt.index('progress: loadProgress(),'), nxt.index("screen: 'round-end',"))
+        self.assertEqual(len(re.findall(r'\bprogress: ', main)), 2)
+        self.assertEqual(main.count('loadProgress()'), 2)
+
+    def test_no_round_starts_once_the_kid_has_left_the_screen_the_tap_came_from(self):
+        # review fix: a station tapped, then the stage screen's back arrow
+        # before the data file arrives (and maybe another theme's card), or
+        # play again then themes on the round end: no round starts, and the
+        # next tap can start one. main.js's own startRound runs through
+        # node with stand-ins for what it calls.
+        start = self.function('startRound')
+        res = self.run_node(
+            "const state = { screen: 'stages', theme: 'animals', startingRound: false, roundsStarted: 0, round: null };"
+            "const setState = (p) => Object.assign(state, p);"
+            "let arrive = null; globalThis.fetch = () => new Promise((r) => { arrive = () => r({ json: () => ({ cat: { stage: 1 } }) }); });"
+            "const progressFor = () => ({ solved: [], cleared: [] }); const currentStage = () => 1; const missedWords = () => [];"
+            "const pickRound = () => ['cat']; const makeWord = (w, stage) => ({ word: w.word, stage }); const newTileId = () => 't1';"
+            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const LIVES = 3;"
+            + start +
+            "const go = async (from, theme, leave, stage = 1) => {"
+            " Object.assign(state, { screen: from, theme, startingRound: false, round: null });"
+            " const p = startRound({ name: 'animals', dataUrl: '/a.json' }, stage); const during = state.startingRound;"
+            " leave(); arrive(); await p; return [state.screen, state.theme, state.startingRound, state.round && state.round.stage, during]; };"
+            "out([await go('stages', 'animals', () => setState({ screen: 'theme', theme: null })),"
+            " await go('stages', 'animals', () => { setState({ screen: 'theme', theme: null }); setState({ screen: 'stages', theme: 'transportation' }); }),"
+            " await go('round-end', 'animals', () => setState({ screen: 'theme', theme: null }), null),"
+            " await go('stages', 'animals', () => {}, 2), await go('round-end', 'animals', () => {}, null)]);")
+        self.assertEqual(res, [
+            ['theme', None, False, None, True],
+            ['stages', 'transportation', False, None, True],
+            ['theme', None, False, None, True],
+            ['play', 'animals', False, 2, True],
+            ['play', 'animals', False, 1, True],
+        ])
+        self.assertLess(start.index('const from = state.screen;'), start.index('setState({ startingRound: true });'))
+        guard = start.index('if (state.screen !== from || state.theme !== name) {')
+        self.assertLess(start.index('await fetch('), guard)
+        self.assertLess(guard, start.index('const progress = progressFor(name);'))
+
+    def test_the_play_screens_back_arrow_goes_to_the_stage_screen(self):
+        back = self.function('onPlayBack')
+        self.assertTrue(back.rstrip().endswith("leaveRound({ screen: 'stages' });\n}"))
+        self.assertNotIn('theme: null', back)                    # the theme stays, for its map
+        leave = self.function('leaveRound')
+        self.assertNotIn('theme', leave.replace('...patch', ''))
+
+    def test_the_robot_and_the_sound_stay_quiet_on_the_stage_screen(self):
+        # back from any point of a word to the stage screen is no moment,
+        # no sound; a station's round starts as any round does
+        res = self.run_node(
+            f"const c = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status: 'playing', placed: put('---') }, ...o });"
+            "const back = (s) => ({ ...s, screen: 'stages', words: [], round: { index: 0, size: 5, results: [] },"
+            " current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' }, pressed: null, speaking: false, idleBeat: null });"
+            "const moments = (a, b) => c.momentsFor(c.snapshot(a), c.snapshot(b));"
+            "const from = [st(), st({ current: { word: 'cat', status: 'wrong', placed: put('tac') }, lives: 2 }),"
+            " st({ current: { word: 'cat', status: 'correct', placed: put('cat') } })];"
+            "out([from.map((s) => moments(s, back(s))), from.map((s) => c.soundsFor(moments(s, back(s)))),"
+            " moments(back(st()), st({ roundsStarted: 2 }))]);")
+        self.assertEqual(res, [[[]] * 3, [[]] * 3, ['roundStart']])
+
+    # --- main.js: the theme cards' bulbs, through node ---
+
+    def test_the_theme_cards_show_their_stages_as_bulbs(self):
+        src = (self.function('clearedOf') + self.function('renderStageBulbs') + self.function('renderThemeButtons'))
+        res = self.run_node(
+            "const make = (tag) => { const el = { tag, children: [], attrs: {}, dataset: {}, className: '', listeners: [],"
+            " setAttribute(k, v) { this.attrs[k] = v; }, addEventListener(t, f) { this.listeners.push(f); },"
+            " appendChild(c) { this.children.push(c); c.remove = () => this.children.splice(this.children.indexOf(c), 1); return c; },"
+            " get lastElementChild() { return this.children[this.children.length - 1]; }, set innerHTML(v) { this.children = []; } }; return el; };"
+            "const container = make('div');"
+            "globalThis.document = { createElement: make }; const $ = () => container;"
+            "let builtThemes = null; const opened = []; const onTheme = (t) => opened.push(t.name);"
+            + src +
+            "const themes = [{ name: 'animals', image: '/cat.webp', stages: [1, 2, 3, 4, 5] }, { name: 'transportation', image: '/bus.webp', stages: [1, 3, 4, 'long'] }];"
+            "const bulbs = () => container.children.map((c) => [c.children.map((k) => k.tag), c.lastElementChild.className,"
+            " c.lastElementChild.attrs['aria-hidden'], c.lastElementChild.children.map((b) => b.className === 'bulb' ? 1 : 0).join('')]);"
+            "renderThemeButtons({ themes, progress: {} }); const fresh = bulbs(); const cards = container.children.slice();"
+            "renderThemeButtons({ themes, progress: { animals: { solved: [], cleared: [1, 2] }, transportation: { solved: [], cleared: [1] } } });"
+            "const later = bulbs(); const kept = container.children.every((c, i) => c === cards[i]);"
+            "container.children[1].listeners.forEach((f) => f());"
+            "out([fresh, later, kept, opened]);")
+        fresh, later, kept, opened = res
+        self.assertEqual(fresh, [[['img', 'span'], 'stage-bulbs', 'true', '00000'], [['img', 'span'], 'stage-bulbs', 'true', '0000']])
+        self.assertEqual([c[3] for c in later], ['11000', '1000'])
+        self.assertTrue(kept)                                    # the cards are not rebuilt, the bulbs follow progress
+        self.assertEqual(opened, ['transportation'])
+
+    def test_the_cards_bulb_row_fits_under_the_picture(self):
+        card = self.rule('.theme-btn')
+        self.assertIn('display: flex;', card)
+        self.assertIn('flex-direction: column;', card)
+        self.assertIn('aspect-ratio: 1 / 1;', card)             # the card keeps its size (StageTests' fit)
+        img = self.rule('.theme-btn img')
+        self.assertIn('flex: 1 1 0;', img)
+        self.assertIn('min-height: 0;', img)
+        self.assertIn('margin-top: 8px;', self.rule('.theme-btn .stage-bulbs'))
+        bulb = self.rule('.theme-btn .stage-bulbs .bulb')
+        self.assertIn('width: 14px;', bulb)
+        self.assertIn('height: 14px;', bulb)
+
+
+class GearsTests(TestCase):
+    """Gears (BACKLOG B-218, PROGRESSION.md "Gears", "Repetition and
+    stickers"): static/js/gears.js is the only reader and writer of
+    localStorage `flip.gears.v1` (a whole number, 0 or more); its pure
+    helpers (isClean, wordGears, roundGears) run through node. Each word's
+    result records `clean`; a correct word earns 1 gear and 1 more when
+    clean, added at its check; the round end adds 2; only a clean word
+    gets a sticker; nothing takes gears away. The counters (cogs.js) and
+    the cogs' flight (celebrate.js) run through node with stand-ins for
+    the DOM and GSAP; main.js's onCheck, onNext and onPlayBack too."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # In-memory localStorage (SEED: the key's initial value or null),
+    # counting writes.
+    STORE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.gears.v1', SEED);
+        let writes = 0;
+        globalThis.localStorage = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { writes++; store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const raw = () => store.get('flip.gears.v1') ?? null;
+    """
+
+    def run_node(self, body, seed=None, store=True):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const SEED = {json.dumps(seed)};"
+            + (self.STORE if store else '')
+            + f"const G = await import('{(self.JS / 'gears.js').as_uri()}');"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        m = re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css())
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    # --- gears.js: the store ---
+
+    def test_no_key_is_no_gears_and_add_writes_a_whole_number(self):
+        res = self.run_node(
+            "const a = [G.load(), raw(), writes];"
+            "const b = [G.add(2), raw(), G.add(1), G.add(2), raw(), G.load(), writes];"
+            "out([a, b]);")
+        self.assertEqual(res, [[0, None, 0], [2, '2', 3, 5, '5', 5, 3]])
+        self.assertEqual(self.run_node("out([G.load(), G.add(3)]);", seed='7'), [7, 10])
+
+    def test_add_takes_only_a_whole_number_above_zero(self):
+        # anything else adds nothing and writes nothing: never a way to
+        # take gears away
+        res = self.run_node(
+            "out([[0, -1, -5, 1.5, '2', NaN, null, undefined, Infinity, 2 ** 60].map((n) => G.add(n)), writes, raw()]);",
+            seed='4')
+        self.assertEqual(res, [[4] * 10, 0, '4'])
+        # spend (B-219, boosts) is the only way gears leave
+        self.assertEqual(sorted(self.run_node("out(Object.keys(G));")),
+                         ['GEARS', 'KEY', 'add', 'isClean', 'load', 'roundGears', 'spend', 'wordGears'])
+
+    def test_a_corrupt_value_reads_as_zero_and_add_recovers(self):
+        for seed in ('{not json', '"5"', '-3', '2.5', 'null', '[1]', '{}', 'true', '1e400', ''):
+            self.assertEqual(self.run_node("out([G.load(), G.add(1), raw()]);", seed=seed), [0, 1, '1'], seed)
+
+    def test_blocked_storage_never_throws(self):
+        res = self.run_node(
+            "globalThis.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };"
+            "const a = [G.load(), G.add(2)];"
+            "Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('denied'); } });"
+            "const b = [G.load(), G.add(2)];"
+            "delete globalThis.localStorage; Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined });"
+            "out([a, b, [G.load(), G.add(2)]]);", store=False)
+        self.assertEqual(res, [[0, 0], [0, 0], [0, 0]])
+
+    def test_the_key_is_only_in_gears_js_which_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            if path.name != 'gears.js':
+                self.assertNotIn('flip.gears', path.read_text(), path.name)
+        code = self.code('gears.js')
+        self.assertIn("export const KEY = 'flip.gears.v1';", code)
+        for word in ('document', 'window', 'setState', 'import '):
+            self.assertNotIn(word, code, word)
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+
+    # --- gears.js: the pure rules ---
+
+    def test_clean_and_the_gears_a_word_earns(self):
+        res = self.run_node(
+            "out([G.GEARS, [G.isClean(true, 0), G.isClean(true, 1), G.isClean(true, 2), G.isClean(false, 0),"
+            " G.isClean(true, 0, true), G.isClean('yes', 0), G.isClean(true, 0, false)],"
+            " [G.wordGears({ word: 'cat', correct: true, clean: true }), G.wordGears({ word: 'cat', correct: true, clean: false }),"
+            "  G.wordGears({ word: 'cat', correct: true }), G.wordGears({ word: 'cat', correct: false, clean: false }),"
+            "  G.wordGears({ word: 'cat', correct: false, clean: true }), G.wordGears(null), G.wordGears(undefined)]]);")
+        self.assertEqual(res, [{'correct': 1, 'clean': 1, 'round': 2},
+                               [True, False, False, False, False, False, True],
+                               [2, 1, 1, 0, 0, 0, 0]])
+
+    def test_the_gears_a_round_earns(self):
+        # five clean words: 5 x 2 + 2; a clean word, one after a miss, a
+        # reveal, a clean word and one left unchecked: 2 + 1 + 0 + 2 + 0 + 2
+        res = self.run_node(
+            "const c = (word) => ({ word, correct: true, clean: true });"
+            "out([G.roundGears(['cat', 'dog', 'fish', 'duck', 'frog'].map(c)),"
+            " G.roundGears([c('cat'), { word: 'dog', correct: true, clean: false }, { word: 'fish', correct: false, clean: false },"
+            "  c('duck'), { word: 'frog', correct: false, clean: false }]),"
+            " G.roundGears([]), G.roundGears(null), G.roundGears([null, undefined])]);")
+        self.assertEqual(res, [12, 7, 2, 2, 2])
+
+    # --- main.js: the wiring, run through node ---
+
+    CHECK = """
+        const state = { screen: 'play', theme: 'animals', gears: 5, lives: 3,
+            round: { index: 0, size: 5, results: [] }, current: null };
+        const setState = (p) => Object.assign(state, p);
+        const LIVES = 3;
+        const calls = [];
+        const addSticker = (t, w) => { calls.push(['sticker', t, w]); return true; };
+        let stored = 5;
+        const addGears = (n) => { calls.push(['gears', n]); stored += n; return stored; };
+        const { isClean, wordGears, GEARS } = G;
+        const { isBoosted } = await import('BOOST');
+        const checkedWrong = (c) => ({ ...c, status: 'wrong' });
+        const giveHint = (c) => c; const afterHint = (c) => c; const revealed = (c) => ({ ...c, status: 'revealed' });
+        const armNudge = () => {};
+        const word = (w, letters, lives, boosts = 0) => {
+            state.lives = lives; state.round = { index: 0, size: 5, results: [] };
+            state.current = { word: w, status: 'playing', boosts, placed: letters.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) };
+            calls.length = 0;
+        };
+    """
+
+    def run_check(self, body):
+        return self.run_node(self.CHECK.replace('BOOST', (self.JS / 'boost.js').as_uri()) + self.function('onCheck') + body)
+
+    def test_a_clean_word_earns_its_sticker_and_two_gears_at_its_check(self):
+        res = self.run_check(
+            "const go = (w, letters, lives, boosts) => { word(w, letters, lives, boosts); onCheck({ pressed: null });"
+            " return [state.round.results[0], calls.slice(), state.gears, state.current.status]; };"
+            "out([go('cat', 'cat', 3), go('dog', 'dog', 2), go('fish', 'fish', 1), go('duck', 'dcuk', 3), go('frog', 'forg', 1),"
+            " go('bird', 'bird', 3, 1), go('lion', 'loin', 3, 1)]);")
+        first, after_miss, after_hint, wrong, reveal, boosted, boosted_wrong = res
+        # first check correct: clean, into the sticker book, 1 + 1 gears
+        self.assertEqual(first, [{'word': 'cat', 'correct': True, 'clean': True, 'boosted': False, 'newSticker': True},
+                                 [['sticker', 'animals', 'cat'], ['gears', 2]], 7, 'correct'])
+        # correct after a miss, or with the robot's letter: solved, not
+        # clean, no sticker (stickers.js add not called), 1 gear
+        self.assertEqual(after_miss, [{'word': 'dog', 'correct': True, 'clean': False, 'boosted': False, 'newSticker': False},
+                                      [['gears', 1]], 8, 'correct'])
+        self.assertEqual(after_hint[:2], [{'word': 'fish', 'correct': True, 'clean': False, 'boosted': False, 'newSticker': False},
+                                          [['gears', 1]]])
+        # a wrong check and a reveal: no sticker, no gears (mistakes never
+        # cost gears either)
+        self.assertEqual(wrong, [{'word': 'duck', 'correct': False, 'clean': False, 'boosted': False}, [], 9, 'wrong'])
+        self.assertEqual(reveal, [{'word': 'frog', 'correct': False, 'clean': False, 'boosted': False}, [], 9, 'revealed'])
+        # a boosted word (B-219) right on its first check: solved, its
+        # correct-word gear, but not clean: no clean gear, no sticker
+        self.assertEqual(boosted, [{'word': 'bird', 'correct': True, 'clean': False, 'boosted': True, 'newSticker': False},
+                                   [['gears', 1]], 10, 'correct'])
+        self.assertEqual(boosted_wrong[0], {'word': 'lion', 'correct': False, 'clean': False, 'boosted': True})
+
+    def test_the_round_end_adds_two_gears_once_and_back_keeps_them(self):
+        nxt = self.function('onNext')
+        res = self.run_node(
+            "const state = { theme: 'animals', data: {}, gears: 7, words: [{ word: 'cat' }, { word: 'dog' }],"
+            " round: { index: 0, size: 2, stage: 1, results: [{ word: 'cat', correct: true, clean: true }] },"
+            " current: { word: 'cat', status: 'correct' } };"
+            "const setState = (p) => Object.assign(state, p);"
+            "const calls = []; let stored = 7;"
+            "const addGears = (n) => { calls.push(n); stored += n; return stored; }; const { GEARS } = G;"
+            "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false });"
+            "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
+            "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't'; const LIVES = 3;"
+            + nxt +
+            "onNext(); const mid = [state.screen, state.gears, calls.slice()];"
+            "onNext(); out([mid, [state.screen, state.gears, calls.slice()], state.round.results]);")
+        mid, end, results = res
+        self.assertEqual(mid, [None, 7, []])                       # the next word: nothing
+        self.assertEqual(end, ['round-end', 9, [2]])               # the round end: + GEARS.round, once
+        # a word left without a check counts as missed, not clean
+        self.assertEqual(results[1], {'word': 'dog', 'correct': False, 'clean': False})
+        main = self.code('main.js')
+        self.assertEqual(main.count('addGears('), 2)
+        self.assertIn("import { load as loadGears, add as addGears, spend as spendGears, isClean, wordGears, GEARS } from './gears.js';", main)
+        self.assertIn('setState({ gears: loadGears() });', main)
+        self.assertLess(nxt.index('recordProgress('), nxt.index('gears: addGears(GEARS.round),'))
+        self.assertLess(nxt.index('gears: addGears(GEARS.round),'), nxt.index("screen: 'round-end',"))
+        # the back arrow and leaving a round take no gears away (the
+        # words' gears were added at their checks; B-201 takes back only
+        # the round's stickers)
+        for name in ('onPlayBack', 'leaveRound', 'onThemes', 'startRound'):
+            self.assertNotIn('gears', self.function(name), name)
+        self.assertIn('if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);', self.function('onPlayBack'))
+
+    def test_state_keeps_the_count(self):
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n    gears: 0,', state)
+        self.assertIn('results[i] = { word, correct, clean, boosted?, newSticker? }', state)
+
+    # --- cogs.js: the counters, with a stand-in DOM ---
+
+    DOM = """
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, props: {}, className: '', textContent: '', html: '',
+                style: { setProperty(k, v) { el.props[k] = v; } },
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+                appendChild(c) { this.children.push(c); return c; },
+                get firstElementChild() { return this.children[0] || null; },
+                get lastElementChild() { return this.children[this.children.length - 1] || null; },
+                set innerHTML(v) { this.children = []; this.html = v; } };
+            return el;
+        };
+        const ids = { 'theme-gears': make('span'), 'console-gears': make('div'), 'round-gears': make('p') };
+        globalThis.document = { createElement: make, getElementById: (id) => ids[id] || null };
+        const C = await import('COGS');
+        const look = (id) => { const h = ids[id]; if (!h.children.length) return null;
+            return { label: h.attrs['aria-label'], digits: h.props['--digits'], cog: [h.children[0].className, h.children[0].attrs['aria-hidden'], /<svg/.test(h.children[0].html)],
+                sign: h.children[1].textContent, flaps: h.children[2].children.map((f) => f.textContent), kinds: h.children.map((c) => c.className) }; };
+        const st = (o) => ({ screen: 'theme', gears: 27, round: { results: [] }, ...o });
+    """
+
+    def run_dom(self, body):
+        return self.run_node(self.DOM.replace('COGS', (self.JS / 'cogs.js').as_uri()) + body)
+
+    def test_the_counters_render_from_state(self):
+        res = self.run_dom(
+            "C.renderGears(st()); const theme = look('theme-gears'); const before = [look('console-gears'), look('round-gears')];"
+            "C.renderGears(st({ screen: 'play', gears: 128 })); const play = look('console-gears');"
+            "C.renderGears(st({ screen: 'round-end', round: { results: [{ word: 'cat', correct: true, clean: true }, { word: 'dog', correct: true, clean: false }] } }));"
+            "const end = look('round-gears');"
+            "C.renderGears(st({ screen: 'stages', gears: 3 })); C.renderGears(st({ screen: 'gallery', gears: 3 }));"
+            "out([theme, before, play, end, look('theme-gears').flaps, C.countText(-1), C.countText(2.5), C.countText('7'), C.countText(12)]);")
+        theme, before, play, end, still, *texts = res
+        self.assertEqual(theme, {'label': 'gears: 27', 'digits': '2', 'cog': ['cog', 'true', True], 'sign': '',
+                                 'flaps': ['2', '7'], 'kinds': ['cog', 'sign', 'flaps count']})
+        self.assertEqual(before, [None, None])                      # only the screen showing is rendered
+        self.assertEqual(play['flaps'], ['1', '2', '8'])
+        self.assertEqual(play['digits'], '3')
+        # the round end: the cog, an ink "+" and the round's gears in flaps
+        # (2 + 1 + 2 for the round end)
+        self.assertEqual(end, {'label': 'gears: +5', 'digits': '1', 'cog': ['cog', 'true', True], 'sign': '+',
+                               'flaps': ['5'], 'kinds': ['cog', 'sign', 'flaps count']})
+        self.assertEqual(still, ['2', '7'])                         # the stage map and the book show no counter
+        self.assertEqual(texts, ['0', '0', '0', '12'])
+
+    def test_a_rerender_writes_only_a_changed_count_and_never_undoes_a_held_one(self):
+        # celebrate.js holds the count from before a word while its cogs
+        # fly (showCount); a re-render in the same state leaves it
+        res = self.run_dom(
+            "C.renderGears(st({ screen: 'play', gears: 7 })); const flaps = ids['console-gears'].children[2].children;"
+            "C.renderGears(st({ screen: 'play', gears: 7 })); const kept = ids['console-gears'].children[2].children === flaps;"
+            "C.showCount(ids['console-gears'], '5'); C.renderGears(st({ screen: 'play', gears: 7 })); const held = look('console-gears').flaps;"
+            "C.renderGears(st({ screen: 'play', gears: 8 })); out([kept, held, look('console-gears').flaps, ids['console-gears'].children.length]);")
+        self.assertEqual(res, [True, ['5'], ['8'], 3])
+
+    def test_cogs_js_is_a_render_with_one_dom_cache(self):
+        code = self.code('cogs.js')
+        self.assertNotIn('setState', code)
+        self.assertNotIn('localStorage', code)
+        self.assertEqual(re.findall(r'(?m)^(?:let|var|const) ([\w$]+)', code), ['$', 'COG', 'rendered'])
+        self.assertIn('// DOM cache:', (self.JS / 'cogs.js').read_text())
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
+                         ["import { renderFlaps } from './flaps.js';", "import { roundGears } from './gears.js';"])
+        main = self.code('main.js')
+        self.assertIn("import { renderGears } from './cogs.js';", main)
+        self.assertLess(main.index('subscribe(renderGears);'), main.index('subscribe(renderCelebrate);'))
+
+    # --- celebrate.js: the cogs fly, with stand-ins ---
+
+    FLY = """
+        const log = [];
+        const tweens = [];
+        const nm = (el) => (Array.isArray(el) ? el.map(nm) : el && (el.id || el.className));
+        globalThis.gsap = {
+            set(el, v) { log.push(['set', nm(el), v]); },
+            to(el, v) { const t = { el, v }; tweens.push(t); log.push(['to', nm(el), Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'onComplete'))]); return t; },
+            fromTo(el, a, b) { log.push(['fromTo', nm(el), a, Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'onComplete'))]); return {}; },
+            timeline() { const tl = { to() { return tl; } }; return tl; },
+            killTweensOf(el) { log.push(['kill', nm(el)]); },
+            getProperty() { return 0; },
+        };
+        let reduced = false;
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, props: {}, className: '', textContent: '', html: '', parent: null,
+                style: { setProperty(k, v) { el.props[k] = v; } },
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k] ?? null; },
+                appendChild(c) { c.parent = this; this.children.push(c); return c; },
+                remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; },
+                get firstElementChild() { return this.children[0] || null; },
+                get lastElementChild() { return this.children[this.children.length - 1] || null; },
+                getBoundingClientRect() { return el.rect || { left: 0, top: 0, width: 0, height: 0 }; },
+                set innerHTML(v) { this.children = []; this.html = v; } };
+            return el;
+        };
+        const card = make('div'); card.rect = { left: 100, top: 100, width: 150, height: 110 };
+        const host = make('div'); host.id = 'console-gears';
+        const body = make('body');
+        globalThis.document = { createElement: make, body,
+            querySelector: (sel) => (sel === '#screen-play .card' ? card : sel === '#console-gears' ? host : null),
+            querySelectorAll: (sel) => (sel === '.gear-fly' ? body.children.filter((c) => c.className === 'gear-fly') : []) };
+        const C = await import('COGS');
+        const K = await import('CELEBRATE');
+        C.showCount(host, '5'); host.children[0].rect = { left: 190, top: 680, width: 24, height: 24 };
+        const flaps = () => host.children[2].children.map((f) => f.textContent).join('');
+        const st = (status, gears, clean = true, word = 'cat') => ({ screen: 'play', gears, current: { word, status },
+            round: { index: 0, stage: 1, results: status === 'correct' ? [{ word, correct: true, clean }] : [] } });
+        const flights = () => body.children.filter((c) => c.className === 'gear-fly');
+        const pieces = () => flights().flatMap((l) => l.children);
+        const drops = () => tweens.filter((t) => t.v.onComplete);
+    """
+
+    def run_fly(self, body):
+        return self.run_node(self.FLY.replace('COGS', (self.JS / 'cogs.js').as_uri())
+                             .replace('CELEBRATE', (self.JS / 'celebrate.js').as_uri()) + body)
+
+    def test_cogs_fly_from_the_tv_and_the_count_flips_up_as_they_land(self):
+        res = self.run_fly(
+            "K.renderCelebrate(st('playing', 5)); C.showCount(host, '7'); K.renderCelebrate(st('correct', 7));"
+            "const start = [flaps(), flights().length, pieces().length, log.filter((e) => e[0] === 'to' && e[1] === 'gear-fly-cog').map((e) => e[2])];"
+            "const sets = log.filter((e) => e[0] === 'set' && e[1] === 'gear-fly-cog').map((e) => e[2]);"
+            "log.length = 0; drops()[0].v.onComplete(); const one = [flaps(), pieces().length, flights().length, log.slice()];"
+            "log.length = 0; drops()[1].v.onComplete(); const two = [flaps(), pieces().length, flights().length, log.slice()];"
+            "log.length = 0; K.renderCelebrate(st('correct', 7)); const again = [log.length, flights().length];"
+            "out([start, sets, one, two, again]);")
+        start, sets, one, two, again = res
+        held, layers, n, moves = start
+        self.assertEqual((held, layers, n), ('5', 1, 2))            # the count from before the word, two cogs
+        # each cog rises out of the TV's centre (175, 155), the two apart,
+        # then drops into the counter's cog (202, 692), 0.1s after the other
+        self.assertEqual(sets, [{'x': 175 - 4.5 - 11, 'y': 155 - 11, 'scale': 0.5, 'rotation': 0},
+                                {'x': 175 + 4.5 - 11, 'y': 155 - 11, 'scale': 0.5, 'rotation': 0}])
+        rise0, drop0, rise1, drop1 = moves
+        self.assertEqual(rise0, {'x': 175 - 9 - 11, 'y': 155 - 22 - 11, 'scale': 1, 'rotation': 90,
+                                 'duration': 0.1, 'delay': 0, 'ease': 'power1.out'})
+        self.assertEqual({k: drop0[k] for k in ('x', 'y', 'delay', 'ease')}, {'x': 202 - 11, 'y': 692 - 11, 'delay': 0.1, 'ease': 'power2.in'})
+        self.assertAlmostEqual(drop0['duration'], 0.26)
+        self.assertEqual((rise1['delay'], round(drop1['delay'], 6)), (0.1, 0.2))
+        # the first lands: one step up, its digit flips, the cog turns a tooth
+        self.assertEqual(one[:3], ['6', 1, 1])
+        self.assertIn(['fromTo', ['flap'], {'scaleY': 0}, {'scaleY': 1, 'duration': 0.12, 'ease': 'power2.out', 'transformOrigin': '50% 50%'}], one[3])
+        self.assertIn(['to', 'cog', {'rotation': 45, 'duration': 0.12, 'ease': 'power2.out', 'transformOrigin': '50% 50%', 'overwrite': True}], one[3])
+        # the last lands: the count is state's, the layer is gone
+        self.assertEqual(two[:3], ['7', 0, 0])
+        self.assertEqual(again, [0, 0])                             # a re-render replays nothing
+
+    def test_one_cog_after_a_miss_none_under_reduced_motion_and_leaving_settles(self):
+        res = self.run_fly(
+            "K.renderCelebrate(st('playing', 5)); C.showCount(host, '6'); K.renderCelebrate(st('correct', 6, false));"
+            "const missed = [pieces().length, flaps()];"
+            "log.length = 0; K.renderCelebrate(st('playing', 6, true, 'dog'));"
+            "const left = [flights().length, flaps(), log.filter((e) => e[0] === 'kill').map((e) => e[1])];"
+            "reduced = true; C.showCount(host, '8'); K.renderCelebrate(st('correct', 8)); const still = [flights().length, flaps()];"
+            "out([missed, left, still]);")
+        missed, left, still = res
+        self.assertEqual(missed, [1, '5'])                          # a word after a miss earns one gear: one cog
+        self.assertEqual(left[:2], [0, '6'])                        # the next word: the cog dropped, state's count
+        self.assertIn(['gear-fly-cog'], left[2])
+        self.assertEqual(still, [0, '8'])                           # reduced motion: the count just changes
+
+    def test_the_flights_numbers_end_within_600ms(self):
+        res = self.run_node(
+            f"const M = await import('{(self.JS / 'motion.js').as_uri()}');"
+            f"const E = await import('{(self.JS / 'celebrate.js').as_uri()}');"
+            "out([[E.gearTicks(5, 7, 2), E.gearTicks(5, 6, 1), E.gearTicks(0, 0, 2), E.gearTicks(null, 7, 2), E.gearTicks(9, 11, 2), E.gearTicks(3, 3, 0)],"
+            " [E.changedFlaps('9', '10'), E.changedFlaps('12', '13'), E.changedFlaps('5', '5'), E.changedFlaps('99', '100'), E.changedFlaps('19', '20')],"
+            " [0, 1, 2].map((n) => E.gearsDone(n)), M.motionFor('gearFly', false), M.motionFor('gearFlip', false),"
+            " M.motionFor('gearFly', true).duration, M.motionFor('gearFlip', true).duration]);")
+        ticks, changed, done, fly, flip, fly_reduced, flip_reduced = res
+        self.assertEqual(ticks, [[6, 7], [6], [0, 0], [7, 7], [10, 11], []])
+        self.assertEqual(changed, [[0, 1], [1], [], [0, 1, 2], [0, 1]])
+        self.assertEqual(done[0], 0)
+        self.assertAlmostEqual(done[1], 0.48)
+        self.assertAlmostEqual(done[2], 0.58)
+        self.assertLessEqual(done[2], 0.6)                          # a clean word's two cogs, flips included
+        self.assertEqual(fly, {'duration': 0.36, 'ease': 'power2.in', 'scale': 1, 'stagger': 0.1, 'rise': 0.1,
+                               'height': 22, 'size': 22, 'spread': 18})
+        self.assertEqual(flip, {'duration': 0.12, 'ease': 'power2.out', 'scale': 1})
+        self.assertEqual((fly_reduced, flip_reduced), (0, 0))
+        cog = self.rule('.gear-fly-cog')
+        self.assertIn(f"width: {fly['size']}px;", cog)
+        self.assertIn(f"height: {fly['size']}px;", cog)
+        layer = self.rule('.gear-fly')
+        for decl in ('position: fixed;', 'pointer-events: none;', 'overflow: hidden;'):
+            self.assertIn(decl, layer)
+
+    # --- the template and the look ---
+
+    def test_the_counters_places_with_no_text(self):
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<header'):html.index('</header>')]
+        theme = re.search(r'<span id="theme-gears" class="gear-counter header-gears" role="img" aria-label="gears"></span>', header)
+        self.assertIsNotNone(theme)
+        self.assertLess(header.index('class="app-title"'), theme.start())
+        self.assertLess(theme.start(), header.index('id="play-back-btn"'))
+        console = html[html.index('<div class="console">'):html.index('<!-- Round-end screen')]
+        # the boost button since B-219: a button, off until boosttray.js turns it on
+        self.assertIn('<button id="console-gears" class="gear-counter console-gears" type="button" aria-label="gears" disabled></button>', console)
+        self.assertLess(console.index('id="speak-btn"'), console.index('id="console-gears"'))
+        self.assertLess(console.index('id="console-gears"'), console.index('id="check-btn"'))
+        totals = html[html.index('<div class="round-totals">'):html.index('<ul id="round-words"')]
+        self.assertIn('<p id="round-gears" class="gear-counter round-gears" role="img" aria-label="gears"></p>', totals)
+        self.assertLess(totals.index('id="round-new"'), totals.index('id="round-gears"'))
+        template = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", template).group(1)), 31)
+
+    def test_the_header_counter_shows_on_the_theme_screen_only(self):
+        self.assertIn('display: none;', self.rule('.header-gears'))
+        self.assertIn('display: flex;', self.rule('body[data-screen="theme"] .header-gears'))
+        shown = re.findall(r'\n([^{}\n]*\.header-gears[^{}\n]*?)\s*{[^}]*display: (?!none)', self.css())
+        self.assertEqual(shown, ['body[data-screen="theme"] .header-gears'])
+        self.assertIn('pointer-events: none;', self.rule('.gear-counter'))
+
+    def test_the_console_counter_sits_between_the_tap_areas_inside_the_console(self):
+        rule = self.rule('#screen-play .console-gears')
+        self.assertIn('left: calc(36.1% + max(24px, var(--console-w) * 0.1145 / 2) + 4px);', rule)
+        self.assertIn('right: calc(18.5% + max(24px, var(--console-w) * 0.254 / 2) + 4px);', rule)
+        self.assertNotIn('z-index', rule)                           # in the console's z-order, like a control
+        speak, dome = self.rule('#speak-btn'), self.rule('#check-btn')
+        self.assertIn('--cx: 36.1%;', speak)
+        self.assertIn('--w: calc(var(--console-w) * 0.1145);', speak)
+        self.assertIn('--cx: 81.5%;', dome)
+        self.assertIn('--w: calc(var(--console-w) * 0.254);', dome)
+        # at 360 and at the 480px column: clear of both tap areas, wide
+        # enough for a 22px cog and three 15px flaps (B-219 enlarged them:
+        # up to 17px each, a longer count shares their 45px), and inside
+        # the console's height
+        for cw in (324, 444):
+            rpx = cw / 324
+            left = 0.361 * cw + max(24, cw * 0.1145 / 2) + 4
+            right = cw - (0.185 * cw + max(24, cw * 0.254 / 2) + 4)
+            self.assertGreaterEqual(left - (0.361 * cw + max(24, cw * 0.1145 / 2)), 4)
+            self.assertLessEqual(right, 0.815 * cw - max(24, cw * 0.254 / 2) - 4 + 1e-9)
+            self.assertGreaterEqual(right - left, (22 + 4 + 45 + 2) * rpx - 1, cw)
+        self.assertIn('top: 53%;', rule)
+        # the boost button since B-219: its tap area at least 48px tall,
+        # still inside the console at 360 and at the 480px column
+        self.assertIn('height: max(48px, calc(30 * var(--rpx)));', rule)
+        for cw in (324, 444):
+            h = max(48, 30 * cw / 324)
+            self.assertLess(h / 2, 0.53 * cw * 175 / 972, cw)              # its top inside the console
+            self.assertLess(0.53 * cw * 175 / 972 + h / 2, cw * 175 / 972, cw)
+        self.assertIn('--flap-w: min(calc(17 * var(--rpx)), calc(45 * var(--rpx) / var(--digits, 1)));', rule)
+        self.assertIn('--flap-h: calc(23 * var(--rpx));', rule)
+        self.assertIn('--cog-size: calc(22 * var(--rpx));', rule)
+        # the robot's hands never reach it: their farthest right edge at
+        # rest or in any pose, in console px at 360 wide
+        reach = self.run_node(
+            f"const R = await import('{(self.JS / 'character.js').as_uri()}');"
+            "out(Math.max(...Object.values(R.HANDS).flatMap((p) => Object.values(p).map((h) => h.x + R.HAND_SHAPES[h.s].width / 2))));")
+        self.assertLess(72.6 + (reach - 266) * 0.24, 0.361 * 324 + 24 + 4 - 10)
+
+    def test_the_counters_look_uses_the_palette_only(self):
+        css = (self.ROOT / 'static' / 'css' / 'game.css').read_text()
+        section = css[css.index('/* --- Gear counter (BACKLOG B-218, cogs.js) --- */'):css.index('/* --- Round-end screen')]
+        self.assertNotRegex(re.sub(r'/\*.*?\*/', '', section, flags=re.S), r'#[0-9a-fA-F]{3,6}\b|rgb|hsl')
+        for part, fill in (('.cog .cog-lo', 'var(--brass-dark-lo)'), ('.cog .cog-hi', 'var(--brass-hi)'),
+                           ('.cog .cog-face', 'var(--brass)'), ('.cog .cog-hub', 'var(--brass-hi)'),
+                           ('.cog .cog-hole', 'var(--bench-deep)')):
+            self.assertIn(f'fill: {fill};', self.rule(part), part)
+        self.assertIn('filter: drop-shadow(1px 2px 1.5px var(--shadow-contact));', self.rule('.cog svg'))
+        self.assertIn('display: none;', self.rule('.gear-counter .sign:empty'))
+        self.assertIn('gap: 16px;', self.rule('.round-totals'))
+
+
+class BoostTests(TestCase):
+    """Boosts (BACKLOG B-219, PROGRESSION.md "Boosts", "Guardrails"):
+    static/js/boost.js holds the pure rules (which boosts are offered, the
+    costs, one per word, the button on or off, which block a boost places)
+    and runs through node; gears.js `spend` takes a boost's gears; the
+    wiring in main.js, the robot's boostGiven (character.js) and the tray
+    (boosttray.js, with a stand-in DOM) run through node too; feedback.js,
+    the template and game.css are checked in the source. Never a free
+    check: what is offered and what glows never depends on whether a placed
+    letter is right."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # word(w, letters, o): the word `w` as the kid filled it, `letters` in
+    # its slots ('-' empty), one block per letter of the word (ids w0, w1,
+    # ...; a slot takes the first unused block with its letter, the word's
+    # own before extras) and o.extras extra blocks (ids x0, x1, ...).
+    # o.locked: slots whose letter is locked; o.fresh: no slot filled yet
+    # but those holding a block; o.status.
+    FIXTURE = """
+        const out = (v) => console.log(JSON.stringify(v));
+        const word = (w, letters, o = {}) => {
+            const tray = w.split('').map((letter, i) => ({ id: 'w' + i, letter, used: false }))
+                .concat((o.extras || '').split('').filter(Boolean).map((letter, j) => ({ id: 'x' + j, letter, used: false, extra: true })));
+            const placed = letters.split('').map((ch, i) => {
+                if (ch === '-') return null;
+                const t = tray.find((b) => b.letter === ch && !b.used);
+                t.used = true;
+                const slot = { letter: ch, tileId: t.id };
+                if ((o.locked || []).includes(i)) slot.locked = true;
+                return slot;
+            });
+            return { word: w, image: '/i.svg', audio: null, break: null, tray, placed, status: o.status || 'playing',
+                rightAtCheck: null, justPulled: false, boosts: o.boosts || 0,
+                filledOnce: placed.map((p) => (o.fresh ? !!p : true)) };
+        };
+        const show = (c) => c.placed.map((p) => (p ? p.letter + (p.locked ? '*' : '') + (p.boost ? 'B' : '') + (p.hint ? 'H' : '') : '-')).join(' ');
+        const used = (c) => Object.fromEntries(c.tray.map((t) => [t.id, t.gone ? t.used + '/gone' : t.used]));
+    """
+
+    def run_node(self, body, pre=''):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            pre
+            + f"const B = await import('{(self.JS / 'boost.js').as_uri()}');"
+            + f"const D = await import('{(self.JS / 'drag.js').as_uri()}');"
+            + f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            + self.FIXTURE + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        m = re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css())
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    # --- boost.js: what is offered, the costs, the limit ---
+
+    def test_the_boosts_their_costs_and_one_per_word(self):
+        self.assertEqual(self.run_node("out([B.BOOSTS, B.COSTS, B.PER_WORD]);"),
+                         [['remember', 'first', 'cleanup'], {'remember': 3, 'first': 2, 'cleanup': 2}, 1])
+
+    def test_what_is_offered_and_what_glows_never_depends_on_a_right_letter(self):
+        res = self.run_node(
+            # every arrangement of the same blocks: right, half right, all wrong
+            "const ways = ['duck', 'dcuk', 'kcud', 'ud-k', '----'].map((l) => word('duck', l));"
+            "const stage1 = ['cat', 'cta', 'c--'].map((l) => word('cat', l, { locked: [0] }));"
+            "const extras = word('fish', 'fisb', { extras: 'b' });"
+            "const allLocked = word('cat', 'cat', { locked: [0, 1, 2] });"
+            "out([ways.map((c) => [B.offered(c), B.pickable(c)]), stage1.map((c) => [B.offered(c), B.pickable(c)]),"
+            " [B.offered(extras), B.offered(word('fish', 'fish', { extras: 'b' })), B.offered(B.cleanUp(extras))],"
+            " [B.offered(allLocked), B.pickable(allLocked), B.boostOn(allLocked)], B.offered({ word: null, placed: [], tray: [] })]);")
+        ways, stage1, extras, all_locked, none = res
+        self.assertEqual(ways, [[['remember', 'first'], [0, 1, 2, 3]]] * 5)
+        # stage 1: the given first letter is locked, so no "First letter"
+        self.assertEqual(stage1, [[['remember'], [1, 2]]] * 3)
+        # Clean-up while an extra block is in play, in a slot or on the bench
+        self.assertEqual(extras, [['remember', 'first', 'cleanup'], ['remember', 'first', 'cleanup'], ['remember', 'first']])
+        self.assertEqual(all_locked, [[], [], False])
+        self.assertEqual(none, [])
+
+    def test_the_button_is_off_before_the_first_try_after_a_boost_and_once_answered(self):
+        res = self.run_node(
+            "let n = 0; const id = () => 't' + (++n);"
+            "const w = R.makeWord({ word: 'cat', image: '/c.svg', audio: null }, 1, id, () => 0.5);"
+            "const t = (c, letter) => c.tray.find((b) => b.letter === letter).id;"
+            "const one = D.placeIn(w, t(w, 'a'), 1);"
+            # slot 1 filled, emptied, then slot 2: every slot filled once,
+            # never all at the same time
+            "const moved = D.placeIn(D.takeOut(one, t(w, 'a')), t(w, 't'), 2);"
+            "const full = D.placeIn(one, t(w, 't'), 2);"
+            "out([w.filledOnce, w.boosts, B.tried(w), B.boostOn(w), one.filledOnce, B.boostOn(one),"
+            " moved.filledOnce, show(moved), B.boostOn(moved), B.boostOn(full),"
+            " ['wrong', 'correct', 'revealed'].map((status) => B.boostOn({ ...full, status })),"
+            " B.boostOn({ ...full, boosts: 1 }), B.boostOn(B.giveLetter(full, 1)),"
+            " B.boostOn({ word: null, placed: [], tray: [], status: 'playing' }), B.tried({ ...full, filledOnce: undefined }),"
+            " R.makeWord({ word: 'frog', image: '/f.svg', audio: null }, 2, id, () => 0.5).filledOnce]);")
+        self.assertEqual(res, [
+            [True, False, False], 0, False, False, [True, True, False], False,
+            [True, True, True], 'c* - t', True, True,
+            [True, False, False],
+            False, False,
+            False, False,
+            [False, False, False, False],
+        ])
+
+    def test_affording_a_boost(self):
+        self.assertEqual(self.run_node(
+            "out([B.canAfford(3, 'remember'), B.canAfford(2, 'remember'), B.canAfford(2, 'first'), B.canAfford(2, 'cleanup'),"
+            " B.canAfford(1, 'first'), B.canAfford(0, 'cleanup'), B.canAfford('5', 'first'), B.canAfford(NaN, 'first'),"
+            " B.canAfford(9, 'slow')]);"),
+            [True, False, True, True, False, False, False, False, False])
+
+    # --- boost.js: what a boost does ---
+
+    def test_remember_this_one_puts_the_right_letter_in_the_tapped_slot(self):
+        res = self.run_node(
+            # duck filled "dcuk": slot 1 wants the u, which is in slot 2;
+            # the c in slot 1 goes back to the bench
+            "const a = word('duck', 'dcuk', { status: 'wrong' }); const a1 = B.giveLetter(a, 1);"
+            # the right letter already there: it stays and locks, the
+            # status stays (nothing moved), it still counts as the boost
+            "const b = word('duck', 'duck', { status: 'wrong' }); const b1 = B.giveLetter(b, 2);"
+            # an empty slot: the u from the bench
+            "const c = word('duck', 'd-ck'); const c1 = B.giveLetter(c, 1);"
+            # First letter: slot 0, from the slot holding it
+            "const d = word('duck', 'kucd'); const d1 = B.giveLetter(d, 0);"
+            "out([[show(a1), used(a1), a1.status, a1.boosts, a1.justPulled, B.letterFor(a, 1)],"
+            " [show(b1), b1.status, b1.boosts, B.letterFor(b, 2)], [show(c1), used(c1), B.letterFor(c, 1)],"
+            " [show(d1), used(d1)], [B.letterFor(word('cat', 'cat', { locked: [0] }), 0), B.giveLetter(word('cat', 'cat', { locked: [0] }), 0).boosts]]);")
+        a, b, c, d, locked = res
+        self.assertEqual(a, ['d u*B - k', {'w0': True, 'w1': True, 'w2': False, 'w3': True}, 'playing', 1, False,
+                             {'tileId': 'w1', 'back': 'w2'}])
+        self.assertEqual(b, ['d u c*B k', 'wrong', 1, {'tileId': 'w2', 'back': None}])
+        self.assertEqual(c, ['d u*B c k', {'w0': True, 'w1': True, 'w2': True, 'w3': True}, {'tileId': 'w1', 'back': None}])
+        self.assertEqual(d, ['d*B u c -', {'w0': True, 'w1': True, 'w2': True, 'w3': False}])
+        self.assertEqual(locked, [None, 0])                         # a locked slot takes no boost
+
+    def test_the_block_a_boost_takes_never_depends_on_a_right_letter(self):
+        # "book" has two o blocks. Slot 2 wants an o and none lies on the
+        # bench: it comes from the first slot, left to right, holding an
+        # o, whether that o is right there ("boko": slot 1) or not ("obko":
+        # slot 0); a bench o is taken first ("bk-o" plus a free o)
+        res = self.run_node(
+            "out([B.letterFor(word('book', 'boko'), 2), B.letterFor(word('book', 'obko'), 2),"
+            " B.letterFor(word('book', 'b-ko'), 2), show(B.giveLetter(word('book', 'boko'), 2)),"
+            " B.letterFor(word('book', 'bo-o', { locked: [1] }), 2)]);")
+        self.assertEqual(res, [{'tileId': 'w1', 'back': 'w3'}, {'tileId': 'w1', 'back': 'w3'},
+                               {'tileId': 'w2', 'back': 'w3'}, 'b - o*B o', {'tileId': 'w2', 'back': None}])
+
+    def test_clean_up_takes_the_extra_blocks_away_and_the_others_keep_their_spots(self):
+        res = self.run_node(
+            # stage 4 "fish" with extras b and z: the b in slot 3, the z on
+            # the bench, after a wrong check
+            "const f = word('fish', 'fisb', { extras: 'bz', status: 'wrong' }); const f1 = B.cleanUp(f);"
+            # only on the bench: nothing in a slot changed, the status stays
+            "const g = word('fish', 'fihs', { extras: 'bz', status: 'wrong' }); const g1 = B.cleanUp(g);"
+            "out([[show(f1), used(f1), f1.status, f1.boosts, f1.justPulled], [show(g1), g1.status, g1.boosts],"
+            " B.cleanUp(word('cat', 'cat')).boosts, D.placeIn(f1, 'x0', 3), D.placeIn(f1, 'w3', 3) !== null,"
+            " B.offered(f1), D.revealed(f1).placed.map((p) => p.tileId), D.returnAll(f1).tray.map((t) => !!t.gone)]);")
+        f, g, nothing, gone_placed, other_placed, offered, reveal, pulled = res
+        self.assertEqual(f, ['f i s -', {'w0': True, 'w1': True, 'w2': True, 'w3': False, 'x0': 'false/gone', 'x1': 'false/gone'},
+                             'playing', 1, False])
+        self.assertEqual(g, ['f i h s', 'wrong', 1])
+        self.assertEqual(nothing, 0)                                # no extra block: nothing happens
+        self.assertIsNone(gone_placed)                              # a gone block never comes back
+        self.assertTrue(other_placed)
+        self.assertEqual(offered, ['remember', 'first'])
+        self.assertEqual(reveal, ['w0', 'w1', 'w2', 'w3'])          # the reveal never uses them
+        self.assertEqual(pulled, [False, False, False, False, True, True])
+
+    def test_the_lever_the_reveal_and_the_free_hint_keep_a_boost_letter(self):
+        res = self.run_node(
+            # "dkcu": slot 1 wants the u, from slot 3; the k goes back
+            "const b = B.giveLetter(word('duck', 'dkcu'), 1);"
+            # the kid fills it again, wrong: d u k c, and checks
+            "const again = D.placeIn(D.placeIn(D.takeOut(b, 'w2'), 'w3', 2), 'w2', 3);"
+            "const wrong = D.checkedWrong(again);"
+            "const pull1 = D.returnAll(wrong); const pull2 = D.returnAll(pull1);"
+            "const hinted = D.giveHint(wrong);"
+            "out([show(b), show(again), D.leverResult(wrong), show(pull1), show(pull2), show(D.revealed(wrong)), show(hinted),"
+            " D.revealed(wrong).placed[1]]);")
+        boosted, again, lever, pull1, pull2, reveal, hinted, kept = res
+        self.assertEqual(boosted, 'd u*B c -')
+        self.assertEqual(again, 'd u*B k c')
+        # after a wrong check the d (right) locks, the k and c go back, the
+        # boost letter is in neither list; a start-over pull keeps it too
+        self.assertEqual(lever, {'back': ['w3', 'w2'], 'lock': ['w0']})
+        self.assertEqual(pull1, 'd* u*B - -')
+        self.assertEqual(pull2, '- u*B - -')
+        self.assertEqual(reveal, 'd u*B c k')
+        self.assertEqual(kept, {'letter': 'u', 'tileId': 'w1', 'locked': True, 'boost': True})
+        # the free hint still comes after a boost, in the first slot that
+        # is not locked and not right, as `hint`, not `boost`
+        self.assertEqual(hinted, 'd u*B c*H -')
+
+    def test_boost_js_is_pure(self):
+        code = self.code('boost.js')
+        for word in ('document', 'window', 'setState', 'localStorage', 'gsap'):
+            self.assertNotIn(word, code, word)
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
+                         ["import { isLocked, afterMove, markFilled } from './drag.js';"])
+
+    # --- gears.js: spend ---
+
+    def test_spend_takes_gears_only_when_there_are_enough(self):
+        res = self.run_node(
+            "const G = await import('" + (self.JS / 'gears.js').as_uri() + "');"
+            "const store = new Map([['flip.gears.v1', '5']]); let writes = 0;"
+            "globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => { writes++; store.set(k, String(v)); } };"
+            "const a = [G.spend(3), store.get('flip.gears.v1'), G.spend(3), store.get('flip.gears.v1'), writes];"
+            "const b = [0, -1, 1.5, '2', NaN, null].map((n) => G.spend(n)); const w = writes;"
+            "const c = [G.spend(2), G.load(), G.spend(1), G.load()];"
+            "globalThis.localStorage = { getItem() { return '9'; }, setItem() { throw new Error('blocked'); } };"
+            "out([a, b, w, c, G.spend(2)]);")
+        a, invalid, writes, last, blocked = res
+        self.assertEqual(a, [2, '2', None, '2', 1])                 # not enough: nothing taken, nothing written
+        self.assertEqual(invalid, [None] * 6)
+        self.assertEqual(writes, 1)
+        self.assertEqual(last, [0, 0, None, 0])
+        self.assertIsNone(blocked)                                  # nothing could be taken: no boost
+
+    # --- main.js: the taps, run through node with stand-ins ---
+
+    MAIN = """
+        const { boostOn, offered, pickable, canAfford, giveLetter, cleanUp, isBoosted, COSTS } = B;
+        const state = { screen: 'play', pressed: null, boostMenu: null, gears: 9, lockedTaps: 0, current: null };
+        const log = [];
+        const setState = (p) => { log.push(Object.keys(p).sort().join(',')); Object.assign(state, p); };
+        let stored = 9; const spent = [];
+        const spendGears = (n) => { spent.push(n); if (stored < n) return null; stored -= n; return stored; };
+        const reset = (cur, gears) => { Object.assign(state, { screen: 'play', pressed: null, boostMenu: null, gears, lockedTaps: 0, current: cur });
+            stored = gears; spent.length = 0; log.length = 0; };
+        const look = () => [state.boostMenu, state.gears, state.lockedTaps, show(state.current), spent.slice()];
+    """
+
+    def run_main(self, body):
+        fns = ''.join(self.function(n) for n in ('onBoost', 'onBoostClose', 'onBoostPick', 'onBoostSlot', 'pay'))
+        return self.run_node(self.MAIN + fns + body)
+
+    def test_the_taps_open_the_tray_pick_pay_and_close(self):
+        res = self.run_main(
+            "const duck = word('duck', 'dcuk', { extras: 'bz' });"
+            "reset(duck, 9); onBoost(); const opened = look(); onBoostClose(); const closed = look();"
+            # Remember this one: the slots glow, then a tap on slot 1 pays 3
+            "reset(duck, 9); onBoost(); onBoostPick('remember'); const picking = look(); onBoostSlot(1); const placed = look();"
+            # First letter and Clean-up happen at once, 2 each
+            "reset(duck, 9); onBoost(); onBoostPick('first'); const first = look();"
+            "reset(duck, 9); onBoost(); onBoostPick('cleanup'); const clean = [look(), state.current.tray.filter((t) => t.gone).length];"
+            # a tap in pick mode on a locked slot, or the scrim: closed, free
+            "reset(word('duck', 'dcuk', { locked: [0] }), 9); onBoost(); onBoostPick('remember'); onBoostSlot(0); const lockedTap = look();"
+            "out([opened, closed, picking, placed, first, clean, lockedTap]);")
+        opened, closed, picking, placed, first, clean, locked_tap = res
+        self.assertEqual(opened, ['tray', 9, 0, 'd c u k', []])
+        self.assertEqual(closed, [None, 9, 0, 'd c u k', []])        # closing costs nothing
+        self.assertEqual(picking, ['pick', 9, 0, 'd c u k', []])     # nothing spent until the slot is tapped
+        self.assertEqual(placed, [None, 6, 0, 'd u*B - k', [3]])
+        self.assertEqual(first, [None, 7, 0, 'd*B c u k', [2]])
+        self.assertEqual(clean, [[None, 7, 0, 'd c u k', [2]], 2])
+        self.assertEqual(locked_tap, [None, 9, 0, 'd* c u k', []])
+
+    def test_a_boost_the_kid_cant_afford_is_not_spent_and_the_robot_shakes_his_head(self):
+        res = self.run_main(
+            "const duck = word('duck', 'dcuk', { extras: 'b' });"
+            "reset(duck, 2); onBoost(); onBoostPick('remember'); const remember = look();"
+            "reset(duck, 1); onBoost(); onBoostPick('first'); const first = [look(), log.slice()];"
+            # the store has fewer than state says: spend says no, as above
+            "reset(duck, 5); stored = 1; onBoost(); onBoostPick('cleanup'); const store = look();"
+            "out([remember, first, store]);")
+        remember, first, store = res
+        self.assertEqual(remember, [None, 2, 1, 'd c u k', []])     # closed, nothing spent, lockedTaps + 1
+        self.assertEqual(first[0], [None, 1, 1, 'd c u k', []])
+        self.assertEqual(first[1], ['boostMenu', 'boostMenu,lockedTaps'])
+        self.assertEqual(store, [None, 5, 1, 'd c u k', [2]])
+
+    def test_no_tray_while_the_button_is_off_or_a_control_is_held(self):
+        res = self.run_main(
+            "const go = (cur, o = {}) => { reset(cur, 9); Object.assign(state, o); onBoost(); return state.boostMenu; };"
+            "out([go(word('duck', 'dc--', { fresh: true })), go(word('duck', 'duck', { status: 'correct' })),"
+            " go(word('duck', 'duck', { status: 'revealed' })), go(word('duck', 'dcuk', { boosts: 1 })),"
+            " go(word('duck', 'dcuk'), { pressed: 'dome' }), go(word('duck', 'dcuk'), { screen: 'round-end' }),"
+            " go(word('duck', 'dcuk', { status: 'wrong' }))]);")
+        self.assertEqual(res, [None, None, None, None, None, None, 'tray'])
+
+    def test_the_wiring(self):
+        main = self.code('main.js')
+        self.assertIn("import { boostOn, offered, pickable, canAfford, giveLetter, cleanUp, isBoosted, COSTS } from './boost.js';", main)
+        self.assertIn("import { renderBoost } from './boosttray.js';", main)
+        self.assertIn("$('console-gears').addEventListener('click', onBoost);", main)
+        self.assertIn("$('boost-scrim').addEventListener('click', onBoostClose);", main)
+        self.assertIn('const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };', main)
+        # the tray is placed after the card is drawn and before feedback.js
+        # pops it open
+        card = main.index('subscribe(renderCard);')
+        boost = main.index('subscribe((s) => renderBoost(s, BOOST_TAPS));')
+        self.assertLess(card, boost)
+        self.assertLess(boost, main.index('subscribe(renderFeedback);'))
+        # the result records the boost, and a boosted word is not clean
+        check = self.function('onCheck')
+        self.assertIn('const boosted = isBoosted(current);', check)
+        self.assertIn('const clean = isClean(correct, LIVES - lives, boosted);', check)
+        self.assertIn('results[round.index] = { word: current.word, correct, clean, boosted };', check)
+        # the tray closes with a new word, a new round and leaving the round
+        for name in ('startRound', 'onNext', 'leaveRound'):
+            self.assertIn('boostMenu: null,', self.function(name), name)
+        self.assertEqual(self.function('onNext').count('boostMenu: null,'), 2)
+        self.assertIn('\n    boostMenu: null,', (self.JS / 'state.js').read_text())
+        self.assertIn('filledOnce: placed.map(Boolean),', self.function('makeWord', 'round.js'))
+        self.assertIn('filledOnce: markFilled(current.filledOnce, placed.length, index),', self.function('placeIn', 'drag.js'))
+        self.assertIn('if (!tile || tile.gone) return null;', self.function('placeIn', 'drag.js'))
+
+    # --- character.js: boostGiven as the letter lands ---
+
+    def test_the_robot_plays_boost_given_as_the_letter_lands(self):
+        res = self.run_node(
+            "const c = await import('" + (self.JS / 'character.js').as_uri() + "');"
+            "const st = (cur) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0, nudges: 0,"
+            " tuned: true, round: { index: 0, size: 5, results: [] }, current: cur });"
+            "const snap = (cur) => c.snapshot(st(cur));"
+            "const pair = (a, b) => [c.momentsFor(snap(a), snap(b)), c.boostLands(snap(a), snap(b)), c.boostLands(snap(a), snap(b), true)];"
+            "const a = word('duck', 'dcuk', { status: 'wrong' }); const e = word('duck', 'd-ck'); const r = word('duck', 'duck');"
+            "const f = word('fish', 'fisb', { extras: 'b' });"
+            "out([pair(a, B.giveLetter(a, 1)), pair(e, B.giveLetter(e, 1)), pair(r, B.giveLetter(r, 2)), pair(f, B.cleanUp(f)),"
+            " [snap(B.giveLetter(a, 1)).boost, snap(B.giveLetter(a, 1)).boosts, snap(a).boost, c.NONE.boost, c.NONE.boosts],"
+            " c.momentsFor({ ...snap(a), lockedTaps: 0 }, { ...snap(a), lockedTaps: 1 })]);")
+        occupied, empty, already, clean, snaps, shake = res
+        # a block in the slot hops back (0.3s), then the letter flies in (0.3s)
+        self.assertEqual(occupied[0], ['boostGiven'])
+        self.assertAlmostEqual(occupied[1], 0.6)
+        self.assertAlmostEqual(occupied[2], 0.4)                    # reduced motion: two 0.2s fades
+        self.assertEqual(empty[0], ['boostGiven'])
+        self.assertAlmostEqual(empty[1], 0.3)
+        self.assertEqual(already[0], ['boostGiven'])                # it only locks: the clunk's hit
+        self.assertAlmostEqual(already[1], 0.09)
+        self.assertEqual(clean[0], ['boostGiven'])                  # the extra blocks have puffed away
+        self.assertAlmostEqual(clean[1], 0.3)
+        self.assertEqual(snaps, [1, 1, -1, -1, 0])
+        self.assertEqual(shake, ['speakerLocked'])                  # can't afford: his head-shake
+        robot = self.function('renderRobot', 'character.js')
+        self.assertIn("playMoments(moments, {}, moments.includes('boostGiven') ? boostLands(prev, now, reducedMotion()) : 0);", robot)
+        self.assertIn('const wait = Math.max(startDelay(performance.now() - last.changedAt) / 1000, delay);',
+                      self.function('playMoments', 'character.js'))
+
+    # --- feedback.js: the motion ---
+
+    def test_the_motion_keys_on_transitions(self):
+        render = self.function('renderFeedback', 'feedback.js')
+        self.assertIn('if (boostSlot(now.placed) !== -1 && boostSlot(prev.placed) === -1) {', render)
+        self.assertIn('const gone = now.gone.filter((id) => !prev.gone.includes(id));', render)
+        self.assertIn('if (now.lockedTaps > prev.lockedTaps) flickerGears();', render)
+        self.assertIn("if (now.menu === 'tray' && prev.menu !== 'tray') trayIn();", render)
+        # the boost's letter: the hint's motion with no wiggle; one already
+        # in its slot only clunks
+        boost = self.function('boostIn', 'feedback.js')
+        self.assertIn('clunk(tileEl(was.tileId), 0);', boost)
+        self.assertIn('letterIn(prevPlaced, current, k, false);', boost)
+        self.assertIn('letterIn(prevPlaced, current, hintSlot(current.placed), true);', self.function('hintIn', 'feedback.js'))
+        letter = self.function('letterIn', 'feedback.js')
+        self.assertIn('let at = missed ? wiggle.duration : 0;', letter)
+        for name in ('boostIn', 'letterIn', 'puffAway', 'flickerGears', 'trayIn'):
+            body = self.function(name, 'feedback.js')
+            for word in ('state.', 'setState'):
+                self.assertNotIn(word, body, (name, word))
+        puff = self.function('puffAway', 'feedback.js')
+        self.assertIn("restoreAfter(els, time, 'visibility,zIndex,opacity');", puff)
+        self.assertIn('layer.remove()', puff)
+
+    def test_the_motion_numbers(self):
+        res = self.run_node(
+            "const M = await import('" + (self.JS / 'motion.js').as_uri() + "');"
+            "out([M.motionFor('puff', false), M.motionFor('puff', true), M.motionFor('trayIn', false), M.motionFor('trayIn', true)]);")
+        puff, puff_reduced, tray, tray_reduced = res
+        self.assertEqual(puff, {'duration': 0.3, 'ease': 'power2.out', 'scale': 1.3, 'count': 6, 'distance': 30, 'fade': 0.2})
+        self.assertEqual(puff_reduced, {'duration': 0, 'ease': 'none', 'scale': 1, 'count': 0, 'distance': 0, 'fade': 0.2})
+        self.assertEqual(tray['duration'], 0.15)
+        self.assertEqual((tray_reduced['duration'], tray_reduced['scale'], tray_reduced['distance'], tray_reduced['fade']), (0, 1, 0, 0.15))
+
+    # --- boosttray.js: the render, with a stand-in DOM ---
+
+    DOM = """
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, props: {}, dataset: {}, className: '', textContent: '', html: '', hidden: false,
+                disabled: false, listeners: {}, rect: null, offsetWidth: 0, offsetHeight: 0, parent: null,
+                style: { setProperty(k, v) { el.props[k] = v; }, getPropertyValue(k) { return el.props[k] || ''; } },
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k] ?? null; },
+                appendChild(c) { c.parent = this; this.children.push(c); return c; },
+                addEventListener(type, fn) { this.listeners[type] = fn; },
+                get firstElementChild() { return this.children[0] || null; },
+                get lastElementChild() { return this.children[this.children.length - 1] || null; },
+                getBoundingClientRect() { return el.rect || { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }; },
+                set innerHTML(v) { this.children = []; this.html = v; }, get innerHTML() { return this.html; } };
+            return el;
+        };
+        const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
+        const ids = Object.fromEntries(['console-gears', 'boost-layer', 'boost-tray', 'boost-picks', 'letter-boxes'].map((id) => [id, make('div')]));
+        ids['boost-layer'].hidden = true;
+        const plate = make('div'); plate.rect = rect(18, 660, 324, 58.3);
+        ids['console-gears'].rect = rect(163, 666, 74, 48);
+        ids['boost-tray'].offsetWidth = 202; ids['boost-tray'].offsetHeight = 84;
+        const rail = ids['letter-boxes']; rail.clientWidth = 332;
+        for (let i = 0; i < 4; i++) { const box = make('div'); box.rect = rect(79 + 52 * i, 355, 46, 46); rail.appendChild(box); }
+        globalThis.document = { createElement: make, getElementById: (id) => ids[id] || null,
+            querySelector: (sel) => (sel === '#screen-play .console' ? plate : null) };
+        globalThis.getComputedStyle = () => ({ getPropertyValue: (k) => (k === '--notch-h' ? '8px' : '') });
+        const T = await import('TRAY');
+        const taps = [];
+        const handlers = { onPick: (k) => taps.push(['pick', k]), onSlot: (i) => taps.push(['slot', i]) };
+        const render = (cur, menu, screen = 'play') => T.renderBoost({ screen, current: cur, boostMenu: menu }, handlers);
+        const view = () => ({ off: ids['console-gears'].disabled, layer: ids['boost-layer'].hidden, tray: ids['boost-tray'].hidden,
+            picks: ids['boost-picks'].hidden,
+            items: ids['boost-tray'].children.map((b) => [b.dataset.boost, b.children[1].children.length, b.attrs['aria-label'], b.textContent]),
+            slots: ids['boost-picks'].children.map((b) => [b.dataset.slot, b.style.left, b.style.top, b.style.width, b.style.height]),
+            at: [ids['boost-tray'].style.left, ids['boost-tray'].style.top, ids['boost-tray'].props['--notch']] });
+    """
+
+    def run_dom(self, body):
+        return self.run_node(self.DOM.replace('TRAY', (self.JS / 'boosttray.js').as_uri()) + body)
+
+    def test_the_button_and_the_tray_render_from_state(self):
+        res = self.run_dom(
+            "render(word('duck', 'dc--', { fresh: true }), null); const off = view();"
+            "const on = word('fish', 'fisb', { extras: 'b' }); render(on, null); const ready = view();"
+            "render(on, 'tray'); const tray = view(); const kids = ids['boost-tray'].children;"
+            "kids[2].listeners.click(); kids[0].listeners.click();"
+            "render(on, 'tray'); const same = ids['boost-tray'].children === kids;"
+            "render(on, 'pick'); const pick = view(); ids['boost-picks'].children[3].listeners.click();"
+            "render({ ...on, status: 'correct' }, 'pick'); const answered = view();"
+            "render(on, 'tray', 'round-end'); const away = view();"
+            "out([off, ready, tray, same, pick, answered, away, taps]);")
+        off, ready, tray, same, pick, answered, away, taps = res
+        self.assertEqual((off['off'], off['layer']), (True, True))           # before the first try: off, no tray
+        self.assertEqual((ready['off'], ready['layer']), (False, True))
+        self.assertEqual((tray['layer'], tray['tray'], tray['picks']), (False, False, True))
+        # one key per boost offered, in order, its cost as cogs, no text
+        self.assertEqual(tray['items'], [['remember', 3, 'remember this one: 3 gears', ''], ['first', 2, 'first letter: 2 gears', ''],
+                                         ['cleanup', 2, 'clean up: 2 gears', '']])
+        # over the bench, above the console (its top less the gap, the
+        # notch and its height), centred over the button but never over
+        # the console's left third (the robot); the notch at the button
+        left = max(18 + 324 * (1 / 3 + 0.025), min(200 - 101, 342 - 6 - 202))
+        self.assertEqual(tray['at'], [f'{round(left)}px', f'{660 - 2 - 8 - 84}px', f'{round(200 - round(left))}px'])
+        self.assertTrue(same)                                                # a re-render keeps the keys
+        self.assertEqual((pick['tray'], pick['picks']), (True, False))
+        # every slot not locked glows, over its tap area (a 46px slot: the slot)
+        self.assertEqual(pick['slots'], [[str(i), f'{79 + 52 * i}px', '355px', '46px', '46px'] for i in range(4)])
+        self.assertEqual(taps, [['pick', 'cleanup'], ['pick', 'remember'], ['slot', 3]])
+        self.assertEqual((answered['off'], answered['layer']), (True, True))  # answered: off, nothing shows
+        self.assertEqual(away['layer'], True)
+
+    def test_boosttray_js_is_a_render_with_one_dom_cache(self):
+        code = self.code('boosttray.js')
+        self.assertNotIn('setState', code)
+        self.assertNotIn('localStorage', code)
+        self.assertEqual(re.findall(r'(?m)^(?:let|var|const) ([\w$]+)', code),
+                         ['$', 'ICONS', 'NAMES', 'GAP', 'SIDE', 'ROBOT', 'NOTCH_IN', 'built'])
+        self.assertIn('// DOM cache:', (self.JS / 'boosttray.js').read_text())
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M), [
+            "import { boostOn, offered, pickable, COSTS } from './boost.js';",
+            "import { cog } from './cogs.js';",
+            "import { slotLayout } from './layout.js';"])
+        # the icons are drawn in code with no text in them
+        icons = ''.join(re.findall(r"'([^']*)'", re.search(r'const ICONS = {(.*?)\n};', code, flags=re.S).group(1)))
+        self.assertIn('<svg', icons)
+        self.assertNotRegex(re.sub(r'<[^>]*>', '', icons), r'\S')
+        for kind in ('remember', 'first', 'cleanup'):
+            self.assertIn(f"    {kind}: '<svg viewBox=\"0 0 36 28\" aria-hidden=\"true\">'", code)
+
+    # --- the template and the look ---
+
+    def test_the_layer_in_the_template(self):
+        html = self.client.get('/').content.decode()
+        layer = html[html.index('<div id="boost-layer"'):html.index('<div class="frame"')]
+        self.assertIn('<div id="boost-layer" class="boost-layer" hidden>', layer)
+        self.assertIn('<div id="boost-scrim" class="boost-scrim"></div>', layer)
+        self.assertIn('<div id="boost-tray" class="boost-tray" role="group" aria-label="Boosts" hidden></div>', layer)
+        self.assertIn('<div id="boost-picks" class="boost-picks" role="group" aria-label="Slots" hidden></div>', layer)
+        self.assertNotRegex(re.sub(r'<[^>]*>', '', layer).strip(), r'\S')      # no text
+        self.assertLess(html.index('<div id="screen-gallery"'), html.index('<div id="boost-layer"'))
+        template = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", template).group(1)), 32)
+
+    def test_the_look(self):
+        # over the header (z-index 1), under the frame (20); the scrim
+        # takes every tap and no scroll
+        z = lambda sel: int(re.search(r'z-index: (\d+);', self.rule(sel)).group(1))
+        self.assertLess(z('.app-header'), z('.boost-layer'))
+        self.assertLess(z('.boost-layer'), z('.frame'))
+        self.assertIn('position: fixed;', self.rule('.boost-layer'))
+        self.assertIn('inset: 0;', self.rule('.boost-scrim'))
+        self.assertIn('touch-action: none;', self.rule('.boost-scrim'))
+        self.assertIn('display: none;', self.rule('.boost-layer[hidden],\n.boost-tray[hidden],\n.boost-picks[hidden]'))
+        # the keys' tap areas are over 48px; the console button's is 48px tall
+        item = self.rule('.boost-item')
+        self.assertIn('width: 58px;', item)
+        self.assertIn('height: 64px;', item)
+        self.assertIn('pointer-events: auto;', self.rule('#screen-play .console-gears'))
+        self.assertIn('filter: brightness(0.6) saturate(0.7);', self.rule('#screen-play .console-gears:disabled'))
+        # the glow pulses, steady under reduced motion
+        self.assertIn('animation: boost-glow 1.2s ease-in-out infinite alternate;', self.rule('.boost-pick::before'))
+        self.assertRegex(self.css(), r'@media \(prefers-reduced-motion: reduce\) {\s*\.boost-pick::before {\s*animation: none;')
+        # a gone block: hidden where it was, out of the layout, no taps
+        gone = self.rule('.draggable-letter.gone,\n.letter-box > .draggable-letter.gone')
+        for decl in ('position: absolute;', 'visibility: hidden;', 'pointer-events: none;'):
+            self.assertIn(decl, gone)
+        for decl in ('position: fixed;', 'pointer-events: none;', 'overflow: hidden;'):
+            self.assertIn(decl, self.rule('.puff'))
+        # palette only (DESIGN "Palette")
+        css = (self.ROOT / 'static' / 'css' / 'game.css').read_text()
+        section = css[css.index('/* --- Boost tray (BACKLOG B-219, boosttray.js) --- */'):css.index('/* --- Round-end screen')]
+        self.assertNotRegex(re.sub(r'/\*.*?\*/', '', section, flags=re.S), r'#[0-9a-fA-F]{3,6}\b|rgb|hsl')

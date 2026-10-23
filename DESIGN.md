@@ -25,6 +25,10 @@ an image model by the human.
 
 Exception: on the interim screens (see "Other screens (interim)") the cream panels with a brass border and the icon buttons (small cream panels with an ink icon) are CSS by design until their design pass.
 
+Exception (BACKLOG B-218): the gear counter on the play screen's console, on the brass plate between the speaker and the check dome (a brass cog drawn in code, inline SVG, with the count in split-flap digits; the face of the boost button, B-219), is a new scene object drawn in code until the Claude Design pass replaces it.
+
+Exception (BACKLOG B-219): the boost tray (a small brass plate over the bench, just above the console, its notch pointing at the gear counter, which is the boost button; one cream key per boost that applies, its icon drawn in code, inline SVG, and its cost as small cogs; the amber glow round the slots "Remember this one" offers; a clear scrim under them) is a new scene object drawn in code until the Claude Design pass replaces it.
+
 ## Assets (`static/images/ui/`)
 | File | What | Shown at (CSS px, 360 wide) |
 |---|---|---|
@@ -94,11 +98,11 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
 - **Console:** pinned to the bottom of the safe area, inset 4px from each
   side of it (324px wide at 360) so its lower corners clear the frame's
   rounded inner corners. On its brass plate,
-  left to right: reset lever (far left), speaker (centre-left), check
+  left to right: reset lever (far left), speaker (centre-left), the gear counter, which is the boost button (B-218, B-219; between the speaker's and the dome's tap areas, its tap area 48px tall), check
   dome (right). Reset and check stay far apart.
 - **Robot:** behind the console's left third, head and shoulders visible
   (~75px); the console, the rail and the bench blocks are drawn above him (on 9–10 letter words his pop-up passes under the second block row; BACKLOG B-115, B-213).
-- **Header:** split-flap logo "flip" top-left, mute toggle top-right, and on the play screen only the back arrow between them (24px left of the toggle's tap area; B-201), inside the safe area over the shelf.
+- **Header:** split-flap logo "flip" top-left, mute toggle top-right, and between them on the play screen only the back arrow (24px left of the toggle's tap area; B-201) and on the theme screen only the gear counter (a brass cog and the kid's gears in split-flaps, centred between the logo and the toggle; B-218), inside the safe area over the shelf.
 
 ## Palette (sampled from v5; use as CSS variables)
 ```
@@ -137,7 +141,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - **Speaker** (`#speak-btn`): plays the word's audio. `speaker-on` while
   playing. A word with no audio file shows `speaker-cap` and ignores taps. On every stage a tap plays the word, before and after the word is answered; it never holds the word back (B-215, PROGRESSION.md: the word is always hearable; B-203's held-back speaker is gone).
 - **Mute toggle** (`#mute-btn`): top-right, one button: the small cream speaker glyph (code; wave, or cross while muted) then the brass switch (`mute-switch-on` knob right = sound on, `mute-switch-off` knob left = muted, stacked and swapped by class). Remembered in localStorage.
-- **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → theme screen at once, the round dropped (B-201).
+- **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → the theme's stage screen at once, the round dropped (B-201, B-217).
 
 ## Feedback (no words)
 - Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb
@@ -148,7 +152,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
   robot: Third miss moment (CHARACTER.md).
 - Correct: slots pulse once; TV screen flashes warm white (200ms); up to
   40 sparks (amber, teal, cream) burst from the TV, 600ms, removed after;
-  robot: Correct moment (CHARACTER.md).
+  small cogs, one per gear the word earns, fly from the TV into the console's gear counter, its count flipping up as each lands (600ms at most; reduced motion: the count just changes; B-218); robot: Correct moment (CHARACTER.md).
 - Never block input for more than 300ms. `prefers-reduced-motion`:
   replace motion with opacity fades; the dome glows steadily instead of
   pulsing or blinking (`next` keeps its lit look, shine and halo).
@@ -169,7 +173,7 @@ dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects a
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
-Theme, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
+Theme, stage map, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
 darkened 40% as backdrop, the same frame, cream panels with a brass
 border in CSS, the palette and fonts above, and icons instead of English
 labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the

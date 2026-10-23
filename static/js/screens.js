@@ -5,6 +5,7 @@
 
 const SCREENS = {
     'theme': 'screen-theme',
+    'stages': 'screen-stages',
     'play': 'screen-play',
     'round-end': 'screen-round-end',
     'gallery': 'screen-gallery',

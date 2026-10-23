@@ -21,6 +21,12 @@
 //     coming on at the hit
 //   - a new word in two rows appeared (BACKLOG B-213): its brass joint
 //     glows once
+//   - a boost (BACKLOG B-219, boost.js): its letter comes in with the
+//     robot's second-miss motion (the block in its slot hops back, the
+//     letter flies in and clunks; one already there only clunks), and the
+//     clean-up's extra blocks puff away; the boost tray pops open; a boost
+//     the kid can't afford (`lockedTaps` one more) flickers the console's
+//     gear counter
 // The correct-check beat (slot pulse, TV flash, sparks) is celebrate.js.
 // Every tween clears what it set when it ends, so the CSS render of state
 // is what stays.
@@ -30,9 +36,11 @@ import { centre } from './drag.js';
 
 // Render cache (like `last` in celebrate.js): what the last render showed
 // of the current word, so a transition can be told from a re-render. The
-// placement is kept so the reveal, the second-miss hint and the reset
-// can fly blocks from the slots they were in.
-const NONE = { key: null, status: null, lives: null, pressed: null, placed: [] };
+// placement is kept so the reveal, the second-miss hint, the reset and a
+// boost can fly blocks from the slots they were in; `gone` (the blocks
+// the clean-up took away), `lockedTaps` and `menu` (state.boostMenu) for
+// the boosts (BACKLOG B-219).
+const NONE = { key: null, status: null, lives: null, pressed: null, placed: [], gone: [], lockedTaps: 0, menu: null };
 let last = NONE;
 
 function reducedMotion() {
@@ -43,7 +51,16 @@ export function renderFeedback(state) {
     const { current, lives, pressed, round } = state;
     const onWord = state.screen === 'play' && !!current.word;
     const now = onWord
-        ? { key: `${round.index}:${current.word}`, status: current.status, lives, pressed, placed: current.placed }
+        ? {
+            key: `${round.index}:${current.word}`,
+            status: current.status,
+            lives,
+            pressed,
+            placed: current.placed,
+            gone: current.tray.filter((t) => t.gone).map((t) => t.id),
+            lockedTaps: state.lockedTaps || 0,
+            menu: state.boostMenu || null,
+        }
         : NONE;
     const prev = last;
     last = now;
@@ -72,10 +89,22 @@ export function renderFeedback(state) {
         shakeRail();
         hopBack(prev.placed);
     }
+    // a boost's letter (BACKLOG B-219, boost.js giveLetter) comes in as the
+    // robot's does
+    if (boostSlot(now.placed) !== -1 && boostSlot(prev.placed) === -1) {
+        boostIn(prev.placed, current);
+    }
+    // the clean-up boost took the extra blocks away (boost.js cleanUp)
+    const gone = now.gone.filter((id) => !prev.gone.includes(id));
+    if (gone.length) puffAway(gone);
+    // a boost the kid can't afford: the gear counter flickers
+    if (now.lockedTaps > prev.lockedTaps) flickerGears();
+    if (now.menu === 'tray' && prev.menu !== 'tray') trayIn();
     // a letter that locked clunks into its slot now (the lever, BACKLOG
-    // B-215b); the robot's letter clunks as it lands (hintIn)
+    // B-215b); the robot's letter and a boost's clunk as they land (hintIn,
+    // boostIn)
     newlyLocked(prev.placed, now.placed)
-        .filter((i) => !now.placed[i].hint)
+        .filter((i) => !now.placed[i].hint && !now.placed[i].boost)
         .forEach((i) => clunk(tileEl(now.placed[i].tileId), 0));
 }
 
@@ -283,31 +312,142 @@ function benchSpot(current, tileId) {
 // comes on at the hit. Reduced motion: no wiggle, flight or clunk; the
 // two fade in where they now are, one after the other.
 function hintIn(prevPlaced, current) {
+    letterIn(prevPlaced, current, hintSlot(current.placed), true);
+}
+
+// The letter the robot puts in slot `k` (the second-miss hint, or a
+// boost's), from where the last render had it: after the wrong wiggle
+// when it comes with a miss (`missed`), else at once. The block that was
+// in the slot hops back to its bench spot, then his letter flies in and
+// clunks as it lands.
+function letterIn(prevPlaced, current, k, missed) {
     const boxes = document.getElementById('letter-boxes').children;
-    const k = hintSlot(current.placed);
-    const hint = current.placed[k];
-    const el = tileEl(hint.tileId);
+    const given = current.placed[k];
+    const el = tileEl(given.tileId);
     if (!el || !boxes[k]) return;
     const reduced = reducedMotion();
     const wiggle = motionFor('wiggle', reduced);
     const hop = motionFor('hop', reduced);
     const flyIn = motionFor('flyIn', reduced);
     const was = prevPlaced[k];
-    const out = was && was.tileId !== hint.tileId ? tileEl(was.tileId) : null;
-    const j = prevPlaced.findIndex((p) => !!p && p.tileId === hint.tileId);
-    const from = j !== -1 ? boxes[j] : benchSpot(current, hint.tileId);
-    let at = wiggle.duration;
+    const out = was && was.tileId !== given.tileId ? tileEl(was.tileId) : null;
+    const j = prevPlaced.findIndex((p) => !!p && p.tileId === given.tileId);
+    const from = j !== -1 ? boxes[j] : benchSpot(current, given.tileId);
+    let at = missed ? wiggle.duration : 0;
     if (out) {
-        travel(out, boxes[k], { wiggle, at, m: hop, hop: true, z: 11 });
+        travel(out, boxes[k], { wiggle: missed ? wiggle : null, at, m: hop, hop: true, z: 11 });
         at += hop.duration || hop.fade;
     }
     if (!from) return;
-    const wrongThere = j !== -1 && prevPlaced[j].letter !== current.word[j];
+    const wrongThere = missed && j !== -1 && prevPlaced[j].letter !== current.word[j];
     // a plain block's size before travel measures it; the clunk after
     // travel, which stops the block's tweens when it starts
     if (!reduced) el.classList.add('landing');
     travel(el, from, { wiggle: wrongThere ? wiggle : null, at, m: flyIn, hop: false, z: 10 });
     if (!reduced) clunk(el, at + flyIn.duration);
+}
+
+// --- Boosts (BACKLOG B-219, boost.js) ---
+
+// The slot holding a boost's letter (boost.js giveLetter), or -1.
+function boostSlot(placed) {
+    return placed.findIndex((p) => !!p && !!p.boost);
+}
+
+// A boost's letter: with the second-miss hint's motion, at once (no
+// wiggle: no check came with it). A letter that was already in its slot
+// stays there and clunks in, locking.
+function boostIn(prevPlaced, current) {
+    const k = boostSlot(current.placed);
+    const was = prevPlaced[k];
+    if (was && was.tileId === current.placed[k].tileId) clunk(tileEl(was.tileId), 0);
+    else letterIn(prevPlaced, current, k, false);
+}
+
+// The clean-up took the blocks `ids` away: card.js has hidden them where
+// they were (class `gone`, game.css: out of the layout, so a block placed
+// in that slot later sits as before), on the bench or in a slot. Each is
+// shown again for the puff: it swells and fades out while a few puffs of
+// smoke spread from it, in a fixed, click-through layer removed when the
+// puff ends; then what was set is cleared, so the hidden render shows.
+// Reduced motion: the block only fades out, no smoke.
+function puffAway(ids) {
+    const m = motionFor('puff', reducedMotion());
+    const els = ids.map(tileEl).filter(Boolean);
+    if (!els.length) return;
+    const time = m.duration || m.fade;
+    gsap.killTweensOf(els);
+    gsap.set(els, { visibility: 'visible', zIndex: 10 });
+    restoreAfter(els, time, 'visibility,zIndex,opacity');
+    if (m.duration === 0) {
+        gsap.fromTo(els, { opacity: 1 }, { opacity: 0, duration: m.fade, ease: 'power1.in' });
+        return;
+    }
+    gsap.fromTo(els, { opacity: 1, scale: 1 }, { opacity: 0, scale: m.scale, duration: m.duration, ease: m.ease });
+    gsap.delayedCall(m.duration, () => gsap.set(els, { scale: 1 }));
+    if (!m.count) return;
+    const layer = document.createElement('div');
+    layer.className = 'puff';
+    layer.setAttribute('aria-hidden', 'true');
+    const tl = gsap.timeline({ onComplete: () => layer.remove() });
+    els.forEach((el) => {
+        const c = centre(el);
+        for (let i = 0; i < m.count; i++) {
+            const bit = document.createElement('span');
+            bit.className = 'puff-bit';
+            layer.appendChild(bit);
+            const angle = (i / m.count) * Math.PI * 2 + 0.4;
+            gsap.set(bit, { x: c.x, y: c.y, xPercent: -50, yPercent: -50, scale: 0.4, opacity: 0.9 });
+            tl.to(bit, {
+                x: c.x + Math.cos(angle) * m.distance,
+                y: c.y + Math.sin(angle) * m.distance,
+                scale: 1.2,
+                opacity: 0,
+                duration: m.duration,
+                ease: m.ease,
+            }, 0);
+        }
+    });
+    document.body.appendChild(layer);
+}
+
+// A boost the kid can't afford: the console's gear counter (the boost
+// button) flickers, off and on m.flashes times within m.duration, the
+// lives bulb's flicker. Reduced motion: one opacity dip.
+function flickerGears() {
+    const host = document.getElementById('console-gears');
+    if (!host) return;
+    const m = motionFor('flicker', reducedMotion());
+    gsap.killTweensOf(host, 'opacity');
+    if (m.flashes > 0) {
+        const step = m.duration / (m.flashes * 2);
+        const tl = gsap.timeline({ onComplete: () => gsap.set(host, { clearProps: 'opacity' }) });
+        for (let i = 0; i < m.flashes; i++) {
+            tl.set(host, { opacity: 0.2 }, 2 * i * step);
+            tl.set(host, { opacity: 1 }, (2 * i + 1) * step);
+        }
+    } else if (m.fade > 0) {
+        dip(host, m.fade);
+    }
+}
+
+// The boost tray opens: it rises a little and grows from its notch (the
+// point under it at the boost button) as it fades in. Reduced motion: a
+// fade in. What it set is cleared when it ends.
+function trayIn() {
+    const tray = document.getElementById('boost-tray');
+    if (!tray) return;
+    const m = motionFor('trayIn', reducedMotion());
+    gsap.killTweensOf(tray);
+    const done = () => gsap.set(tray, { clearProps: 'opacity,transform,transformOrigin' });
+    if (m.duration === 0) {
+        gsap.fromTo(tray, { opacity: 0 }, { opacity: 1, duration: m.fade, ease: 'power1.out', onComplete: done });
+        return;
+    }
+    const notch = parseFloat(tray.style.getPropertyValue('--notch')) || tray.offsetWidth / 2;
+    gsap.fromTo(tray, { opacity: 0, scale: m.scale, y: m.distance }, {
+        opacity: 1, scale: 1, y: 0, duration: m.duration, ease: m.ease, transformOrigin: `${notch}px 100%`, onComplete: done,
+    });
 }
 
 // Move `el` from where `fromEl` is (a slot or a bench spot) to where the
