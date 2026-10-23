@@ -10191,3 +10191,425 @@ class MomentLinesTests(TestCase):
         character = strip(self.CHARACTER.read_text())
         for word in ('setState', 'AudioContext', 'new Audio', "from './audio.js'"):
             self.assertNotIn(word, character)
+
+
+class PictureLifeTests(TestCase):
+    """The TV picture's life (BACKLOG B-221; the approved prototype is
+    design/reference/tv-motion.html, layer 2 "Life"): picture.js's table of
+    idle moves (sway and rumble the prototype's, the others new, small,
+    starting and ending at rest), the pivots, the plate's glow and the
+    specks; lifeOf reads a word's data entry (`motion` with both pictures,
+    or the still picture); its subscriber (stand-ins for the DOM and Web
+    Animations) loads a word's two layers as it starts, shows them once the
+    picture has locked (state.tuned) and both have decoded, runs the life
+    with Element.animate only, and cancels it on a new word, on leaving the
+    play screen and while the page is hidden; reduced motion shows the
+    layers still. main.js, the template, game.css and feedback.js's static
+    wire it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const P = await import('{(self.JS / 'picture.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    def entries(self):
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        for theme, url in index.items():
+            data = json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8'))
+            for word, entry in data.items():
+                yield theme, word, entry
+
+    # --- the table ---
+
+    def test_sway_and_rumble_are_the_prototypes(self):
+        idle, pivots = self.run_node("out([P.IDLE, P.PIVOTS]);")
+        self.assertEqual(idle['sway'], {
+            'keyframes': [{'transform': 'rotate(-1.8deg)'}, {'transform': 'rotate(1.8deg)'}],
+            'duration': 3200, 'direction': 'alternate', 'easing': 'ease-in-out',
+            # it starts halfway through its first swing, at rest
+            'iterationStart': 0.5,
+        })
+        self.assertEqual(idle['rumble'], {
+            'keyframes': [
+                {'transform': 'translateY(0) scaleY(1)'},
+                {'transform': 'translateY(-0.9%) scaleY(1.008)', 'offset': 0.18},
+                {'transform': 'translateY(0) scaleY(0.994)', 'offset': 0.36},
+                {'transform': 'translateY(0) scaleY(1)'},
+            ],
+            'duration': 950, 'easing': 'ease-in-out',
+        })
+        # the backlog's pivots (the prototype's bat 51% 14%, its taxi 50% 88%)
+        self.assertEqual(pivots, {'top': '50% 12%', 'bottom': '50% 88%', 'center': '50% 50%'})
+        # the prototype's own lines, so a change there shows up here
+        proto = (self.ROOT / 'design' / 'reference' / 'tv-motion.html').read_text()
+        for line in ('sway:   { kf: [{ transform: "rotate(-1.8deg)" }, { transform: "rotate(1.8deg)" }], opt: { duration: 3200, direction: "alternate", easing: "ease-in-out" } },',
+                     '{ transform: "translateY(0) scaleY(1)" },',
+                     '{ transform: "translateY(-0.9%) scaleY(1.008)", offset: 0.18 },',
+                     '{ transform: "translateY(0) scaleY(0.994)", offset: 0.36 },',
+                     '], opt: { duration: 950, easing: "ease-in-out" } }',
+                     '{ duration: 4200, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }',
+                     'glowAnim = $("plate").animate([{ filter: "brightness(1)" }, { filter: "brightness(1.07)" }],',
+                     'for (let i = 0; i < 6; i++) {',
+                     'm.style.left = (18 + Math.random() * 64) + "%";',
+                     'm.style.top = (55 + Math.random() * 35) + "%";',
+                     '{ opacity: 0.3, offset: 0.3 },',
+                     '{ transform: `translate(${(Math.random() - 0.5) * 30}px, -${40 + Math.random() * 50}px)`, opacity: 0 }',
+                     '], { duration: 9000 + Math.random() * 7000, delay: Math.random() * 6000, iterations: Infinity, easing: "linear" }));',
+                     '.mote { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--cream); opacity: 0; }'):
+            self.assertIn(line, proto)
+
+    def parse(self, transform):
+        """A keyframe's transform as { function: [numbers] } (units dropped)."""
+        out = {}
+        for name, args in re.findall(r'([a-zA-Z]+)\(([^)]*)\)', transform):
+            out[name] = [float(re.sub(r'[a-z%]+$', '', a.strip())) for a in args.split(',')]
+        return out
+
+    def test_the_new_moves_are_small_loops_that_start_and_end_at_rest(self):
+        idle = self.run_node("out(P.IDLE);")
+        self.assertEqual(sorted(idle), sorted(['sway', 'rumble', 'bob', 'hop', 'wobble', 'float', 'breathe', 'spin']))
+        # every move the data asks for is in the table
+        used = {e['motion']['idle'] for _, _, e in self.entries() if 'motion' in e}
+        self.assertEqual(used - set(idle), set())
+        rest = {'translateY': 0, 'translateX': 0, 'rotate': 0}
+        for name in ('bob', 'hop', 'wobble', 'float', 'breathe', 'spin'):
+            move = idle[name]
+            frames = [self.parse(k['transform']) for k in move['keyframes']]
+            # a loop of 1-3.5s, played forwards (no alternate: the loop is the duration)
+            self.assertTrue(1000 <= move['duration'] <= 3500, name)
+            self.assertNotIn('direction', move, name)
+            self.assertNotIn('iterationStart', move, name)
+            # the same transform functions in every keyframe, so each one
+            # tweens on its own
+            self.assertEqual(len({tuple(f) for f in frames}), 1, name)
+            # it starts and ends at rest, so the subject never jumps off
+            # the still picture as the layers come in
+            for f in (frames[0], frames[-1]):
+                for fn, args in f.items():
+                    want = 1 if fn.startswith('scale') else rest[fn]
+                    self.assertTrue(all(a == want for a in args), (name, f))
+            # small: at most 2% of the picture, 3 degrees (spin about 10),
+            # a squash or swell within 3%
+            for f in frames:
+                for fn, args in f.items():
+                    for a in args:
+                        if fn.startswith('translate'):
+                            self.assertLessEqual(abs(a), 2, (name, f))
+                        elif fn == 'rotate':
+                            self.assertLessEqual(abs(a), 10 if name == 'spin' else 3, (name, f))
+                        else:
+                            self.assertTrue(0.97 <= a <= 1.03, (name, f))
+        biggest = lambda name, fn: max(abs(a) for k in idle[name]['keyframes'] for a in self.parse(k['transform']).get(fn, [0]))
+        self.assertEqual(biggest('spin', 'rotate'), 10)
+        self.assertEqual(max(a for k in idle['breathe']['keyframes'] for a in self.parse(k['transform'])['scale']), 1.02)
+        # a hop goes up, lands squashed (wider, lower) and pauses
+        hop = [self.parse(k['transform']) for k in idle['hop']['keyframes']]
+        self.assertLess(min(f['translateY'][0] for f in hop), 0)
+        self.assertTrue(any(f['scale'][0] > 1 > f['scale'][1] and f['translateY'][0] == 0 for f in hop))
+        self.assertLessEqual(idle['hop']['keyframes'][-2]['offset'], 0.5)
+        # a float tilts, a bob does not; a wobble rocks both ways
+        self.assertNotEqual(biggest('float', 'rotate'), 0)
+        self.assertNotIn('rotate', self.parse(idle['bob']['keyframes'][0]['transform']))
+        wob = [self.parse(k['transform'])['rotate'][0] for k in idle['wobble']['keyframes']]
+        self.assertTrue(min(wob) < 0 < max(wob))
+
+    def test_idle_of_glow_of_and_the_specks(self):
+        res = self.run_node(
+            "const i = P.idleOf('sway'); const g = P.glowOf();"
+            "const lo = P.moteSpecs(() => 0); const hi = P.moteSpecs(() => 0.9999); const half = P.moteSpecs(() => 0.5);"
+            "let k = 0; const seq = P.moteSpecs(() => [0.1, 0.2, 0.3, 0.4, 0.5, 0.6][k++ % 6]);"
+            "out([i.keyframes, { ...i.options, iterations: String(i.options.iterations) }, P.idleOf('nope'), P.idleOf('constructor'), P.idleOf(null),"
+            " g.keyframes, { ...g.options, iterations: String(g.options.iterations) }, P.GLOW, P.MOTES,"
+            " lo.length, lo[0], hi[0], half[0], seq[0],"
+            " P.moteOf(half[0]).keyframes, { ...P.moteOf(half[0]).options, iterations: String(P.moteOf(half[0]).options.iterations) },"
+            " P.moteOf({ dx: -7.5, dy: 40, duration: 9000, delay: 0 }, 1.5).keyframes[2].transform,"
+            " P.scaleOf(151.2), P.scaleOf(201.6), P.scaleOf(0), P.scaleOf(undefined)]);")
+        (keyframes, options, nope, ctor, none, glow, glow_opts, GLOW, MOTES, n, lo, hi, half, seq,
+         frames, mote_opts, scaled, s1, s2, s0, su) = res
+        self.assertEqual(keyframes, [{'transform': 'rotate(-1.8deg)'}, {'transform': 'rotate(1.8deg)'}])
+        self.assertEqual(options, {'duration': 3200, 'direction': 'alternate', 'easing': 'ease-in-out', 'iterationStart': 0.5, 'iterations': 'Infinity'})
+        self.assertEqual([nope, ctor, none], [None, None, None])
+        # the plate's glow: brightness 1 -> 1.07, 4.2s each way, forever
+        self.assertEqual(glow, [{'filter': 'brightness(1)'}, {'filter': 'brightness(1.07)'}])
+        self.assertEqual(glow_opts, {'duration': 4200, 'direction': 'alternate', 'easing': 'ease-in-out', 'iterations': 'Infinity'})
+        self.assertEqual(GLOW['duration'], 4200)
+        # about 6 dim specks: the prototype's numbers
+        self.assertEqual(MOTES, {'count': 6, 'left': {'least': 18, 'range': 64}, 'top': {'least': 55, 'range': 35}, 'drift': 30,
+                                 'rise': {'least': 40, 'range': 50}, 'duration': {'least': 9000, 'range': 7000}, 'delay': 6000,
+                                 'peak': 0.3, 'peakAt': 0.3, 'width': 151.2})
+        self.assertEqual(n, 6)
+        self.assertEqual(lo, {'left': 18, 'top': 55, 'dx': -15, 'dy': 40, 'duration': 9000, 'delay': 0})
+        for key, top in (('left', 82), ('top', 90), ('dx', 15), ('dy', 90), ('duration', 16000), ('delay', 6000)):
+            self.assertAlmostEqual(hi[key], top, delta=top * 0.0001 + 0.01)
+        self.assertEqual(half, {'left': 50, 'top': 72.5, 'dx': 0, 'dy': 65, 'duration': 12500, 'delay': 3000})
+        # the prototype's order: left, top, then dx, dy, duration, delay
+        self.assertEqual(seq, {'left': 18 + 0.1 * 64, 'top': 55 + 0.2 * 35, 'dx': (0.3 - 0.5) * 30, 'dy': 40 + 0.4 * 50,
+                               'duration': 9000 + 0.5 * 7000, 'delay': 0.6 * 6000})
+        # each fades in to 0.3 a third of the way and out as it rises,
+        # linearly, again and again
+        self.assertEqual(frames, [{'transform': 'translate(0px, 0px)', 'opacity': 0}, {'opacity': 0.3, 'offset': 0.3},
+                                  {'transform': 'translate(0px, -65px)', 'opacity': 0}])
+        self.assertEqual(mote_opts, {'duration': 12500, 'delay': 3000, 'iterations': 'Infinity', 'easing': 'linear'})
+        # the px scale with the TV picture (151.2px wide at 360)
+        self.assertEqual(scaled, 'translate(-11.25px, -60px)')
+        self.assertEqual([s1, s2, s0, su], [1, 201.6 / 151.2, 1, 1])
+
+    def test_life_of_a_data_entry(self):
+        res = self.run_node(
+            "const m = (o) => ({ image: '/w/x.webp', motion: { subject: '/w/x-subject.webp', plate: '/w/x-plate.webp', idle: 'hop', pivot: 'bottom', win: 'pop', ...o } });"
+            "out([P.lifeOf(m({})), P.lifeOf(m({ idle: 'sway', pivot: 'top' })), P.lifeOf(m({ pivot: 'center', idle: 'spin' })),"
+            " P.lifeOf(m({ idle: 'tumble', pivot: 'left' })), P.lifeOf(m({ idle: 'toString', pivot: '__proto__' })),"
+            " P.lifeOf({ image: '/a/duck.svg' }), P.lifeOf(m({ subject: '' })), P.lifeOf(m({ plate: null })), P.lifeOf({ motion: 'cat' }),"
+            " P.lifeOf(null), P.lifeOf(undefined), P.lifeOf('cat')]);")
+        self.assertEqual(res[0], {'subject': '/w/x-subject.webp', 'plate': '/w/x-plate.webp', 'idle': 'hop', 'origin': '50% 88%'})
+        self.assertEqual(res[1]['origin'], '50% 12%')
+        self.assertEqual([res[2]['idle'], res[2]['origin']], ['spin', '50% 50%'])
+        # a move or a pivot the table does not have: still, from the centre
+        self.assertEqual([res[3]['idle'], res[3]['origin']], [None, '50% 50%'])
+        self.assertEqual([res[4]['idle'], res[4]['origin']], [None, '50% 50%'])
+        # no motion with both pictures: the still picture
+        self.assertEqual(res[5:], [None] * 7)
+        # the win (BACKLOG B-222) is not read here
+        self.assertNotIn('win', self.code('picture.js').replace('window', ''))
+
+    def test_every_word_but_the_duck_has_its_two_layers(self):
+        entries = {f'{t}/{w}': e for t, w, e in self.entries()}
+        res = self.run_node(f"const E = {json.dumps(entries)}; out(Object.fromEntries(Object.entries(E).map(([k, e]) => [k, P.lifeOf(e)])));")
+        still = sorted(k for k, v in res.items() if v is None)
+        self.assertEqual(still, ['animals/duck'])
+        for key, life in res.items():
+            if life is None:
+                continue
+            for pic in (life['plate'], life['subject']):
+                self.assertTrue((self.ROOT / pic.lstrip('/')).exists(), (key, pic))
+            self.assertIsNotNone(life['idle'], key)
+            self.assertNotEqual(life['origin'], None, key)
+
+    # --- the subscriber (stand-ins for the DOM and Web Animations) ---
+
+    FAKE = """
+        const calls = []; const live = new Set(); let reduced = false; const prefetched = [];
+        const tick = () => new Promise((r) => setTimeout(r, 0));
+        const inside = (el, root) => { for (let e = el; e; e = e.parent) if (e === root) return true; return false; };
+        class El {
+            constructor(name, parent = null) { this.name = name; this.parent = parent; this.attrs = {}; this.style = {}; this.kids = [];
+                this.cls = new Set(); this.isConnected = true; this.clientWidth = 151.2; this.pending = [];
+                const s = this.cls; this.classList = { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c),
+                    toggle: (c, on) => (on ? s.add(c) : s.delete(c)) }; }
+            getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+            set src(v) { this.attrs.src = v; calls.push(['src', this.name, v]); }
+            decode() { calls.push(['decode', this.name]); return new Promise((res, rej) => this.pending.push({ res, rej })); }
+            animate(keyframes, options) {
+                const a = { target: this, keyframes, options, cancel: () => { live.delete(a); calls.push(['cancel', this.name]); } };
+                live.add(a); calls.push(['animate', this.name, keyframes, { ...options, iterations: String(options.iterations) }]); return a;
+            }
+            appendChild(c) { c.parent = this; this.kids.push(c); }
+            set textContent(v) { this.kids.forEach((k) => { k.parent = null; }); this.kids = []; calls.push(['clear', this.name]); }
+            getAnimations(o) { return [...live].filter((a) => (o && o.subtree ? inside(a.target, this) : a.target === this)); }
+        }
+        const card = new El('card'); const life = new El('life', card); const plate = new El('plate', life);
+        const motes = new El('motes', life); const actor = new El('actor', life); const subject = new El('subject', actor);
+        const parts = { '.tv-life': life, '.tv-plate': plate, '.tv-motes': motes, '.tv-actor': actor, '.tv-subject': subject };
+        card.querySelector = (s) => parts[s] || null;
+        globalThis.document = { hidden: false, querySelector: (s) => (s === '#screen-play .card' ? card : null), createElement: () => new El('mote') };
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        globalThis.Image = class { set src(v) { prefetched.push(v); } };
+        const decodeAll = async (ok = true) => { for (const el of [plate, subject]) { el.pending.splice(0).forEach((p) => (ok ? p.res() : p.rej(new Error('no')))); } await tick(); };
+        const M = (idle, pivot) => ({ subject: '/w/' + idle + '-subject.webp', plate: '/w/' + idle + '-plate.webp', idle, pivot, win: 'pop' });
+        const data = { cat: { image: '/w/cat.webp', motion: M('breathe', 'bottom') }, bat: { image: '/w/bat.webp', motion: M('sway', 'top') },
+            duck: { image: '/a/duck.svg' }, bus: { image: '/w/bus.webp', motion: M('rumble', 'bottom') } };
+        const words = [{ word: 'cat' }, { word: 'bat' }, { word: 'duck' }, { word: 'bus' }];
+        const at = (index, o = {}) => ({ screen: 'play', roundsStarted: 1, data, words, round: { index }, current: { word: words[index].word }, tuned: false, ...o });
+        const take = () => calls.splice(0);
+        const on = () => card.cls.has('life-on');
+        const kinds = (c) => c.map((x) => x[0] + ' ' + x[1]);
+    """
+
+    def test_a_word_loads_its_layers_and_shows_them_once_locked_and_decoded(self):
+        res = self.run_node(
+            "P.renderPicture(at(0)); const start = take(); const s1 = [on(), live.size, actor.style.transformOrigin];"
+            # decoded first, then the lock
+            "await decodeAll(); const decoded = [take(), on(), live.size];"
+            "P.renderPicture(at(0, { tuned: true })); const locked = take(); const s2 = [on(), live.size, motes.kids.length];"
+            # a re-render in the same state starts nothing new
+            "P.renderPicture(at(0, { tuned: true })); P.renderPicture(at(0, { tuned: true, lives: 2 })); const again = take();"
+            "out([start, s1, decoded, locked, s2, again, prefetched, motes.kids.map((m) => [m.style.left.endsWith('%'), m.style.top.endsWith('%'), m.className])]);",
+            prelude=self.FAKE)
+        start, s1, decoded, locked, s2, again, prefetched, specks = res
+        # the word starts: its plate and subject load and decode, its pivot set; nothing shows yet
+        self.assertEqual(start, [['clear', 'motes'], ['src', 'plate', '/w/breathe-plate.webp'], ['src', 'subject', '/w/breathe-subject.webp'],
+                                 ['decode', 'plate'], ['decode', 'subject']])
+        self.assertEqual(s1, [False, 0, '50% 88%'])
+        # decoded but not locked yet: still the still picture
+        self.assertEqual(decoded, [[], False, 0])
+        # at the lock: the layers show and the life starts, Web Animations only
+        self.assertEqual([c[:2] for c in locked], [['animate', 'actor'], ['animate', 'plate']] + [['animate', 'mote']] * 6)
+        self.assertEqual(locked[0][2:], [[{'transform': 'scale(1)', 'easing': 'ease-in-out'}, {'transform': 'scale(1.02)', 'easing': 'ease-in-out'}, {'transform': 'scale(1)'}],
+                                         {'duration': 3200, 'iterations': 'Infinity'}])
+        self.assertEqual(locked[1][2:], [[{'filter': 'brightness(1)'}, {'filter': 'brightness(1.07)'}],
+                                         {'duration': 4200, 'direction': 'alternate', 'easing': 'ease-in-out', 'iterations': 'Infinity'}])
+        for c in locked[2:]:
+            self.assertEqual(c[3]['iterations'], 'Infinity')
+            self.assertEqual(c[3]['easing'], 'linear')
+        self.assertEqual(s2, [True, 8, 6])
+        self.assertEqual(again, [])
+        # the next word's layers start loading now
+        self.assertEqual(prefetched, ['/w/sway-plate.webp', '/w/sway-subject.webp'])
+        self.assertEqual(specks, [[True, True, 'tv-mote']] * 6)
+
+    def test_layers_still_loading_at_the_lock_show_when_they_have_decoded(self):
+        res = self.run_node(
+            "P.renderPicture(at(1)); P.renderPicture(at(1, { tuned: true })); take(); const s1 = [on(), live.size];"
+            "await decodeAll(); const late = take(); const s2 = [on(), live.size, actor.style.transformOrigin];"
+            # one that fails to load: the still picture stays
+            "P.renderPicture(at(3)); P.renderPicture(at(3, { tuned: true })); take(); await decodeAll(false); const failed = [take(), on(), live.size];"
+            # one that decodes after its word has gone: nothing shows
+            "P.renderPicture(at(0)); const pend = [plate.pending.length, subject.pending.length]; P.renderPicture(at(2)); take();"
+            "await decodeAll(); P.renderPicture(at(2, { tuned: true })); const stale = [take(), on(), live.size];"
+            "out([s1, kinds(late), s2, failed, pend, stale]);",
+            prelude=self.FAKE)
+        s1, late, s2, failed, pend, stale = res
+        self.assertEqual(s1, [False, 0])
+        self.assertEqual(late, ['animate actor', 'animate plate'] + ['animate mote'] * 6)
+        self.assertEqual(s2, [True, 8, '50% 12%'])
+        self.assertEqual(failed, [[], False, 0])
+        self.assertEqual(pend, [1, 1])
+        self.assertEqual(stale, [[], False, 0])
+
+    def test_a_word_without_motion_shows_its_still_picture(self):
+        res = self.run_node(
+            "P.renderPicture(at(2)); P.renderPicture(at(2, { tuned: true })); await decodeAll(); const duck = [take(), on(), live.size];"
+            # a data entry missing, or no data at all
+            "P.renderPicture(at(0, { data: null, tuned: true })); P.renderPicture({ ...at(1, { tuned: true }), current: { word: 'owl' } }); await decodeAll();"
+            "out([duck, take(), on(), live.size]);",
+            prelude=self.FAKE)
+        duck, rest, is_on, n = res
+        self.assertEqual(duck, [[['clear', 'motes']], False, 0])
+        self.assertEqual([c[0] for c in rest], ['clear', 'clear'])
+        self.assertEqual([is_on, n], [False, 0])
+
+    def test_a_new_word_leaving_or_a_hidden_page_stops_it(self):
+        res = self.run_node(
+            "const run = async (i) => { P.renderPicture(at(i)); await decodeAll(); P.renderPicture(at(i, { tuned: true })); };"
+            "await run(0); take();"
+            # the next word: everything is cancelled at once and the layers hide until its own lock
+            "P.renderPicture(at(1)); const next = take(); const s1 = [on(), live.size, motes.kids.length];"
+            "await decodeAll(); P.renderPicture(at(1, { tuned: true })); take();"
+            # the page hidden: the life stops, the layers stay; shown: it starts again
+            "document.hidden = true; P.renderPicture(at(1, { tuned: true })); const hidden = take(); const s2 = [on(), live.size];"
+            "P.renderPicture(at(1, { tuned: true })); const hiddenAgain = take();"
+            "document.hidden = false; P.renderPicture(at(1, { tuned: true })); const shown = take(); const s3 = [on(), live.size];"
+            # leaving the play screen (the round end, the back arrow)
+            "P.renderPicture({ ...at(1, { tuned: true }), screen: 'round-end' }); const left = take(); const s4 = [on(), live.size];"
+            "P.renderPicture({ ...at(0), screen: 'stages', current: { word: null } }); const off = take();"
+            # the same word in a new round is a new word
+            "await run(0); take(); P.renderPicture(at(0, { roundsStarted: 2 })); const round2 = take();"
+            "out([kinds(next), s1, kinds(hidden), s2, hiddenAgain, kinds(shown), s3, kinds(left), s4, off, kinds(round2)]);",
+            prelude=self.FAKE)
+        nxt, s1, hidden, s2, hidden_again, shown, s3, left, s4, off, round2 = res
+        cancels = ['cancel actor', 'cancel plate'] + ['cancel mote'] * 6
+        self.assertEqual(nxt, cancels + ['clear motes', 'src plate', 'src subject', 'decode plate', 'decode subject'])
+        self.assertEqual(s1, [False, 0, 0])
+        self.assertEqual(hidden, cancels + ['clear motes'])
+        self.assertEqual(s2, [True, 0])
+        self.assertEqual(hidden_again, [])
+        self.assertEqual(shown, ['animate actor', 'animate plate'] + ['animate mote'] * 6)
+        self.assertEqual(s3, [True, 8])
+        self.assertEqual(left, cancels + ['clear motes'])
+        self.assertEqual(s4, [False, 0])
+        self.assertEqual(off, [])
+        self.assertEqual(round2[:8], cancels)
+        # the same pictures are not set again (they are loaded already)
+        self.assertNotIn('src plate', round2)
+        self.assertIn('decode plate', round2)
+
+    def test_reduced_motion_shows_the_layers_still(self):
+        res = self.run_node(
+            "reduced = true; P.renderPicture(at(0)); await decodeAll(); P.renderPicture(at(0, { tuned: true }));"
+            "out([on(), live.size, motes.kids.length, calls.filter((c) => c[0] === 'animate').length]);",
+            prelude=self.FAKE)
+        self.assertEqual(res, [True, 0, 0, 0])
+
+    # --- wiring: main.js, the template, game.css, feedback.js ---
+
+    def test_main_wires_it_after_the_tv_and_on_visibility_changes(self):
+        main = self.code('main.js')
+        self.assertIn("import { renderPicture } from './picture.js';", main)
+        self.assertIn('subscribe(renderPicture);', main)
+        self.assertLess(main.index('subscribe((s) => renderTv(s, onTuned));'), main.index('subscribe(renderPicture);'))
+        self.assertIn("document.addEventListener('visibilitychange', () => renderPicture(state));", main)
+        pic = self.code('picture.js')
+        # it never sets state and runs no script per frame: Web Animations
+        # only, cancelled through getAnimations (no animation handle kept)
+        for word in ('setState', "from './state.js'", 'requestAnimationFrame', 'gsap', 'setTimeout', 'setInterval', 'addEventListener'):
+            self.assertNotIn(word, pic, word)
+        self.assertIn('getAnimations({ subtree: true })', pic)
+        self.assertEqual(re.findall(r'^let (\w+)', pic, flags=re.M), ['shown', 'dom'])
+        # only picture.js puts the layers on
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'picture.js':
+                self.assertNotIn('life-on', self.code(f.name), f.name)
+
+    def test_the_layers_sit_over_the_picture_under_the_tune_in_and_take_no_taps(self):
+        html = self.HTML.read_text()
+        card = html[html.index('<div class="card">'):html.index('<div class="plate">')]
+        order = [card.index(s) for s in ('id="play-image"', '<div class="tv-life" aria-hidden="true">', 'class="tv-plate"', 'class="tv-motes"',
+                                         '<div class="tv-actor"><img class="tv-subject" src="" alt="" /></div>', 'class="tv-tune"',
+                                         'class="tv-roll"', 'class="tv-static"', 'class="tv-flash"')]
+        self.assertEqual(order, sorted(order))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 33)
+        life = self.rule('#screen-play .tv-life')
+        for decl in ('position: absolute;', 'inset: 0;', 'pointer-events: none;', 'visibility: hidden;'):
+            self.assertIn(decl, life)
+        self.assertIn('visibility: visible;', self.rule('#screen-play .card.life-on .tv-life'))
+        self.assertIn('visibility: hidden;', self.rule('#screen-play .card.life-on #play-image'))
+        # framed exactly like the new word pictures (cover, the whole tube)
+        shared = re.search(r'\n#screen-play \.card \.tv-life img,\n#screen-play \.tv-motes,\n#screen-play \.tv-actor\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        for decl in ('position: absolute;', 'inset: 0;', 'width: 100%;', 'height: 100%;'):
+            self.assertIn(decl, shared)
+        fit = self.rule('#screen-play .card .tv-life img')
+        for decl in ('object-fit: cover;', 'aspect-ratio: auto;', 'border-radius: 0;'):
+            self.assertIn(decl, fit)
+        words = self.rule('#screen-play .card img[src*="/images/words/"]')
+        for decl in ('width: 100%;', 'height: 100%;', 'object-fit: cover;', 'border-radius: 0;'):
+            self.assertIn(decl, words)
+        mote = self.rule('#screen-play .tv-mote')
+        for decl in ('width: calc(3 * var(--u));', 'height: calc(3 * var(--u));', 'border-radius: 50%;', 'background: var(--cream);', 'opacity: 0;'):
+            self.assertIn(decl, mote)
+
+    def test_the_wrong_check_static_jitters_the_layers_too(self):
+        static = self.function('staticTv', 'feedback.js')
+        self.assertIn("const life = document.querySelector('#screen-play .tv-life');", static)
+        self.assertIn('const img = life ? [still, life] : still;', static)
+        self.assertIn("tl.set(img, { x: f.x, opacity: 0.75 }, i * step);", static)
+        self.assertIn("gsap.set([layer].concat(img), { clearProps: 'opacity,transform,backgroundPosition' })", static)

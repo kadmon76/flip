@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=32">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=33">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -106,10 +106,19 @@
          tune-in on (snow, sync bar, the picture rolling in) and .tv-roll
          the faint bar that rolls past after it (BACKLOG B-214); .tv-static
          and .tv-flash are the TV's wrong-check static and correct-check
-         flash. All four are invisible at rest and take no taps. -->
+         flash. All four are invisible at rest and take no taps. .tv-life
+         is the picture's life (BACKLOG B-221, picture.js): a word with
+         `motion` shows there as its plate, a few drifting specks and its
+         subject (in .tv-actor, which moves), once the tune-in has locked;
+         hidden until then, under the four above, and it takes no taps. -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
             <img id="play-image" src="" alt="" />
+            <div class="tv-life" aria-hidden="true">
+                <img class="tv-plate" src="" alt="" />
+                <div class="tv-motes"></div>
+                <div class="tv-actor"><img class="tv-subject" src="" alt="" /></div>
+            </div>
             <canvas class="tv-tune" aria-hidden="true"></canvas>
             <div class="tv-roll" aria-hidden="true"></div>
             <div class="tv-static" aria-hidden="true"></div>

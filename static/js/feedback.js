@@ -227,15 +227,19 @@ function flickerBulb(index) {
 }
 
 // The TV picture breaks into static for 150ms: the static layer
-// (.tv-static) flickers and jumps while the picture jitters sideways.
+// (.tv-static) flickers and jumps while the picture jitters sideways: the
+// still picture and the picture's life (.tv-life, BACKLOG B-221,
+// picture.js), whichever shows.
 // Reduced motion: the static layer fades in and out once, no jitter.
 function staticTv() {
     const layer = document.querySelector('#screen-play .tv-static');
-    const img = document.getElementById('play-image');
-    if (!layer || !img) return;
+    const still = document.getElementById('play-image');
+    if (!layer || !still) return;
+    const life = document.querySelector('#screen-play .tv-life');
+    const img = life ? [still, life] : still;
     const m = motionFor('tvStatic', reducedMotion());
-    const done = () => gsap.set([layer, img], { clearProps: 'opacity,transform,backgroundPosition' });
-    gsap.killTweensOf([layer, img]);
+    const done = () => gsap.set([layer].concat(img), { clearProps: 'opacity,transform,backgroundPosition' });
+    gsap.killTweensOf([layer].concat(img));
     if (m.distance > 0) {
         const step = m.duration / 4;
         const frames = [

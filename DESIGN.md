@@ -76,6 +76,24 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   the play screen is hidden. Reduced motion: the picture fades in over
   250ms instead of the snow and roll (no hiss), then locks; no bar, no
   flicker.
+- **TV picture life** (BACKLOG B-221; `design/reference/tv-motion.html`
+  layer 2 "Life"): from the lock, a word whose data has `motion` shows as
+  two layers framed exactly like its picture (they line up pixel for
+  pixel): the plate (the background, the subject painted out), its glow
+  breathing (brightness 1 → 1.07, 4.2s each way) under about 6 dim cream
+  specks drifting up (at most 0.3 opacity, 9–16s each), and over it the
+  subject (the cutout) looping its `idle` move around its `pivot` (`top`
+  50% 12%, `bottom` 50% 88%, `center` 50% 50%): `sway` and `rumble` as
+  the prototype, `bob`, `hop`, `wobble`, `float`, `breathe` and `spin` in
+  the same small scale (at most about 2% of the picture or 3°, `spin`
+  ±10°; loops of 1–3.5s), every move starting from rest so nothing jumps
+  at the lock. The tune-in still rolls the full picture; a word without
+  `motion` keeps its still picture. The quiet bar, the dim flicker and
+  the wrong-check static show over the layers (they jitter with the
+  static); the layers take no taps. Transforms, opacity and the plate's
+  brightness only, no script per frame; stopped on a new word, off the
+  play screen and while the page is hidden. Reduced motion: the two
+  layers show still.
 - **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
   lives bulbs. Right: split-flap counter "2 / 5".
 - **Slot rail:** brass, full safe width, directly below the machine

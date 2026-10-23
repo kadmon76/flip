@@ -668,6 +668,58 @@ body[data-screen="play"] .play-back-btn {
     background: linear-gradient(to bottom, transparent, var(--tv-roll), transparent);
 }
 
+/* The picture's life (BACKLOG B-221, picture.js): a word with `motion`
+   shows, once the tune-in has locked, as two layers over the picture,
+   framed exactly like it (the new word pictures' cover, so they line up
+   pixel for pixel): the plate (the background) with a few dim cream
+   specks drifting up over it, and the subject (the cutout) in .tv-actor,
+   which picture.js moves around its pivot. Hidden until picture.js puts
+   `life-on` on the card, which hides the still picture under them. Under
+   the tune-in canvas, the quiet bar, the static, the flash and the
+   scanlines; no taps. */
+#screen-play .tv-life {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+#screen-play .card.life-on .tv-life {
+    visibility: visible;
+}
+
+#screen-play .card.life-on #play-image {
+    visibility: hidden;
+}
+
+#screen-play .card .tv-life img,
+#screen-play .tv-motes,
+#screen-play .tv-actor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#screen-play .card .tv-life img {
+    aspect-ratio: auto;
+    object-fit: cover;
+    border-radius: 0;
+}
+
+#screen-play .tv-actor {
+    will-change: transform;
+}
+
+#screen-play .tv-mote {
+    position: absolute;
+    width: calc(3 * var(--u));
+    height: calc(3 * var(--u));
+    border-radius: 50%;
+    background: var(--cream);
+    opacity: 0;
+}
+
 /* Wrong check: static over the picture, fine light and dark noise lines
    on the tube; feedback.js flickers it for 150ms. Correct check: the
    screen flashes warm white; celebrate.js fades it out over 200ms. Both

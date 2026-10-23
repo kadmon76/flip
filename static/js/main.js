@@ -6,7 +6,8 @@
 // (check dome, reset lever, speaker), the header's mute toggle and the
 // play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
-// the TV's lock (tv.js), screen renders. The kid's gears (gears.js,
+// the TV's lock (tv.js) and the picture's life after it (picture.js,
+// BACKLOG B-221), screen renders. The kid's gears (gears.js,
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
 // kept in state.gears for the gear counters (cogs.js); and spent on boosts
 // (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
@@ -18,6 +19,7 @@ import { renderCard } from './card.js';
 import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderTv } from './tv.js';
+import { renderPicture } from './picture.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
 import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';
 import { starsFor } from './score.js';
@@ -689,6 +691,7 @@ subscribe(renderCard);
 subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places the boost tray and the glowing slots on it
 subscribe(renderFeedback);    // after the card render: keys off its DOM (and the boost tray's)
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
+subscribe(renderPicture);     // after the TV: the picture's life once it has locked (BACKLOG B-221)
 subscribe(renderControls);
 subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
 subscribe(renderRoundEnd);
@@ -740,6 +743,10 @@ window.addEventListener('resize', () => {
     renderCard(state);
     renderBoost(state, BOOST_TAPS);
 });
+
+// The picture's life (picture.js, BACKLOG B-221) stops while the page is
+// hidden and starts again when it shows.
+document.addEventListener('visibilitychange', () => renderPicture(state));
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.
