@@ -395,7 +395,7 @@ Build order: long words → TV tune-in. Picture life and win are now M5 (the the
 ## M4 — Stages instead of levels, gears and boosts
 Decided by the human on 2026-10-13 (stages, gears, boosts) and 2026-10-15 (lever rule); build decisions 2026-10-21. **Read PROGRESSION.md first**: it is the source for every item here, and its tables are the starting numbers. CLAUDE.md "Product rules" already describe where M4 ends up.
 Looks: new screens and controls use the interim style (DESIGN.md "Other screens", the lab palette, no English text). The human will restyle them later in Claude Design, so keep each new visual piece in one small, easily replaced component. Choose the interim look yourself and record it in DECISIONS; don't open a question issue only about looks.
-Today's theme data is partial (25 words have a voice; the rest wait for the voice batch), so some stages have 1–2 words or none. Every item must work with that and with full stages of 5.
+Since 2026-10-23 the theme data is full (four themes, 130 words, every stage); the stage and round tests keep a frozen copy of the earlier partial data (`spelling_game/fixtures/sparse-data/`). Every item must work with sparse stages and with full ones.
 Build order: stages replace levels → lever rule → stage rounds and clearing → stage map and replay → gears → boosts → struggle help.
 
 ### B-215 Stages replace the level picker
@@ -481,6 +481,36 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - Screenshots: `struggle-swap.png` (the swapped-in word on the play screen, after three forced misses). Checklist passes.
 - status:
 
+## M4b — The robot's new voice
+Decided by the human on 2026-10-19 (per word: the clean word, then its own gag line; shared lines per moment; Hebrew guesses only where funny) and 2026-10-21/22 (the voice "FLIP ROBIT -FINAL" on Eleven v4, clean words with "!"). The clips are made by `tools/voices.py` into `static/voice/` and listed in `static/voice/manifest.json` (DECISIONS 2026-10-22); since 2026-10-23 every word's `audio` in the theme data is its new clip (`words/<theme>/<word>.mp3`, DECISIONS 2026-10-23).
+`static/voice/` is content: read it, never add, edit, rename or re-encode a file there or in `content/voice/`. Only some lines are voiced so far and more arrive in batches (a rerun of the script adds files and manifest entries, nothing else), so everything here works from what the manifest lists today and picks up new clips with no code change. A moment with no new clip yet keeps today's prototype clip (`static/sounds/`).
+Line pools and what each moment wants: `content/voice/robot-lines.json` (`pools`, each with its `moment`) and `content/voice/word-lines.json`. The manifest's keys are the files that exist, relative to `static/voice/`; a shared line's file is `robot/<line id>.mp3` and its pool is the id without its `-NN` (`robot/correct-02.mp3` → `correct`).
+
+### B-223 Correct word: the robot says the word, then his gag
+- why: on a correct word he should say the word itself mixed with his celebration (human, 2026-10-13), and each word has its own gag line tied to its picture's joke (human, 2026-10-19).
+- acceptance:
+  - audio.js fetches `/static/voice/manifest.json` once at `init` (a missing or broken manifest counts as an empty one, no console error). Pure helpers, tested through `node` with stand-in manifests: the clips the manifest lists per pool, and a word's gag clips (`gags/<theme>/<word>.mp3`, and `<word>-2.mp3` when it exists).
+  - On a correct check (moments `correct` and `streak`) he says the word, clean and complete, from the word's `audio`, then, when it ends, one line: on `correct` the word's gag (one of its gag clips at random), else a random line of pool `correct`; on `streak` a random line of pool `streak`, else the word's gag, else pool `correct`. With none of these clips, the prototype `correct` pool plays after the word as today's clip does. The word is never cut (CHARACTER.md "Rules"); the line after it is his voice clip like any other: one at a time, cut by the next voice clip, by a speaker tap or by leaving the word.
+  - Both clips are his voice: they go through the analyser, so the scope mouth, eyes and cap move while he says the word and the gag (B-210). The current word's word and gag clips are fetched and decoded when the word starts (a new word), so they are ready at the check; a clip not ready at the check is skipped, never waited for.
+  - The speaker (`speakWord`, B-215) is unchanged: it plays the word as today.
+  - Mute and the first-gesture unlock work as today; muted, nothing plays.
+  - Docs: CHARACTER.md's moment map ("Correct", "3 correct in a row") and its "Voice lines…" paragraph; CLAUDE.md's audio.js bullet (the manifest, the new clips, and that `static/voice/` is read-only content).
+  - Tests: the helpers above; the order word → line; the fallbacks (no gag, no pool line, no clip at all); nothing over the word.
+  - Screenshots: `correct-talking.png` (right after a correct check, the scope mouth showing his voice). Checklist passes.
+- status:
+
+### B-224 His shared lines on the moments, the Hebrew guess, the letter names
+- why: the robot's personality lives in his lines (CHARACTER.md, `claude/flip-robot-lines.md`); the prototype clips don't fit him (human, 2026-10-10).
+- acceptance:
+  - character.js's moment table names, per moment, the pool of his new lines it plays (CHARACTER.md's moment map gets the column), and audio.js plays a random clip of that pool that the manifest lists; with no clip in the pool, the moment's prototype sound as today (or nothing, where it has none). Starting map, recorded in DECISIONS: `roundStart` → `start`; `picture` → the word's Hebrew guess (`hebrew/<theme>/<word>.mp3`) when it exists, else `picture-<variant>` (surprise, giggle, shock); `filledEarly` and `domeNudge` → `press`; `kidIdle` → `idle`; the peeks → `peek`; `wake` → `wake`; `wrong` → `wrong`, else `mumble`; `wrongPeek` → `mumble`; `hintGiven` → `hint`; `thirdMiss` → `reveal-open`; the round end by its stars: 3 → `end-high`, 2 → `end-mid`, 0–1 → `end-low` (the tada stays as an effect, under or before the line); `speakerLocked` (a boost the kid can't afford) → `no-gears`; `boostGiven` → `boost-slot`, `boost-first` or `boost-clean` by the boost.
+  - Letter names: when his letter lands (`hintGiven`, `boostGiven` for Remember this one and First letter) he says its name (`letters/<letter>.mp3`, "Eigh!" … "Zee!") after his line, or alone when the moment has no line.
+  - All rules of his voice stay: one clip at a time, never over the word, nothing while muted. A line that can't play now (the word is playing, not decoded yet) is dropped, not queued.
+  - Pools not wired here (`greet`, `murmur`, `reveal-close`, `sticker`, `stage`, `gear`, `boost-slow`) get one line each in "Later / not now".
+  - Pure helpers (moment → pool, pool → its clips, the picture's choice, the letter clip) tested through `node` with stand-in manifests.
+  - Docs: CHARACTER.md moment map (the pool per moment); DESIGN.md "Sound" where it lists the pools.
+  - Screenshots: `picture-talking.png` (a new picture, him saying his line). Checklist passes.
+- status:
+
 ## M5 — Living pictures
 Approved by the human on 2026-10-18 (prototype v3: "every word picture should be lively with a humorous approach, with the humour emphasised in the correct-word animation"). Reference: `design/reference/tv-motion.html` (serve the repo root and open `/design/reference/tv-motion.html`), layers 2 "Life" and 3 "Win"; its layer 1 is B-214. The data is read-only. A word entry's optional `motion` object has `subject` and `plate` (image paths: the cutout and the background with the subject painted out), `idle` (`sway`, `bob`, `hop`, `rumble`, `wobble`, `float`, `breathe` or `spin`), `pivot` (`top`, `bottom` or `center`) and `win` (`cheer`, `drive`, `bungee`, `hop-spin`, `wobble-flop`, `splash`, `pop` or `zoom`); later it may also carry `face` or `win_image` (see "Later").
 Build order: life → win.
@@ -538,10 +568,8 @@ Build order: life → win.
 - Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
 - `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
-- Replace the placeholder voice lines and game sounds (prototype clips) with new ones that fit the lab look; the human will provide them.
+- Replace the placeholder game sounds (swipe, tada, prototype clips still used where a moment has no new line) with ones that fit the lab look; the human will provide them. The robot's voice is M4b.
 - Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
-- Robot voice lines for the puppet's moments (the ~60-line ElevenLabs pool): the reference page `design/reference/robot-puppet.html` shows the line each moment wants (e.g. surprised "Ooh! What is THAT?", smirky "Take your time… I'll just… wait here."); the human will generate them.
-- Play the new robot voice from `static/voice/` (see `manifest.json`, DECISIONS 2026-10-22) in place of the prototype clips: the word on the speaker and after a correct answer from `words/`, letter names from `letters/`, the gag after a correct answer from `gags/`, the Hebrew guess on a new picture from `hebrew/`, and the shared lines on their moments from `robot/`. Lands once the human merges the clips.
 - A dome-aimed point pose for the robot's dome nudge (B-212 reuses `point`, turned 32° down, while the dome is ~13° down from his hand at 360); tune it on `design/reference/robot-puppet.html` with the human.
 - `tools/shot.mjs`: a `--reduced-motion` flag (`Emulation.setEmulatedMedia`) and a `--step-timeout <ms>` option, so reduced-motion shots and long real-flow runs don't need a throwaway copy (B-210, B-211, B-212 used one).

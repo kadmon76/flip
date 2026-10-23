@@ -119,4 +119,8 @@ a phone.
   them. `next-btn` and `result-line` were removed by B-114 (the check dome is also next); `level-picker`, `level-easy`, `level-normal`, `level-hard` (and the nudge's `level-up-btn`) by B-215 (stages replace the level picker).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist; never add, trim or re-encode them in M1.
+- `static/voice/` (the robot's new voice, `manifest.json` lists every clip)
+  and `content/` are content written by `tools/voices.py`, `tools/themes.py`
+  and Claude in chat: read them, never add, edit, rename or re-encode a file
+  there in an agent run.
 - The robot lives behind the console's left third, a puppet in two layers inside `.console`, which has no z-index (B-115, B-210): his body and head (`.robot`, z-index -2) are drawn under the console image (`.console-body`, z-index -1), the rail, the bench blocks and the controls; his hands (`.robot-hands`, z-index -1, after the console image) are drawn over the console's top edge, resting on it, and still under the rail, the bench blocks and the controls. Neither layer takes taps. He never covers the rail, a bench block or a console control's tap area. At rest no block overlaps him; only the top of his pop-up on 9–10 letter words passes under the second block row.
