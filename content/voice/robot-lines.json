@@ -4,7 +4,7 @@
  "doc": "claude/flip-robot-lines.md",
  "notes": "Text master for the shared robot lines. The voice script reads it. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags. They describe sounds and delivery, never actions; actions live in pose (hand poses in order). Robot moments (v2, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on a target word, a letter name or a Hebrew word. Pauses use [short pause] / [pause] / [long pause]. recipe = tone recipe 1-6 in the doc. status: approved = words seen and approved on 2026-10-19 (only tags changed in v2); draft = new, to review. From 2026-10-22 the review happens only on the Robot Line Review page (Robot lines tab); this file is synced from it.",
  "letters": {
-  "a": "Ay",
+  "a": "Eigh",
   "b": "Bee",
   "c": "See",
   "d": "Dee",
@@ -31,7 +31,7 @@
   "y": "Why",
   "z": "Zee"
  },
- "letters_note": "z: Zee (American), decided 2026-10-21.",
+ "letters_note": "z: Zee (American), decided 2026-10-21. a: spelled Eigh, because Ay was voiced wrong; chosen by ear on 2026-10-23.",
  "pools": {
   "greet": {
    "moment": "Theme screen, first open",
