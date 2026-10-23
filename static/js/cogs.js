@@ -9,8 +9,8 @@
 //   - #theme-gears, in the header, shown on the theme screen only: the
 //     kid's gears (state.gears);
 //   - #console-gears, on the play screen's console between the speaker
-//     and the dome (the face of the boost button B-219 builds; not
-//     tappable yet): the kid's gears;
+//     and the dome, the face of the boost button (BACKLOG B-219; on or
+//     off and its taps are boosttray.js's and main.js's): the kid's gears;
 //   - #round-gears, on the round-end screen: the round's gears as "+N"
 //     (gears.js roundGears over state.round.results).
 // It renders from state on every render and never mutates state.

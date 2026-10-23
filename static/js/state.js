@@ -20,7 +20,8 @@ export const state = {
     // and to gears.js add()'s return when a word is checked correct and
     // when a round reaches its end, so the gear counters (cogs.js) are a
     // render of state. gears.js stays the only reader and writer of the
-    // stored count.
+    // stored count. A boost (BACKLOG B-219) sets it to gears.js spend()'s
+    // return when it happens.
     gears: 0,
     // The data file of the round's theme ({ "cat": { image, audio, stage,
     // break }, ... }), set by startRound with the round and kept to its
@@ -29,9 +30,11 @@ export const state = {
     // (the theme and stage screens).
     data: null,
     words: [],                  // [{ word, image, audio, break }] for the current round
-    // results[i] = { word, correct, clean, newSticker? }: clean (BACKLOG
-    // B-218, gears.js isClean) when checked correct on the first check
-    // with no boost; newSticker on a correct word, true when it was clean
+    // results[i] = { word, correct, clean, boosted?, newSticker? }: clean
+    // (BACKLOG B-218, gears.js isClean) when checked correct on the first
+    // check with no boost; boosted (BACKLOG B-219, every checked word) when
+    // the word took a boost (boost.js isBoosted); newSticker on a correct
+    // word, true when it was clean
     // and new in the sticker book (stickers.js add). stage is the stage the round is
     // played at (BACKLOG B-215: 1-5 or 'long', stage.js STAGES), set when
     // a station on the theme's stage map is tapped (its stage, BACKLOG
@@ -57,9 +60,9 @@ export const state = {
         // `break` in the content JSON; round.js makeWord, layout.js
         // slotLayout, BACKLOG B-213), or null
         break: null,
-        // placed[i] is null or { letter, tileId, locked?, hint? }; one slot per letter of word. locked: true (stage 1's given first letter, round.js makeWord; a letter the last wrong check found right that the lever kept, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter and the hint letter (and from B-219 a boost's, boost: true); a start-over pull sends a lever-locked one back
+        // placed[i] is null or { letter, tileId, locked?, hint?, boost? }; one slot per letter of word. locked: true (stage 1's given first letter, round.js makeWord; a letter the last wrong check found right that the lever kept, drag.js leverResult; the robot's letter on the second miss, drag.js giveHint, which is also hint: true; a boost's letter, boost.js giveLetter, BACKLOG B-219, which is also boost: true) stays put: no drag, tap out or drop on it (drag.js isLocked). The lever always leaves the given letter, the hint letter and a boost's letter; a start-over pull sends a lever-locked one back
         placed: [],
-        // tray is [{ id, letter, used, given?, extra? }] in tray display order (given: stage 1's first letter's block, which has no bench spot; extra: on a stage with extras, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal); used: it is in a slot; id is stable
+        // tray is [{ id, letter, used, given?, extra?, gone? }] in tray display order (given: stage 1's first letter's block, which has no bench spot; extra: on a stage with extras, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal; gone: an extra block the clean-up boost took away, boost.js cleanUp, BACKLOG B-219: it is in no slot, keeps its bench spot empty and never comes back); used: it is in a slot; id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
         // 'playing' | 'wrong' (checked, lives left; the next block move
@@ -75,9 +78,16 @@ export const state = {
         rightAtCheck: null,
         // true after a lever pull (drag.js returnAll), false after any
         // block move (a drag, a tap, the robot's letter landing: placeIn,
-        // takeOut, giveHint) and after a wrong check; a pull while it is
-        // true starts the word over.
+        // takeOut, giveHint; a boost, boost.js) and after a wrong check; a
+        // pull while it is true starts the word over.
         justPulled: false,
+        // Boosts (BACKLOG B-219, boost.js). filledOnce: per slot, whether a
+        // block has been in it yet (round.js makeWord, drag.js placeIn);
+        // the boost button stays off until every slot has been filled once
+        // (boost.js tried). boosts: the boosts the word has taken (one per
+        // word, boost.js PER_WORD).
+        filledOnce: [],
+        boosts: 0,
     },
     lives: 3,                   // attempts left for the current word
     // Console control held down (DESIGN "Controls and states"): 'dome' for
@@ -88,9 +98,18 @@ export const state = {
     // Times the robot shakes his head (his `speakerLocked` moment in
     // character.js, with its "hmm no" in audio.js): each one more plays it
     // once, so only the change matters; counted over the session. Since
-    // BACKLOG B-215 the speaker always plays the word, so nothing adds to
-    // it yet; B-219 adds one when the kid can't afford a boost.
+    // BACKLOG B-215 the speaker always plays the word; main.js adds one
+    // when the kid picks a boost he can't afford (BACKLOG B-219), and the
+    // console's gear counter flickers with it (feedback.js).
     lockedTaps: 0,
+    // The boost tray (BACKLOG B-219, boosttray.js): null when closed;
+    // 'tray' while it is open over the bench (a tap on the boost button,
+    // main.js onBoost); 'pick' after "Remember this one" was picked there,
+    // while the slots that aren't locked glow for the kid to tap one. Any
+    // other tap closes it (null); so do a boost, a new word and leaving
+    // the round. Shown only while the boost button is on (boost.js
+    // boostOn).
+    boostMenu: null,
     // Sound off (the header's mute toggle, B-108): no sound plays at all.
     // Remembered in localStorage `flip.muted` (audio.js loadMuted /
     // saveMuted); main.js sets it from there at start-up.

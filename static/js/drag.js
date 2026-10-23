@@ -219,20 +219,35 @@ function placedIndex(current, tileId) {
 // A slot holding a locked letter (round.js makeWord: the given first
 // letter on stage 1, BACKLOG B-204, B-215; a letter the last wrong check
 // found right that the lever kept, B-215b, leverResult; the robot's
-// letter on the second miss, B-206, giveHint): it stays where it is.
+// letter on the second miss, B-206, giveHint; a boost's letter, B-219,
+// boost.js giveLetter): it stays where it is.
 export function isLocked(slot) {
     return !!(slot && slot.locked);
 }
 
+// `filledOnce` (per slot: a block has been in it at least once; round.js
+// makeWord starts it) after a block went into slot `index`: a copy, that
+// slot marked (pure). A missing or short list (a word from before BACKLOG
+// B-219) reads as no slot filled yet. No boost before every slot has been
+// filled once (boost.js tried).
+export function markFilled(filledOnce, count, index) {
+    const seen = Array.from({ length: count }, (_, i) => !!(Array.isArray(filledOnce) && filledOnce[i]));
+    if (index >= 0 && index < count) seen[index] = true;
+    return seen;
+}
+
 // Put tile into box `index`: the new current, or null when nothing
-// changes (no such tile, already there, a locked slot, a locked tile).
+// changes (no such tile, a block the clean-up boost took away (`gone`,
+// BACKLOG B-219), already there, a locked slot, a locked tile).
 // A block moved: the next lever pull is not "right after a pull"
-// (`justPulled` false, leverResult).
+// (`justPulled` false, leverResult). The slot has now been filled at
+// least once (`filledOnce`, boost.js tried: no boost before the word's
+// first try).
 export function placeIn(current, tileId, index) {
     const placed = [...current.placed];
     const tray = current.tray.map((t) => ({ ...t }));
     const tile = tray.find((t) => t.id === tileId);
-    if (!tile) return null;
+    if (!tile || tile.gone) return null;
 
     const occupant = placed[index];
     if (occupant && occupant.tileId === tileId) return null;
@@ -250,7 +265,14 @@ export function placeIn(current, tileId, index) {
 
     placed[index] = { letter: tile.letter, tileId };
     tile.used = true;
-    return { ...current, placed, tray, status: afterMove(current.status), justPulled: false };
+    return {
+        ...current,
+        placed,
+        tray,
+        status: afterMove(current.status),
+        justPulled: false,
+        filledOnce: markFilled(current.filledOnce, placed.length, index),
+    };
 }
 
 // Take the tile out of its box, back to its spot on the bench: the new
@@ -433,7 +455,8 @@ export function afterHint(current) {
 // The third miss (main.js onCheck): every slot gets its right letter from
 // the word's own blocks. A block already in its right slot stays there (a
 // locked one stays locked: the given letter, a lever-locked one, the
-// robot's letter), so on the reveal only the others fly in (feedback.js).
+// robot's letter, a boost's letter, BACKLOG B-219), so on the reveal only
+// the others fly in (feedback.js).
 // The extra letters (BACKLOG B-207) are never used: one in a slot
 // goes back to its bench spot (`used` is whether a block is in a slot).
 export function revealed(current) {

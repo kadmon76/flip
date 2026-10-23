@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=31">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=32">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -140,8 +140,9 @@
              (game.css). character.js moves the parts.
              #console-gears (BACKLOG B-218) is the gear counter on the
              plate between the speaker and the dome, a brass cog drawn in
-             code and the kid's gears in split-flap digits (cogs.js); the
-             face of the boost button B-219 builds, it takes no taps yet. -->
+             code and the kid's gears in split-flap digits (cogs.js), and
+             the boost button (BACKLOG B-219): on or off (disabled, dimmed)
+             from state (boosttray.js); a tap opens the boost tray. -->
         <div class="console">
             <div class="robot eyes-idle brows-calm hands-rest" data-head="0" aria-hidden="true">
                 <div class="puppet">
@@ -242,7 +243,7 @@
                     <img class="speaker-cap" src="{% static 'images/ui/speaker-cap.png' %}" alt="" />
                 </span>
             </button>
-            <div id="console-gears" class="gear-counter console-gears" role="img" aria-label="gears"></div>
+            <button id="console-gears" class="gear-counter console-gears" type="button" aria-label="gears" disabled></button>
             <button id="check-btn" class="ctl" type="button" aria-label="Check" disabled>
                 <span class="sprite">
                     <img class="dome-off" src="{% static 'images/ui/dome-off.png' %}" alt="" />
@@ -315,6 +316,21 @@
             <span class="sticker off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg></span>
         </div>
         <div id="gallery-themes" class="gallery-themes"></div>
+    </div>
+
+    <!-- The boost tray (BACKLOG B-219, boosttray.js; PROGRESSION.md
+         "Boosts"), hidden until the boost button is tapped on the play
+         screen: a clear scrim over the whole page (a tap on it closes the
+         tray; nothing under it takes a tap), the small brass tray placed
+         over the bench above the console, one key per boost that applies
+         now (an icon drawn in code and its cost as small cogs), and, after
+         "Remember this one", a glowing clear button over each slot that
+         isn't locked. Under the frame, over everything else. No text:
+         the boosts are only in aria-label. -->
+    <div id="boost-layer" class="boost-layer" hidden>
+        <div id="boost-scrim" class="boost-scrim"></div>
+        <div id="boost-tray" class="boost-tray" role="group" aria-label="Boosts" hidden></div>
+        <div id="boost-picks" class="boost-picks" role="group" aria-label="Slots" hidden></div>
     </div>
 
     <!-- Bakelite frame over every screen (DESIGN.md "Layout", "Other

@@ -21,6 +21,7 @@
 
 import { starsFor } from './score.js';
 import { domeAction } from './controls.js';
+import { motionFor } from './motion.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -191,10 +192,20 @@ export const FX = {
 // word is answered and the dome, which now means "next", has not been
 // pressed for a while) is the reference's "All slots filled" pointing at
 // the dome, with a pop and the pointing finger wagging, then his rest
-// pose; no clip (none of the existing ones says "go on").
+// pose; no clip (none of the existing ones says "go on"). boostGiven
+// (BACKLOG B-219: a boost the kid paid for, his letter landing in its
+// slot, or the extra blocks gone) takes hintGiven's steps, as his letter
+// lands (boostLands).
 const LETTER_PLACED = [
     { at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest', look: [-26, 22] },
     { at: 0.6, look: [0, 0] },
+];
+
+// His letter in the slot (hintGiven, and boostGiven): happy, a small pop,
+// pointing up at it on the rail, then rest.
+const LETTER_GIVEN = [
+    { at: 0, sink: 0, head: 0, look: [0, 0], eyes: 'happy', brows: 'happy', hands: 'pointUp', pop: 'small' },
+    { at: 1.2, hands: 'rest', eyes: 'idle', brows: 'calm' },
 ];
 
 export const MOMENTS = {
@@ -324,13 +335,8 @@ export const MOMENTS = {
         ],
         sound: 'locked',
     },
-    hintGiven: {
-        steps: [
-            { at: 0, sink: 0, head: 0, look: [0, 0], eyes: 'happy', brows: 'happy', hands: 'pointUp', pop: 'small' },
-            { at: 1.2, hands: 'rest', eyes: 'idle', brows: 'calm' },
-        ],
-        sound: null,
-    },
+    hintGiven: { steps: LETTER_GIVEN, sound: null },
+    boostGiven: { steps: LETTER_GIVEN, sound: null },
     domeNudge: {
         steps: [
             { at: 0, sink: 0, head: 6, eyes: 'wide', brows: 'up', hands: 'point', look: [26, 22], pop: 1 },
@@ -635,6 +641,10 @@ export function snapshot(state) {
         lockedTaps: state.lockedTaps || 0,
         // the slot holding his second-miss letter (BACKLOG B-206), or -1
         hint: onWord ? current.placed.findIndex((p) => !!p && !!p.hint) : -1,
+        // the slot holding a boost's letter (BACKLOG B-219), or -1, and the
+        // boosts the word has taken (one more: boostGiven)
+        boost: onWord ? current.placed.findIndex((p) => !!p && !!p.boost) : -1,
+        boosts: onWord ? current.boosts || 0 : 0,
         // his nudges toward the dome on this word (BACKLOG B-212)
         nudges: onWord ? state.nudges || 0 : 0,
         // the TV has tuned in to this word's picture (BACKLOG B-214)
@@ -668,9 +678,12 @@ export function momentsFor(prev, now) {
             return now.hint !== -1 && now.hint !== prev.hint ? [miss, 'hintGiven'] : [miss];
         }
     }
+    // One more boost on the word (B-219): his letter lands in its slot, or
+    // the extra blocks are gone (boostLands says when).
+    if (now.boosts > prev.boosts) return ['boostGiven'];
     // One more `lockedTaps`: his head-shake (B-203; since B-215 the speaker
-    // never holds the word back, and B-219 adds one for a boost the kid
-    // can't afford).
+    // never holds the word back; main.js adds one for a boost the kid
+    // can't afford, B-219).
     if (now.lockedTaps !== prev.lockedTaps) return ['speakerLocked'];
     // One more nudge toward the dome on the answered word (B-212).
     if (now.nudges > prev.nudges) return ['domeNudge'];
@@ -692,6 +705,27 @@ export function momentsFor(prev, now) {
 export function blockEntered(before, after) {
     const was = before.split(',');
     return after.split(',').some((id, i) => id !== '-' && id !== '' && id !== was[i]);
+}
+
+// Seconds after a boost (between snapshots `prev` and `now`, BACKLOG
+// B-219) until what it did has landed, when his boostGiven starts:
+// feedback.js's motion, from motion.js's numbers. A boost's letter (its
+// slot `now.boost`): already in its slot, it only locks there (the
+// clunk's hit); from the bench or another slot, it flies in (flyIn),
+// after the block that was in its slot has hopped back (hop). The
+// clean-up: its blocks have puffed away (puff). Under `reduced` motion,
+// when the fades are done.
+export function boostLands(prev, now, reduced = false) {
+    const m = (kind) => {
+        const spec = motionFor(kind, reduced);
+        return spec.duration || spec.fade || 0;
+    };
+    const k = now.boost;
+    if (k === -1 || prev.boost === k) return m('puff');
+    const was = (prev.placed || '').split(',')[k];
+    const is = (now.placed || '').split(',')[k];
+    if (was === is) return reduced ? m('clunk') : motionFor('clunk', false).press;
+    return (was && was !== '-' ? m('hop') : 0) + m('flyIn');
 }
 
 // The clips `moments` call for, in order (MOMENTS' sound column; moments
@@ -726,7 +760,7 @@ export function nudgeWait(state) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, nudges: 0, tuned: false, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, nudges: 0, tuned: false, streak: 0, stars: null };
 
 // --- Render ---
 
@@ -960,15 +994,16 @@ function dropWaiting() {
 
 // Play `moments` from now: one script (scriptFor), each moment's variant
 // picked at random unless `picks` names it, its first step no sooner than
-// CHANGE_MS after his last change. A newer moment replaces the steps an
-// older one still had waiting. renderRobot calls it on a transition;
+// CHANGE_MS after his last change, nor than `delay` seconds from now (a
+// boost's letter landing, boostLands). A newer moment replaces the steps
+// an older one still had waiting. renderRobot calls it on a transition;
 // exported so a screenshot script can show a moment the play screen never
 // does (the round end).
-export function playMoments(moments, picks = {}) {
+export function playMoments(moments, picks = {}, delay = 0) {
     const chosen = {};
     for (const m of moments) chosen[m] = picks[m] || pickVariant(m, Math.random());
     const script = scriptFor(moments, chosen);
-    const wait = startDelay(performance.now() - last.changedAt) / 1000;
+    const wait = Math.max(startDelay(performance.now() - last.changedAt) / 1000, delay);
     dropWaiting();
     for (const step of script) {
         const t = wait + step.at;
@@ -1082,8 +1117,9 @@ function stopLife() {
 
 export function renderRobot(state) {
     const now = snapshot(state);
-    const moments = momentsFor(last.snap, now);
-    const wasOnPlay = last.snap.screen === 'play';
+    const prev = last.snap;
+    const moments = momentsFor(prev, now);
+    const wasOnPlay = prev.screen === 'play';
     last = { ...last, snap: now };
     if (now.screen !== 'play') {
         // He is only on the play screen; steps still waiting are dropped.
@@ -1092,7 +1128,8 @@ export function renderRobot(state) {
     }
     if (!wasOnPlay) startLife();
     if (!moments.length) return;
-    playMoments(moments);
+    // a boost's moment waits for its letter to land (BACKLOG B-219)
+    playMoments(moments, {}, moments.includes('boostGiven') ? boostLands(prev, now, reducedMotion()) : 0);
 }
 
 // --- Following a dragged block (drag.js) ---

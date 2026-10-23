@@ -25,7 +25,9 @@ an image model by the human.
 
 Exception: on the interim screens (see "Other screens (interim)") the cream panels with a brass border and the icon buttons (small cream panels with an ink icon) are CSS by design until their design pass.
 
-Exception (BACKLOG B-218): the gear counter on the play screen's console, on the brass plate between the speaker and the check dome (a brass cog drawn in code, inline SVG, with the count in split-flap digits; the face of the boost button B-219 builds), is a new scene object drawn in code until the Claude Design pass replaces it.
+Exception (BACKLOG B-218): the gear counter on the play screen's console, on the brass plate between the speaker and the check dome (a brass cog drawn in code, inline SVG, with the count in split-flap digits; the face of the boost button, B-219), is a new scene object drawn in code until the Claude Design pass replaces it.
+
+Exception (BACKLOG B-219): the boost tray (a small brass plate over the bench, just above the console, its notch pointing at the gear counter, which is the boost button; one cream key per boost that applies, its icon drawn in code, inline SVG, and its cost as small cogs; the amber glow round the slots "Remember this one" offers; a clear scrim under them) is a new scene object drawn in code until the Claude Design pass replaces it.
 
 ## Assets (`static/images/ui/`)
 | File | What | Shown at (CSS px, 360 wide) |
@@ -96,7 +98,7 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
 - **Console:** pinned to the bottom of the safe area, inset 4px from each
   side of it (324px wide at 360) so its lower corners clear the frame's
   rounded inner corners. On its brass plate,
-  left to right: reset lever (far left), speaker (centre-left), the gear counter (B-218; between the speaker's and the dome's tap areas, taking no taps until B-219), check
+  left to right: reset lever (far left), speaker (centre-left), the gear counter, which is the boost button (B-218, B-219; between the speaker's and the dome's tap areas, its tap area 48px tall), check
   dome (right). Reset and check stay far apart.
 - **Robot:** behind the console's left third, head and shoulders visible
   (~75px); the console, the rail and the bench blocks are drawn above him (on 9–10 letter words his pop-up passes under the second block row; BACKLOG B-115, B-213).

@@ -14,9 +14,11 @@
 // main.js adds a word's gears at its correct check (wordGears), so a
 // round left with the back button keeps them (B-201 takes back only that
 // round's stickers), and the round's GEARS.round in onNext's round-end
-// branch. It keeps a copy of the count in state.gears (load() at
-// start-up, add()'s return after each add), from which the gear counters
-// render (cogs.js). Nothing takes gears away yet; B-219's boosts will.
+// branch. A boost (BACKLOG B-219, boost.js COSTS) takes its gears when it
+// happens (spend), the only way gears leave: mistakes never cost any.
+// main.js keeps a copy of the count in state.gears (load() at start-up,
+// add()'s or spend()'s return after each add or spend), from which the
+// gear counters render (cogs.js).
 
 export const KEY = 'flip.gears.v1';
 
@@ -71,18 +73,33 @@ function save(count) {
 
 // Add `n` gears (a whole number above 0) and return the stored count
 // after it (load(): with storage blocked, 0, as nothing is kept). Any
-// other `n` adds nothing and writes nothing. There is no way to take
-// gears away here: they are never lost.
+// other `n` adds nothing and writes nothing. Gears are never lost: only
+// spend takes any away.
 export function add(n) {
     if (!isCount(n) || n === 0) return load();
     save(load() + n);
     return load();
 }
 
+// Spend `n` gears (a whole number above 0) on a boost (BACKLOG B-219,
+// boost.js COSTS) and return the stored count after it. null, with
+// nothing taken and nothing written, when the store has fewer than `n`
+// (no gears, no boost: PROGRESSION.md "Guardrails"), for any other `n`,
+// or when the count could not be written (storage blocked).
+export function spend(n) {
+    if (!isCount(n) || n === 0) return null;
+    const have = load();
+    if (have < n) return null;
+    save(have - n);
+    const left = load();
+    return left === have - n ? left : null;
+}
+
 // Whether a word's check was clean (pure): checked correct on the word's
 // first check, that is with no wrong check before it (each wrong check
 // costs a lives bulb, so main.js passes the bulbs lost), and with no
-// boost (B-219 passes it). Only a clean word earns its sticker
+// boost (BACKLOG B-219: main.js passes boost.js isBoosted). Only a clean
+// word earns its sticker
 // (stickers.js add) and the clean gear.
 export function isClean(correct, wrongChecks, boosted = false) {
     return correct === true && wrongChecks === 0 && !boosted;

@@ -6,7 +6,9 @@
 // timer and the dome-nudge timer for the robot and his voice's frames,
 // the TV's lock (tv.js), screen renders. The kid's gears (gears.js,
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
-// kept in state.gears for the gear counters (cogs.js).
+// kept in state.gears for the gear counters (cogs.js); and spent on boosts
+// (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
+// the boost itself.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -19,8 +21,10 @@ import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMut
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
-import { load as loadGears, add as addGears, isClean, wordGears, GEARS } from './gears.js';
+import { load as loadGears, add as addGears, spend as spendGears, isClean, wordGears, GEARS } from './gears.js';
 import { renderGears } from './cogs.js';
+import { boostOn, offered, pickable, canAfford, giveLetter, cleanUp, isBoosted, COSTS } from './boost.js';
+import { renderBoost } from './boosttray.js';
 import { renderGallery } from './gallery.js';
 import { renderStageMap } from './stagemap.js';
 import { renderFlaps } from './flaps.js';
@@ -188,6 +192,7 @@ async function startRound({ name, dataUrl }, chosen = null) {
         idleBeat: null,
         nudges: 0,
         tuned: false,
+        boostMenu: null,
         startingRound: false,
     });
     armIdle();
@@ -253,9 +258,12 @@ function onCheck(extra = {}) {
     const results = [...round.results];
     // clean (BACKLOG B-218, gears.js isClean): checked correct on the
     // word's first check (no bulb lost to a wrong check yet), with no
-    // boost (B-219 adds `boosted`).
-    const clean = isClean(correct, LIVES - lives);
-    results[round.index] = { word: current.word, correct, clean };
+    // boost; boosted (BACKLOG B-219, boost.js isBoosted): the word took a
+    // boost, so it still counts for its stage and earns its correct-word
+    // gear, but no clean gear and no sticker.
+    const boosted = isBoosted(current);
+    const clean = isClean(correct, LIVES - lives, boosted);
+    results[round.index] = { word: current.word, correct, clean, boosted };
 
     if (correct) {
         // Only a clean word goes into the sticker book (PROGRESSION.md
@@ -328,6 +336,7 @@ function onNext(extra = {}) {
             speaking: false,
             idleBeat: null,
             nudges: 0,
+            boostMenu: null,
             ...extra,
         });
     } else {
@@ -340,6 +349,7 @@ function onNext(extra = {}) {
             idleBeat: null,
             nudges: 0,
             tuned: false,
+            boostMenu: null,
             ...extra,
         });
         armIdle();
@@ -394,6 +404,67 @@ function armNudge() {
     };
     const wait = nudgeWait(state);
     if (wait !== null) setTimeout(tick, wait);
+}
+
+// --- Boosts (BACKLOG B-219, PROGRESSION.md "Boosts", "Guardrails") ---
+
+// The boost button (the console's gear counter): while it is on (boost.js
+// boostOn: the word's first try made, no boost on it yet, not answered)
+// a tap opens the tray (boosttray.js). Not while a control is held: the
+// dome's check or the lever's pull is under way.
+function onBoost() {
+    if (state.screen !== 'play' || state.pressed || state.boostMenu || !boostOn(state.current)) return;
+    setState({ boostMenu: 'tray' });
+}
+
+// A tap anywhere but the tray or a glowing slot closes them, costing
+// nothing.
+function onBoostClose() {
+    if (state.boostMenu) setState({ boostMenu: null });
+}
+
+// A boost tapped in the tray. One the kid can't afford is not spent: the
+// tray closes and `lockedTaps` goes up by one (the robot shakes his head
+// with his "hmm no", character.js speakerLocked; the gear counter
+// flickers, feedback.js). "Remember this one" makes the slots that aren't
+// locked glow for the kid to pick one (onBoostSlot); "First letter" and
+// "Clean-up" happen at once.
+function onBoostPick(kind) {
+    if (state.screen !== 'play' || state.boostMenu !== 'tray') return;
+    const { current } = state;
+    if (!boostOn(current) || !offered(current).includes(kind)) {
+        setState({ boostMenu: null });
+        return;
+    }
+    if (!canAfford(state.gears, kind)) {
+        setState({ boostMenu: null, lockedTaps: state.lockedTaps + 1 });
+        return;
+    }
+    if (kind === 'remember') setState({ boostMenu: 'pick' });
+    else pay(kind, kind === 'first' ? giveLetter(current, 0) : cleanUp(current));
+}
+
+// A glowing slot tapped after "Remember this one": the robot puts its
+// right letter there (boost.js giveLetter), also when it was already
+// there.
+function onBoostSlot(index) {
+    if (state.screen !== 'play' || state.boostMenu !== 'pick') return;
+    if (!boostOn(state.current) || !pickable(state.current).includes(index)) {
+        setState({ boostMenu: null });
+        return;
+    }
+    pay('remember', giveLetter(state.current, index));
+}
+
+// The boost happens: its gears are taken (gears.js spend) and `next`
+// (the word after it) is shown, in one setState with the count after it.
+// The robot's boostGiven (character.js) and the motion (feedback.js) key
+// on the change. Not enough gears in the store after all: nothing is
+// spent, as onBoostPick.
+function pay(kind, next) {
+    const gears = spendGears(COSTS[kind]);
+    if (gears === null) setState({ boostMenu: null, lockedTaps: state.lockedTaps + 1 });
+    else setState({ boostMenu: null, gears, current: next });
 }
 
 // --- The TV (BACKLOG B-214, tv.js) ---
@@ -536,6 +607,7 @@ function leaveRound(patch) {
         idleBeat: null,
         nudges: 0,
         tuned: false,
+        boostMenu: null,
     });
 }
 
@@ -595,10 +667,14 @@ function onGalleryBack() {
 
 // --- Wiring ---
 
+// The taps the boost tray hands back (boosttray.js).
+const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };
+
 subscribe(renderScreens);
 subscribe(renderThemeButtons);
 subscribe(renderCard);
-subscribe(renderFeedback);    // after the card render: keys off its DOM
+subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places the boost tray and the glowing slots on it
+subscribe(renderFeedback);    // after the card render: keys off its DOM (and the boost tray's)
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
 subscribe(renderControls);
 subscribe(renderRobot);
@@ -625,6 +701,8 @@ $('gallery-back-btn').addEventListener('click', onGalleryBack);
 $('stages-back-btn').addEventListener('click', onThemes);
 $('mute-btn').addEventListener('click', onMute);
 $('play-back-btn').addEventListener('click', onPlayBack);
+$('console-gears').addEventListener('click', onBoost);
+$('boost-scrim').addEventListener('click', onBoostClose);
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
 document.addEventListener('pointerdown', onInput, true);
@@ -643,8 +721,12 @@ setState({ progress: loadProgress() });
 setState({ gears: loadGears() });
 loadThemes();
 
-// Box sizing depends on the row width (layout.js); re-render on rotate.
-window.addEventListener('resize', () => renderCard(state));
+// Box sizing depends on the row width (layout.js); re-render on rotate,
+// and the boost tray or its glowing slots follow (boosttray.js).
+window.addEventListener('resize', () => {
+    renderCard(state);
+    renderBoost(state, BOOST_TAPS);
+});
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.
