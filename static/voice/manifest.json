@@ -1,0 +1,787 @@
+{
+ "voice_id": "eLkzmL7sIxy7PLUgCfeT",
+ "model_id": "eleven_v4",
+ "output_format": "mp3_44100_128",
+ "clips": {
+  "letters/a.mp3": {
+   "id": "letter-a",
+   "text": "Eigh!",
+   "made": "2026-10-23"
+  },
+  "letters/b.mp3": {
+   "id": "letter-b",
+   "text": "Bee!",
+   "made": "2026-10-23"
+  },
+  "letters/c.mp3": {
+   "id": "letter-c",
+   "text": "See!",
+   "made": "2026-10-23"
+  },
+  "letters/d.mp3": {
+   "id": "letter-d",
+   "text": "Dee!",
+   "made": "2026-10-23"
+  },
+  "letters/e.mp3": {
+   "id": "letter-e",
+   "text": "Ee!",
+   "made": "2026-10-23"
+  },
+  "letters/f.mp3": {
+   "id": "letter-f",
+   "text": "Ef!",
+   "made": "2026-10-23"
+  },
+  "letters/g.mp3": {
+   "id": "letter-g",
+   "text": "Gee!",
+   "made": "2026-10-23"
+  },
+  "letters/h.mp3": {
+   "id": "letter-h",
+   "text": "Aitch!",
+   "made": "2026-10-23"
+  },
+  "letters/i.mp3": {
+   "id": "letter-i",
+   "text": "Eye!",
+   "made": "2026-10-23"
+  },
+  "letters/j.mp3": {
+   "id": "letter-j",
+   "text": "Jay!",
+   "made": "2026-10-23"
+  },
+  "letters/k.mp3": {
+   "id": "letter-k",
+   "text": "Kay!",
+   "made": "2026-10-23"
+  },
+  "letters/l.mp3": {
+   "id": "letter-l",
+   "text": "El!",
+   "made": "2026-10-23"
+  },
+  "letters/m.mp3": {
+   "id": "letter-m",
+   "text": "Em!",
+   "made": "2026-10-23"
+  },
+  "letters/n.mp3": {
+   "id": "letter-n",
+   "text": "En!",
+   "made": "2026-10-23"
+  },
+  "letters/o.mp3": {
+   "id": "letter-o",
+   "text": "Oh!",
+   "made": "2026-10-23"
+  },
+  "letters/p.mp3": {
+   "id": "letter-p",
+   "text": "Pee!",
+   "made": "2026-10-23"
+  },
+  "letters/q.mp3": {
+   "id": "letter-q",
+   "text": "Cue!",
+   "made": "2026-10-23"
+  },
+  "letters/r.mp3": {
+   "id": "letter-r",
+   "text": "Ar!",
+   "made": "2026-10-23"
+  },
+  "letters/s.mp3": {
+   "id": "letter-s",
+   "text": "Ess!",
+   "made": "2026-10-23"
+  },
+  "letters/t.mp3": {
+   "id": "letter-t",
+   "text": "Tee!",
+   "made": "2026-10-23"
+  },
+  "letters/u.mp3": {
+   "id": "letter-u",
+   "text": "You!",
+   "made": "2026-10-23"
+  },
+  "letters/v.mp3": {
+   "id": "letter-v",
+   "text": "Vee!",
+   "made": "2026-10-23"
+  },
+  "letters/w.mp3": {
+   "id": "letter-w",
+   "text": "Double-you!",
+   "made": "2026-10-23"
+  },
+  "letters/x.mp3": {
+   "id": "letter-x",
+   "text": "Ex!",
+   "made": "2026-10-23"
+  },
+  "letters/y.mp3": {
+   "id": "letter-y",
+   "text": "Why!",
+   "made": "2026-10-23"
+  },
+  "letters/z.mp3": {
+   "id": "letter-z",
+   "text": "Zee!",
+   "made": "2026-10-23"
+  },
+  "words/animals/ant.mp3": {
+   "id": "ant",
+   "text": "Ant!",
+   "made": "2026-10-23"
+  },
+  "words/animals/bat.mp3": {
+   "id": "bat",
+   "text": "Bat!",
+   "made": "2026-10-23"
+  },
+  "words/animals/bear.mp3": {
+   "id": "bear",
+   "text": "Bear!",
+   "made": "2026-10-23"
+  },
+  "words/animals/bird.mp3": {
+   "id": "bird",
+   "text": "Bird!",
+   "made": "2026-10-23"
+  },
+  "words/animals/bug.mp3": {
+   "id": "bug",
+   "text": "Bug!",
+   "made": "2026-10-23"
+  },
+  "words/animals/butterfly.mp3": {
+   "id": "butterfly",
+   "text": "Butterfly!",
+   "made": "2026-10-23"
+  },
+  "words/animals/cat.mp3": {
+   "id": "cat",
+   "text": "Cat!",
+   "made": "2026-10-23"
+  },
+  "words/animals/crab.mp3": {
+   "id": "crab",
+   "text": "Crab!",
+   "made": "2026-10-23"
+  },
+  "words/animals/crocodile.mp3": {
+   "id": "crocodile",
+   "text": "Crocodile!",
+   "made": "2026-10-23"
+  },
+  "words/animals/dog.mp3": {
+   "id": "dog",
+   "text": "Dog!",
+   "made": "2026-10-23"
+  },
+  "words/animals/dolphin.mp3": {
+   "id": "dolphin",
+   "text": "Dolphin!",
+   "made": "2026-10-23"
+  },
+  "words/animals/duck.mp3": {
+   "id": "duck",
+   "text": "Duck!",
+   "made": "2026-10-23"
+  },
+  "words/animals/elephant.mp3": {
+   "id": "elephant",
+   "text": "Elephant!",
+   "made": "2026-10-23"
+  },
+  "words/animals/fish.mp3": {
+   "id": "fish",
+   "text": "Fish!",
+   "made": "2026-10-23"
+  },
+  "words/animals/fox.mp3": {
+   "id": "fox",
+   "text": "Fox!",
+   "made": "2026-10-23"
+  },
+  "words/animals/frog.mp3": {
+   "id": "frog",
+   "text": "Frog!",
+   "made": "2026-10-23"
+  },
+  "words/animals/giraffe.mp3": {
+   "id": "giraffe",
+   "text": "Giraffe!",
+   "made": "2026-10-23"
+  },
+  "words/animals/hen.mp3": {
+   "id": "hen",
+   "text": "Hen!",
+   "made": "2026-10-23"
+  },
+  "words/animals/horse.mp3": {
+   "id": "horse",
+   "text": "Horse!",
+   "made": "2026-10-23"
+  },
+  "words/animals/kangaroo.mp3": {
+   "id": "kangaroo",
+   "text": "Kangaroo!",
+   "made": "2026-10-23"
+  },
+  "words/animals/lion.mp3": {
+   "id": "lion",
+   "text": "Lion!",
+   "made": "2026-10-23"
+  },
+  "words/animals/mouse.mp3": {
+   "id": "mouse",
+   "text": "Mouse!",
+   "made": "2026-10-23"
+  },
+  "words/animals/octopus.mp3": {
+   "id": "octopus",
+   "text": "Octopus!",
+   "made": "2026-10-23"
+  },
+  "words/animals/panda.mp3": {
+   "id": "panda",
+   "text": "Panda!",
+   "made": "2026-10-23"
+  },
+  "words/animals/penguin.mp3": {
+   "id": "penguin",
+   "text": "Penguin!",
+   "made": "2026-10-23"
+  },
+  "words/animals/pig.mp3": {
+   "id": "pig",
+   "text": "Pig!",
+   "made": "2026-10-23"
+  },
+  "words/animals/rabbit.mp3": {
+   "id": "rabbit",
+   "text": "Rabbit!",
+   "made": "2026-10-23"
+  },
+  "words/animals/shark.mp3": {
+   "id": "shark",
+   "text": "Shark!",
+   "made": "2026-10-23"
+  },
+  "words/animals/sheep.mp3": {
+   "id": "sheep",
+   "text": "Sheep!",
+   "made": "2026-10-23"
+  },
+  "words/animals/snake.mp3": {
+   "id": "snake",
+   "text": "Snake!",
+   "made": "2026-10-23"
+  },
+  "words/animals/tiger.mp3": {
+   "id": "tiger",
+   "text": "Tiger!",
+   "made": "2026-10-23"
+  },
+  "words/animals/wolf.mp3": {
+   "id": "wolf",
+   "text": "Wolf!",
+   "made": "2026-10-23"
+  },
+  "words/animals/zebra.mp3": {
+   "id": "zebra",
+   "text": "Zebra!",
+   "made": "2026-10-23"
+  },
+  "words/food/apple.mp3": {
+   "id": "apple",
+   "text": "Apple!",
+   "made": "2026-10-23"
+  },
+  "words/food/avocado.mp3": {
+   "id": "avocado",
+   "text": "Avocado!",
+   "made": "2026-10-23"
+  },
+  "words/food/banana.mp3": {
+   "id": "banana",
+   "text": "Banana!",
+   "made": "2026-10-23"
+  },
+  "words/food/bread.mp3": {
+   "id": "bread",
+   "text": "Bread!",
+   "made": "2026-10-23"
+  },
+  "words/food/bun.mp3": {
+   "id": "bun",
+   "text": "Bun!",
+   "made": "2026-10-23"
+  },
+  "words/food/cake.mp3": {
+   "id": "cake",
+   "text": "Cake!",
+   "made": "2026-10-23"
+  },
+  "words/food/can.mp3": {
+   "id": "can",
+   "text": "Can!",
+   "made": "2026-10-23"
+  },
+  "words/food/carrot.mp3": {
+   "id": "carrot",
+   "text": "Carrot!",
+   "made": "2026-10-23"
+  },
+  "words/food/cheese.mp3": {
+   "id": "cheese",
+   "text": "Cheese!",
+   "made": "2026-10-23"
+  },
+  "words/food/chocolate.mp3": {
+   "id": "chocolate",
+   "text": "Chocolate!",
+   "made": "2026-10-23"
+  },
+  "words/food/corn.mp3": {
+   "id": "corn",
+   "text": "Corn!",
+   "made": "2026-10-23"
+  },
+  "words/food/egg.mp3": {
+   "id": "egg",
+   "text": "Egg!",
+   "made": "2026-10-23"
+  },
+  "words/food/falafel.mp3": {
+   "id": "falafel",
+   "text": "Falafel!",
+   "made": "2026-10-23"
+  },
+  "words/food/fig.mp3": {
+   "id": "fig",
+   "text": "Fig!",
+   "made": "2026-10-23"
+  },
+  "words/food/gum.mp3": {
+   "id": "gum",
+   "text": "Gum!",
+   "made": "2026-10-23"
+  },
+  "words/food/jam.mp3": {
+   "id": "jam",
+   "text": "Jam!",
+   "made": "2026-10-23"
+  },
+  "words/food/ketchup.mp3": {
+   "id": "ketchup",
+   "text": "Ketchup!",
+   "made": "2026-10-23"
+  },
+  "words/food/lemon.mp3": {
+   "id": "lemon",
+   "text": "Lemon!",
+   "made": "2026-10-23"
+  },
+  "words/food/mango.mp3": {
+   "id": "mango",
+   "text": "Mango!",
+   "made": "2026-10-23"
+  },
+  "words/food/melon.mp3": {
+   "id": "melon",
+   "text": "Melon!",
+   "made": "2026-10-23"
+  },
+  "words/food/milk.mp3": {
+   "id": "milk",
+   "text": "Milk!",
+   "made": "2026-10-23"
+  },
+  "words/food/mint.mp3": {
+   "id": "mint",
+   "text": "Mint!",
+   "made": "2026-10-23"
+  },
+  "words/food/nut.mp3": {
+   "id": "nut",
+   "text": "Nut!",
+   "made": "2026-10-23"
+  },
+  "words/food/pasta.mp3": {
+   "id": "pasta",
+   "text": "Pasta!",
+   "made": "2026-10-23"
+  },
+  "words/food/pizza.mp3": {
+   "id": "pizza",
+   "text": "Pizza!",
+   "made": "2026-10-23"
+  },
+  "words/food/plum.mp3": {
+   "id": "plum",
+   "text": "Plum!",
+   "made": "2026-10-23"
+  },
+  "words/food/popcorn.mp3": {
+   "id": "popcorn",
+   "text": "Popcorn!",
+   "made": "2026-10-23"
+  },
+  "words/food/salad.mp3": {
+   "id": "salad",
+   "text": "Salad!",
+   "made": "2026-10-23"
+  },
+  "words/food/sandwich.mp3": {
+   "id": "sandwich",
+   "text": "Sandwich!",
+   "made": "2026-10-23"
+  },
+  "words/food/soup.mp3": {
+   "id": "soup",
+   "text": "Soup!",
+   "made": "2026-10-23"
+  },
+  "words/food/strawberry.mp3": {
+   "id": "strawberry",
+   "text": "Strawberry!",
+   "made": "2026-10-23"
+  },
+  "words/food/toast.mp3": {
+   "id": "toast",
+   "text": "Toast!",
+   "made": "2026-10-23"
+  },
+  "words/food/watermelon.mp3": {
+   "id": "watermelon",
+   "text": "Watermelon!",
+   "made": "2026-10-23"
+  },
+  "words/home/bath.mp3": {
+   "id": "bath",
+   "text": "Bath!",
+   "made": "2026-10-23"
+  },
+  "words/home/bed.mp3": {
+   "id": "bed",
+   "text": "Bed!",
+   "made": "2026-10-23"
+  },
+  "words/home/bell.mp3": {
+   "id": "bell",
+   "text": "Bell!",
+   "made": "2026-10-23"
+  },
+  "words/home/blanket.mp3": {
+   "id": "blanket",
+   "text": "Blanket!",
+   "made": "2026-10-23"
+  },
+  "words/home/book.mp3": {
+   "id": "book",
+   "text": "Book!",
+   "made": "2026-10-23"
+  },
+  "words/home/bowl.mp3": {
+   "id": "bowl",
+   "text": "Bowl!",
+   "made": "2026-10-23"
+  },
+  "words/home/box.mp3": {
+   "id": "box",
+   "text": "Box!",
+   "made": "2026-10-23"
+  },
+  "words/home/chair.mp3": {
+   "id": "chair",
+   "text": "Chair!",
+   "made": "2026-10-23"
+  },
+  "words/home/clock.mp3": {
+   "id": "clock",
+   "text": "Clock!",
+   "made": "2026-10-23"
+  },
+  "words/home/computer.mp3": {
+   "id": "computer",
+   "text": "Computer!",
+   "made": "2026-10-23"
+  },
+  "words/home/cup.mp3": {
+   "id": "cup",
+   "text": "Cup!",
+   "made": "2026-10-23"
+  },
+  "words/home/doll.mp3": {
+   "id": "doll",
+   "text": "Doll!",
+   "made": "2026-10-23"
+  },
+  "words/home/door.mp3": {
+   "id": "door",
+   "text": "Door!",
+   "made": "2026-10-23"
+  },
+  "words/home/fork.mp3": {
+   "id": "fork",
+   "text": "Fork!",
+   "made": "2026-10-23"
+  },
+  "words/home/key.mp3": {
+   "id": "key",
+   "text": "Key!",
+   "made": "2026-10-23"
+  },
+  "words/home/kitchen.mp3": {
+   "id": "kitchen",
+   "text": "Kitchen!",
+   "made": "2026-10-23"
+  },
+  "words/home/knife.mp3": {
+   "id": "knife",
+   "text": "Knife!",
+   "made": "2026-10-23"
+  },
+  "words/home/lamp.mp3": {
+   "id": "lamp",
+   "text": "Lamp!",
+   "made": "2026-10-23"
+  },
+  "words/home/mop.mp3": {
+   "id": "mop",
+   "text": "Mop!",
+   "made": "2026-10-23"
+  },
+  "words/home/pan.mp3": {
+   "id": "pan",
+   "text": "Pan!",
+   "made": "2026-10-23"
+  },
+  "words/home/phone.mp3": {
+   "id": "phone",
+   "text": "Phone!",
+   "made": "2026-10-23"
+  },
+  "words/home/plate.mp3": {
+   "id": "plate",
+   "text": "Plate!",
+   "made": "2026-10-23"
+  },
+  "words/home/rug.mp3": {
+   "id": "rug",
+   "text": "Rug!",
+   "made": "2026-10-23"
+  },
+  "words/home/sink.mp3": {
+   "id": "sink",
+   "text": "Sink!",
+   "made": "2026-10-23"
+  },
+  "words/home/sofa.mp3": {
+   "id": "sofa",
+   "text": "Sofa!",
+   "made": "2026-10-23"
+  },
+  "words/home/spoon.mp3": {
+   "id": "spoon",
+   "text": "Spoon!",
+   "made": "2026-10-23"
+  },
+  "words/home/stove.mp3": {
+   "id": "stove",
+   "text": "Stove!",
+   "made": "2026-10-23"
+  },
+  "words/home/table.mp3": {
+   "id": "table",
+   "text": "Table!",
+   "made": "2026-10-23"
+  },
+  "words/home/television.mp3": {
+   "id": "television",
+   "text": "Television!",
+   "made": "2026-10-23"
+  },
+  "words/home/toothbrush.mp3": {
+   "id": "toothbrush",
+   "text": "Toothbrush!",
+   "made": "2026-10-23"
+  },
+  "words/home/umbrella.mp3": {
+   "id": "umbrella",
+   "text": "Umbrella!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/ambulance.mp3": {
+   "id": "ambulance",
+   "text": "Ambulance!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/bag.mp3": {
+   "id": "bag",
+   "text": "Bag!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/bicycle.mp3": {
+   "id": "bicycle",
+   "text": "Bicycle!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/boat.mp3": {
+   "id": "boat",
+   "text": "Boat!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/bridge.mp3": {
+   "id": "bridge",
+   "text": "Bridge!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/bus.mp3": {
+   "id": "bus",
+   "text": "Bus!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/car.mp3": {
+   "id": "car",
+   "text": "Car!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/caravan.mp3": {
+   "id": "caravan",
+   "text": "Caravan!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/helicopter.mp3": {
+   "id": "helicopter",
+   "text": "Helicopter!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/helmet.mp3": {
+   "id": "helmet",
+   "text": "Helmet!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/jeep.mp3": {
+   "id": "jeep",
+   "text": "Jeep!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/jet.mp3": {
+   "id": "jet",
+   "text": "Jet!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/kayak.mp3": {
+   "id": "kayak",
+   "text": "Kayak!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/map.mp3": {
+   "id": "map",
+   "text": "Map!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/motorbike.mp3": {
+   "id": "motorbike",
+   "text": "Motorbike!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/plane.mp3": {
+   "id": "plane",
+   "text": "Plane!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/raft.mp3": {
+   "id": "raft",
+   "text": "Raft!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/road.mp3": {
+   "id": "road",
+   "text": "Road!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/rocket.mp3": {
+   "id": "rocket",
+   "text": "Rocket!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/scooter.mp3": {
+   "id": "scooter",
+   "text": "Scooter!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/ship.mp3": {
+   "id": "ship",
+   "text": "Ship!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/sled.mp3": {
+   "id": "sled",
+   "text": "Sled!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/submarine.mp3": {
+   "id": "submarine",
+   "text": "Submarine!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/tank.mp3": {
+   "id": "tank",
+   "text": "Tank!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/taxi.mp3": {
+   "id": "taxi",
+   "text": "Taxi!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/tent.mp3": {
+   "id": "tent",
+   "text": "Tent!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/tractor.mp3": {
+   "id": "tractor",
+   "text": "Tractor!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/train.mp3": {
+   "id": "train",
+   "text": "Train!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/tram.mp3": {
+   "id": "tram",
+   "text": "Tram!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/truck.mp3": {
+   "id": "truck",
+   "text": "Truck!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/tunnel.mp3": {
+   "id": "tunnel",
+   "text": "Tunnel!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/van.mp3": {
+   "id": "van",
+   "text": "Van!",
+   "made": "2026-10-23"
+  },
+  "words/transportation/wheel.mp3": {
+   "id": "wheel",
+   "text": "Wheel!",
+   "made": "2026-10-23"
+  }
+ }
+}
