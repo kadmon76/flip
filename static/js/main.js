@@ -1,8 +1,10 @@
 // main.js — wiring: theme selection and the theme's stage map (BACKLOG
 // B-217: a theme card opens its stage screen, a station there starts a
 // round of its stage), round flow (its progress recorded at the round
-// end), the console controls (check dome, reset lever, speaker), the
-// header's mute toggle and the play screen's back button, the kid-idle
+// end; the struggle help, BACKLOG B-220: after three words in a row that
+// were not clean the next two are easier ones), the console controls
+// (check dome, reset lever, speaker), the header's mute toggle and the
+// play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
 // the TV's lock (tv.js), screen renders. The kid's gears (gears.js,
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
@@ -30,7 +32,7 @@ import { renderStageMap } from './stagemap.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
 import { stagesOf } from './stage.js';
-import { pickRound, makeWord } from './round.js';
+import { pickRound, makeWord, swapForStruggle } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
 
@@ -317,7 +319,15 @@ function onCheck(extra = {}) {
 // were added at their checks). A round left with the back button never
 // gets here, so it records nothing and earns no round gears (B-201). The
 // next word starts by the round's stage rules, as the first did (BACKLOG
-// B-215).
+// B-215). Before it starts, the struggle help (BACKLOG B-220, round.js
+// swapForStruggle; PROGRESSION.md "Guardrails"): when this word and the
+// two before it were not clean (a wrong check, a boost or a reveal), the
+// next two words are swapped for solved words of the theme's earlier
+// stages (progress.js: the solved words as the round started; nothing is
+// recorded before its end), in the same setState as the next word, with
+// no sign to the kid. Not on stage 1, nor when no earlier word is solved.
+// The words swapped out have no result, so the round end records nothing
+// about them: they stay unsolved and come back in a later round.
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -340,9 +350,11 @@ function onNext(extra = {}) {
             ...extra,
         });
     } else {
+        const words = swapForStruggle(state.words, round.index, results, state.data, round.stage, progressFor(state.theme).solved);
         setState({
+            words,
             round: { ...round, index: nextIndex, results },
-            current: makeWord(state.words[nextIndex], state.round.stage, newTileId),
+            current: makeWord(words[nextIndex], state.round.stage, newTileId),
             lives: LIVES,
             speaking: false,
             lastInput: performance.now(),

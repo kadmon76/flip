@@ -3253,7 +3253,7 @@ class StageTests(TestCase):
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
-        self.assertIn('current: makeWord(state.words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
+        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
         # nothing else writes a round's stage; leaving a round clears it
         main = self.code('main.js')
         self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
@@ -3644,7 +3644,7 @@ class StageStartTests(TestCase):
         main = self.code('main.js')
         # since B-208 the pick goes through pickRound (the theme's missed
         # words back, then pickWords by the stage)
-        self.assertIn("import { pickRound, makeWord } from './round.js';", main)
+        self.assertIn("import { pickRound, makeWord, swapForStruggle } from './round.js';", main)
         self.assertNotIn('makeCurrent', main)
         self.assertNotIn('shuffle', main)
         start = self.function('startRound')
@@ -3652,7 +3652,7 @@ class StageStartTests(TestCase):
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
         nxt = self.function('onNext')
-        self.assertIn('current: makeWord(state.words[nextIndex], state.round.stage, newTileId),', nxt)
+        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', nxt)
 
     def test_the_reveal_keeps_a_locked_letter_locked(self):
         # the reveal moved to drag.js with B-207 (a pure transition)
@@ -7090,6 +7090,391 @@ class StageRoundTests(TestCase):
         self.assertEqual({words.index('sheep') for words in rounds if 'sheep' in words}, {0, 1, 2, 3, 4})
 
 
+class StruggleSwapTests(TestCase):
+    """Struggle help (BACKLOG B-220, PROGRESSION.md "Guardrails"): after
+    three words in a row of a round that were not clean (a wrong check, a
+    boost or a reveal), the next two words not yet shown are swapped for
+    solved words of the theme's earlier stages (round.js swapForStruggle,
+    pure, run through node with a seeded Math.random; main.js onNext
+    applies it before the next word). Nothing on stage 1 or when no earlier
+    word is solved; words swapped out stay unsolved and come back. On a
+    full test theme, the frozen sparse data and today's theme files."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    FULL = StageRoundTests.FULL
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"const M = await import('{(self.JS / 'missed.js').as_uri()}');"
+            "const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            # a round's word as main.js startRound makes it
+            "const entry = (data, w) => ({ word: w, image: data[w].image, audio: data[w].audio, break: data[w].break });"
+            "const entries = (data, names) => names.map((w) => entry(data, w));"
+            "const names = (words) => words.map((e) => e.word);"
+            # results that are not clean: a wrong check (then right), a
+            # boost, a reveal; and a clean one
+            "const wrong = (w) => ({ word: w, correct: true, clean: false, boosted: false });"
+            "const boost = (w) => ({ word: w, correct: true, clean: false, boosted: true });"
+            "const reveal = (w) => ({ word: w, correct: false, clean: false, boosted: false });"
+            "const clean = (w) => ({ word: w, correct: true, clean: true, boosted: false });"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def full(self):
+        return {w: {'image': f'/{w}.svg', 'audio': f'/{w}.mp3', 'stage': s}
+                for s, words in self.FULL.items() for w in words}
+
+    def sparse(self, theme):
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
+
+    def stage_of(self, data, word):
+        return data[word]['stage']
+
+    # --- round.js swapForStruggle ---
+
+    def test_three_not_clean_swap_the_next_two_for_solved_words_of_the_stage_before(self):
+        data = self.full()
+        solved = self.FULL[1] + self.FULL[2]
+        runs = {
+            'reveals': "[reveal(w[0]), reveal(w[1]), reveal(w[2])]",
+            'wrong checks': "[wrong(w[0]), wrong(w[1]), wrong(w[2])]",
+            'boosts': "[boost(w[0]), boost(w[1]), boost(w[2])]",
+            'mixed': "[wrong(w[0]), boost(w[1]), reveal(w[2])]",
+        }
+        for label, run in runs.items():
+            res = self.run_node(
+                f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])};"
+                "const words = entries(data, w);"
+                f"out(Array.from({{ length: 40 }}, (_, i) => R.swapForStruggle(words, 2, {run}, data, 3,"
+                f" {json.dumps(solved)}, seeded(i + 1))));")
+            seen = set()
+            for words in res:
+                self.assertEqual([e['word'] for e in words[:3]], self.FULL[3][:3], label)
+                swapped = [e['word'] for e in words[3:]]
+                self.assertEqual(len(set(swapped)), 2, label)
+                # the nearest earlier stage first: stage 2 has five solved words
+                self.assertLessEqual(set(swapped), set(self.FULL[2]), label)
+                for e in words[3:]:
+                    self.assertEqual(e, {'word': e['word'], 'image': f"/{e['word']}.svg", 'audio': f"/{e['word']}.mp3"})
+                seen |= set(swapped)
+            # each stage's words at random
+            self.assertEqual(seen, set(self.FULL[2]), label)
+
+    def test_the_nearest_earlier_stage_first_then_the_ones_before(self):
+        data = self.full()
+        # stage 5: one solved word on stage 4, none on 3, one on 2
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[5])};"
+            "const words = entries(data, w); const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            f"out(Array.from({{ length: 20 }}, (_, i) => names(R.swapForStruggle(words, 2, run, data, 5,"
+            f" {json.dumps(self.FULL[1] + ['frog', 'mole'])}, seeded(i + 1)))));")
+        for words in res:
+            self.assertEqual(words, self.FULL[5][:3] + ['mole', 'frog'])
+        # long: stage 5 first
+        long = self.FULL['long'][:5]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(long)};"
+            "const words = entries(data, w); const run = [boost(w[0]), reveal(w[1]), wrong(w[2])];"
+            f"out(Array.from({{ length: 20 }}, (_, i) => names(R.swapForStruggle(words, 2, run, data, 'long',"
+            f" {json.dumps(self.FULL[1] + self.FULL[5])}, seeded(i + 1)))));")
+        for words in res:
+            self.assertEqual(words[:3], long[:3])
+            self.assertLessEqual(set(words[3:]), set(self.FULL[5]))
+            self.assertEqual(len(set(words)), 5)
+
+    def test_fewer_solved_earlier_words_than_places(self):
+        data = self.full()
+        w = self.FULL[2]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(w)}; const words = entries(data, w);"
+            "const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            # one solved earlier word: it takes the first place, the other stays
+            "const one = names(R.swapForStruggle(words, 2, run, data, 2, ['cat', 'frog', 'fish']));"
+            # a solved earlier word already in the round is not taken again
+            "const round = entries(data, ['cat', ...w.slice(1)]);"
+            "const run2 = [reveal('cat'), reveal(w[1]), reveal(w[2])];"
+            "const inRound = names(R.swapForStruggle(round, 2, run2, data, 2, ['cat', 'dog']));"
+            "out([one, inRound]);")
+        one, in_round = res
+        self.assertEqual(one, w[:3] + ['cat', w[4]])
+        self.assertEqual(in_round, ['cat'] + w[1:3] + ['dog', w[4]])
+
+    def test_nothing_changes_on_stage_1_without_the_run_or_with_nothing_solved_before(self):
+        data = self.full()
+        everything = [w for words in self.FULL.values() for w in words]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const all = {json.dumps(everything)};"
+            "const at = (stage) => { const w = Object.keys(data).filter((k) => data[k].stage === stage).slice(0, 5);"
+            " return { w, words: entries(data, w), run: [reveal(w[0]), reveal(w[1]), reveal(w[2])] }; };"
+            "const s1 = at(1), s3 = at(3); const rand = () => 0.5;"
+            "const same = (words, ...args) => R.swapForStruggle(words, ...args) === words;"
+            "out({"
+            # stage 1, and anything that is not a stage (read as stage 1)
+            " stage1: same(s1.words, 2, s1.run, data, 1, all, rand),"
+            " notStages: [null, undefined, '3', 'Long', 0, 6].map((st) => same(s3.words, 2, s3.run, data, st, all, rand)),"
+            # a clean word among the last three
+            " cleanFirst: same(s3.words, 2, [clean(s3.w[0]), reveal(s3.w[1]), reveal(s3.w[2])], data, 3, all, rand),"
+            " cleanLast: same(s3.words, 2, [reveal(s3.w[0]), reveal(s3.w[1]), clean(s3.w[2])], data, 3, all, rand),"
+            " cleanBeforeRun: !same(s3.words, 3, [clean(s3.w[0]), reveal(s3.w[1]), reveal(s3.w[2]), reveal(s3.w[3])], data, 3, all, rand),"
+            " runBroken: same(s3.words, 3, [reveal(s3.w[0]), reveal(s3.w[1]), clean(s3.w[2]), reveal(s3.w[3])], data, 3, all, rand),"
+            # only two words done; a word without a result
+            " two: same(s3.words, 1, s3.run.slice(0, 2), data, 3, all, rand),"
+            " hole: same(s3.words, 2, [reveal(s3.w[0]), undefined, reveal(s3.w[2])], data, 3, all, rand),"
+            " short: same(s3.words, 2, s3.run.slice(0, 2), data, 3, all, rand),"
+            # nothing solved before the stage: none, only its own words, only later ones
+            " none: same(s3.words, 2, s3.run, data, 3, [], rand),"
+            " own: same(s3.words, 2, s3.run, data, 3, s3.w, rand),"
+            " later: same(s3.words, 2, s3.run, data, 3, all.filter((k) => [4, 5, 'long'].includes(data[k].stage)), rand),"
+            # no data; the last word of the round (nothing left to swap)
+            " noData: same(s3.words, 2, s3.run, null, 3, all, rand),"
+            " last: same(s3.words, 4, [...s3.run, reveal(s3.w[3]), reveal(s3.w[4])], data, 3, all, rand),"
+            "});")
+        self.assertTrue(res['stage1'])
+        self.assertEqual(res['notStages'], [True] * 6)
+        for key in ('cleanFirst', 'cleanLast', 'runBroken', 'two', 'hole', 'short', 'none', 'own', 'later', 'noData', 'last'):
+            self.assertTrue(res[key], key)
+        # the run is the last three words, whatever came before them
+        self.assertTrue(res['cleanBeforeRun'])
+
+    def test_only_the_next_words_not_yet_shown(self):
+        data = self.full()
+        solved = self.FULL[1] + self.FULL[2]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])}; const words = entries(data, w);"
+            f"const solved = {json.dumps(solved)};"
+            # after the fourth word: only the fifth is left
+            "const fourth = names(R.swapForStruggle(words, 3, [clean(w[0]), reveal(w[1]), wrong(w[2]), boost(w[3])], data, 3, solved));"
+            # a longer round: only the two after the run
+            f"const eight = entries(data, [...w, ...{json.dumps(self.FULL[4][:3])}]);"
+            "const long = names(R.swapForStruggle(eight, 2, [reveal(w[0]), reveal(w[1]), reveal(w[2])], data, 3, solved));"
+            "out([fourth, long]);")
+        fourth, long = res
+        self.assertEqual(fourth[:4], self.FULL[3][:4])
+        self.assertIn(fourth[4], self.FULL[2])
+        self.assertEqual(long[:3], self.FULL[3][:3])
+        self.assertLessEqual(set(long[3:5]), set(self.FULL[2]))
+        self.assertEqual(long[5:], self.FULL[4][:3])
+
+    def test_a_word_swapped_in_or_already_easy_is_never_swapped_out(self):
+        data = self.full()
+        solved = self.FULL[1] + self.FULL[2]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])}; const words = entries(data, w);"
+            f"const solved = {json.dumps(solved)};"
+            "const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            "const swapped = R.swapForStruggle(words, 2, run, data, 3, solved, seeded(3));"
+            # the swapped-in fourth word is not clean either: the fifth stays
+            "const again = R.swapForStruggle(swapped, 3, [...run, reveal(swapped[3].word)], data, 3, solved, seeded(4));"
+            # a review word (solved, stage 1) next stays; the one after it is swapped
+            "const review = entries(data, [...w.slice(0, 3), 'cat', w[4]]);"
+            "const kept = names(R.swapForStruggle(review, 2, run, data, 3, solved, seeded(5)));"
+            # both next words already easy: nothing changes
+            "const easy = entries(data, [...w.slice(0, 3), 'cat', 'frog']);"
+            "out([again === swapped, kept, R.swapForStruggle(easy, 2, run, data, 3, solved) === easy]);")
+        again_same, kept, easy_same = res
+        self.assertTrue(again_same)
+        self.assertEqual(kept[:4], self.FULL[3][:3] + ['cat'])
+        self.assertIn(kept[4], self.FULL[2])
+        self.assertTrue(easy_same)
+
+    def test_words_swapped_out_stay_unsolved_and_come_back(self):
+        # a stage-3 round with moose missed last time; three reveals, the
+        # swap, the two swapped-in words right; then the round end's
+        # records (progress.js, missed.js afterRound) and the next round
+        data = self.full()
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const solved = {json.dumps(self.FULL[1] + self.FULL[2])};"
+            "const rows = [];"
+            "for (let s = 1; s <= 20; s++) {"
+            "  const w = R.pickRound(data, 5, 3, ['moose'], solved, seeded(s)); const words = entries(data, w);"
+            "  const results = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            "  const swapped = names(R.swapForStruggle(words, 2, results, data, 3, solved, seeded(s + 50)));"
+            "  results.push(clean(swapped[3]), clean(swapped[4]));"
+            "  const { progress, justCleared } = P.afterRound({ solved, cleared: [1, 2] }, data, 3, results);"
+            "  const missed = M.afterRound(['moose'], results);"
+            "  const next = R.pickRound(data, 5, 3, missed, progress.solved, seeded(s + 100));"
+            "  rows.push({ w, swapped, solved: progress.solved, cleared: progress.cleared, justCleared, missed, next });"
+            "}"
+            "out(rows);")
+        for row in res:
+            self.assertEqual(set(row['w']), set(self.FULL[3]))
+            out = row['w'][3:]
+            self.assertLessEqual(set(row['swapped'][3:]), set(self.FULL[2]))
+            for word in out:
+                self.assertNotIn(word, row['solved'])
+                self.assertIn(word, row['next'])
+            self.assertEqual(row['cleared'], [1, 2])
+            self.assertFalse(row['justCleared'])
+            # a missed word swapped out stays missed
+            if 'moose' in out:
+                self.assertIn('moose', row['missed'])
+            self.assertEqual(set(row['next']), set(self.FULL[3]))
+        self.assertTrue(any('moose' in row['w'][3:] for row in res))
+
+    def test_the_sparse_data(self):
+        animals = self.sparse('animals')
+        transportation = self.sparse('transportation')
+        res = self.run_node(
+            f"const A = {json.dumps(animals)}; const T = {json.dumps(transportation)};"
+            "const play = (data, stage, solved, s) => { const w = R.pickRound(data, 5, stage, [], solved, seeded(s));"
+            " const words = entries(data, w); const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            " const after = R.swapForStruggle(words, 2, run, data, stage, solved, seeded(s + 7));"
+            " return { w, after: names(after), same: after === words }; };"
+            "const seeds = Array.from({ length: 30 }, (_, i) => i + 1);"
+            "out({"
+            # animals stage 4 (bird, lion, horse; fish and duck fill from stage 3)
+            " a4: seeds.map((s) => play(A, 4, ['cat', 'dog', 'frog', 'fish', 'duck'], s)),"
+            # transportation long: taxi (stage 4), then stage 3's car or truck
+            " tLong: seeds.map((s) => play(T, 'long', ['bus', 'car', 'truck', 'taxi'], s)),"
+            # transportation stage 3: bus, the only earlier word, is in the round already
+            " t3: seeds.map((s) => play(T, 3, ['bus'], s)),"
+            # stage 1: never
+            " a1: seeds.map((s) => play(A, 1, Object.keys(A), s)),"
+            "});")
+        easy = {'cat', 'dog', 'frog', 'fish', 'duck'}
+        for row in res['a4']:
+            self.assertEqual(row['after'][:3], row['w'][:3])
+            self.assertLessEqual(set(row['after'][3:]), easy)
+            self.assertEqual(len(set(row['after'])), 5)
+            for i in (3, 4):
+                if row['w'][i] in ('fish', 'duck'):
+                    self.assertEqual(row['after'][i], row['w'][i])
+        for row in res['tLong']:
+            self.assertEqual(row['after'][3], 'taxi')
+            self.assertIn(row['after'][4], ('car', 'truck'))
+        for row in res['t3'] + res['a1']:
+            self.assertTrue(row['same'])
+
+    def test_todays_theme_files(self):
+        # whatever the live data holds: every stage after a theme's first
+        # swaps in words of the stage before it (all of them solved)
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        themes = {t: json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8')) for t, url in index.items()}
+        res = self.run_node(
+            f"const themes = {json.dumps(themes)};"
+            f"const S = await import('{(self.JS / 'stage.js').as_uri()}');"
+            "const rows = [];"
+            "for (const [theme, data] of Object.entries(themes)) {"
+            "  const stages = S.stagesOf(data);"
+            "  stages.forEach((stage, k) => {"
+            "    const solved = Object.keys(data).filter((w) => stages.indexOf(data[w].stage) < k);"
+            "    const w = R.pickRound(data, 5, stage, [], solved, seeded(k + 1)); const words = entries(data, w);"
+            "    const after = R.swapForStruggle(words, 2, [reveal(w[0]), wrong(w[1]), boost(w[2])], data, stage, solved, seeded(k + 9));"
+            "    rows.push({ theme, stage, before: k ? stages[k - 1] : null, w, after: names(after), same: after === words,"
+            "      stages: names(after).map((x) => data[x].stage) });"
+            "  });"
+            "}"
+            "out(rows);")
+        self.assertTrue(res)
+        for row in res:
+            label = f"{row['theme']} {row['stage']}"
+            if row['before'] is None:
+                self.assertTrue(row['same'], label)
+                continue
+            self.assertEqual(row['after'][:3], row['w'][:3], label)
+            self.assertEqual(row['stages'][3:], [row['before']] * 2, label)
+            self.assertEqual(len(set(row['after'])), 5, label)
+
+    def test_swap_for_struggle_is_pure(self):
+        code = self.code('round.js')
+        self.assertIn('export const STRUGGLE_RUN = 3;', code)
+        self.assertIn('export const STRUGGLE_SWAP = 2;', code)
+        swap = self.function('swapForStruggle', 'round.js')
+        self.assertNotRegex(swap, r'localStorage|document|window|state\.|setState')
+        self.assertNotRegex(code, r'\nlet |\nvar ')
+        # the inputs are not changed
+        data = self.full()
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])}; const words = entries(data, w);"
+            f"const solved = {json.dumps(self.FULL[1])}; const results = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            "const before = JSON.stringify([words, results, data, solved]);"
+            "const after = R.swapForStruggle(words, 2, results, data, 2, solved);"
+            "out([before === JSON.stringify([words, results, data, solved]), after !== words, after[0] === words[0]]);")
+        self.assertEqual(res, [True, True, True])
+
+    # --- main.js: applied before the next word ---
+
+    def test_main_applies_it_before_the_next_word(self):
+        nxt = self.function('onNext')
+        data = self.full()
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const solved = {json.dumps(self.FULL[1] + self.FULL[2])};"
+            "const play = (stage, w, results) => {"
+            "  const state = { theme: 'animals', data, words: entries(data, w), gears: 0,"
+            "    round: { index: 2, size: 5, stage, results }, current: { word: w[2], status: 'revealed' } };"
+            "  const before = state.words; let sets = 0; const asked = [];"
+            "  const setState = (p) => { sets++; Object.assign(state, p); };"
+            "  const swapForStruggle = (...args) => R.swapForStruggle(...args);"
+            "  const progressFor = (theme) => { asked.push(theme); return { solved, cleared: [1, 2] }; };"
+            "  const stopWord = () => {}; const armIdle = () => {}; const recordMissed = () => {};"
+            "  const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const loadProgress = () => ({});"
+            "  const addGears = () => 0; const GEARS = { round: 2 }; const LIVES = 3; const newTileId = () => 't';"
+            "  const makeWord = (e, st) => ({ word: e.word, stage: st, status: 'playing' });"
+            f"  {nxt}"
+            "  onNext();"
+            "  return { sets, asked, same: state.words === before, words: names(state.words), current: state.current,"
+            "    index: state.round.index, results: state.round.results };"
+            "};"
+            f"const w3 = {json.dumps(self.FULL[3])}; const w1 = {json.dumps(self.FULL[1])};"
+            "out({"
+            # the third word left without a result counts as not clean too
+            " swap: play(3, w3, [reveal(w3[0]), boost(w3[1])]),"
+            " cleanRun: play(3, w3, [clean(w3[0]), reveal(w3[1]), reveal(w3[2])]),"
+            " stage1: play(1, w1, [reveal(w1[0]), reveal(w1[1]), reveal(w1[2])]),"
+            "});")
+        swap = res['swap']
+        self.assertEqual(swap['sets'], 1)                 # the swap and the next word: one setState
+        self.assertEqual(swap['asked'], ['animals'])
+        self.assertFalse(swap['same'])
+        self.assertEqual(swap['words'][:3], self.FULL[3][:3])
+        self.assertLessEqual(set(swap['words'][3:]), set(self.FULL[2]))
+        self.assertEqual(swap['current'], {'word': swap['words'][3], 'stage': 3, 'status': 'playing'})
+        self.assertEqual(swap['index'], 3)
+        self.assertEqual(swap['results'][2], {'word': 'sheep', 'correct': False, 'clean': False})
+        for key in ('cleanRun', 'stage1'):
+            self.assertTrue(res[key]['same'], key)
+            self.assertEqual(res[key]['sets'], 1, key)
+        self.assertEqual(res['cleanRun']['current']['word'], self.FULL[3][3])
+        self.assertEqual(res['stage1']['current']['word'], self.FULL[1][3])
+
+    def test_the_wiring(self):
+        main = self.code('main.js')
+        self.assertIn("import { pickRound, makeWord, swapForStruggle } from './round.js';", main)
+        self.assertEqual(main.count('swapForStruggle('), 1)
+        nxt = self.function('onNext')
+        other = nxt.index('} else {', nxt.index('if (nextIndex >= round.size) {'))
+        call = nxt.index('const words = swapForStruggle(state.words, round.index, results, state.data, round.stage, progressFor(state.theme).solved);')
+        self.assertLess(other, call)
+        branch = nxt[call:]
+        self.assertLess(branch.index('setState({'), branch.index('            words,\n'))
+        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', branch)
+        for name in ('startRound', 'onCheck', 'onPlayAgain', 'onPlayBack', 'leaveRound'):
+            self.assertNotIn('swapForStruggle', self.function(name), name)
+        # the kid isn't told: no other module knows of it (no moment, sound,
+        # motion or mark on the screen)
+        for path in sorted(self.JS.glob('*.js')):
+            if path.name not in ('round.js', 'main.js'):
+                self.assertNotRegex(self.code(path.name), r'(?i)struggle|swapped', path.name)
+
+
 class RoundEndStagesTests(TestCase):
     """The round-end's stage bulbs (BACKLOG B-216): under the stars, one
     bulb per stage the theme's data has words in, lit = cleared; the bulb
@@ -7878,6 +8263,7 @@ class GearsTests(TestCase):
             "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false });"
             "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
             "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't'; const LIVES = 3;"
+            "const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });"
             + nxt +
             "onNext(); const mid = [state.screen, state.gears, calls.slice()];"
             "onNext(); out([mid, [state.screen, state.gears, calls.slice()], state.round.results]);")

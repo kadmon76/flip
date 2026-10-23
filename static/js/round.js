@@ -2,8 +2,9 @@
 // and the round's stage (state.round.stage; the rules are stage.js
 // stageRules, BACKLOG B-215): which words the round plays (pickRound: the
 // theme's missed words back, then pickWords by the stage and the theme's
-// solved words, BACKLOG B-216) and how each word starts (makeWord, by the
-// stage's rules: the first letter given on stage 1, extra letters,
+// solved words, BACKLOG B-216; and, during the round, the struggle help,
+// swapForStruggle, BACKLOG B-220) and how each word starts (makeWord, by
+// the stage's rules: the first letter given on stage 1, extra letters,
 // extraLetters, on stages 3-5). No DOM and no module state; main.js calls
 // them and puts the result in state, and a Django test runs them through
 // node.
@@ -73,6 +74,60 @@ export function pickRound(data, size, stage, missed = [], solved = [], rand = Ma
     if (!back.length) return pickWords(data, size, stage, solved, rand);
     const rest = Object.fromEntries(names.filter((w) => !back.includes(w)).map((w) => [w, data[w]]));
     return shuffle([...back, ...pickWords(rest, size - back.length, stage, solved, rand)], rand);
+}
+
+// The struggle help (BACKLOG B-220, PROGRESSION.md "Guardrails"): after
+// STRUGGLE_RUN words in a row of a round that were not clean, the next
+// STRUGGLE_SWAP words of the round are easier ones.
+export const STRUGGLE_RUN = 3;
+export const STRUGGLE_SWAP = 2;
+
+// The round's words once the word at `index` is done (main.js onNext
+// calls it before it starts the next word). `words` is the round's words
+// (state.words, [{ word, image, audio, break }]), `results` its results
+// so far, the word at `index` included (state.round.results, each
+// { word, correct, clean, ... }), `data` the theme's data file, `stage`
+// the round's stage and `solved` the theme's solved words (progress.js).
+// When the word at `index` and the STRUGGLE_RUN - 1 words before it all
+// have a result that is not clean (`clean` not true: a wrong check, a
+// boost or a reveal; gears.js isClean), the next STRUGGLE_SWAP words not
+// yet shown (from index + 1, as many as the round has left) are swapped,
+// each for a solved word of an earlier stage than `stage` that is not in
+// the round yet: the nearest earlier stage first, each stage's words at
+// random (pickWords' review order). A word that already is a solved word
+// of an earlier stage (a review word, or one swapped in before) stays, so
+// a word swapped in is never swapped out again. With fewer such words
+// than places, the first places are swapped and the others stay. Nothing
+// changes, and the same array comes back, on stage 1 (or anything that
+// is not a stage, which reads as stage 1, as in stage.js stageRules),
+// when no earlier word is solved, or without the run. A word swapped in
+// is { word, image, audio, break } from `data`, the shape main.js
+// startRound gives the round's words; it plays by the round's stage rules
+// like every word of the round (makeWord). A word swapped out is in no
+// result, so the round end records nothing about it (missed.js,
+// progress.js): it stays unsolved, a missed word stays missed, and it
+// comes back in a later round (pickRound). The kid isn't told.
+export function swapForStruggle(words, index, results, data, stage, solved = [], rand = Math.random) {
+    const at = isStage(stage) ? STAGES.indexOf(stage) : 0;
+    if (at === 0 || !Array.isArray(words) || !data || typeof data !== 'object') return words;
+    if (!Number.isInteger(index) || index < STRUGGLE_RUN - 1 || !Array.isArray(results)) return words;
+    const run = results.slice(index - STRUGGLE_RUN + 1, index + 1);
+    if (run.length < STRUGGLE_RUN || run.some((r) => !r || r.clean === true)) return words;
+    const done = new Set(Array.isArray(solved) ? solved : []);
+    const earlier = STAGES.slice(0, at);
+    const easy = (w) => done.has(w) && !!data[w] && earlier.includes(data[w].stage);
+    const inRound = new Set(words.map((e) => e && e.word));
+    const names = Object.keys(data).filter((w) => easy(w) && !inRound.has(w));
+    const pool = [...earlier].reverse().flatMap((s) => shuffle(names.filter((w) => data[w].stage === s), rand));
+    const out = [...words];
+    let swapped = false;
+    for (let i = index + 1; i < Math.min(words.length, index + 1 + STRUGGLE_SWAP) && pool.length; i++) {
+        if (words[i] && easy(words[i].word)) continue;
+        const w = pool.shift();
+        out[i] = { word: w, image: data[w].image, audio: data[w].audio, break: data[w].break };
+        swapped = true;
+    }
+    return swapped ? out : words;
 }
 
 // Letters a beginner mixes up (BACKLOG B-207): the pairs the backlog
