@@ -3,7 +3,7 @@
         "stage": 1,
         "difficulty": "easy",
         "image": "/static/images/words/transportation/bus.webp",
-        "audio": "/static/sounds/themes/transportation/bus.mp3",
+        "audio": "/static/voice/words/transportation/bus.mp3",
         "hebrew": "אוטובוס",
         "motion": {
             "subject": "/static/images/words/transportation/bus-subject.webp",
@@ -13,11 +13,151 @@
             "win": "drive"
         }
     },
+    "jet": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/jet.webp",
+        "audio": "/static/voice/words/transportation/jet.mp3",
+        "hebrew": "מטוס סילון",
+        "motion": {
+            "subject": "/static/images/words/transportation/jet-subject.webp",
+            "plate": "/static/images/words/transportation/jet-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "zoom"
+        }
+    },
+    "map": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/map.webp",
+        "audio": "/static/voice/words/transportation/map.mp3",
+        "hebrew": "מפה",
+        "motion": {
+            "subject": "/static/images/words/transportation/map-subject.webp",
+            "plate": "/static/images/words/transportation/map-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "pop"
+        }
+    },
+    "bag": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/bag.webp",
+        "audio": "/static/voice/words/transportation/bag.mp3",
+        "hebrew": "תיק",
+        "motion": {
+            "subject": "/static/images/words/transportation/bag-subject.webp",
+            "plate": "/static/images/words/transportation/bag-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "van": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/van.webp",
+        "audio": "/static/voice/words/transportation/van.mp3",
+        "hebrew": "ואן",
+        "motion": {
+            "subject": "/static/images/words/transportation/van-subject.webp",
+            "plate": "/static/images/words/transportation/van-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "tank": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/tank.webp",
+        "audio": "/static/voice/words/transportation/tank.mp3",
+        "hebrew": "טנק",
+        "motion": {
+            "subject": "/static/images/words/transportation/tank-subject.webp",
+            "plate": "/static/images/words/transportation/tank-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "tent": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/tent.webp",
+        "audio": "/static/voice/words/transportation/tent.mp3",
+        "hebrew": "אוהל",
+        "motion": {
+            "subject": "/static/images/words/transportation/tent-subject.webp",
+            "plate": "/static/images/words/transportation/tent-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "sled": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/sled.webp",
+        "audio": "/static/voice/words/transportation/sled.mp3",
+        "hebrew": "מזחלת",
+        "motion": {
+            "subject": "/static/images/words/transportation/sled-subject.webp",
+            "plate": "/static/images/words/transportation/sled-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "zoom"
+        }
+    },
+    "raft": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/raft.webp",
+        "audio": "/static/voice/words/transportation/raft.mp3",
+        "hebrew": "רפסודה",
+        "motion": {
+            "subject": "/static/images/words/transportation/raft-subject.webp",
+            "plate": "/static/images/words/transportation/raft-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "tram": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/transportation/tram.webp",
+        "audio": "/static/voice/words/transportation/tram.mp3",
+        "hebrew": "רכבת קלה",
+        "motion": {
+            "subject": "/static/images/words/transportation/tram-subject.webp",
+            "plate": "/static/images/words/transportation/tram-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "jeep": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/transportation/jeep.webp",
+        "audio": "/static/voice/words/transportation/jeep.mp3",
+        "hebrew": "ג'יפ",
+        "motion": {
+            "subject": "/static/images/words/transportation/jeep-subject.webp",
+            "plate": "/static/images/words/transportation/jeep-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
     "car": {
         "stage": 3,
-        "difficulty": "easy",
+        "difficulty": "medium",
         "image": "/static/images/words/transportation/car.webp",
-        "audio": "/static/sounds/themes/transportation/car.mp3",
+        "audio": "/static/voice/words/transportation/car.mp3",
         "hebrew": "מכונית",
         "motion": {
             "subject": "/static/images/words/transportation/car-subject.webp",
@@ -27,11 +167,25 @@
             "win": "drive"
         }
     },
+    "ship": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/transportation/ship.webp",
+        "audio": "/static/voice/words/transportation/ship.mp3",
+        "hebrew": "אונייה",
+        "motion": {
+            "subject": "/static/images/words/transportation/ship-subject.webp",
+            "plate": "/static/images/words/transportation/ship-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
     "truck": {
         "stage": 3,
         "difficulty": "medium",
         "image": "/static/images/words/transportation/truck.webp",
-        "audio": "/static/sounds/themes/transportation/truck.mp3",
+        "audio": "/static/voice/words/transportation/truck.mp3",
         "hebrew": "משאית",
         "motion": {
             "subject": "/static/images/words/transportation/truck-subject.webp",
@@ -41,11 +195,25 @@
             "win": "drive"
         }
     },
+    "wheel": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/transportation/wheel.webp",
+        "audio": "/static/voice/words/transportation/wheel.mp3",
+        "hebrew": "גלגל",
+        "motion": {
+            "subject": "/static/images/words/transportation/wheel-subject.webp",
+            "plate": "/static/images/words/transportation/wheel-plate.webp",
+            "idle": "spin",
+            "pivot": "center",
+            "win": "drive"
+        }
+    },
     "taxi": {
         "stage": 4,
-        "difficulty": "easy",
+        "difficulty": "medium",
         "image": "/static/images/words/transportation/taxi.webp",
-        "audio": "/static/sounds/themes/transportation/taxi.mp3",
+        "audio": "/static/voice/words/transportation/taxi.mp3",
         "hebrew": "מונית",
         "motion": {
             "subject": "/static/images/words/transportation/taxi-subject.webp",
@@ -57,9 +225,9 @@
     },
     "boat": {
         "stage": 4,
-        "difficulty": "easy",
+        "difficulty": "medium",
         "image": "/static/images/words/transportation/boat.webp",
-        "audio": "/static/sounds/themes/transportation/boat.mp3",
+        "audio": "/static/voice/words/transportation/boat.mp3",
         "hebrew": "סירה",
         "motion": {
             "subject": "/static/images/words/transportation/boat-subject.webp",
@@ -69,11 +237,25 @@
             "win": "splash"
         }
     },
+    "road": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/transportation/road.webp",
+        "audio": "/static/voice/words/transportation/road.mp3",
+        "hebrew": "כביש",
+        "motion": {
+            "subject": "/static/images/words/transportation/road-subject.webp",
+            "plate": "/static/images/words/transportation/road-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "zoom"
+        }
+    },
     "plane": {
         "stage": 4,
         "difficulty": "medium",
         "image": "/static/images/words/transportation/plane.webp",
-        "audio": "/static/sounds/themes/transportation/plane.mp3",
+        "audio": "/static/voice/words/transportation/plane.mp3",
         "hebrew": "מטוס",
         "motion": {
             "subject": "/static/images/words/transportation/plane-subject.webp",
@@ -87,7 +269,7 @@
         "stage": 4,
         "difficulty": "medium",
         "image": "/static/images/words/transportation/train.webp",
-        "audio": "/static/sounds/themes/transportation/train.mp3",
+        "audio": "/static/voice/words/transportation/train.mp3",
         "hebrew": "רכבת",
         "motion": {
             "subject": "/static/images/words/transportation/train-subject.webp",
@@ -97,12 +279,82 @@
             "win": "drive"
         }
     },
+    "rocket": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/transportation/rocket.webp",
+        "audio": "/static/voice/words/transportation/rocket.mp3",
+        "hebrew": "רקטה",
+        "motion": {
+            "subject": "/static/images/words/transportation/rocket-subject.webp",
+            "plate": "/static/images/words/transportation/rocket-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "zoom"
+        }
+    },
+    "kayak": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/transportation/kayak.webp",
+        "audio": "/static/voice/words/transportation/kayak.mp3",
+        "hebrew": "קיאק",
+        "motion": {
+            "subject": "/static/images/words/transportation/kayak-subject.webp",
+            "plate": "/static/images/words/transportation/kayak-plate.webp",
+            "idle": "bob",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "helmet": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/transportation/helmet.webp",
+        "audio": "/static/voice/words/transportation/helmet.mp3",
+        "hebrew": "קסדה",
+        "motion": {
+            "subject": "/static/images/words/transportation/helmet-subject.webp",
+            "plate": "/static/images/words/transportation/helmet-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "tunnel": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/transportation/tunnel.webp",
+        "audio": "/static/voice/words/transportation/tunnel.mp3",
+        "hebrew": "מנהרה",
+        "motion": {
+            "subject": "/static/images/words/transportation/tunnel-subject.webp",
+            "plate": "/static/images/words/transportation/tunnel-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "bridge": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/transportation/bridge.webp",
+        "audio": "/static/voice/words/transportation/bridge.mp3",
+        "hebrew": "גשר",
+        "motion": {
+            "subject": "/static/images/words/transportation/bridge-subject.webp",
+            "plate": "/static/images/words/transportation/bridge-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
     "helicopter": {
         "stage": "long",
-        "break": 4,
         "difficulty": "hard",
+        "break": 4,
         "image": "/static/images/words/transportation/helicopter.webp",
-        "audio": "/static/sounds/themes/transportation/helicopter.mp3",
+        "audio": "/static/voice/words/transportation/helicopter.mp3",
         "hebrew": "מסוק",
         "motion": {
             "subject": "/static/images/words/transportation/helicopter-subject.webp",
@@ -114,10 +366,10 @@
     },
     "scooter": {
         "stage": "long",
+        "difficulty": "hard",
         "break": 4,
-        "difficulty": "easy",
         "image": "/static/images/words/transportation/scooter.webp",
-        "audio": "/static/sounds/themes/transportation/scooter.mp3",
+        "audio": "/static/voice/words/transportation/scooter.mp3",
         "hebrew": "קורקינט",
         "motion": {
             "subject": "/static/images/words/transportation/scooter-subject.webp",
@@ -127,12 +379,57 @@
             "win": "drive"
         }
     },
+    "ambulance": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/transportation/ambulance.webp",
+        "audio": "/static/voice/words/transportation/ambulance.mp3",
+        "hebrew": "אמבולנס",
+        "motion": {
+            "subject": "/static/images/words/transportation/ambulance-subject.webp",
+            "plate": "/static/images/words/transportation/ambulance-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "tractor": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/transportation/tractor.webp",
+        "audio": "/static/voice/words/transportation/tractor.mp3",
+        "hebrew": "טרקטור",
+        "motion": {
+            "subject": "/static/images/words/transportation/tractor-subject.webp",
+            "plate": "/static/images/words/transportation/tractor-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
+    "caravan": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/transportation/caravan.webp",
+        "audio": "/static/voice/words/transportation/caravan.mp3",
+        "hebrew": "קרוואן",
+        "motion": {
+            "subject": "/static/images/words/transportation/caravan-subject.webp",
+            "plate": "/static/images/words/transportation/caravan-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "drive"
+        }
+    },
     "bicycle": {
         "stage": "long",
+        "difficulty": "hard",
         "break": 2,
-        "difficulty": "medium",
         "image": "/static/images/words/transportation/bicycle.webp",
-        "audio": "/static/sounds/themes/transportation/bicycle.mp3",
+        "audio": "/static/voice/words/transportation/bicycle.mp3",
         "hebrew": "אופניים",
         "motion": {
             "subject": "/static/images/words/transportation/bicycle-subject.webp",
@@ -144,10 +441,10 @@
     },
     "motorbike": {
         "stage": "long",
+        "difficulty": "hard",
         "break": 5,
-        "difficulty": "medium",
         "image": "/static/images/words/transportation/motorbike.webp",
-        "audio": "/static/sounds/themes/transportation/motorbike.mp3",
+        "audio": "/static/voice/words/transportation/motorbike.mp3",
         "hebrew": "אופנוע",
         "motion": {
             "subject": "/static/images/words/transportation/motorbike-subject.webp",
@@ -159,10 +456,10 @@
     },
     "submarine": {
         "stage": "long",
-        "break": 3,
         "difficulty": "hard",
+        "break": 3,
         "image": "/static/images/words/transportation/submarine.webp",
-        "audio": "/static/sounds/themes/transportation/submarine.mp3",
+        "audio": "/static/voice/words/transportation/submarine.mp3",
         "hebrew": "צוללת",
         "motion": {
             "subject": "/static/images/words/transportation/submarine-subject.webp",

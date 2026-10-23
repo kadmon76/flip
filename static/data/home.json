@@ -1,0 +1,442 @@
+{
+    "bed": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/bed.webp",
+        "audio": "/static/voice/words/home/bed.mp3",
+        "hebrew": "מיטה",
+        "motion": {
+            "subject": "/static/images/words/home/bed-subject.webp",
+            "plate": "/static/images/words/home/bed-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "pan": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/pan.webp",
+        "audio": "/static/voice/words/home/pan.mp3",
+        "hebrew": "מחבת",
+        "motion": {
+            "subject": "/static/images/words/home/pan-subject.webp",
+            "plate": "/static/images/words/home/pan-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "hop-spin"
+        }
+    },
+    "cup": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/cup.webp",
+        "audio": "/static/voice/words/home/cup.mp3",
+        "hebrew": "כוס",
+        "motion": {
+            "subject": "/static/images/words/home/cup-subject.webp",
+            "plate": "/static/images/words/home/cup-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "rug": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/rug.webp",
+        "audio": "/static/voice/words/home/rug.mp3",
+        "hebrew": "שטיח",
+        "motion": {
+            "subject": "/static/images/words/home/rug-subject.webp",
+            "plate": "/static/images/words/home/rug-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "zoom"
+        }
+    },
+    "box": {
+        "stage": 1,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/box.webp",
+        "audio": "/static/voice/words/home/box.mp3",
+        "hebrew": "קופסה",
+        "motion": {
+            "subject": "/static/images/words/home/box-subject.webp",
+            "plate": "/static/images/words/home/box-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "lamp": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/lamp.webp",
+        "audio": "/static/voice/words/home/lamp.mp3",
+        "hebrew": "מנורה",
+        "motion": {
+            "subject": "/static/images/words/home/lamp-subject.webp",
+            "plate": "/static/images/words/home/lamp-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "mop": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/mop.webp",
+        "audio": "/static/voice/words/home/mop.mp3",
+        "hebrew": "סחבה",
+        "motion": {
+            "subject": "/static/images/words/home/mop-subject.webp",
+            "plate": "/static/images/words/home/mop-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "doll": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/doll.webp",
+        "audio": "/static/voice/words/home/doll.mp3",
+        "hebrew": "בובה",
+        "motion": {
+            "subject": "/static/images/words/home/doll-subject.webp",
+            "plate": "/static/images/words/home/doll-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "bell": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/bell.webp",
+        "audio": "/static/voice/words/home/bell.mp3",
+        "hebrew": "פעמון",
+        "motion": {
+            "subject": "/static/images/words/home/bell-subject.webp",
+            "plate": "/static/images/words/home/bell-plate.webp",
+            "idle": "sway",
+            "pivot": "top",
+            "win": "bungee"
+        }
+    },
+    "sink": {
+        "stage": 2,
+        "difficulty": "easy",
+        "image": "/static/images/words/home/sink.webp",
+        "audio": "/static/voice/words/home/sink.mp3",
+        "hebrew": "כיור",
+        "motion": {
+            "subject": "/static/images/words/home/sink-subject.webp",
+            "plate": "/static/images/words/home/sink-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "book": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/book.webp",
+        "audio": "/static/voice/words/home/book.mp3",
+        "hebrew": "ספר",
+        "motion": {
+            "subject": "/static/images/words/home/book-subject.webp",
+            "plate": "/static/images/words/home/book-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "fork": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/fork.webp",
+        "audio": "/static/voice/words/home/fork.mp3",
+        "hebrew": "מזלג",
+        "motion": {
+            "subject": "/static/images/words/home/fork-subject.webp",
+            "plate": "/static/images/words/home/fork-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "clock": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/clock.webp",
+        "audio": "/static/voice/words/home/clock.mp3",
+        "hebrew": "שעון",
+        "motion": {
+            "subject": "/static/images/words/home/clock-subject.webp",
+            "plate": "/static/images/words/home/clock-plate.webp",
+            "idle": "spin",
+            "pivot": "center",
+            "win": "pop"
+        }
+    },
+    "spoon": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/spoon.webp",
+        "audio": "/static/voice/words/home/spoon.mp3",
+        "hebrew": "כף",
+        "motion": {
+            "subject": "/static/images/words/home/spoon-subject.webp",
+            "plate": "/static/images/words/home/spoon-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "bath": {
+        "stage": 3,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/bath.webp",
+        "audio": "/static/voice/words/home/bath.mp3",
+        "hebrew": "אמבטיה",
+        "motion": {
+            "subject": "/static/images/words/home/bath-subject.webp",
+            "plate": "/static/images/words/home/bath-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    },
+    "sofa": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/sofa.webp",
+        "audio": "/static/voice/words/home/sofa.mp3",
+        "hebrew": "ספה",
+        "motion": {
+            "subject": "/static/images/words/home/sofa-subject.webp",
+            "plate": "/static/images/words/home/sofa-plate.webp",
+            "idle": "hop",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "bowl": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/bowl.webp",
+        "audio": "/static/voice/words/home/bowl.mp3",
+        "hebrew": "קערה",
+        "motion": {
+            "subject": "/static/images/words/home/bowl-subject.webp",
+            "plate": "/static/images/words/home/bowl-plate.webp",
+            "idle": "spin",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "plate": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/plate.webp",
+        "audio": "/static/voice/words/home/plate.mp3",
+        "hebrew": "צלחת",
+        "motion": {
+            "subject": "/static/images/words/home/plate-subject.webp",
+            "plate": "/static/images/words/home/plate-plate.webp",
+            "idle": "spin",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "chair": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/chair.webp",
+        "audio": "/static/voice/words/home/chair.mp3",
+        "hebrew": "כיסא",
+        "motion": {
+            "subject": "/static/images/words/home/chair-subject.webp",
+            "plate": "/static/images/words/home/chair-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "wobble-flop"
+        }
+    },
+    "stove": {
+        "stage": 4,
+        "difficulty": "medium",
+        "image": "/static/images/words/home/stove.webp",
+        "audio": "/static/voice/words/home/stove.mp3",
+        "hebrew": "כיריים",
+        "motion": {
+            "subject": "/static/images/words/home/stove-subject.webp",
+            "plate": "/static/images/words/home/stove-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "phone": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/home/phone.webp",
+        "audio": "/static/voice/words/home/phone.mp3",
+        "hebrew": "טלפון",
+        "motion": {
+            "subject": "/static/images/words/home/phone-subject.webp",
+            "plate": "/static/images/words/home/phone-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "hop-spin"
+        }
+    },
+    "key": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/home/key.webp",
+        "audio": "/static/voice/words/home/key.mp3",
+        "hebrew": "מפתח",
+        "motion": {
+            "subject": "/static/images/words/home/key-subject.webp",
+            "plate": "/static/images/words/home/key-plate.webp",
+            "idle": "spin",
+            "pivot": "center",
+            "win": "pop"
+        }
+    },
+    "door": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/home/door.webp",
+        "audio": "/static/voice/words/home/door.mp3",
+        "hebrew": "דלת",
+        "motion": {
+            "subject": "/static/images/words/home/door-subject.webp",
+            "plate": "/static/images/words/home/door-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "table": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/home/table.webp",
+        "audio": "/static/voice/words/home/table.mp3",
+        "hebrew": "שולחן",
+        "motion": {
+            "subject": "/static/images/words/home/table-subject.webp",
+            "plate": "/static/images/words/home/table-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "knife": {
+        "stage": 5,
+        "difficulty": "hard",
+        "image": "/static/images/words/home/knife.webp",
+        "audio": "/static/voice/words/home/knife.mp3",
+        "hebrew": "סכין",
+        "motion": {
+            "subject": "/static/images/words/home/knife-subject.webp",
+            "plate": "/static/images/words/home/knife-plate.webp",
+            "idle": "breathe",
+            "pivot": "center",
+            "win": "pop"
+        }
+    },
+    "computer": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 3,
+        "image": "/static/images/words/home/computer.webp",
+        "audio": "/static/voice/words/home/computer.mp3",
+        "hebrew": "מחשב",
+        "motion": {
+            "subject": "/static/images/words/home/computer-subject.webp",
+            "plate": "/static/images/words/home/computer-plate.webp",
+            "idle": "rumble",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "television": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/home/television.webp",
+        "audio": "/static/voice/words/home/television.mp3",
+        "hebrew": "טלוויזיה",
+        "motion": {
+            "subject": "/static/images/words/home/television-subject.webp",
+            "plate": "/static/images/words/home/television-plate.webp",
+            "idle": "sway",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "blanket": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 4,
+        "image": "/static/images/words/home/blanket.webp",
+        "audio": "/static/voice/words/home/blanket.mp3",
+        "hebrew": "שמיכה",
+        "motion": {
+            "subject": "/static/images/words/home/blanket-subject.webp",
+            "plate": "/static/images/words/home/blanket-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "kitchen": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 3,
+        "image": "/static/images/words/home/kitchen.webp",
+        "audio": "/static/voice/words/home/kitchen.mp3",
+        "hebrew": "מטבח",
+        "motion": {
+            "subject": "/static/images/words/home/kitchen-subject.webp",
+            "plate": "/static/images/words/home/kitchen-plate.webp",
+            "idle": "breathe",
+            "pivot": "bottom",
+            "win": "pop"
+        }
+    },
+    "umbrella": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 2,
+        "image": "/static/images/words/home/umbrella.webp",
+        "audio": "/static/voice/words/home/umbrella.mp3",
+        "hebrew": "מטרייה",
+        "motion": {
+            "subject": "/static/images/words/home/umbrella-subject.webp",
+            "plate": "/static/images/words/home/umbrella-plate.webp",
+            "idle": "float",
+            "pivot": "center",
+            "win": "bungee"
+        }
+    },
+    "toothbrush": {
+        "stage": "long",
+        "difficulty": "hard",
+        "break": 5,
+        "image": "/static/images/words/home/toothbrush.webp",
+        "audio": "/static/voice/words/home/toothbrush.mp3",
+        "hebrew": "מברשת שיניים",
+        "motion": {
+            "subject": "/static/images/words/home/toothbrush-subject.webp",
+            "plate": "/static/images/words/home/toothbrush-plate.webp",
+            "idle": "wobble",
+            "pivot": "bottom",
+            "win": "splash"
+        }
+    }
+}
