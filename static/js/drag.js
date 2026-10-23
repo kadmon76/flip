@@ -420,7 +420,7 @@ export function giveHint(current) {
 // on the bench (BACKLOG B-207). Every slot then holds its right letter,
 // an arrangement that was never checked, so the word reopens ('playing'):
 // the dome lights at once and the kid checks it (a word counts as
-// mastered only when checked correct). Otherwise `current` itself: a
+// solved only when checked correct). Otherwise `current` itself: a
 // slot is empty or a wrong letter is left, and the check's 'wrong' stays
 // until a block moves. Pure; main.js applies it in a setState of its own
 // right after the check's, so the robot, the sound and the motion see

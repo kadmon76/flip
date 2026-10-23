@@ -530,6 +530,7 @@ Build order: life → win.
 - `tools/shot.mjs` sometimes exits 1 with ENOTEMPTY while removing its temp profile after `Browser.close` (Chromium still flushing); the PNG is still written. Wait for process exit before `rmSync` or retry the removal.
 - Fold `feedback.js` (B-109, wiggle) and `celebrate.js` (B-110, pulse/confetti/star pop) into one transition-keyed module once both PRs land; the CLAUDE.md lines added from issues #19 and #21 each claim the correct-check effects until then.
 - Screen change crossfade 200ms (DESIGN "Motion") has no backlog item; screens still switch instantly via `display`.
+- A clink as each cog lands in the gear counter (B-218's flight is silent; needs a clip, or an effect made in code in audio.js like the TV hiss).
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
 - Wrong-box tint (from closed PR #18, B-109): boxes holding a wrong letter keep an error-colour tint until the kid next moves a block; main has the wiggle and the bulb flicker but no tint.

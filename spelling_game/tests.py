@@ -5057,11 +5057,13 @@ class MissedWordsTests(TestCase):
             self.assertNotIn('recordMissed', self.function(name), name)
 
     def test_stickers_still_only_for_correct_words(self):
+        # since BACKLOG B-218 only for a clean correct word (GearsTests
+        # runs onCheck through node)
         main = self.code('main.js')
         self.assertEqual(main.count('addSticker('), 1)
         check = self.function('onCheck')
         branch = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
-        self.assertIn('results[round.index].newSticker = addSticker(state.theme, current.word);', branch)
+        self.assertIn('results[round.index].newSticker = clean && addSticker(state.theme, current.word);', branch)
         self.assertNotIn('missed', self.code('stickers.js'))
 
 
@@ -7661,3 +7663,469 @@ class StageMapTests(TestCase):
         bulb = self.rule('.theme-btn .stage-bulbs .bulb')
         self.assertIn('width: 14px;', bulb)
         self.assertIn('height: 14px;', bulb)
+
+
+class GearsTests(TestCase):
+    """Gears (BACKLOG B-218, PROGRESSION.md "Gears", "Repetition and
+    stickers"): static/js/gears.js is the only reader and writer of
+    localStorage `flip.gears.v1` (a whole number, 0 or more); its pure
+    helpers (isClean, wordGears, roundGears) run through node. Each word's
+    result records `clean`; a correct word earns 1 gear and 1 more when
+    clean, added at its check; the round end adds 2; only a clean word
+    gets a sticker; nothing takes gears away. The counters (cogs.js) and
+    the cogs' flight (celebrate.js) run through node with stand-ins for
+    the DOM and GSAP; main.js's onCheck, onNext and onPlayBack too."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # In-memory localStorage (SEED: the key's initial value or null),
+    # counting writes.
+    STORE = """
+        const store = new Map();
+        if (SEED !== null) store.set('flip.gears.v1', SEED);
+        let writes = 0;
+        globalThis.localStorage = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { writes++; store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const raw = () => store.get('flip.gears.v1') ?? null;
+    """
+
+    def run_node(self, body, seed=None, store=True):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const SEED = {json.dumps(seed)};"
+            + (self.STORE if store else '')
+            + f"const G = await import('{(self.JS / 'gears.js').as_uri()}');"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+
+    def rule(self, selector):
+        m = re.search(r'\n' + re.escape(selector) + r'\s*{([^}]*)}', self.css())
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    # --- gears.js: the store ---
+
+    def test_no_key_is_no_gears_and_add_writes_a_whole_number(self):
+        res = self.run_node(
+            "const a = [G.load(), raw(), writes];"
+            "const b = [G.add(2), raw(), G.add(1), G.add(2), raw(), G.load(), writes];"
+            "out([a, b]);")
+        self.assertEqual(res, [[0, None, 0], [2, '2', 3, 5, '5', 5, 3]])
+        self.assertEqual(self.run_node("out([G.load(), G.add(3)]);", seed='7'), [7, 10])
+
+    def test_add_takes_only_a_whole_number_above_zero(self):
+        # anything else adds nothing and writes nothing: never a way to
+        # take gears away
+        res = self.run_node(
+            "out([[0, -1, -5, 1.5, '2', NaN, null, undefined, Infinity, 2 ** 60].map((n) => G.add(n)), writes, raw()]);",
+            seed='4')
+        self.assertEqual(res, [[4] * 10, 0, '4'])
+        self.assertEqual(sorted(self.run_node("out(Object.keys(G));")),
+                         ['GEARS', 'KEY', 'add', 'isClean', 'load', 'roundGears', 'wordGears'])
+
+    def test_a_corrupt_value_reads_as_zero_and_add_recovers(self):
+        for seed in ('{not json', '"5"', '-3', '2.5', 'null', '[1]', '{}', 'true', '1e400', ''):
+            self.assertEqual(self.run_node("out([G.load(), G.add(1), raw()]);", seed=seed), [0, 1, '1'], seed)
+
+    def test_blocked_storage_never_throws(self):
+        res = self.run_node(
+            "globalThis.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };"
+            "const a = [G.load(), G.add(2)];"
+            "Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('denied'); } });"
+            "const b = [G.load(), G.add(2)];"
+            "delete globalThis.localStorage; Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined });"
+            "out([a, b, [G.load(), G.add(2)]]);", store=False)
+        self.assertEqual(res, [[0, 0], [0, 0], [0, 0]])
+
+    def test_the_key_is_only_in_gears_js_which_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            if path.name != 'gears.js':
+                self.assertNotIn('flip.gears', path.read_text(), path.name)
+        code = self.code('gears.js')
+        self.assertIn("export const KEY = 'flip.gears.v1';", code)
+        for word in ('document', 'window', 'setState', 'import '):
+            self.assertNotIn(word, code, word)
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+
+    # --- gears.js: the pure rules ---
+
+    def test_clean_and_the_gears_a_word_earns(self):
+        res = self.run_node(
+            "out([G.GEARS, [G.isClean(true, 0), G.isClean(true, 1), G.isClean(true, 2), G.isClean(false, 0),"
+            " G.isClean(true, 0, true), G.isClean('yes', 0), G.isClean(true, 0, false)],"
+            " [G.wordGears({ word: 'cat', correct: true, clean: true }), G.wordGears({ word: 'cat', correct: true, clean: false }),"
+            "  G.wordGears({ word: 'cat', correct: true }), G.wordGears({ word: 'cat', correct: false, clean: false }),"
+            "  G.wordGears({ word: 'cat', correct: false, clean: true }), G.wordGears(null), G.wordGears(undefined)]]);")
+        self.assertEqual(res, [{'correct': 1, 'clean': 1, 'round': 2},
+                               [True, False, False, False, False, False, True],
+                               [2, 1, 1, 0, 0, 0, 0]])
+
+    def test_the_gears_a_round_earns(self):
+        # five clean words: 5 x 2 + 2; a clean word, one after a miss, a
+        # reveal, a clean word and one left unchecked: 2 + 1 + 0 + 2 + 0 + 2
+        res = self.run_node(
+            "const c = (word) => ({ word, correct: true, clean: true });"
+            "out([G.roundGears(['cat', 'dog', 'fish', 'duck', 'frog'].map(c)),"
+            " G.roundGears([c('cat'), { word: 'dog', correct: true, clean: false }, { word: 'fish', correct: false, clean: false },"
+            "  c('duck'), { word: 'frog', correct: false, clean: false }]),"
+            " G.roundGears([]), G.roundGears(null), G.roundGears([null, undefined])]);")
+        self.assertEqual(res, [12, 7, 2, 2, 2])
+
+    # --- main.js: the wiring, run through node ---
+
+    CHECK = """
+        const state = { screen: 'play', theme: 'animals', gears: 5, lives: 3,
+            round: { index: 0, size: 5, results: [] }, current: null };
+        const setState = (p) => Object.assign(state, p);
+        const LIVES = 3;
+        const calls = [];
+        const addSticker = (t, w) => { calls.push(['sticker', t, w]); return true; };
+        let stored = 5;
+        const addGears = (n) => { calls.push(['gears', n]); stored += n; return stored; };
+        const { isClean, wordGears, GEARS } = G;
+        const checkedWrong = (c) => ({ ...c, status: 'wrong' });
+        const giveHint = (c) => c; const afterHint = (c) => c; const revealed = (c) => ({ ...c, status: 'revealed' });
+        const armNudge = () => {};
+        const word = (w, letters, lives) => {
+            state.lives = lives; state.round = { index: 0, size: 5, results: [] };
+            state.current = { word: w, status: 'playing', placed: letters.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) };
+            calls.length = 0;
+        };
+    """
+
+    def test_a_clean_word_earns_its_sticker_and_two_gears_at_its_check(self):
+        res = self.run_node(
+            self.CHECK + self.function('onCheck') +
+            "const go = (w, letters, lives) => { word(w, letters, lives); onCheck({ pressed: null });"
+            " return [state.round.results[0], calls.slice(), state.gears, state.current.status]; };"
+            "out([go('cat', 'cat', 3), go('dog', 'dog', 2), go('fish', 'fish', 1), go('duck', 'dcuk', 3), go('frog', 'forg', 1)]);")
+        first, after_miss, after_hint, wrong, reveal = res
+        # first check correct: clean, into the sticker book, 1 + 1 gears
+        self.assertEqual(first, [{'word': 'cat', 'correct': True, 'clean': True, 'newSticker': True},
+                                 [['sticker', 'animals', 'cat'], ['gears', 2]], 7, 'correct'])
+        # correct after a miss, or with the robot's letter: solved, not
+        # clean, no sticker (stickers.js add not called), 1 gear
+        self.assertEqual(after_miss, [{'word': 'dog', 'correct': True, 'clean': False, 'newSticker': False},
+                                      [['gears', 1]], 8, 'correct'])
+        self.assertEqual(after_hint[:2], [{'word': 'fish', 'correct': True, 'clean': False, 'newSticker': False},
+                                          [['gears', 1]]])
+        # a wrong check and a reveal: no sticker, no gears (mistakes never
+        # cost gears either)
+        self.assertEqual(wrong, [{'word': 'duck', 'correct': False, 'clean': False}, [], 9, 'wrong'])
+        self.assertEqual(reveal, [{'word': 'frog', 'correct': False, 'clean': False}, [], 9, 'revealed'])
+
+    def test_the_round_end_adds_two_gears_once_and_back_keeps_them(self):
+        nxt = self.function('onNext')
+        res = self.run_node(
+            "const state = { theme: 'animals', data: {}, gears: 7, words: [{ word: 'cat' }, { word: 'dog' }],"
+            " round: { index: 0, size: 2, stage: 1, results: [{ word: 'cat', correct: true, clean: true }] },"
+            " current: { word: 'cat', status: 'correct' } };"
+            "const setState = (p) => Object.assign(state, p);"
+            "const calls = []; let stored = 7;"
+            "const addGears = (n) => { calls.push(n); stored += n; return stored; }; const { GEARS } = G;"
+            "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false });"
+            "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
+            "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't'; const LIVES = 3;"
+            + nxt +
+            "onNext(); const mid = [state.screen, state.gears, calls.slice()];"
+            "onNext(); out([mid, [state.screen, state.gears, calls.slice()], state.round.results]);")
+        mid, end, results = res
+        self.assertEqual(mid, [None, 7, []])                       # the next word: nothing
+        self.assertEqual(end, ['round-end', 9, [2]])               # the round end: + GEARS.round, once
+        # a word left without a check counts as missed, not clean
+        self.assertEqual(results[1], {'word': 'dog', 'correct': False, 'clean': False})
+        main = self.code('main.js')
+        self.assertEqual(main.count('addGears('), 2)
+        self.assertIn("import { load as loadGears, add as addGears, isClean, wordGears, GEARS } from './gears.js';", main)
+        self.assertIn('setState({ gears: loadGears() });', main)
+        self.assertLess(nxt.index('recordProgress('), nxt.index('gears: addGears(GEARS.round),'))
+        self.assertLess(nxt.index('gears: addGears(GEARS.round),'), nxt.index("screen: 'round-end',"))
+        # the back arrow and leaving a round take no gears away (the
+        # words' gears were added at their checks; B-201 takes back only
+        # the round's stickers)
+        for name in ('onPlayBack', 'leaveRound', 'onThemes', 'startRound'):
+            self.assertNotIn('gears', self.function(name), name)
+        self.assertIn('if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);', self.function('onPlayBack'))
+
+    def test_state_keeps_the_count(self):
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n    gears: 0,', state)
+        self.assertIn('results[i] = { word, correct, clean, newSticker? }', state)
+
+    # --- cogs.js: the counters, with a stand-in DOM ---
+
+    DOM = """
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, props: {}, className: '', textContent: '', html: '',
+                style: { setProperty(k, v) { el.props[k] = v; } },
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+                appendChild(c) { this.children.push(c); return c; },
+                get firstElementChild() { return this.children[0] || null; },
+                get lastElementChild() { return this.children[this.children.length - 1] || null; },
+                set innerHTML(v) { this.children = []; this.html = v; } };
+            return el;
+        };
+        const ids = { 'theme-gears': make('span'), 'console-gears': make('div'), 'round-gears': make('p') };
+        globalThis.document = { createElement: make, getElementById: (id) => ids[id] || null };
+        const C = await import('COGS');
+        const look = (id) => { const h = ids[id]; if (!h.children.length) return null;
+            return { label: h.attrs['aria-label'], digits: h.props['--digits'], cog: [h.children[0].className, h.children[0].attrs['aria-hidden'], /<svg/.test(h.children[0].html)],
+                sign: h.children[1].textContent, flaps: h.children[2].children.map((f) => f.textContent), kinds: h.children.map((c) => c.className) }; };
+        const st = (o) => ({ screen: 'theme', gears: 27, round: { results: [] }, ...o });
+    """
+
+    def run_dom(self, body):
+        return self.run_node(self.DOM.replace('COGS', (self.JS / 'cogs.js').as_uri()) + body)
+
+    def test_the_counters_render_from_state(self):
+        res = self.run_dom(
+            "C.renderGears(st()); const theme = look('theme-gears'); const before = [look('console-gears'), look('round-gears')];"
+            "C.renderGears(st({ screen: 'play', gears: 128 })); const play = look('console-gears');"
+            "C.renderGears(st({ screen: 'round-end', round: { results: [{ word: 'cat', correct: true, clean: true }, { word: 'dog', correct: true, clean: false }] } }));"
+            "const end = look('round-gears');"
+            "C.renderGears(st({ screen: 'stages', gears: 3 })); C.renderGears(st({ screen: 'gallery', gears: 3 }));"
+            "out([theme, before, play, end, look('theme-gears').flaps, C.countText(-1), C.countText(2.5), C.countText('7'), C.countText(12)]);")
+        theme, before, play, end, still, *texts = res
+        self.assertEqual(theme, {'label': 'gears: 27', 'digits': '2', 'cog': ['cog', 'true', True], 'sign': '',
+                                 'flaps': ['2', '7'], 'kinds': ['cog', 'sign', 'flaps count']})
+        self.assertEqual(before, [None, None])                      # only the screen showing is rendered
+        self.assertEqual(play['flaps'], ['1', '2', '8'])
+        self.assertEqual(play['digits'], '3')
+        # the round end: the cog, an ink "+" and the round's gears in flaps
+        # (2 + 1 + 2 for the round end)
+        self.assertEqual(end, {'label': 'gears: +5', 'digits': '1', 'cog': ['cog', 'true', True], 'sign': '+',
+                               'flaps': ['5'], 'kinds': ['cog', 'sign', 'flaps count']})
+        self.assertEqual(still, ['2', '7'])                         # the stage map and the book show no counter
+        self.assertEqual(texts, ['0', '0', '0', '12'])
+
+    def test_a_rerender_writes_only_a_changed_count_and_never_undoes_a_held_one(self):
+        # celebrate.js holds the count from before a word while its cogs
+        # fly (showCount); a re-render in the same state leaves it
+        res = self.run_dom(
+            "C.renderGears(st({ screen: 'play', gears: 7 })); const flaps = ids['console-gears'].children[2].children;"
+            "C.renderGears(st({ screen: 'play', gears: 7 })); const kept = ids['console-gears'].children[2].children === flaps;"
+            "C.showCount(ids['console-gears'], '5'); C.renderGears(st({ screen: 'play', gears: 7 })); const held = look('console-gears').flaps;"
+            "C.renderGears(st({ screen: 'play', gears: 8 })); out([kept, held, look('console-gears').flaps, ids['console-gears'].children.length]);")
+        self.assertEqual(res, [True, ['5'], ['8'], 3])
+
+    def test_cogs_js_is_a_render_with_one_dom_cache(self):
+        code = self.code('cogs.js')
+        self.assertNotIn('setState', code)
+        self.assertNotIn('localStorage', code)
+        self.assertEqual(re.findall(r'(?m)^(?:let|var|const) ([\w$]+)', code), ['$', 'COG', 'rendered'])
+        self.assertIn('// DOM cache:', (self.JS / 'cogs.js').read_text())
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
+                         ["import { renderFlaps } from './flaps.js';", "import { roundGears } from './gears.js';"])
+        main = self.code('main.js')
+        self.assertIn("import { renderGears } from './cogs.js';", main)
+        self.assertLess(main.index('subscribe(renderGears);'), main.index('subscribe(renderCelebrate);'))
+
+    # --- celebrate.js: the cogs fly, with stand-ins ---
+
+    FLY = """
+        const log = [];
+        const tweens = [];
+        const nm = (el) => (Array.isArray(el) ? el.map(nm) : el && (el.id || el.className));
+        globalThis.gsap = {
+            set(el, v) { log.push(['set', nm(el), v]); },
+            to(el, v) { const t = { el, v }; tweens.push(t); log.push(['to', nm(el), Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'onComplete'))]); return t; },
+            fromTo(el, a, b) { log.push(['fromTo', nm(el), a, Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'onComplete'))]); return {}; },
+            timeline() { const tl = { to() { return tl; } }; return tl; },
+            killTweensOf(el) { log.push(['kill', nm(el)]); },
+            getProperty() { return 0; },
+        };
+        let reduced = false;
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        const make = (tag) => {
+            const el = { tag, children: [], attrs: {}, props: {}, className: '', textContent: '', html: '', parent: null,
+                style: { setProperty(k, v) { el.props[k] = v; } },
+                setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k] ?? null; },
+                appendChild(c) { c.parent = this; this.children.push(c); return c; },
+                remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; },
+                get firstElementChild() { return this.children[0] || null; },
+                get lastElementChild() { return this.children[this.children.length - 1] || null; },
+                getBoundingClientRect() { return el.rect || { left: 0, top: 0, width: 0, height: 0 }; },
+                set innerHTML(v) { this.children = []; this.html = v; } };
+            return el;
+        };
+        const card = make('div'); card.rect = { left: 100, top: 100, width: 150, height: 110 };
+        const host = make('div'); host.id = 'console-gears';
+        const body = make('body');
+        globalThis.document = { createElement: make, body,
+            querySelector: (sel) => (sel === '#screen-play .card' ? card : sel === '#console-gears' ? host : null),
+            querySelectorAll: (sel) => (sel === '.gear-fly' ? body.children.filter((c) => c.className === 'gear-fly') : []) };
+        const C = await import('COGS');
+        const K = await import('CELEBRATE');
+        C.showCount(host, '5'); host.children[0].rect = { left: 190, top: 680, width: 24, height: 24 };
+        const flaps = () => host.children[2].children.map((f) => f.textContent).join('');
+        const st = (status, gears, clean = true, word = 'cat') => ({ screen: 'play', gears, current: { word, status },
+            round: { index: 0, stage: 1, results: status === 'correct' ? [{ word, correct: true, clean }] : [] } });
+        const flights = () => body.children.filter((c) => c.className === 'gear-fly');
+        const pieces = () => flights().flatMap((l) => l.children);
+        const drops = () => tweens.filter((t) => t.v.onComplete);
+    """
+
+    def run_fly(self, body):
+        return self.run_node(self.FLY.replace('COGS', (self.JS / 'cogs.js').as_uri())
+                             .replace('CELEBRATE', (self.JS / 'celebrate.js').as_uri()) + body)
+
+    def test_cogs_fly_from_the_tv_and_the_count_flips_up_as_they_land(self):
+        res = self.run_fly(
+            "K.renderCelebrate(st('playing', 5)); C.showCount(host, '7'); K.renderCelebrate(st('correct', 7));"
+            "const start = [flaps(), flights().length, pieces().length, log.filter((e) => e[0] === 'to' && e[1] === 'gear-fly-cog').map((e) => e[2])];"
+            "const sets = log.filter((e) => e[0] === 'set' && e[1] === 'gear-fly-cog').map((e) => e[2]);"
+            "log.length = 0; drops()[0].v.onComplete(); const one = [flaps(), pieces().length, flights().length, log.slice()];"
+            "log.length = 0; drops()[1].v.onComplete(); const two = [flaps(), pieces().length, flights().length, log.slice()];"
+            "log.length = 0; K.renderCelebrate(st('correct', 7)); const again = [log.length, flights().length];"
+            "out([start, sets, one, two, again]);")
+        start, sets, one, two, again = res
+        held, layers, n, moves = start
+        self.assertEqual((held, layers, n), ('5', 1, 2))            # the count from before the word, two cogs
+        # each cog rises out of the TV's centre (175, 155), the two apart,
+        # then drops into the counter's cog (202, 692), 0.1s after the other
+        self.assertEqual(sets, [{'x': 175 - 4.5 - 11, 'y': 155 - 11, 'scale': 0.5, 'rotation': 0},
+                                {'x': 175 + 4.5 - 11, 'y': 155 - 11, 'scale': 0.5, 'rotation': 0}])
+        rise0, drop0, rise1, drop1 = moves
+        self.assertEqual(rise0, {'x': 175 - 9 - 11, 'y': 155 - 22 - 11, 'scale': 1, 'rotation': 90,
+                                 'duration': 0.1, 'delay': 0, 'ease': 'power1.out'})
+        self.assertEqual({k: drop0[k] for k in ('x', 'y', 'delay', 'ease')}, {'x': 202 - 11, 'y': 692 - 11, 'delay': 0.1, 'ease': 'power2.in'})
+        self.assertAlmostEqual(drop0['duration'], 0.26)
+        self.assertEqual((rise1['delay'], round(drop1['delay'], 6)), (0.1, 0.2))
+        # the first lands: one step up, its digit flips, the cog turns a tooth
+        self.assertEqual(one[:3], ['6', 1, 1])
+        self.assertIn(['fromTo', ['flap'], {'scaleY': 0}, {'scaleY': 1, 'duration': 0.12, 'ease': 'power2.out', 'transformOrigin': '50% 50%'}], one[3])
+        self.assertIn(['to', 'cog', {'rotation': 45, 'duration': 0.12, 'ease': 'power2.out', 'transformOrigin': '50% 50%', 'overwrite': True}], one[3])
+        # the last lands: the count is state's, the layer is gone
+        self.assertEqual(two[:3], ['7', 0, 0])
+        self.assertEqual(again, [0, 0])                             # a re-render replays nothing
+
+    def test_one_cog_after_a_miss_none_under_reduced_motion_and_leaving_settles(self):
+        res = self.run_fly(
+            "K.renderCelebrate(st('playing', 5)); C.showCount(host, '6'); K.renderCelebrate(st('correct', 6, false));"
+            "const missed = [pieces().length, flaps()];"
+            "log.length = 0; K.renderCelebrate(st('playing', 6, true, 'dog'));"
+            "const left = [flights().length, flaps(), log.filter((e) => e[0] === 'kill').map((e) => e[1])];"
+            "reduced = true; C.showCount(host, '8'); K.renderCelebrate(st('correct', 8)); const still = [flights().length, flaps()];"
+            "out([missed, left, still]);")
+        missed, left, still = res
+        self.assertEqual(missed, [1, '5'])                          # a word after a miss earns one gear: one cog
+        self.assertEqual(left[:2], [0, '6'])                        # the next word: the cog dropped, state's count
+        self.assertIn(['gear-fly-cog'], left[2])
+        self.assertEqual(still, [0, '8'])                           # reduced motion: the count just changes
+
+    def test_the_flights_numbers_end_within_600ms(self):
+        res = self.run_node(
+            f"const M = await import('{(self.JS / 'motion.js').as_uri()}');"
+            f"const E = await import('{(self.JS / 'celebrate.js').as_uri()}');"
+            "out([[E.gearTicks(5, 7, 2), E.gearTicks(5, 6, 1), E.gearTicks(0, 0, 2), E.gearTicks(null, 7, 2), E.gearTicks(9, 11, 2), E.gearTicks(3, 3, 0)],"
+            " [E.changedFlaps('9', '10'), E.changedFlaps('12', '13'), E.changedFlaps('5', '5'), E.changedFlaps('99', '100'), E.changedFlaps('19', '20')],"
+            " [0, 1, 2].map((n) => E.gearsDone(n)), M.motionFor('gearFly', false), M.motionFor('gearFlip', false),"
+            " M.motionFor('gearFly', true).duration, M.motionFor('gearFlip', true).duration]);")
+        ticks, changed, done, fly, flip, fly_reduced, flip_reduced = res
+        self.assertEqual(ticks, [[6, 7], [6], [0, 0], [7, 7], [10, 11], []])
+        self.assertEqual(changed, [[0, 1], [1], [], [0, 1, 2], [0, 1]])
+        self.assertEqual(done[0], 0)
+        self.assertAlmostEqual(done[1], 0.48)
+        self.assertAlmostEqual(done[2], 0.58)
+        self.assertLessEqual(done[2], 0.6)                          # a clean word's two cogs, flips included
+        self.assertEqual(fly, {'duration': 0.36, 'ease': 'power2.in', 'scale': 1, 'stagger': 0.1, 'rise': 0.1,
+                               'height': 22, 'size': 22, 'spread': 18})
+        self.assertEqual(flip, {'duration': 0.12, 'ease': 'power2.out', 'scale': 1})
+        self.assertEqual((fly_reduced, flip_reduced), (0, 0))
+        cog = self.rule('.gear-fly-cog')
+        self.assertIn(f"width: {fly['size']}px;", cog)
+        self.assertIn(f"height: {fly['size']}px;", cog)
+        layer = self.rule('.gear-fly')
+        for decl in ('position: fixed;', 'pointer-events: none;', 'overflow: hidden;'):
+            self.assertIn(decl, layer)
+
+    # --- the template and the look ---
+
+    def test_the_counters_places_with_no_text(self):
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<header'):html.index('</header>')]
+        theme = re.search(r'<span id="theme-gears" class="gear-counter header-gears" role="img" aria-label="gears"></span>', header)
+        self.assertIsNotNone(theme)
+        self.assertLess(header.index('class="app-title"'), theme.start())
+        self.assertLess(theme.start(), header.index('id="play-back-btn"'))
+        console = html[html.index('<div class="console">'):html.index('<!-- Round-end screen')]
+        self.assertIn('<div id="console-gears" class="gear-counter console-gears" role="img" aria-label="gears"></div>', console)
+        self.assertLess(console.index('id="speak-btn"'), console.index('id="console-gears"'))
+        self.assertLess(console.index('id="console-gears"'), console.index('id="check-btn"'))
+        totals = html[html.index('<div class="round-totals">'):html.index('<ul id="round-words"')]
+        self.assertIn('<p id="round-gears" class="gear-counter round-gears" role="img" aria-label="gears"></p>', totals)
+        self.assertLess(totals.index('id="round-new"'), totals.index('id="round-gears"'))
+        template = (self.ROOT / 'templates' / 'spelling_game' / 'index.html').read_text()
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", template).group(1)), 31)
+
+    def test_the_header_counter_shows_on_the_theme_screen_only(self):
+        self.assertIn('display: none;', self.rule('.header-gears'))
+        self.assertIn('display: flex;', self.rule('body[data-screen="theme"] .header-gears'))
+        shown = re.findall(r'\n([^{}\n]*\.header-gears[^{}\n]*?)\s*{[^}]*display: (?!none)', self.css())
+        self.assertEqual(shown, ['body[data-screen="theme"] .header-gears'])
+        self.assertIn('pointer-events: none;', self.rule('.gear-counter'))
+
+    def test_the_console_counter_sits_between_the_tap_areas_inside_the_console(self):
+        rule = self.rule('#screen-play .console-gears')
+        self.assertIn('left: calc(36.1% + max(24px, var(--console-w) * 0.1145 / 2) + 4px);', rule)
+        self.assertIn('right: calc(18.5% + max(24px, var(--console-w) * 0.254 / 2) + 4px);', rule)
+        self.assertNotIn('z-index', rule)                           # in the console's z-order, like a control
+        speak, dome = self.rule('#speak-btn'), self.rule('#check-btn')
+        self.assertIn('--cx: 36.1%;', speak)
+        self.assertIn('--w: calc(var(--console-w) * 0.1145);', speak)
+        self.assertIn('--cx: 81.5%;', dome)
+        self.assertIn('--w: calc(var(--console-w) * 0.254);', dome)
+        # at 360 and at the 480px column: clear of both tap areas, wide
+        # enough for a cog and three 14px flaps (a longer count shares
+        # their 42px), and inside the console's height
+        for cw in (324, 444):
+            rpx = cw / 324
+            left = 0.361 * cw + max(24, cw * 0.1145 / 2) + 4
+            right = cw - (0.185 * cw + max(24, cw * 0.254 / 2) + 4)
+            self.assertGreaterEqual(left - (0.361 * cw + max(24, cw * 0.1145 / 2)), 4)
+            self.assertLessEqual(right, 0.815 * cw - max(24, cw * 0.254 / 2) - 4 + 1e-9)
+            self.assertGreaterEqual(right - left, (24 + 4 + 42 + 2) * rpx - 1, cw)
+        self.assertIn('top: 53%;', rule)
+        self.assertIn('height: calc(30 * var(--rpx));', rule)
+        self.assertLess(30 / 2, 0.53 * 324 * 175 / 972)             # its top inside the console
+        self.assertLess(0.53 * 324 * 175 / 972 + 30 / 2, 324 * 175 / 972)
+        self.assertIn('--flap-w: min(calc(14 * var(--rpx)), calc(42 * var(--rpx) / var(--digits, 1)));', rule)
+        # the robot's hands never reach it: their farthest right edge at
+        # rest or in any pose, in console px at 360 wide
+        reach = self.run_node(
+            f"const R = await import('{(self.JS / 'character.js').as_uri()}');"
+            "out(Math.max(...Object.values(R.HANDS).flatMap((p) => Object.values(p).map((h) => h.x + R.HAND_SHAPES[h.s].width / 2))));")
+        self.assertLess(72.6 + (reach - 266) * 0.24, 0.361 * 324 + 24 + 4 - 10)
+
+    def test_the_counters_look_uses_the_palette_only(self):
+        css = (self.ROOT / 'static' / 'css' / 'game.css').read_text()
+        section = css[css.index('/* --- Gear counter (BACKLOG B-218, cogs.js) --- */'):css.index('/* --- Round-end screen')]
+        self.assertNotRegex(re.sub(r'/\*.*?\*/', '', section, flags=re.S), r'#[0-9a-fA-F]{3,6}\b|rgb|hsl')
+        for part, fill in (('.cog .cog-lo', 'var(--brass-dark-lo)'), ('.cog .cog-hi', 'var(--brass-hi)'),
+                           ('.cog .cog-face', 'var(--brass)'), ('.cog .cog-hub', 'var(--brass-hi)'),
+                           ('.cog .cog-hole', 'var(--bench-deep)')):
+            self.assertIn(f'fill: {fill};', self.rule(part), part)
+        self.assertIn('filter: drop-shadow(1px 2px 1.5px var(--shadow-contact));', self.rule('.cog svg'))
+        self.assertIn('display: none;', self.rule('.gear-counter .sign:empty'))
+        self.assertIn('gap: 16px;', self.rule('.round-totals'))

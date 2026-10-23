@@ -15,6 +15,13 @@ export const state = {
     // bulbs and the stage map (BACKLOG B-217) are a render of state.
     // progress.js stays the only reader and writer of the stored copy.
     progress: {},
+    // The kid's gears (BACKLOG B-218, PROGRESSION.md "Gears"), as gears.js
+    // reads them from the browser: main.js sets it at start-up (load())
+    // and to gears.js add()'s return when a word is checked correct and
+    // when a round reaches its end, so the gear counters (cogs.js) are a
+    // render of state. gears.js stays the only reader and writer of the
+    // stored count.
+    gears: 0,
     // The data file of the round's theme ({ "cat": { image, audio, stage,
     // break }, ... }), set by startRound with the round and kept to its
     // round-end screen (the round's stage's words, progress.js afterRound;
@@ -22,7 +29,10 @@ export const state = {
     // (the theme and stage screens).
     data: null,
     words: [],                  // [{ word, image, audio, break }] for the current round
-    // results[i] = { word, correct }; stage is the stage the round is
+    // results[i] = { word, correct, clean, newSticker? }: clean (BACKLOG
+    // B-218, gears.js isClean) when checked correct on the first check
+    // with no boost; newSticker on a correct word, true when it was clean
+    // and new in the sticker book (stickers.js add). stage is the stage the round is
     // played at (BACKLOG B-215: 1-5 or 'long', stage.js STAGES), set when
     // a station on the theme's stage map is tapped (its stage, BACKLOG
     // B-217) or play again is (startRound: the theme's current stage,

@@ -4,7 +4,9 @@
 // end), the console controls (check dome, reset lever, speaker), the
 // header's mute toggle and the play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
-// the TV's lock (tv.js), screen renders.
+// the TV's lock (tv.js), screen renders. The kid's gears (gears.js,
+// BACKLOG B-218): a word's at its correct check, the round's at its end,
+// kept in state.gears for the gear counters (cogs.js).
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -17,6 +19,8 @@ import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMut
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
+import { load as loadGears, add as addGears, isClean, wordGears, GEARS } from './gears.js';
+import { renderGears } from './cogs.js';
 import { renderGallery } from './gallery.js';
 import { renderStageMap } from './stagemap.js';
 import { renderFlaps } from './flaps.js';
@@ -247,13 +251,24 @@ function onCheck(extra = {}) {
     const answer = current.placed.map((p) => p.letter).join('');
     const correct = answer === current.word;
     const results = [...round.results];
-    results[round.index] = { word: current.word, correct };
+    // clean (BACKLOG B-218, gears.js isClean): checked correct on the
+    // word's first check (no bulb lost to a wrong check yet), with no
+    // boost (B-219 adds `boosted`).
+    const clean = isClean(correct, LIVES - lives);
+    results[round.index] = { word: current.word, correct, clean };
 
     if (correct) {
-        // Mastered (correct with a heart left): into the sticker book.
+        // Only a clean word goes into the sticker book (PROGRESSION.md
+        // "Repetition and stickers"; stickers.js add is not called for a
+        // word solved after a miss, which still counts for its stage).
         // newSticker is true only if the book did not have the word yet.
-        results[round.index].newSticker = addSticker(state.theme, current.word);
-        setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, ...extra });
+        // The word's gears (gears.js wordGears: 1, and 1 more when clean)
+        // are added now, so a round left with the back button keeps them
+        // (B-201 takes back only its stickers); state.gears is the count
+        // after them, which celebrate.js flies cogs to.
+        results[round.index].newSticker = clean && addSticker(state.theme, current.word);
+        const gears = addGears(wordGears(results[round.index]));
+        setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, gears, ...extra });
         armNudge();
     } else if (lives - 1 <= 0) {
         setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
@@ -263,7 +278,8 @@ function onCheck(extra = {}) {
         // every stage (BACKLOG B-206, drag.js giveHint): in the same
         // setState, so the robot (character.js hintGiven) and the fly-in
         // (feedback.js) see it with the miss. A word then checked correct
-        // is mastered as any other (a bulb is left). The check notes the
+        // is solved as any other (a bulb is left), but not clean: it earns
+        // no sticker and no clean gear (BACKLOG B-218). The check notes the
         // letters it found right, the ones the lever keeps (drag.js
         // checkedWrong, BACKLOG B-215b).
         const checked = checkedWrong(current);
@@ -288,13 +304,16 @@ function onCheck(extra = {}) {
 // cleared once all its words are; the round keeps the theme's cleared
 // stages and whether this round cleared its own, for the round-end's
 // stage bulbs, and state.progress is read again for the theme cards and
-// the stage map (BACKLOG B-217). A round left with the back button
-// never gets here, so it records nothing (B-201). The next word starts
-// by the round's stage rules, as the first did (BACKLOG B-215).
+// the stage map (BACKLOG B-217); and reaching the round end earns the
+// round's gears (gears.js GEARS.round, BACKLOG B-218; its words' gears
+// were added at their checks). A round left with the back button never
+// gets here, so it records nothing and earns no round gears (B-201). The
+// next word starts by the round's stage rules, as the first did (BACKLOG
+// B-215).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
-    if (!results[round.index]) results[round.index] = { word: current.word, correct: false };
+    if (!results[round.index]) results[round.index] = { word: current.word, correct: false, clean: false };
 
     stopWord();
     const nextIndex = round.index + 1;
@@ -304,6 +323,7 @@ function onNext(extra = {}) {
         setState({
             round: { ...round, results, cleared: progress.cleared, justCleared },
             progress: loadProgress(),
+            gears: addGears(GEARS.round),
             screen: 'round-end',
             speaking: false,
             idleBeat: null,
@@ -421,10 +441,11 @@ function renderStageBulbs(el, stages, cleared) {
 }
 
 // Stars, the theme's stage bulbs, the score as split-flaps, the
-// new-sticker count (a sticker and "+N", the sticker dark at +0) and one
-// row per word (thumbnail, word, a sticker if the word is new in the
-// book, a lit or dark bulb). No English (DESIGN "Words on screen"): only
-// the words and numbers.
+// new-sticker count (a sticker and "+N", the sticker dark at +0; only a
+// clean word can be new in the book, BACKLOG B-218) and one row per word
+// (thumbnail, word, a sticker if the word is new in the book, a lit or
+// dark bulb); the round's gears beside the count are cogs.js's. No
+// English (DESIGN "Words on screen"): only the words and numbers.
 // The rows are rebuilt from state.round.results on every render; the
 // list is small and nothing on this screen is interactive per row.
 function renderRoundEnd(state) {
@@ -471,7 +492,7 @@ function renderRoundEnd(state) {
             li.appendChild(badge);
         }
 
-        // lit bulb: mastered; dark bulb: missed (the lives bulbs' look)
+        // lit bulb: checked correct; dark bulb: missed (the lives bulbs' look)
         const bulb = document.createElement('span');
         bulb.className = ok ? 'bulb' : 'bulb off';
         bulb.setAttribute('aria-label', ok ? 'correct' : 'wrong');
@@ -522,12 +543,14 @@ function leaveRound(patch) {
 
 // Leave the round for the theme's stage screen at once (B-217; it went
 // to the theme screen until then), no confirmation. The unfinished round
-// is dropped: the stickers it added to the book (words checked correct
+// is dropped: the stickers it added to the book (words spelled clean
 // this round that were not in the book before, marked `newSticker` by
 // onCheck) come out again, and leaveRound stops the word clip and clears
 // the round (words, results, current word), so no stars, stickers or
 // results are kept; the theme stays, for its stage map. A sticker the
-// book already had stays. Pending timers find the round gone: the dome's
+// book already had stays, and so do the gears its words earned (never
+// lost, BACKLOG B-218); the round's own gears were never earned.
+// Pending timers find the round gone: the dome's
 // checks the screen, the idle timer ends off the play screen, and the
 // robot drops his waiting steps when the screen changes (character.js).
 function onPlayBack() {
@@ -580,6 +603,7 @@ subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to 
 subscribe(renderControls);
 subscribe(renderRobot);
 subscribe(renderRoundEnd);
+subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter
 subscribe(renderGallery);
 subscribe((s) => renderStageMap(s, onStation));
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
@@ -615,6 +639,8 @@ setState({ muted: loadMuted() });
 // The kid's progress per theme (progress.js, BACKLOG B-217), for the
 // theme cards' bulbs and the stage map.
 setState({ progress: loadProgress() });
+// The kid's gears (gears.js, BACKLOG B-218), for the gear counters.
+setState({ gears: loadGears() });
 loadThemes();
 
 // Box sizing depends on the row width (layout.js); re-render on rotate.

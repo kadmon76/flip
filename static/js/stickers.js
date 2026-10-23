@@ -1,5 +1,8 @@
 // stickers.js — the sticker book: which words the kid has mastered, per
-// theme, persisted in localStorage (BACKLOG B-111). No DOM and no module
+// theme, persisted in localStorage (BACKLOG B-111). A word is mastered
+// when it is spelled clean: checked correct on its first check, with no
+// boost (BACKLOG B-218, PROGRESSION.md "Repetition and stickers"; main.js
+// calls add only then). No DOM and no module
 // state: every call reads the store, so a Django test runs this through
 // node with a fake `globalThis.localStorage`. The book is the truth for
 // "already mastered"; main.js records per round which words were new.

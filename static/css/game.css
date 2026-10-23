@@ -479,7 +479,8 @@ body[data-screen="play"] .play-back-btn {
 }
 
 /* split-flap numbers on the interim screens (round-end score, sticker
-   book counts): .flap characters from flaps.js, the slash narrower */
+   book counts; the gear counters' too, BACKLOG B-218): .flap characters
+   from flaps.js, the slash narrower */
 .flaps {
     margin: 0;
     display: flex;
@@ -996,7 +997,7 @@ body.dragging-active {
    #screen-play's stacking context: the robot's body and head (.robot,
    z-index -2), the console image (-1), his hands (.robot-hands, -1,
    after the image), the next-word dome's halo (::after, -1, last; B-212),
-   then the rail, the bench blocks and the controls (BACKLOG B-210). The
+   then the rail, the bench blocks, the controls and the gear counter (BACKLOG B-210, B-218). The
    bench never reaches the console (4px apart). */
 #screen-play .console {
     --console-w: calc(var(--scene-w) - 36px);
@@ -1447,10 +1448,166 @@ body.dragging-active {
 .robot-hands .shape-ball { width: calc(100% * 72 / 505); }
 .robot-hands .shape-palm { width: calc(100% * 103 / 505); }
 
+/* --- Gear counter (BACKLOG B-218, cogs.js) --- */
+
+/* A brass cog drawn in code (inline SVG from cogs.js) and the count in
+   split-flap digits (flaps.js .flap), side by side; it takes no taps.
+   Interim (a new scene object drawn in code: DESIGN "The layer model",
+   its exception for the cog counter) until the Claude Design pass; all of
+   its look is this section. Each place sets the cog's size (--cog-size)
+   and the flaps' (--flap-w, -h, -font); cogs.js sets --digits, the
+   number of flaps, so a long count shares the same width. */
+.gear-counter {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.gear-counter .count {
+    gap: var(--flap-gap, 2px);
+}
+
+/* the round end's "+" before the digits, in ink as the new-sticker
+   count's "+N" (not on a flap: the hinge line would cross it) */
+.gear-counter .sign {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.6rem;
+    line-height: 1;
+    margin-right: -2px;
+}
+
+.gear-counter .sign:empty {
+    display: none;
+}
+
+/* The cog, lit from the upper left: its outline drawn three times, a
+   light rim (brass lightened) showing at the upper left, a dark one at
+   the lower right, the brass face over both, a raised hub and the axle
+   hole; one contact shadow (DESIGN "Assets"). */
+.cog {
+    flex: 0 0 auto;
+    display: block;
+    width: var(--cog-size, 24px);
+    height: var(--cog-size, 24px);
+}
+
+.cog svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    filter: drop-shadow(1px 2px 1.5px var(--shadow-contact));
+}
+
+.cog .cog-lo {
+    fill: var(--brass-dark-lo);
+}
+
+.cog .cog-hi {
+    fill: var(--brass-hi);
+}
+
+.cog .cog-face {
+    fill: var(--brass);
+    stroke: var(--brass-dark);
+    stroke-width: 0.4;
+}
+
+.cog .cog-hub {
+    fill: var(--brass-hi);
+    stroke: var(--brass-dark);
+    stroke-width: 0.9;
+}
+
+.cog .cog-hole {
+    fill: var(--bench-deep);
+}
+
+/* The theme screen's header, between the logo and the mute toggle
+   (centred between them by the header's space-between), its middle on
+   the logo's centre line (y 49); on the theme screen only (screens.js
+   mirrors state.screen onto <body data-screen>). Up to three flaps at
+   17px; a longer count shares their 51px. */
+.header-gears {
+    display: none;
+    height: 24px;
+    margin-top: 1px;
+    gap: 5px;
+    --cog-size: 24px;
+    --flap-w: min(17px, 51px / var(--digits, 1));
+    --flap-h: 22px;
+    --flap-font: var(--flap-w);
+}
+
+body[data-screen="theme"] .header-gears {
+    display: flex;
+}
+
+/* The play screen's console, on the brass plate between the speaker and
+   the check dome (the face of the boost button B-219 builds). Its box
+   spans the plate from 4px right of the speaker's tap area (centred at
+   36.1% of the console, at least 48px wide) to 4px left of the dome's
+   (centred at 81.5%, 25.4% of the console wide): 74px at 360 wide, so it
+   never covers a control's tap area, and it lies inside the console, so
+   never over the rail, a bench block or the robot (his hands reach 120px
+   into the console at most). In the console's z-order like a control:
+   over the console image and his hands. Sized in --rpx; up to three
+   flaps at 14px, a longer count shares their 42px. */
+#screen-play .console-gears {
+    position: absolute;
+    left: calc(36.1% + max(24px, var(--console-w) * 0.1145 / 2) + 4px);
+    right: calc(18.5% + max(24px, var(--console-w) * 0.254 / 2) + 4px);
+    top: 53%;
+    height: calc(30 * var(--rpx));
+    transform: translateY(-50%);
+    justify-content: center;
+    gap: calc(4 * var(--rpx));
+    --cog-size: calc(24 * var(--rpx));
+    --flap-w: min(calc(14 * var(--rpx)), calc(42 * var(--rpx) / var(--digits, 1)));
+    --flap-h: calc(19 * var(--rpx));
+    --flap-font: var(--flap-w);
+    --flap-gap: calc(1 * var(--rpx));
+}
+
+/* The round end, in the totals row after the new stickers: the round's
+   gears as a cog and "+N" (BACKLOG B-218; 2 to 12, so one or two flaps,
+   the sticker book counts' 22px). */
+.round-gears {
+    gap: 5px;
+    --cog-size: 28px;
+    --flap-w: 22px;
+    --flap-h: 30px;
+    --flap-font: 22px;
+}
+
+/* Cogs flying from the TV into the console's counter on a correct word
+   (celebrate.js): a fixed, click-through layer over the page, removed
+   when the last cog lands, as the sparks' (.confetti); 22px cogs
+   (motion.js gearFly `size`). */
+.gear-fly {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.gear-fly-cog {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 22px;
+    height: 22px;
+    --cog-size: 22px;
+}
+
 /* --- Round-end screen (interim, DESIGN "Other screens (interim)") --- */
 
 /* Under the logo, top to bottom: the three stars on the dark backdrop,
-   one cream panel (the score and the new stickers, then the five words)
+   one cream panel (the score, the new stickers and the round's gears,
+   then the five words)
    and the button row near the bottom of the safe area: themes and play
    again. Stars and panel are centred in the space between the logo
    and the buttons. At 360x740 (~420px of content above 56px of buttons)
@@ -1532,12 +1689,14 @@ body.dragging-active {
     padding: 10px 12px 4px;
 }
 
-/* the score in flaps and the new-sticker count side by side */
+/* the score in flaps, the new-sticker count and the round's gears
+   (BACKLOG B-218) side by side: at most 82 + 76 + 96px with two 16px
+   gaps, inside the panel's 294px at 360 wide */
 .round-totals {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 32px;
+    gap: 16px;
     padding-bottom: 10px;
 }
 
@@ -1563,7 +1722,7 @@ body.dragging-active {
 
 /* One row per word: the picture, the word (the only English allowed), a
    sticker if it is new in the book, and a bulb: lit when the word was
-   mastered, dark when it was missed. Rows are divided by a shaded line. */
+   checked correct, dark when it was missed. Rows are divided by a shaded line. */
 .round-words {
     list-style: none;
     margin: 0;
