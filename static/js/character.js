@@ -201,7 +201,8 @@ export const FX = {
 // (head-shake and shrug), wrong with peek (ducks to his eyes, looks left
 // and right, shivers, comes back), third miss (covers his eyes, then
 // relief), correct (fist pump), 3 in a row (two fists, double pop, cap
-// sparks), round end (clap), speaker locked (head-shake, shrug).
+// sparks; only the third correct in a row, so the words after it say
+// their gag again), round end (clap), speaker locked (head-shake, shrug).
 // Where the map gives a choice, momentsFor() picks the moment:
 //   - "All slots filled": filledEarly (pointing at the dome) in the first
 //     EARLY_ROUNDS rounds of the session; filled after that, which is
@@ -426,7 +427,9 @@ export const IDLE_MS = 10000;     // kid idle 10s -> thinking, then sink
 // about 4 seconds", "at most every 8 seconds").
 export const NUDGE_MS = { first: 4000, every: 8000 };
 export const EARLY_ROUNDS = 2;    // he points at the dome in the first 2 rounds
-export const STREAK = 3;          // 3 correct in a row -> double pop
+// The 3rd correct in a row -> double pop and a streak line; the 4th and
+// 5th are plain correct again, so they say their gag (human, 2026-10-24).
+export const STREAK = 3;
 
 // The variants of moment `name` as [{ name, chance, steps }] (one, named
 // 'only', for a moment without variants).
@@ -745,7 +748,7 @@ export function momentsFor(prev, now) {
     if (now.tuned && !prev.tuned) return ['picture'];
     if (now.status !== prev.status || now.lives < prev.lives) {
         if (now.status === 'revealed') return ['thirdMiss'];
-        if (now.status === 'correct') return [now.streak >= STREAK ? 'streak' : 'correct'];
+        if (now.status === 'correct') return [now.streak === STREAK ? 'streak' : 'correct'];
         if (now.status === 'wrong') {
             const miss = now.lives === 1 ? 'wrongPeek' : 'wrong';
             // the miss that leaves one bulb also gave his letter (B-206)

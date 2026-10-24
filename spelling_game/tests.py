@@ -1597,8 +1597,12 @@ class CharacterTests(TestCase):
             " moments(st({ round: { index: 2, size: 5, results: [{ correct: true }, { correct: true }] }, current: cur('playing', 'cat') }),"
             "         st({ round: { index: 2, size: 5, results: [{ correct: true }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') })),"
             " moments(st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: true }, { correct: true }, { correct: true }] }, current: cur('playing', 'cat') }),"
-            "         st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: true }, { correct: true }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') }))]);"),
-            [['correct'], ['correct'], ['streak'], ['streak']])
+            "         st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: true }, { correct: true }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') })),"
+            " moments(st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: false }, { correct: true }, { correct: true }] }, current: cur('playing', 'cat') }),"
+            "         st({ round: { index: 4, size: 5, results: [{ correct: false }, { correct: false }, { correct: true }, { correct: true }, { correct: true }] }, current: cur('correct', 'cat') }))]);"),
+            # only the third correct in a row is a streak; the fourth is a
+            # plain correct again, so it says its gag (human, 2026-10-24)
+            [['correct'], ['correct'], ['streak'], ['correct'], ['streak']])
 
     def test_idle_sinks_him_once_and_input_pops_him_back(self):
         self.assertEqual(self.run_node(
