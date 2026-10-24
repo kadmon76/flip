@@ -6573,6 +6573,7 @@ class VoiceScriptTests(TestCase):
     def test_drafts_are_left_out(self):
         import tempfile
         v = self.load()
+        _, before = v.plan_items(['gags', 'hebrew'])   # lines still waiting on review in the real content
         with tempfile.TemporaryDirectory() as tmp:
             for name in ('words.json', 'robot-lines.json'):
                 shutil.copy(str(self.ROOT / 'content' / 'voice' / name), tmp)
@@ -6584,7 +6585,7 @@ class VoiceScriptTests(TestCase):
             ids = set(i['id'] for i in items)
             self.assertNotIn('cat-gag', ids)
             self.assertIn('cat-he', ids)   # the Hebrew guess has its own approval
-            self.assertEqual(waiting.get('gags'), 1)
+            self.assertEqual(waiting.get('gags', 0), before.get('gags', 0) + 1)
 
     def test_make_skips_what_exists_and_remakes_changed_text(self):
         import io, os, tempfile, contextlib
