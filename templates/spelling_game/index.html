@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=35">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=36">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -102,6 +102,21 @@
             <img class="start-hand start-hand-R" src="{% static 'images/ui/robot/hand-wave.png' %}" alt="" />
         </div>
         <div id="player-cards" class="player-grid"></div>
+        <!-- the name step (human, 2026-10-24): the picture just picked, a
+             name field (any language, optional, up to 12 letters), back and
+             go; go (or the keyboard's enter) adds the player and starts -->
+        <div id="player-namer" class="player-namer" hidden>
+            <div class="player-card panel namer-pic"><img id="namer-pic" alt="" /></div>
+            <input id="player-name" class="name-input" type="text" maxlength="24" dir="auto" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" aria-label="Your name" />
+            <div class="actions">
+                <button id="namer-back-btn" class="panel-btn" type="button" aria-label="Back">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19.5 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>
+                </button>
+                <button id="namer-ok-btn" class="panel-btn" type="button" aria-label="Start">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M4.5 12.5l5 5 10-11"/></svg>
+                </button>
+            </div>
+        </div>
         <div id="player-picker" class="player-picker" hidden>
             <div id="picker-pics" class="player-grid"></div>
             <div class="actions">
@@ -124,6 +139,7 @@
             <button id="player-btn" class="panel-btn player-btn" type="button" aria-label="Switch player">
                 <img id="player-pic" alt="" />
             </button>
+            <span id="player-label" class="player-label" dir="auto"></span>
         </div>
         <div id="theme-buttons"></div>
         <div class="actions">

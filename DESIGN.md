@@ -141,7 +141,9 @@ No other colours without a DECISIONS entry. Tints within ±15% allowed.
 ## Words on screen
 The players cannot read English yet. The only words allowed on screen
 are the target word (on the blocks, and revealed in the slots) and the
-"flip" logo. Numbers are allowed. Every other label, message and button
+"flip" logo, and a player's own name, typed by the kid (any language;
+under their card on the start screen and beside their picture on the
+theme screen; human, 2026-10-24). Numbers are allowed. Every other label, message and button
 is an icon, a light, a sound, motion or the robot. No result-line text.
 
 ## Controls and states
@@ -219,7 +221,7 @@ labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
 theme's picture, not its name. These are placeholders; a design pass
 will replace them.
 
-Start screen (human, 2026-10-24): the game opens on it. The robot, still and waving, stacked from his puppet parts (not the old still poses), over a grid of square cream cards, three to a row: one per player on the device showing the animal picture the kid picked (a word picture's cutout), and a new-player card with a plus while there is room (6 players at most). A card is the start. The picker shows the pictures no player has taken; with no player yet it shows at once and has no back arrow. No names, no text. The theme screen has the player's picture on a small icon button, top left, back to the start screen to switch player.
+Start screen (human, 2026-10-24): the game opens on it. The robot, still and waving, stacked from his puppet parts (not the old still poses), over a grid of square cream cards, three to a row: one per player on the device showing the animal picture the kid picked (a word picture's cutout), and a new-player card with a plus while there is room (6 players at most). A card is the start. The picker shows the pictures no player has taken; with no player yet it shows at once and has no back arrow. A picture picked opens the name step: the picture, a cream name field (Andika Bold 24px, centred, any language, optional, 12 characters at most), back and go (a check mark); go or the keyboard's enter adds the player and starts. Each card shows the player's name under the picture (cut with an ellipsis when long). The theme screen has the player's picture on a small icon button, top left, back to the start screen to switch player, and their name beside it in cream.
 
 Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned, mastered / missed and a theme's stages cleared / not cleared are lit / dark (stars, bulbs), never ticks, crosses or outlines. There is no level picker: how hard a round is comes from its theme's stage (PROGRESSION.md "Stages", B-215).
 

@@ -131,7 +131,7 @@ function renderThemeButtons(state) {
 // that got here is the first gesture, so his voice can play.
 function startAs(players) {
     setState({
-        screen: 'theme', players: players.list, player: players.current, picking: false, theme: null,
+        screen: 'theme', players: players.list, player: players.current, picking: false, naming: null, theme: null,
         progress: loadProgress(), gears: loadGears(),
     });
 }
@@ -147,12 +147,28 @@ function onNewPlayer() {
     setState({ picking: true });
 }
 
-// A picture picked: a new player with it, playing at once. The first
-// player on the device takes over the saves made before players existed.
+// A picture picked: the name step for it (start.js), the kid types their
+// name (human, 2026-10-24).
 function onPickPic(pic) {
     if (state.screen !== 'start') return;
-    const players = addPlayer(pic, [STICKERS_KEY, PROGRESS_KEY, GEARS_KEY, MISSED_KEY]);
+    setState({ naming: pic });
+}
+
+// Go on the name step (or the keyboard's enter): a new player with the
+// picture and the typed name (players.js cleans it; it may be empty),
+// playing at once. The first player on the device takes over the saves
+// made before players existed. The field's text is read only here, at
+// the tap, as the kid's input; it is not game state.
+function onNameOk() {
+    if (state.screen !== 'start' || !state.naming) return;
+    const name = $('player-name').value;
+    const players = addPlayer(state.naming, [STICKERS_KEY, PROGRESS_KEY, GEARS_KEY, MISSED_KEY], name);
     if (players) startAs(players);
+}
+
+function onNameBack() {
+    if (state.screen !== 'start') return;
+    setState({ naming: null });
 }
 
 function onPickBack() {
@@ -163,7 +179,7 @@ function onPickBack() {
 // The theme screen's player button: back to the start screen, to switch.
 function onSwitchPlayer() {
     if (state.screen !== 'theme') return;
-    setState({ screen: 'start', picking: false, players: loadPlayers().list });
+    setState({ screen: 'start', picking: false, naming: null, players: loadPlayers().list });
 }
 
 const START = { onPlayer, onNew: onNewPlayer, onPick: onPickPic, onPickBack };
@@ -741,7 +757,7 @@ function onGalleryBack() {
 const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };
 
 subscribe(renderScreens);
-subscribe((s) => renderStart(s, START));
+subscribe((s) => renderStart(s, START));   // after renderScreens: focuses the name field once it shows
 subscribe(renderPlayerButton);
 subscribe(renderThemeButtons);
 subscribe(renderCard);
@@ -775,6 +791,9 @@ $('stages-back-btn').addEventListener('click', onThemes);
 $('mute-btn').addEventListener('click', onMute);
 $('player-btn').addEventListener('click', onSwitchPlayer);
 $('picker-back-btn').addEventListener('click', onPickBack);
+$('namer-ok-btn').addEventListener('click', onNameOk);
+$('namer-back-btn').addEventListener('click', onNameBack);
+$('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onNameOk(); } });
 $('play-back-btn').addEventListener('click', onPlayBack);
 $('console-gears').addEventListener('click', onBoost);
 $('boost-scrim').addEventListener('click', onBoostClose);

@@ -12,6 +12,9 @@ export const state = {
     players: [],
     player: null,
     picking: false,
+    // The picture picked for a new player while the kid types their name
+    // (the name step, human 2026-10-24), else null.
+    naming: null,
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }], stages }] from themes.json and the data files; image is the first word's; stages: stage.js stagesOf(data), the stages the data has words in (BACKLOG B-217)
     // The theme being played: set when its card is tapped (its stage
     // screen, BACKLOG B-217) and kept through its rounds, their round end

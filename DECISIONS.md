@@ -1583,3 +1583,11 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - docs: CLAUDE.md (players.js, start.js bullets; the stickers.js bullet; the new DOM ids), DESIGN.md "Other screens" (the start screen), CHARACTER.md moment map (Greet).
 - tests: new `PlayersTests` (7); the moment-table, pool and theme-screen tests name `greet` and `#player-btn`; the progress start-up test counts `startAs`'s read.
 - reversible: yes; removing players leaves each save under `<base>@p1` for the first player.
+
+## 2026-10-24 — Players have a name the kid types (chat, no backlog id)
+- chose: after a picture is picked, a name step (`#player-namer`): the picture, a name field, back and go; go or enter adds the player with the name and starts. players.js keeps `name` per player (`cleanName`: any language, spaces collapsed, no control or direction marks, at most 12 characters counted as code points; optional, '' when none). The name shows under the player's card on the start screen (ellipsis when long; the grid's columns are `minmax(0, 1fr)` so a long name never widens a card) and beside the picture on the theme screen (`#player-label`).
+- because: the human, 2026-10-24: "the image the player chooses should have a way to name it with a username the kid chooses". Most kids will type Hebrew, so the field takes any language (`dir="auto"`).
+- chose: DESIGN.md "Words on screen" allows a player's own name, the kid's own text, as the one exception besides the target word and the logo.
+- not now: renaming or removing a player (a "Later / not now" line).
+- tests: `PlayersTests.test_names_the_kid_types`; the players' and start view's expected shapes carry `name` and `naming`.
+- reversible: yes; a stored name is ignored by a version without names.
