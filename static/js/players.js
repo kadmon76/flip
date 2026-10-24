@@ -30,6 +30,19 @@ export const PICS = ['cat', 'dog', 'fox', 'frog', 'lion', 'panda', 'penguin', 'r
 // one per player).
 export const MAX = 6;
 
+// A player's name, typed by the kid (human, 2026-10-24): any language
+// (most will type Hebrew), at most this many characters, optional.
+export const NAME_MAX = 12;
+
+// A name as stored: a string with no control characters, spaces
+// collapsed, trimmed, at most NAME_MAX characters (code points, so a
+// Hebrew or accented letter counts as one); '' when there is none.
+export function cleanName(name) {
+    if (typeof name !== 'string') return '';
+    const flat = name.replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim();
+    return Array.from(flat).slice(0, NAME_MAX).join('').trim();
+}
+
 // The picture of `pic` as an image path.
 export function picUrl(pic) {
     return `/static/images/words/animals/${pic}-subject.webp`;
@@ -46,8 +59,8 @@ function storage() {
 }
 
 // A stored value, sanitised: { list, current } with unique ids of the
-// form p<n>, pictures from PICS, at most MAX players, and `current` one
-// of their ids or null.
+// form p<n>, pictures from PICS, names through cleanName, at most MAX
+// players, and `current` one of their ids or null.
 export function clean(parsed) {
     const out = { list: [], current: null };
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return out;
@@ -58,7 +71,7 @@ export function clean(parsed) {
         if (typeof p.id !== 'string' || !/^p\d+$/.test(p.id) || ids.has(p.id)) continue;
         if (!PICS.includes(p.pic)) continue;
         ids.add(p.id);
-        out.list.push({ id: p.id, pic: p.pic });
+        out.list.push({ id: p.id, pic: p.pic, name: cleanName(p.name) });
     }
     out.current = ids.has(parsed.current) ? parsed.current : null;
     return out;
@@ -114,17 +127,17 @@ export function freePics(list) {
     return PICS.filter((pic) => !list.some((p) => p.pic === pic));
 }
 
-// Add a player with picture `pic` and make them current. The first
-// player on a device takes over the saves made before players existed:
-// each key of `saves` (the save modules' KEYs) moves to the player's
-// key. Returns the players, or null when the picture is taken, unknown,
-// or the device is full.
-export function add(pic, saves = []) {
+// Add a player with picture `pic` and name `name` (cleanName; it may be
+// empty) and make them current. The first player on a device takes over
+// the saves made before players existed: each key of `saves` (the save
+// modules' KEYs) moves to the player's key. Returns the players, or null
+// when the picture is taken, unknown, or the device is full.
+export function add(pic, saves = [], name = '') {
     const players = load();
     if (players.list.length >= MAX || !freePics(players.list).includes(pic)) return null;
     const id = nextId(players.list);
     if (players.list.length === 0) adopt(id, saves);
-    const next = { list: [...players.list, { id, pic }], current: id };
+    const next = { list: [...players.list, { id, pic, name: cleanName(name) }], current: id };
     save(next);
     return next;
 }

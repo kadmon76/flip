@@ -11157,8 +11157,9 @@ class PlayersTests(TestCase):
             "P.select('p1'); const back = [G.load(), St.load()];"
             "out([a, b, first, second, back, dump()]);", seed=old)
         a, b, first, second, back, store = res
-        self.assertEqual(a, {'list': [{'id': 'p1', 'pic': 'fox'}], 'current': 'p1'})
-        self.assertEqual(b, {'list': [{'id': 'p1', 'pic': 'fox'}, {'id': 'p2', 'pic': 'panda'}], 'current': 'p2'})
+        self.assertEqual(a, {'list': [{'id': 'p1', 'pic': 'fox', 'name': ''}], 'current': 'p1'})
+        self.assertEqual(b, {'list': [{'id': 'p1', 'pic': 'fox', 'name': ''}, {'id': 'p2', 'pic': 'panda', 'name': ''}],
+                             'current': 'p2'})
         self.assertEqual(first, [7, {'animals': ['cat']}, 'flip.gears.v1@p1'])
         self.assertEqual(second, [0, {}, 2])
         self.assertEqual(back, [7, {'animals': ['cat']}])
@@ -11179,7 +11180,8 @@ class PlayersTests(TestCase):
             {'id': 'p1', 'pic': 'fox'}, {'id': 'p1', 'pic': 'cat'}, {'id': 'x', 'pic': 'dog'},
             {'id': 'p3', 'pic': 'dragon'}, None, {'id': 'p4', 'pic': 'lion'}], 'current': 'p3'})}
         self.assertEqual(self.run_node("out([P.load(), P.nextId(P.load().list)]);", seed=bad),
-                         [{'list': [{'id': 'p1', 'pic': 'fox'}, {'id': 'p4', 'pic': 'lion'}], 'current': None}, 'p5'])
+                         [{'list': [{'id': 'p1', 'pic': 'fox', 'name': ''}, {'id': 'p4', 'pic': 'lion', 'name': ''}],
+                           'current': None}, 'p5'])
         self.assertEqual(self.run_node("out(P.load());", seed={'flip.players.v1': '{oops'}), {'list': [], 'current': None})
 
     def test_the_start_screen_view(self):
@@ -11190,9 +11192,10 @@ class PlayersTests(TestCase):
         none, two, picking, full = res
         # no player yet: the picker at once, every picture, no back arrow
         self.assertEqual(none, {'cards': [], 'plus': False, 'picker': True,
-                                'pics': ['cat', 'dog', 'fox', 'frog', 'lion', 'panda', 'penguin', 'rabbit'], 'back': False})
-        self.assertEqual(two, {'cards': [{'id': 'p1', 'pic': 'fox'}, {'id': 'p2', 'pic': 'cat'}], 'plus': True,
-                               'picker': False, 'pics': [], 'back': False})
+                                'pics': ['cat', 'dog', 'fox', 'frog', 'lion', 'panda', 'penguin', 'rabbit'], 'back': False,
+                                'naming': None})
+        self.assertEqual(two, {'cards': [{'id': 'p1', 'pic': 'fox', 'name': ''}, {'id': 'p2', 'pic': 'cat', 'name': ''}],
+                               'plus': True, 'picker': False, 'pics': [], 'back': False, 'naming': None})
         self.assertEqual(picking['pics'], ['dog', 'frog', 'lion', 'panda', 'penguin', 'rabbit'])
         self.assertTrue(picking['back'])
         self.assertFalse(full['plus'])
@@ -11220,3 +11223,23 @@ class PlayersTests(TestCase):
         self.assertNotRegex(code, r'(?m)^(let|var) ')
         # the game opens on the start screen
         self.assertIn("screen: 'start',", (self.JS / 'state.js').read_text())
+
+    def test_names_the_kid_types(self):
+        # any language, spaces collapsed, no control or direction marks,
+        # at most 12 characters (code points); optional
+        res = self.run_node(
+            "out([P.cleanName('  \u05e0\u05d5\u05e2\u05d4   \u05db\u05d4\u05df '), P.cleanName('Dan the very long name'),"
+            " P.cleanName('a\\u0007b\\u202ec'), P.cleanName(7), P.NAME_MAX,"
+            " P.add('fox', [], '  Noa  '), P.add('cat'),"
+            " V.startView(P.load().list, false, null).cards, V.startView(P.load().list, true, 'dog'),"
+            " V.startView(P.load().list, true, 'fox').naming]);")
+        hebrew, long, controls, number, top, noa, cat, cards, naming, taken = res
+        self.assertEqual(hebrew, '\u05e0\u05d5\u05e2\u05d4 \u05db\u05d4\u05df')
+        self.assertEqual([long, controls, number, top], ['Dan the very', 'abc', '', 12])
+        self.assertEqual(noa['list'], [{'id': 'p1', 'pic': 'fox', 'name': 'Noa'}])
+        self.assertEqual(cat['list'][1], {'id': 'p2', 'pic': 'cat', 'name': ''})
+        self.assertEqual(cards, [{'id': 'p1', 'pic': 'fox', 'name': 'Noa'}, {'id': 'p2', 'pic': 'cat', 'name': ''}])
+        # the name step for a free picture: no cards, no picker
+        self.assertEqual(naming, {'cards': [], 'plus': False, 'picker': False, 'pics': [], 'back': False, 'naming': 'dog'})
+        # a picture already taken never gets a name step
+        self.assertIsNone(taken)
