@@ -375,10 +375,28 @@ function fetchClip(url) {
 function decodeClip(clip) {
     if (!ctx || clip.decoding) return;
     clip.decoding = true;
-    clip.bytes
+    clip.done = clip.bytes
         .then((data) => (data ? ctx.decodeAudioData(data) : null))
-        .then((buf) => { if (buf) clip.buffer = buf; })
-        .catch(() => {});
+        .then((buf) => { if (buf) clip.buffer = buf; return !!buf; })
+        .catch(() => false);
+}
+
+// Resolves true as soon as one clip of his shared-line pool `pool` is
+// decoded, false when none can be (none listed, none decodes). For a
+// moment the table marks `waitReady` (the greeting, human 2026-10-24).
+function poolDecoded(pool) {
+    const clips = poolClips(listed, pool).map((file) => lineClips.get(voiceUrl(file))).filter(Boolean);
+    return new Promise((resolve) => {
+        let left = clips.length;
+        if (!left) resolve(false);
+        for (const clip of clips) {
+            const done = clip.buffer ? Promise.resolve(true) : (clip.done || Promise.resolve(false));
+            done.then((ok) => {
+                if (ok) resolve(true);
+                else if (--left === 0) resolve(false);
+            });
+        }
+    });
 }
 
 // The decoded buffer of a clip of his new voice, or null while not ready.
@@ -810,5 +828,18 @@ export function renderSound(state) {
         return;
     }
     const moments = momentsFor(prev.snap, snap);
-    if (moments.length) speak(moments, state, prev.snap, snap);
+    if (!moments.length) return;
+    // A moment the table marks `waitReady` (the greeting) comes with the
+    // very tap that unlocks the sound, before his clips are decoded: it
+    // waits for a clip of its pool (a few hundred ms), then says it if
+    // the screen is still the same and the sound is on; never twice.
+    const waiting = moments.find((m) => MOMENTS[m].waitReady && Array.isArray(MOMENTS[m].lines)
+        && !MOMENTS[m].lines.some((pool) => poolClips(listed, pool).some((file) => !!bufferOf(voiceUrl(file)))));
+    if (waiting) {
+        Promise.all(MOMENTS[waiting].lines.map(poolDecoded)).then((ok) => {
+            if (ok.some(Boolean) && state.screen === snap.screen && !state.muted) speak(moments, state, prev.snap, snap);
+        });
+        return;
+    }
+    speak(moments, state, prev.snap, snap);
 }

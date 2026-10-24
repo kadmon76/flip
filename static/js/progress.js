@@ -32,7 +32,9 @@
 // cleared.
 
 import { STAGES, isStage, stagesOf } from './stage.js';
+import { keyOf } from './players.js';
 
+// Kept per player (players.js keyOf: `flip.progress.v1@p1`).
 export const KEY = 'flip.progress.v1';
 
 // The store, or null. Reading `localStorage` itself can throw when the
@@ -67,7 +69,7 @@ export function load() {
     const store = storage();
     let raw = null;
     try {
-        raw = store ? store.getItem(KEY) : null;
+        raw = store ? store.getItem(keyOf(KEY)) : null;
     } catch {
         return {};
     }
@@ -91,7 +93,7 @@ function save(all) {
     const store = storage();
     if (!store) return;
     try {
-        store.setItem(KEY, JSON.stringify(all));
+        store.setItem(keyOf(KEY), JSON.stringify(all));
     } catch {
         // quota or private mode: the game still plays, nothing to do
     }

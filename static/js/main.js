@@ -38,6 +38,15 @@ import { stagesOf } from './stage.js';
 import { pickRound, makeWord, swapForStruggle } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
+import { load as loadPlayers, add as addPlayer, select as selectPlayer } from './players.js';
+// The save modules' keys, for the first player to take over the saves
+// made before players existed (players.js add); each key stays named only
+// in its own module.
+import { KEY as STICKERS_KEY } from './stickers.js';
+import { KEY as GEARS_KEY } from './gears.js';
+import { KEY as MISSED_KEY } from './missed.js';
+import { KEY as PROGRESS_KEY } from './progress.js';
+import { renderStart, renderPlayerButton } from './start.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -113,6 +122,51 @@ function renderThemeButtons(state) {
         renderStageBulbs(container.children[i].lastElementChild, theme.stages || [], clearedOf(state, theme.name));
     });
 }
+
+// --- Start screen: who's playing (human, 2026-10-24; players.js, start.js) ---
+
+// A player starts: the theme screen with their own saves (players.js
+// keyOf scopes the save modules to the current player), and the robot's
+// greeting (character.js greet, on the start -> theme change). The tap
+// that got here is the first gesture, so his voice can play.
+function startAs(players) {
+    setState({
+        screen: 'theme', players: players.list, player: players.current, picking: false, theme: null,
+        progress: loadProgress(), gears: loadGears(),
+    });
+}
+
+function onPlayer(id) {
+    if (state.screen !== 'start') return;
+    const players = selectPlayer(id);
+    if (players) startAs(players);
+}
+
+function onNewPlayer() {
+    if (state.screen !== 'start') return;
+    setState({ picking: true });
+}
+
+// A picture picked: a new player with it, playing at once. The first
+// player on the device takes over the saves made before players existed.
+function onPickPic(pic) {
+    if (state.screen !== 'start') return;
+    const players = addPlayer(pic, [STICKERS_KEY, PROGRESS_KEY, GEARS_KEY, MISSED_KEY]);
+    if (players) startAs(players);
+}
+
+function onPickBack() {
+    if (state.screen !== 'start') return;
+    setState({ picking: false });
+}
+
+// The theme screen's player button: back to the start screen, to switch.
+function onSwitchPlayer() {
+    if (state.screen !== 'theme') return;
+    setState({ screen: 'start', picking: false, players: loadPlayers().list });
+}
+
+const START = { onPlayer, onNew: onNewPlayer, onPick: onPickPic, onPickBack };
 
 // --- Stage screen (BACKLOG B-217, stagemap.js) ---
 
@@ -687,6 +741,8 @@ function onGalleryBack() {
 const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };
 
 subscribe(renderScreens);
+subscribe((s) => renderStart(s, START));
+subscribe(renderPlayerButton);
 subscribe(renderThemeButtons);
 subscribe(renderCard);
 subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places the boost tray and the glowing slots on it
@@ -717,6 +773,8 @@ $('stickers-btn').addEventListener('click', onStickers);
 $('gallery-back-btn').addEventListener('click', onGalleryBack);
 $('stages-back-btn').addEventListener('click', onThemes);
 $('mute-btn').addEventListener('click', onMute);
+$('player-btn').addEventListener('click', onSwitchPlayer);
+$('picker-back-btn').addEventListener('click', onPickBack);
 $('play-back-btn').addEventListener('click', onPlayBack);
 $('console-gears').addEventListener('click', onBoost);
 $('boost-scrim').addEventListener('click', onBoostClose);
@@ -731,6 +789,8 @@ renderScreens(state);
 // `flip.level` left in the browser by an earlier version is ignored.
 initAudio();
 setState({ muted: loadMuted() });
+// The players on this device, for the start screen's cards (players.js).
+setState({ players: loadPlayers().list });
 // The kid's progress per theme (progress.js, BACKLOG B-217), for the
 // theme cards' bulbs and the stage map.
 setState({ progress: loadProgress() });

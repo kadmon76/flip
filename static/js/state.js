@@ -2,7 +2,16 @@
 // Only this module mutates state; everything else calls setState().
 
 export const state = {
-    screen: 'theme',            // 'theme' | 'stages' | 'play' | 'round-end' | 'gallery'
+    screen: 'start',            // 'start' | 'theme' | 'stages' | 'play' | 'round-end' | 'gallery'
+    // The players on this device (players.js load(): [{ id, pic }]), for
+    // the start screen's cards (start.js), and the one playing in this
+    // session, set when the kid taps their card or picks a new picture
+    // (main.js); null until then. players.js stays the only reader and
+    // writer of the stored list. `picking`: the start screen shows the
+    // picture picker for a new player instead of the players' cards.
+    players: [],
+    player: null,
+    picking: false,
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }], stages }] from themes.json and the data files; image is the first word's; stages: stage.js stagesOf(data), the stages the data has words in (BACKLOG B-217)
     // The theme being played: set when its card is tapped (its stage
     // screen, BACKLOG B-217) and kept through its rounds, their round end

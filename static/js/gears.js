@@ -20,6 +20,9 @@
 // add()'s or spend()'s return after each add or spend), from which the
 // gear counters render (cogs.js).
 
+import { keyOf } from './players.js';
+
+// Kept per player (players.js keyOf: `flip.gears.v1@p1`).
 export const KEY = 'flip.gears.v1';
 
 // What playing earns (PROGRESSION.md "Gears"; starting values to tune in
@@ -47,7 +50,7 @@ export function load() {
     const store = storage();
     let raw = null;
     try {
-        raw = store ? store.getItem(KEY) : null;
+        raw = store ? store.getItem(keyOf(KEY)) : null;
     } catch {
         return 0;
     }
@@ -65,7 +68,7 @@ function save(count) {
     const store = storage();
     if (!store) return;
     try {
-        store.setItem(KEY, JSON.stringify(count));
+        store.setItem(keyOf(KEY), JSON.stringify(count));
     } catch {
         // quota or private mode: the game still plays, nothing to do
     }

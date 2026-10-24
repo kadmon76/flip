@@ -4,6 +4,7 @@
 // render output, written on every render and never read by any script.
 
 const SCREENS = {
+    'start': 'screen-start',
     'theme': 'screen-theme',
     'stages': 'screen-stages',
     'play': 'screen-play',
