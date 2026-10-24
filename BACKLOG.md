@@ -580,6 +580,5 @@ Build order: life → win.
 - His `gear` lines (the first gear of a session): not wired by B-224; no moment for it yet.
 - His `boost-slow` line (the slow say boost, before the slow word): not wired by B-224; waits for the slow say boost (above).
 - Renaming or removing a player on the start screen (players and names, chat 2026-10-24): today a player can only be added.
-- His `tutorial-drag`, `tutorial-press` and `tutorial-done` lines (the first word's tutorial, 2026-10-24): not wired yet; the tutorial is being built in chat.
 - His `key` lines (a theme key earned, 2026-10-24): not wired yet; theme keys are being built in chat.
 - His `theme-open` line (a key opens a new theme, 2026-10-24): not wired yet; theme keys are being built in chat.

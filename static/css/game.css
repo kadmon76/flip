@@ -2721,3 +2721,21 @@ body[data-screen="theme"] .header-gears {
     border-width: 29px 26px 38px 28px;          /* top right bottom left */
     border-image: url(../images/ui/frame.png) 180 165 235 175;   /* no fill */
 }
+
+/* --- The first word's tutorial (coach.js; human, 2026-10-24) --- */
+
+/* The ghost mitten: the robot's pointing mitten over everything, never
+   taking taps; coach.js places it (fixed, by its fingertip) and moves it.
+   Starts hidden. */
+.coach-hand {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 50;
+    height: auto;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    filter: drop-shadow(3px 6px 6px var(--shadow-contact));
+}

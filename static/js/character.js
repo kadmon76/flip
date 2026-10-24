@@ -27,6 +27,7 @@
 import { starsFor } from './score.js';
 import { domeAction } from './controls.js';
 import { motionFor } from './motion.js';
+import { coachStep } from './coach.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -315,6 +316,47 @@ export const MOMENTS = {
         ],
         sound: null,
         lines: ['wake'],
+    },
+    // The first word's tutorial (human, 2026-10-24; coach.js): as the
+    // picture tunes in, he points down at the bench and says how it goes
+    // (instead of the picture's look); once every slot is full, he points
+    // at the dome (as filledEarly) and says to press it; on its correct
+    // check he says the word and then his tutorial-done line (else the
+    // word's gag).
+    // the tutorial word's round start: his wave, with no line, so his
+    // drag line comes as the picture tunes in
+    tutorialWave: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'up', hands: 'wave', pop: 1 },
+            { at: 0.6, brows: 'calm', hands: 'rest' },
+        ],
+        sound: null,
+    },
+    tutorialDrag: {
+        steps: [
+            { at: 0, sink: 0, head: -4, eyes: 'happy', brows: 'up', hands: 'point', look: [10, 30], pop: 1 },
+            { at: 2.4, hands: 'rest', eyes: 'idle', brows: 'calm', look: [0, 0] },
+        ],
+        sound: null,
+        lines: ['tutorial-drag'],
+    },
+    tutorialPress: {
+        steps: [
+            { at: 0, sink: 0, head: 6, eyes: 'wide', brows: 'up', hands: 'point', look: [26, 22], pop: 2 },
+            { at: 0.3, fx: 'wag' },
+        ],
+        sound: 'swipe',
+        lines: ['tutorial-press'],
+    },
+    tutorialDone: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'happy', brows: 'up', hands: 'pump2', pop: 2 },
+            { at: 0.25, fx: 'pump2' },
+            { at: 1.85, hands: 'rest', eyes: 'idle', brows: 'calm' },
+        ],
+        sound: 'correct',
+        word: true,
+        lines: ['tutorial-done', 'gag', 'correct'],
     },
     // A player picked on the start screen (human, 2026-10-24): the theme
     // screen comes up and he greets the kid. He is not drawn there yet, so
@@ -741,6 +783,10 @@ export function snapshot(state) {
         // the TV has tuned in to this word's picture (BACKLOG B-214)
         tuned: onWord && !!state.tuned,
         streak: onWord ? streakOf(results, round.index) : 0,
+        // the first word's tutorial (coach.js): whether this word has it,
+        // and its step now ('drag', 'press' or null)
+        tutorial: onWord && !!state.tutorial,
+        tutor: onWord ? coachStep(state) : null,
         stars: screen === 'round-end' ? starsFor(results.filter((r) => r && r.correct).length, round.size) : null,
     };
 }
@@ -759,12 +805,19 @@ export function momentsFor(prev, now) {
         return [now.stars >= 2 ? 'roundEndGood' : 'roundEnd'];
     }
     if (!now.key) return [];
-    if (!prev.key || prev.round !== now.round) return now.tuned ? ['roundStart', 'picture'] : ['roundStart'];
-    if (prev.key !== now.key) return now.tuned ? ['picture'] : [];
-    if (now.tuned && !prev.tuned) return ['picture'];
+    // the tutorial's first word: his drag line in place of the round's
+    // wave line and the picture's look (coach.js shows the mitten)
+    const look = now.tutor === 'drag' ? 'tutorialDrag' : 'picture';
+    if (!prev.key || prev.round !== now.round) {
+        if (now.tutor === 'drag') return ['tutorialDrag'];
+        if (now.tutorial) return ['tutorialWave'];
+        return now.tuned ? ['roundStart', 'picture'] : ['roundStart'];
+    }
+    if (prev.key !== now.key) return now.tuned ? [look] : [];
+    if (now.tuned && !prev.tuned) return [look];
     if (now.status !== prev.status || now.lives < prev.lives) {
         if (now.status === 'revealed') return ['thirdMiss'];
-        if (now.status === 'correct') return [now.streak === STREAK ? 'streak' : 'correct'];
+        if (now.status === 'correct') return [now.tutorial ? 'tutorialDone' : now.streak === STREAK ? 'streak' : 'correct'];
         if (now.status === 'wrong') {
             const miss = now.lives === 1 ? 'wrongPeek' : 'wrong';
             // the miss that leaves one bulb also gave his letter (B-206)
@@ -785,7 +838,10 @@ export function momentsFor(prev, now) {
         if (prev.idleBeat === 'sunk') return ['wake'];
     }
     if (now.placed !== prev.placed) {
-        if (now.filled && now.status === 'playing') return [now.round <= EARLY_ROUNDS ? 'filledEarly' : 'filled'];
+        if (now.filled && now.status === 'playing') {
+            if (now.tutor === 'press') return ['tutorialPress'];
+            return [now.round <= EARLY_ROUNDS ? 'filledEarly' : 'filled'];
+        }
         return [blockEntered(prev.placed, now.placed) ? 'blockPlaced' : 'blockReturned'];
     }
     return [];
@@ -917,7 +973,7 @@ export function nudgeWait(state) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, tuned: false, streak: 0, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null };
 
 // --- Render ---
 

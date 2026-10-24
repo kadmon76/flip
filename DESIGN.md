@@ -29,6 +29,8 @@ Exception (BACKLOG B-218): the gear counter on the play screen's console, on the
 
 Exception (BACKLOG B-219): the boost tray (a small brass plate over the bench, just above the console, its notch pointing at the gear counter, which is the boost button; one cream key per boost that applies, its icon drawn in code, inline SVG, and its cost as small cogs; the amber glow round the slots "Remember this one" offers; a clear scrim under them) is a new scene object drawn in code until the Claude Design pass replaces it.
 
+Tutorial (human, 2026-10-24): on a player's first word a ghost mitten shows what to do, with no words: the robot's own pointing mitten (`ui/robot/hand-point.png`, a puppet part, not a new object) carries a letter from the bench to the first empty slot on a loop, and once every slot is full taps the check dome. It never takes taps; it goes as the kid does the step. Under reduced motion it stays still at the slot or the dome (at the slot, fading in and out).
+
 ## Assets (`static/images/ui/`)
 | File | What | Shown at (CSS px, 360 wide) |
 |---|---|---|
