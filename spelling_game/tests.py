@@ -9717,7 +9717,8 @@ class MomentLinesTests(TestCase):
              'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
              'boost-first', 'boost-clean', 'peek']
     # BACKLOG B-224: the pools not wired here (each a "Later / not now" line)
-    UNWIRED = ['greet', 'murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow']
+    UNWIRED = ['greet', 'murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow',
+               'tutorial-drag', 'tutorial-press', 'tutorial-done', 'key', 'theme-open']
 
     def setUp(self):
         if shutil.which('node') is None:
