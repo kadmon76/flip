@@ -1,8 +1,8 @@
 {
- "version": 8,
- "date": "2026-10-22",
+ "version": 9,
+ "date": "2026-10-24",
  "doc": "claude/flip-robot-lines.md",
- "notes": "Text master for the robot's word lines: the gag line after a correct answer, and the broken-Hebrew guess on a new picture. Kept in its own file instead of gag_line / he_line in claude/flip-word-list.json, so the picture batch and the voice work never overwrite each other's edits. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags; they describe sounds and delivery, never actions (actions live in the poses). pose = hand poses in order; recipe = tone recipe 1-6 in the doc; win = the picture's win move from the word list, which the gag line plays with. Writing rules from the human's review (2026-10-19, round 2): every gag says the word, clearly, best at the start; very simple English a beginner of 9-10 knows, about 10 spoken words or fewer; the fun is silly, childish and ridiculous, carried by sounds and acting (animal noises, squeaky voices, crashes, sneezes, dizzy spins) rather than wordplay or clever English. Robot moments (v4, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on the target word or a Hebrew word; pauses use [short pause] / [pause]. A Hebrew guess plays on a new picture (in place of a shared picture line, about 1 in 6 times the word comes up): mangled Hebrew, a silly beat, then the English word, a bridge from Hebrew to English. status: approved = words seen and approved by the human (only tags changed in v4); draft = new, to review. Animals and Transport approved 2026-10-19 (round 2); Food drafted 2026-10-19; Home drafted 2026-10-21. Still missing (2026-10-21): the 19 new animal words and the 21 new transport words of the 130-word list (the approved animals and transport lines cover the 26 old words only). Approvals now live only on the Robot Line Review page (https://claude.ai/artifact/5fmw8W8FCej3MgeMkAtwmu, one tab per theme plus Robot lines): a line is done when he marked Keep there or it was approved earlier; Change or Drop sends it back to Claude. 2026-10-22: he kept every Food and Home line on the page (including the 12 earlier 'revised'/'draft' ones), so all 64 Food and Home words are approved. he_status = the Hebrew guess's own status where it differs.",
+ "notes": "Text master for the robot's word lines: the gag line after a correct answer, and the broken-Hebrew guess on a new picture. Kept in its own file instead of gag_line / he_line in claude/flip-word-list.json, so the picture batch and the voice work never overwrite each other's edits. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags; they describe sounds and delivery, never actions (actions live in the poses). pose = hand poses in order; recipe = tone recipe 1-6 in the doc; win = the picture's win move from the word list, which the gag line plays with. Writing rules from the human's review (2026-10-19, round 2): every gag says the word, clearly, best at the start; very simple English a beginner of 9-10 knows, about 10 spoken words or fewer; the fun is silly, childish and ridiculous, carried by sounds and acting (animal noises, squeaky voices, crashes, sneezes, dizzy spins) rather than wordplay or clever English. Robot moments (v4, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on the target word or a Hebrew word; pauses use [short pause] / [pause]. A Hebrew guess plays on a new picture (in place of a shared picture line, about 1 in 6 times the word comes up): mangled Hebrew, a silly beat, then the English word, a bridge from Hebrew to English. status: approved = words seen and approved by the human (only tags changed in v4); draft = new, to review. Animals and Transport approved 2026-10-19 (round 2); Food drafted 2026-10-19; Home drafted 2026-10-21. Approvals now live only on the Robot Line Review page (https://claude.ai/artifact/5fmw8W8FCej3MgeMkAtwmu, one tab per theme plus Robot lines): a line is done when he marked Keep there or it was approved earlier; Change or Drop sends it back to Claude. 2026-10-22: he kept every Food and Home line on the page (including the 12 earlier 'revised'/'draft' ones), so all 64 Food and Home words are approved. he_status = the Hebrew guess's own status where it differs. 2026-10-24: lines drafted for the 19 new animal and 21 new transport words (all 130 words now have a gag line), plus 4 new Hebrew guesses (hen, elephant, bag, map); helicopter and motorbike rewritten from his notes.",
  "words": {
   "cat": {
    "theme": "animals",
@@ -31,6 +31,84 @@
    ],
    "status": "approved"
   },
+  "pig": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "hop-spin",
+   "gag": "Pig! [pig snorting] [short pause] [robotic snort, electronic glitch] Oink? …I'm learning pig.",
+   "gag_pose": [
+    "point",
+    "giggle"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "hen": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a hen. [loud startled clucking] [short pause] [whispers] She saw me. [shy robotic beep]",
+   "gag_pose": [
+    "point",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24",
+   "he": "Tar-ne-go… tar-ne-gol… [tongue twisted, electronic glitches] [short pause] Hen! Much shorter.",
+   "he_pose": [
+    "chin",
+    "pump"
+   ],
+   "he_status": "draft"
+  },
+  "fox": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "This is a fox. [whispers] He is sneaking… [tiptoe steps] [whispers] Me too… [loud metal clank] …Not anymore.",
+   "gag_pose": [
+    "chin",
+    "shock"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "bat": {
+   "theme": "animals",
+   "recipe": 3,
+   "win": "cheer",
+   "gag": "[deadpan] A bat. [pause] It's just like a cat… [short pause] but different. [robotic beep]",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "approved",
+   "by": "his own gag line"
+  },
+  "ant": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Ant! [tiny marching steps] Hup, two! Hup, two! [short pause] Me too! [clanking metal steps]",
+   "gag_pose": [
+    "pump",
+    "pump2"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "bug": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "zoom",
+   "gag": "This is a bug. [tiny buzzing] Fly, bug, fly! [buzzing stops, electronic glitch] …Maybe tomorrow.",
+   "gag_pose": [
+    "point",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
   "frog": {
    "theme": "animals",
    "recipe": 4,
@@ -50,6 +128,30 @@
    ],
    "status": "approved",
    "by": "his own gag lines"
+  },
+  "crab": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "drive",
+   "gag": "This is a crab. [scuttling sideways] [short pause] [confused robotic beep] Hey, crab! Forward is that way!",
+   "gag_pose": [
+    "point",
+    "pointUp"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "panda": {
+   "theme": "animals",
+   "recipe": 3,
+   "win": "wobble-flop",
+   "gag": "This is a panda. [munching] Munch, munch, munch… [long pause, slow computer bleeps] …still munching.",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
   },
   "fish": {
    "theme": "animals",
@@ -72,6 +174,42 @@
     "pump2"
    ],
    "status": "approved"
+  },
+  "sheep": {
+   "theme": "animals",
+   "recipe": 3,
+   "win": "hop-spin",
+   "gag": "This is a sheep. [short pause] Or a cloud with legs. [confused robotic beep]",
+   "gag_pose": [
+    "chin",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "shark": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "splash",
+   "gag": "Shark! [nervous robotic beeping] [short pause] Oh… he's smiling. [relieved sigh] Hello, shark!",
+   "gag_pose": [
+    "shock",
+    "wave"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "zebra": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "hop-spin",
+   "gag": "This is a zebra. [short pause] Black, white, black, white… [dizzy, electronic glitch] Too many stripes!",
+   "gag_pose": [
+    "point",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
   },
   "bird": {
    "theme": "animals",
@@ -99,6 +237,18 @@
     "giggle"
    ],
    "status": "approved"
+  },
+  "snake": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "This is a snake. Sssss… [robotic hissing, steam] Sssss! [whispers] We are friends now.",
+   "gag_pose": [
+    "chin",
+    "giggle"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
   },
   "horse": {
    "theme": "animals",
@@ -171,17 +321,107 @@
    ],
    "status": "approved"
   },
-  "bat": {
+  "giraffe": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "bungee",
+   "gag": "This is a giraffe. [short pause] Hello up there! [long pause] [sad robotic beep] He can't hear me.",
+   "gag_pose": [
+    "pointUp",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "dolphin": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "splash",
+   "gag": "Dolphin! [splash] [applause] Thank you, thank you… [electronic glitch] Oh. That was for the dolphin.",
+   "gag_pose": [
+    "wave",
+    "scratch"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "penguin": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "wobble-flop",
+   "gag": "This is a penguin. [squeaky robotic steps] He walks just like me! [proud robotic beep]",
+   "gag_pose": [
+    "point",
+    "pump"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "kangaroo": {
+   "theme": "animals",
+   "recipe": 1,
+   "win": "hop-spin",
+   "gag": "Kangaroo! [boing, boing] And a baby in the pocket! [happy robotic beeping] [whispers] I want a pocket.",
+   "gag_pose": [
+    "gasp",
+    "pump"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "elephant": {
    "theme": "animals",
    "recipe": 3,
    "win": "cheer",
-   "gag": "[deadpan] A bat. [pause] It's just like a cat… [short pause] but different. [robotic beep]",
+   "gag": "This is an elephant. [loud trumpeting] [short pause] [whispers] Bless you. [robotic beep]",
+   "gag_pose": [
+    "shock",
+    "chin"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24",
+   "he": "PEEL! [short pause] Peel? Banana peel? [confused robotic beep] No, no… elephant!",
+   "he_pose": [
+    "gasp",
+    "shrug"
+   ],
+   "he_status": "draft"
+  },
+  "octopus": {
+   "theme": "animals",
+   "recipe": 6,
+   "win": "pop",
+   "gag": "Octopus! One, two, three… [slow computer bleeps] [electronic glitch] …a lot of arms!",
+   "gag_pose": [
+    "point",
+    "scratch"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "butterfly": {
+   "theme": "animals",
+   "recipe": 3,
+   "win": "zoom",
+   "gag": "This is a butterfly. [short pause] Butter… fly? [confused robotic beep] I don't see butter.",
    "gag_pose": [
     "chin",
     "shrug"
    ],
-   "status": "approved",
-   "by": "his own gag line"
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "crocodile": {
+   "theme": "animals",
+   "recipe": 5,
+   "win": "wobble-flop",
+   "gag": "This is a crocodile. [short pause] What a big smile! [teeth chomp] [nervous robotic beep] I'll smile from here.",
+   "gag_pose": [
+    "point",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
   },
   "bus": {
    "theme": "transportation",
@@ -199,6 +439,138 @@
    ],
    "status": "approved"
   },
+  "jet": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "zoom",
+   "gag": "Jet! [jet whooshing] Zoom! [short pause] [dizzy, electronic glitch] I'm dizzy… and I didn't even go.",
+   "gag_pose": [
+    "pointUp",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "map": {
+   "theme": "transportation",
+   "recipe": 3,
+   "win": "pop",
+   "gag": "This is a map. [paper rustling] Here… and here… and here… [slow computer bleeps] …We are lost.",
+   "gag_pose": [
+    "point",
+    "scratch"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24",
+   "he": "MA-pa! [short pause] Ma-ma? Pa-pa? [confused robotic beep] …No, no. Map!",
+   "he_pose": [
+    "chin",
+    "shrug"
+   ],
+   "he_status": "draft"
+  },
+  "bag": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a bag. [zipper straining] One more thing… [loud pop] [short pause] [deadpan] Too much.",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24",
+   "he": "Teek! [clock ticking] Teek… tok… teek… tok… [electronic glitch] No! Not a clock. Bag!",
+   "he_pose": [
+    "chin",
+    "pointUp"
+   ],
+   "he_status": "draft"
+  },
+  "van": {
+   "theme": "transportation",
+   "recipe": 5,
+   "win": "drive",
+   "gag": "This is a van! [tyres screeching] [short pause] [shaky voice, electronic glitch] Slow down, van! Slow down!",
+   "gag_pose": [
+    "shock",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "tank": {
+   "theme": "transportation",
+   "recipe": 3,
+   "win": "drive",
+   "gag": "This is a tank. [heavy rumbling] Very big… [robotic whirring] very slow… [long pause] …still coming.",
+   "gag_pose": [
+    "point",
+    "chin"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "tent": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "wobble-flop",
+   "gag": "This is a tent. I made it myself! [creaking, tent falling down] [short pause] [muffled] …I'm inside now.",
+   "gag_pose": [
+    "pump",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "sled": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "zoom",
+   "gag": "Sled! [whoosh] Wheeee! [short pause] [shivering, metal chattering] C-c-cold… my bolts are c-cold…",
+   "gag_pose": [
+    "pump2",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "raft": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "splash",
+   "gag": "This is a raft. Logs, rope… and me! [splash, electronic glitch] …Logs and rope.",
+   "gag_pose": [
+    "pump",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "tram": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "drive",
+   "gag": "This is a tram. [ding ding] [electric sparks crackling] [happy robotic beeping] It eats electricity! Like me!",
+   "gag_pose": [
+    "point",
+    "pump"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "jeep": {
+   "theme": "transportation",
+   "recipe": 6,
+   "win": "drive",
+   "gag": "Jeep! [engine revving] Jump! [boing, metal clang] [short pause] Ow… I hit the roof! [short pause] There is no roof.",
+   "gag_pose": [
+    "pump2",
+    "scratch"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
   "car": {
    "theme": "transportation",
    "recipe": 1,
@@ -210,6 +582,18 @@
    ],
    "status": "approved"
   },
+  "ship": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "splash",
+   "gag": "This is a ship. [deep ship horn] [short pause] [small squeaky robot honk] …He's bigger.",
+   "gag_pose": [
+    "point",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
   "truck": {
    "theme": "transportation",
    "recipe": 6,
@@ -220,6 +604,18 @@
     "shrug"
    ],
    "status": "approved"
+  },
+  "wheel": {
+   "theme": "transportation",
+   "recipe": 5,
+   "win": "drive",
+   "gag": "This is a wheel. [rolling away] Hey! Come back! [alarm beeping] [sighs] Now the car has three.",
+   "gag_pose": [
+    "point",
+    "wave"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
   },
   "taxi": {
    "theme": "transportation",
@@ -244,6 +640,18 @@
    ],
    "status": "approved"
   },
+  "road": {
+   "theme": "transportation",
+   "recipe": 3,
+   "win": "zoom",
+   "gag": "This is a road. Left… right… left… right… [dizzy, electronic glitch] Who made this road?",
+   "gag_pose": [
+    "point",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
   "plane": {
    "theme": "transportation",
    "recipe": 6,
@@ -266,11 +674,71 @@
    ],
    "status": "approved"
   },
+  "rocket": {
+   "theme": "transportation",
+   "recipe": 2,
+   "win": "zoom",
+   "gag": "Rocket! Three… two… [slow computer bleeps] …what comes after two? [electronic glitch] One! [rocket blasting off]",
+   "gag_pose": [
+    "pointUp",
+    "pump2"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "kayak": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "splash",
+   "gag": "This is a kayak. [paddle splashing] Paddle, paddle… [confused robotic beep] Why am I going around?",
+   "gag_pose": [
+    "pump",
+    "scratch"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "helmet": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a helmet. I don't need one… [boing, metal clang] [dizzy] I need one.",
+   "gag_pose": [
+    "shrug",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "tunnel": {
+   "theme": "transportation",
+   "recipe": 5,
+   "win": "pop",
+   "gag": "This is a tunnel. Hello… [echo] hello… hello… [short pause] [whispers] Somebody is in there!",
+   "gag_pose": [
+    "wave",
+    "gasp"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "bridge": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "pop",
+   "gag": "This is a bridge. [short pause] Over the water… [big splash, sputtering electronic glitch] …not over me.",
+   "gag_pose": [
+    "point",
+    "shock"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
   "helicopter": {
    "theme": "transportation",
    "recipe": 6,
    "win": "zoom",
-   "gag": "Helicopter! Whirr whirr whirr… [dizzy, robotic whirring down] Whooa… I see two helicopters!",
+   "gag": "This is a helicopter. [short pause] Just like a car… [rotor whirring, electronic glitch] but totally different.",
    "gag_pose": [
     "pointUp",
     "shrug"
@@ -280,7 +748,9 @@
     "pump2",
     "pointUp"
    ],
-   "status": "approved"
+   "status": "revised",
+   "old_gag": "Helicopter! Whirr whirr whirr… [dizzy, robotic whirring down] Whooa… I see two helicopters!",
+   "by": "his idea (review 2026-10-24); tags by Claude"
   },
   "scooter": {
    "theme": "transportation",
@@ -292,6 +762,42 @@
     "pump2"
    ],
    "status": "approved"
+  },
+  "ambulance": {
+   "theme": "transportation",
+   "recipe": 3,
+   "win": "drive",
+   "gag": "Ambulance! [siren wailing] Wee-woo! Wee-woo! [short pause] [robotic beep] Robots go to the garage.",
+   "gag_pose": [
+    "pointUp",
+    "shrug"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "tractor": {
+   "theme": "transportation",
+   "recipe": 1,
+   "win": "drive",
+   "gag": "This is a tractor. Putt-putt-putt… [loud bang] [coughing, electronic glitch] Too much smoke!",
+   "gag_pose": [
+    "point",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
+  },
+  "caravan": {
+   "theme": "transportation",
+   "recipe": 3,
+   "win": "drive",
+   "gag": "This is a caravan. A house… on wheels! [rattling, dishes crashing] [whispers] Oops.",
+   "gag_pose": [
+    "point",
+    "cover"
+   ],
+   "status": "draft",
+   "by": "Claude 2026-10-24"
   },
   "bicycle": {
    "theme": "transportation",
@@ -313,12 +819,14 @@
    "theme": "transportation",
    "recipe": 1,
    "win": "drive",
-   "gag": "Motorbike! VROOM VROOM! [short pause] [alarm beeping] Too loud! Too loud!",
+   "gag": "Motorbike! VROOM VROOM! [wind rushing] [short pause] [sighs] I wish I had hair… to feel the wind in my hair. [sad robotic beep]",
    "gag_pose": [
     "pump2",
     "cover"
    ],
-   "status": "approved"
+   "status": "revised",
+   "old_gag": "Motorbike! VROOM VROOM! [short pause] [alarm beeping] Too loud! Too loud!",
+   "by": "his idea (review 2026-10-24); tags by Claude"
   },
   "submarine": {
    "theme": "transportation",
@@ -330,38 +838,6 @@
     "shock"
    ],
    "status": "approved"
-  },
-  "milk": {
-   "theme": "food",
-   "recipe": 6,
-   "win": "splash",
-   "gag": "This is milk. [short pause] Just like water… [electronic glitch] but different.",
-   "gag_pose": [
-    "pump",
-    "shock"
-   ],
-   "status": "approved",
-   "old_gag": "[happily] Milk! [slurps] Mmm… [glitching voice] Ro-bots… should… not… drink… milk.",
-   "by": "his idea (review 2026-10-21); tags by Claude"
-  },
-  "chair": {
-   "theme": "home",
-   "recipe": 1,
-   "win": "wobble-flop",
-   "gag": "This is a chair. I'll just sit here… [electric zap, buzzing] [short pause] [shaky voice] That's a weird chair…",
-   "gag_pose": [
-    "shock",
-    "shrug"
-   ],
-   "he": "Shul-KHAN? …No. Kee-SEH! [electronic glitch] [whispers] I knew that.",
-   "he_pose": [
-    "chin"
-   ],
-   "status": "approved",
-   "old_gag": "[happy sigh] Ahh, a chair. Time to sit… [wobbling] whoa… whoa… WHOA! [metal crash] …The floor is nice too.",
-   "by": "his idea (review 2026-10-21); tags by Claude",
-   "note": "The new gag is an electric zap; the picture's win move (wobble-flop for the wobbly leg) may want a small zap instead.",
-   "he_status": "approved"
   },
   "jam": {
    "theme": "food",
@@ -449,6 +925,19 @@
    ],
    "status": "approved",
    "he_status": "approved"
+  },
+  "milk": {
+   "theme": "food",
+   "recipe": 6,
+   "win": "splash",
+   "gag": "This is milk. [short pause] Just like water… [electronic glitch] but different.",
+   "gag_pose": [
+    "pump",
+    "shock"
+   ],
+   "status": "approved",
+   "old_gag": "[happily] Milk! [slurps] Mmm… [glitching voice] Ro-bots… should… not… drink… milk.",
+   "by": "his idea (review 2026-10-21); tags by Claude"
   },
   "mint": {
    "theme": "food",
@@ -1007,6 +1496,25 @@
    "status": "approved",
    "old_gag": "Plate! [deadpan] A plate. Very round. [robotic beep] [short pause] No food. Very sad.",
    "by": "his idea (review 2026-10-21); tags by Claude"
+  },
+  "chair": {
+   "theme": "home",
+   "recipe": 1,
+   "win": "wobble-flop",
+   "gag": "This is a chair. I'll just sit here… [electric zap, buzzing] [short pause] [shaky voice] That's a weird chair…",
+   "gag_pose": [
+    "shock",
+    "shrug"
+   ],
+   "he": "Shul-KHAN? …No. Kee-SEH! [electronic glitch] [whispers] I knew that.",
+   "he_pose": [
+    "chin"
+   ],
+   "status": "approved",
+   "old_gag": "[happy sigh] Ahh, a chair. Time to sit… [wobbling] whoa… whoa… WHOA! [metal crash] …The floor is nice too.",
+   "by": "his idea (review 2026-10-21); tags by Claude",
+   "note": "The new gag is an electric zap; the picture's win move (wobble-flop for the wobbly leg) may want a small zap instead.",
+   "he_status": "approved"
   },
   "stove": {
    "theme": "home",

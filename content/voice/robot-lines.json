@@ -1,8 +1,8 @@
 {
- "version": 3,
- "date": "2026-10-22",
+ "version": 4,
+ "date": "2026-10-24",
  "doc": "claude/flip-robot-lines.md",
- "notes": "Text master for the shared robot lines. The voice script reads it. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags. They describe sounds and delivery, never actions; actions live in pose (hand poses in order). Robot moments (v2, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on a target word, a letter name or a Hebrew word. Pauses use [short pause] / [pause] / [long pause]. recipe = tone recipe 1-6 in the doc. status: approved = words seen and approved on 2026-10-19 (only tags changed in v2); draft = new, to review. From 2026-10-22 the review happens only on the Robot Line Review page (Robot lines tab); this file is synced from it.",
+ "notes": "Text master for the shared robot lines. The voice script reads it. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags. They describe sounds and delivery, never actions; actions live in pose (hand poses in order). Robot moments (v2, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on a target word, a letter name or a Hebrew word. Pauses use [short pause] / [pause] / [long pause]. recipe = tone recipe 1-6 in the doc. status: approved = words seen and approved on 2026-10-19 (only tags changed in v2); draft = new, to review. From 2026-10-22 the review happens only on the Robot Line Review page (Robot lines tab); this file is synced from it. 2026-10-24: his first review on the page applied (kept lines approved; 9 rewritten from his notes; reveal-open-02 dropped and redrafted).",
  "letters": {
   "a": "Eigh",
   "b": "Bee",
@@ -53,7 +53,7 @@
       "wave"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "greet-03",
@@ -62,7 +62,7 @@
       "point"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -87,7 +87,7 @@
       "pump2"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "start-03",
@@ -96,7 +96,7 @@
       "clap"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -131,12 +131,14 @@
    "lines": [
     {
      "id": "picture-giggle-01",
-     "text": "[robot giggles, high buzzing sounds] Hee hee… I know this one. [short pause] I know it so much.",
+     "text": "[robot giggles, high buzzing sounds] Hee hee… I know this one… [short pause] [confused robotic beep] How do you spell it?",
      "pose": [
       "giggle"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[robot giggles, high buzzing sounds] Hee hee… I know this one. [short pause] I know it so much.",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     },
     {
      "id": "picture-giggle-02",
@@ -145,7 +147,7 @@
       "giggle"
      ],
      "recipe": 5,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -160,7 +162,7 @@
       "shock"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "picture-shock-02",
@@ -169,7 +171,7 @@
       "shock"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -179,12 +181,14 @@
    "lines": [
     {
      "id": "murmur-01",
-     "text": "[thoughtful] Hmm… yes… [robotic whirring] I see… [whispers] I see nothing.",
+     "text": "[thoughtful] Hmm… yes… [robotic whirring] I see… [short pause] I see…",
      "pose": [
       "chin"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[thoughtful] Hmm… yes… [robotic whirring] I see… [whispers] I see nothing.",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     },
     {
      "id": "murmur-02",
@@ -193,7 +197,7 @@
       "chin"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "murmur-03",
@@ -202,7 +206,7 @@
       "chin"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -227,7 +231,7 @@
       "rest"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "idle-03",
@@ -236,7 +240,7 @@
       "chin"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -246,24 +250,26 @@
    "lines": [
     {
      "id": "peek-01",
-     "text": "[whispers] Psst… [tiny robotic beep] is it safe?",
+     "text": "[whispers] Psst… [tiny robotic beep] you there?",
      "pose": [],
      "recipe": 1,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[whispers] Psst… [tiny robotic beep] is it safe?",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     },
     {
      "id": "peek-02",
      "text": "[whispers] I am not here. [quiet electronic glitch] You can't see me.",
      "pose": [],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "peek-03",
      "text": "[whispers] Peek-a-boo! [robot giggles, high buzzing sounds]",
      "pose": [],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -278,7 +284,7 @@
       "gasp"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "wake-02",
@@ -287,7 +293,7 @@
       "wave"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -311,7 +317,7 @@
       "point"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "press-03",
@@ -320,7 +326,7 @@
       "point"
      ],
      "recipe": 5,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -335,7 +341,7 @@
       "scratch"
      ],
      "recipe": null,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "mumble-02",
@@ -344,25 +350,29 @@
       "shrug"
      ],
      "recipe": null,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "mumble-03",
-     "text": "[long thinking noise] Uhhhhh… [little beep]",
+     "text": "[long thinking noise] Uhhhh… [little beep] you missed a spot…",
      "pose": [
       "chin"
      ],
      "recipe": null,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[long thinking noise] Uhhhhh… [little beep]",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     },
     {
      "id": "mumble-04",
-     "text": "[worried] Uh-oh… [robotic whirring down]",
+     "text": "[thinking] Emmm… [robotic whirring] [curious] didn't you forget something?",
      "pose": [
       "cover"
      ],
      "recipe": null,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[worried] Uh-oh… [robotic whirring down]",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     }
    ]
   },
@@ -395,26 +405,30 @@
       "scratch"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "wrong-04",
-     "text": "[proudly] I remember! It's— [robotic malfunctioning sounds] [disappointed] …No. I remembered spaghetti again.",
+     "text": "[proudly] Hmm… that would be correct… [electronic glitch] if it was a different word!",
      "pose": [
       "pointUp",
       "shrug"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[proudly] I remember! It's— [robotic malfunctioning sounds] [disappointed] …No. I remembered spaghetti again.",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     },
     {
      "id": "wrong-05",
-     "text": "[whispers] Let's try again. [soft robotic beep] [whispers] But quietly, so my memory doesn't hear.",
+     "text": "[whispers] Let's try again. [soft robotic beep] [whispers] And pretend that this didn't happen.",
      "pose": [
       "shrug"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[whispers] Let's try again. [soft robotic beep] [whispers] But quietly, so my memory doesn't hear.",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     }
    ]
   },
@@ -438,7 +452,7 @@
       "pointUp"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "hint-03",
@@ -447,7 +461,7 @@
       "pointUp"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -463,16 +477,18 @@
       "pointUp"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "reveal-open-02",
-     "text": "[very dramatic] Wait! It's coming… [gears grinding] it's coming… IT CAME!",
+     "text": "Okay! Let me show you. [slow computer bleeps] Loading… loading… [ding] Here it is!",
      "pose": [
       "pump"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "draft",
+     "dropped_text": "[very dramatic] Wait! It's coming… [gears grinding] it's coming… IT CAME!",
+     "by": "Claude 2026-10-24, old line dropped in review"
     },
     {
      "id": "reveal-open-03",
@@ -481,7 +497,7 @@
       "scratch"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -496,16 +512,18 @@
       "clap"
      ],
      "recipe": null,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "reveal-close-02",
-     "text": "[cheerful] I'll write it on my hand! [short pause] [robotic whirring down] …I have mittens.",
+     "text": "[surprised] Ooooh! [robotic whirring] Now I see!",
      "pose": [
       "shrug"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[cheerful] I'll write it on my hand! [short pause] [robotic whirring down] …I have mittens.",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     }
    ]
   },
@@ -548,16 +566,18 @@
       "clap"
      ],
      "recipe": null,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "correct-05",
-     "text": "[cheers] Yes! [robot chuckles, high buzzing sounds] Eyebrows, dance!",
+     "text": "[cheers] Yes! [robot chuckles, high buzzing sounds] Now I do the win dance… [clanking, happy robotic whirring] [short pause] [proudly] Done!",
      "pose": [
       "pump2"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "revised",
+     "old_text": "[cheers] Yes! [robot chuckles, high buzzing sounds] Eyebrows, dance!",
+     "by": "his idea (review 2026-10-24); tags by Claude"
     }
    ]
   },
@@ -581,7 +601,7 @@
       "pump2"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "streak-03",
@@ -590,7 +610,7 @@
       "pump2"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -615,7 +635,7 @@
       "clap"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "end-low-03",
@@ -624,7 +644,7 @@
       "wave"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -639,7 +659,7 @@
       "clap"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "end-mid-02",
@@ -648,7 +668,7 @@
       "pump"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "end-mid-03",
@@ -657,7 +677,7 @@
       "clap"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -672,7 +692,7 @@
       "pump2"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "end-high-02",
@@ -681,7 +701,7 @@
       "pump2"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "end-high-03",
@@ -690,7 +710,7 @@
       "point"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -705,7 +725,7 @@
       "point"
      ],
      "recipe": 3,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "sticker-02",
@@ -714,7 +734,7 @@
       "clap"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "sticker-03",
@@ -723,7 +743,7 @@
       "point"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -738,7 +758,7 @@
       "pump2"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "stage-02",
@@ -747,7 +767,7 @@
       "pump"
      ],
      "recipe": 2,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "stage-03",
@@ -756,7 +776,7 @@
       "wave"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -771,7 +791,7 @@
       "pump"
      ],
      "recipe": 5,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "gear-02",
@@ -780,7 +800,7 @@
       "pump2"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -796,7 +816,7 @@
       "pointUp"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -811,7 +831,7 @@
       "chin"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -826,7 +846,7 @@
       "wave"
      ],
      "recipe": 5,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -841,7 +861,7 @@
       "rest"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -856,7 +876,7 @@
       "shrug"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "no-gears-02",
@@ -865,7 +885,7 @@
       "shrug"
      ],
      "recipe": 6,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   }
