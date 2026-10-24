@@ -9450,10 +9450,14 @@ class CorrectWordVoiceTests(TestCase):
                                ['words/animals/cat.mp3', 'correct/bingo.mp3'], []])
 
     def test_the_real_manifest_today(self):
-        # static/voice/manifest.json as it is: the 130 words and 26
-        # letters, no gag and no shared line yet, so a correct check says
-        # the word, then the prototype correct clip, as before B-223
-        manifest = json.loads(self.MANIFEST.read_text())
+        # static/voice/manifest.json's words and letters only (the first
+        # batch, #82): the 130 words and 26 letters, no gag and no shared
+        # line, so a correct check says the word, then the prototype
+        # correct clip, as before B-223. Later batches add gags and shared
+        # lines to the real manifest; they are left out here so this case
+        # stays tested.
+        real = json.loads(self.MANIFEST.read_text())
+        manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
         res = self.run_node(
             f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound); Math.random = () => 0.99;"
             "const listed = a.listedClips(MAN);"
@@ -9962,11 +9966,14 @@ class MomentLinesTests(TestCase):
         self.assertEqual(res, expect)
 
     def test_with_no_clip_in_the_pool_the_prototype_sound_or_nothing(self):
-        # static/voice/manifest.json as it is today: no shared line yet, so
-        # every moment plays what it played before B-224 (nothing where it
-        # had nothing; the tada now as an effect); only the letter names
-        # are new
-        manifest = json.loads(self.MANIFEST.read_text())
+        # static/voice/manifest.json's words and letters only (the first
+        # batch, #82): no shared line, so every moment plays what it played
+        # before B-224 (nothing where it had nothing; the tada now as an
+        # effect); only the letter names are new. Later batches add shared
+        # lines to the real manifest; they are left out here so this case
+        # stays tested.
+        real = json.loads(self.MANIFEST.read_text())
+        manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
         res = self.run_node(
             f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound);"
             "Math.random = () => 0; const res = {};"
