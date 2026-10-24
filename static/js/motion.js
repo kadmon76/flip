@@ -50,6 +50,14 @@
 // - `trayIn`: the boost tray (BACKLOG B-219) opens: it rises `distance` px
 //   and grows from `scale` to full size as it fades in, from its notch,
 //   within `duration`. Reduced motion: a fade in.
+// - `keyPop`: on the round-end screen, the theme key a round earned
+//   (human, 2026-10-24, celebrate.js) pops in after the stars and the
+//   stage bulb: it scales up from 0 with the overshoot and turns from
+//   `turn` degrees, within `duration`. Reduced motion: a fade in.
+// - `unlock`: a key opens a theme (celebrate.js): the card's padlock
+//   rises `height` px, swells to `scale` and turns `turn` degrees as it
+//   fades out, within `duration`, while the picture brightens. Reduced
+//   motion: the padlock only fades out.
 export const MOTION = {
     pickup: { duration: 0.12, ease: 'power2.out', scale: 1.08 },
     snap: { duration: 0.2, ease: 'back.out(1.4)', scale: 1 },
@@ -69,6 +77,8 @@ export const MOTION = {
     gearFlip: { duration: 0.12, ease: 'power2.out', scale: 1 },
     puff: { duration: 0.3, ease: 'power2.out', scale: 1.3, count: 6, distance: 30, fade: 0.2 },
     trayIn: { duration: 0.15, ease: 'power2.out', scale: 0.9, distance: 6, fade: 0.15 },
+    keyPop: { duration: 0.4, ease: 'back.out(1.6)', scale: 1, turn: -40, fade: 0.2 },
+    unlock: { duration: 0.5, ease: 'power2.in', scale: 1.3, turn: -25, height: 18, fade: 0.25 },
 };
 
 // Spec for one motion. With `reduced` (prefers-reduced-motion) every

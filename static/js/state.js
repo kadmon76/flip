@@ -41,6 +41,12 @@ export const state = {
     // stored count. A boost (BACKLOG B-219) sets it to gears.js spend()'s
     // return when it happens.
     gears: 0,
+    // The player's theme keys as keys.js load() reads them ({ opened,
+    // bonus, dry }; human, 2026-10-24): main.js sets it at start-up, when
+    // a player starts (startAs), when a key opens a theme (onTheme) and
+    // after each round's record. Which themes are locked and how many keys
+    // are held are keys.js keysView of it and state.progress.
+    keys: { opened: [], bonus: 0, dry: 0 },
     // The data file of the round's theme ({ "cat": { image, audio, stage,
     // break }, ... }), set by startRound with the round and kept to its
     // round-end screen (the round's stage's words, progress.js afterRound;
@@ -68,7 +74,10 @@ export const state = {
     // end (main.js onNext, progress.js record; BACKLOG B-216): the theme's
     // cleared stages after the round, and whether this round cleared its
     // stage (the round-end's stage bulbs; celebrate.js pops that bulb).
-    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false },
+    // keyEarned (keys.js record, at the round end): the round brought a
+    // theme key the kid can use now (locks.js shows it, celebrate.js pops
+    // it, the robot says his key line).
+    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },
     // A round is being set up: true from a tap that starts one (a station
     // on the stage map, play again) until main.js startRound has the theme's data file
     // and shows the round, or finds the kid has left the screen the tap came
