@@ -18,9 +18,24 @@
    "text": "Bird! Tweet tweet! [short pause] [very loud, off-key, electronic squeal] TWEEEEET! [short pause] Oops. Too loud.",
    "made": "2026-10-24"
   },
+  "gags/animals/butterfly.mp3": {
+   "id": "butterfly-gag",
+   "text": "This is a butterfly. [short pause] Butter… fly? [confused robotic beep] I don't see butter.",
+   "made": "2026-10-24"
+  },
   "gags/animals/cat.mp3": {
    "id": "cat-gag",
    "text": "Cat! [purring loudly, like a motor] Prrrrrr… [motor sputtering] [giggles] Oops. That's my motor.",
+   "made": "2026-10-24"
+  },
+  "gags/animals/crab.mp3": {
+   "id": "crab-gag",
+   "text": "This is a crab. [scuttling sideways] [short pause] [confused robotic beep] Hey, crab! Forward is that way!",
+   "made": "2026-10-24"
+  },
+  "gags/animals/crocodile.mp3": {
+   "id": "crocodile-gag",
+   "text": "This is a crocodile. [short pause] What a big smile! [teeth chomp] [nervous robotic beep] I'll smile from here.",
    "made": "2026-10-24"
   },
   "gags/animals/dog.mp3": {
@@ -28,14 +43,29 @@
    "text": "Dog! Sit! [short pause] Sit! [short pause] [sighs] Okay… I sit. [rusty creak, metal clank]",
    "made": "2026-10-24"
   },
+  "gags/animals/dolphin.mp3": {
+   "id": "dolphin-gag",
+   "text": "Dolphin! [splash] [applause] Thank you, thank you… [electronic glitch] Oh. That was for the dolphin.",
+   "made": "2026-10-24"
+  },
   "gags/animals/duck.mp3": {
    "id": "duck-gag",
    "text": "Duck! [quacks badly] Quack quack! [short pause] [proudly] I speak duck! [glitchy robotic quack] QUACK!",
    "made": "2026-10-24"
   },
+  "gags/animals/elephant.mp3": {
+   "id": "elephant-gag",
+   "text": "This is an elephant. [loud trumpeting] [short pause] [whispers] Bless you. [robotic beep]",
+   "made": "2026-10-24"
+  },
   "gags/animals/fish.mp3": {
    "id": "fish-gag",
    "text": "Fish! [bubbly voice] Blub blub blub… [short pause] Look! I am a fish! [robotic beep] A robot fish.",
+   "made": "2026-10-24"
+  },
+  "gags/animals/fox.mp3": {
+   "id": "fox-gag",
+   "text": "This is a fox. [whispers] He is sneaking… [tiptoe steps] [whispers] Me too… [loud metal clank] …Not anymore.",
    "made": "2026-10-24"
   },
   "gags/animals/frog-2.mp3": {
@@ -48,9 +78,24 @@
    "text": "[tenderly] From the outside, you are a frog… [sighs] but on the inside, [electronic glitches] you are always a prince to me.",
    "made": "2026-10-24"
   },
+  "gags/animals/giraffe.mp3": {
+   "id": "giraffe-gag",
+   "text": "This is a giraffe. [short pause] Hello up there! [long pause] [sad robotic beep] He can't hear me.",
+   "made": "2026-10-24"
+  },
+  "gags/animals/hen.mp3": {
+   "id": "hen-gag",
+   "text": "This is a hen. [loud startled clucking] [short pause] [whispers] She saw me. [shy robotic beep]",
+   "made": "2026-10-24"
+  },
   "gags/animals/horse.mp3": {
    "id": "horse-gag",
    "text": "Horse! Wait for me! [galloping away] [short pause] Come back, horse! [galloping back, happy robotic beeping] Yay!",
+   "made": "2026-10-24"
+  },
+  "gags/animals/kangaroo.mp3": {
+   "id": "kangaroo-gag",
+   "text": "Kangaroo! [boing, boing] And a baby in the pocket! [happy robotic beeping] [whispers] I want a pocket.",
    "made": "2026-10-24"
   },
   "gags/animals/lion.mp3": {
@@ -63,9 +108,39 @@
    "text": "[whispers] Shh… a mouse! [loud sneeze] ATCHOO! [electronic glitches] [tiny feet running] Bye-bye, mouse!",
    "made": "2026-10-24"
   },
+  "gags/animals/octopus.mp3": {
+   "id": "octopus-gag",
+   "text": "Octopus! One, two, three… [slow computer bleeps] [electronic glitch] …a lot of arms!",
+   "made": "2026-10-24"
+  },
+  "gags/animals/penguin.mp3": {
+   "id": "penguin-gag",
+   "text": "This is a penguin. [squeaky robotic steps] He walks just like me! [proud robotic beep]",
+   "made": "2026-10-24"
+  },
+  "gags/animals/pig.mp3": {
+   "id": "pig-gag",
+   "text": "Pig! [pig snorting] [short pause] [robotic snort, electronic glitch] Oink? …I'm learning pig.",
+   "made": "2026-10-24"
+  },
   "gags/animals/rabbit.mp3": {
    "id": "rabbit-gag",
    "text": "One ear up! One ear down! [robot giggles, high buzzing sounds] Silly rabbit!",
+   "made": "2026-10-24"
+  },
+  "gags/animals/shark.mp3": {
+   "id": "shark-gag",
+   "text": "Shark! [nervous robotic beeping] [short pause] Oh… he's smiling. [relieved sigh] Hello, shark!",
+   "made": "2026-10-24"
+  },
+  "gags/animals/sheep.mp3": {
+   "id": "sheep-gag",
+   "text": "This is a sheep. [short pause] Or a cloud with legs. [confused robotic beep]",
+   "made": "2026-10-24"
+  },
+  "gags/animals/snake.mp3": {
+   "id": "snake-gag",
+   "text": "This is a snake. Sssss… [robotic hissing, steam] Sssss! [whispers] We are friends now.",
    "made": "2026-10-24"
   },
   "gags/animals/tiger.mp3": {
@@ -76,6 +151,11 @@
   "gags/animals/wolf.mp3": {
    "id": "wolf-gag",
    "text": "Wolf! Ahhh-WOOO! [short pause] [proudly] Ahhh-WOOOOOO… [robotic beep] [giggles] We sing!",
+   "made": "2026-10-24"
+  },
+  "gags/animals/zebra.mp3": {
+   "id": "zebra-gag",
+   "text": "This is a zebra. [short pause] Black, white, black, white… [dizzy, electronic glitch] Too many stripes!",
    "made": "2026-10-24"
   },
   "gags/food/apple.mp3": {
@@ -453,6 +533,11 @@
    "text": "Kha-TOOL! [proudly] I know Hebrew! [happy robotic beep] Kha-tool… cat!",
    "made": "2026-10-24"
   },
+  "hebrew/animals/elephant.mp3": {
+   "id": "elephant-he",
+   "text": "PEEL! [short pause] Peel? Banana peel? [confused robotic beep] No, no… elephant!",
+   "made": "2026-10-24"
+  },
   "hebrew/animals/frog.mp3": {
    "id": "frog-he",
    "text": "Tsfar… tsfarrr… [sneezes] ATCHOO! [sparks crackling] [sniffs] Sorry. Very sneezy word.",
@@ -693,9 +778,19 @@
    "text": "Correct! [sniffs, electronic glitch] I'm not crying. [loud nose blowing] HONK.",
    "made": "2026-10-24"
   },
+  "robot/correct-03.mp3": {
+   "id": "correct-03",
+   "text": "[gasps] It's back! It's back in my head! [happy robotic beeping] [whispers] Hello, word. Stay.",
+   "made": "2026-10-24"
+  },
   "robot/correct-04.mp3": {
    "id": "correct-04",
    "text": "You did it! [proudly] I helped. [short pause] A little. [electronic glitch] …Not really.",
+   "made": "2026-10-24"
+  },
+  "robot/correct-05.mp3": {
+   "id": "correct-05",
+   "text": "[cheers] Yes! [robot chuckles, high buzzing sounds] Now I do the win dance… [clanking, happy robotic whirring] [short pause] [proudly] Done!",
    "made": "2026-10-24"
   },
   "robot/end-high-01.mp3": {
@@ -798,6 +893,16 @@
    "text": "[deep sigh, steam hissing] When I was a young robot… [long pause] …I forgot. Never mind.",
    "made": "2026-10-24"
   },
+  "robot/key-01.mp3": {
+   "id": "key-01",
+   "text": "[gasps] A key! [metal jingling] What does it open? [whispers] Pick one!",
+   "made": "2026-10-24"
+  },
+  "robot/key-02.mp3": {
+   "id": "key-02",
+   "text": "A key! For me? [happy robotic beeping] No, no… for you!",
+   "made": "2026-10-24"
+  },
   "robot/mumble-01.mp3": {
    "id": "mumble-01",
    "text": "[confused] Hmm-mm? [questioning robotic beep]",
@@ -806,6 +911,21 @@
   "robot/mumble-02.mp3": {
    "id": "mumble-02",
    "text": "[confused] Ehh? [electronic glitch]",
+   "made": "2026-10-24"
+  },
+  "robot/mumble-03.mp3": {
+   "id": "mumble-03",
+   "text": "[long thinking noise] Uhhhh… [little beep] you missed a spot…",
+   "made": "2026-10-24"
+  },
+  "robot/mumble-04.mp3": {
+   "id": "mumble-04",
+   "text": "[thinking] Emmm… [robotic whirring] [curious] didn't you forget something?",
+   "made": "2026-10-24"
+  },
+  "robot/murmur-01.mp3": {
+   "id": "murmur-01",
+   "text": "[thoughtful] Hmm… yes… [robotic whirring] I see… [short pause] I see…",
    "made": "2026-10-24"
   },
   "robot/murmur-02.mp3": {
@@ -828,6 +948,11 @@
    "text": "[sighs, steam hissing] No gears… [whispers] I'd give you mine, but I need them to think.",
    "made": "2026-10-24"
   },
+  "robot/peek-01.mp3": {
+   "id": "peek-01",
+   "text": "[whispers] Psst… [tiny robotic beep] you there?",
+   "made": "2026-10-24"
+  },
   "robot/peek-02.mp3": {
    "id": "peek-02",
    "text": "[whispers] I am not here. [quiet electronic glitch] You can't see me.",
@@ -836,6 +961,11 @@
   "robot/peek-03.mp3": {
    "id": "peek-03",
    "text": "[whispers] Peek-a-boo! [robot giggles, high buzzing sounds]",
+   "made": "2026-10-24"
+  },
+  "robot/picture-giggle-01.mp3": {
+   "id": "picture-giggle-01",
+   "text": "[robot giggles, high buzzing sounds] Hee hee… I know this one… [short pause] [confused robotic beep] How do you spell it?",
    "made": "2026-10-24"
   },
   "robot/picture-giggle-02.mp3": {
@@ -858,6 +988,11 @@
    "text": "[gasps] I know you! [computer bleeps] …Do I know you? Yes! [short pause] Maybe.",
    "made": "2026-10-24"
   },
+  "robot/picture-surprise-02.mp3": {
+   "id": "picture-surprise-02",
+   "text": "[gasps] Ooh! [robot whispers] Act normal. [loudly, not normal at all] HELLO THERE!",
+   "made": "2026-10-24"
+  },
   "robot/press-01.mp3": {
    "id": "press-01",
    "text": "The button… [whispers] it's looking at you. [soft robotic beep] [whispers] I think it likes you.",
@@ -878,9 +1013,19 @@
    "text": "[whispers] Next time, we get it together. [soft robotic beep] Deal?",
    "made": "2026-10-24"
   },
+  "robot/reveal-close-02.mp3": {
+   "id": "reveal-close-02",
+   "text": "[surprised] Ooooh! [robotic whirring] Now I see!",
+   "made": "2026-10-24"
+  },
   "robot/reveal-open-01.mp3": {
    "id": "reveal-open-01",
    "text": "[groans] Ohhhh… [loud metal clang] Ow. [short pause] I remember now!",
+   "made": "2026-10-24"
+  },
+  "robot/reveal-open-02.mp3": {
+   "id": "reveal-open-02",
+   "text": "Okay! Let me show you. [slow computer bleeps] Loading… loading… [ding] Here it is!",
    "made": "2026-10-24"
   },
   "robot/reveal-open-03.mp3": {
@@ -948,6 +1093,26 @@
    "text": "[shouts] FIRE! You're on fire! [short pause] Not real fire. [sparks crackling] [whispers] Don't call anyone.",
    "made": "2026-10-24"
   },
+  "robot/theme-open-01.mp3": {
+   "id": "theme-open-01",
+   "text": "[door creaking, robotic whirring] New words! [whispers] I don't remember any of them.",
+   "made": "2026-10-24"
+  },
+  "robot/tutorial-done-01.mp3": {
+   "id": "tutorial-done-01",
+   "text": "Yes! [happy robotic beeping] Now you know everything. [whispers] More than me.",
+   "made": "2026-10-24"
+  },
+  "robot/tutorial-drag-01.mp3": {
+   "id": "tutorial-drag-01",
+   "text": "Look! Take a letter… [soft robotic beep] and put it here!",
+   "made": "2026-10-24"
+  },
+  "robot/tutorial-press-01.mp3": {
+   "id": "tutorial-press-01",
+   "text": "Now press the big button! [excited robotic beeping] Yalla!",
+   "made": "2026-10-24"
+  },
   "robot/wake-01.mp3": {
    "id": "wake-01",
    "text": "[startled, robotic beep] Oh! You're back! [whispers] I missed you. A little.",
@@ -971,6 +1136,16 @@
   "robot/wrong-03.mp3": {
    "id": "wrong-03",
    "text": "Hmm. Let me shake my head… [loose parts rattling] [short pause] Nope. Not that one.",
+   "made": "2026-10-24"
+  },
+  "robot/wrong-04.mp3": {
+   "id": "wrong-04",
+   "text": "[proudly] Hmm… that would be correct… [electronic glitch] if it was a different word!",
+   "made": "2026-10-24"
+  },
+  "robot/wrong-05.mp3": {
+   "id": "wrong-05",
+   "text": "[whispers] Let's try again. [soft robotic beep] [whispers] And pretend that this didn't happen.",
    "made": "2026-10-24"
   },
   "words/animals/ant.mp3": {
