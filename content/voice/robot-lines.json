@@ -1,8 +1,8 @@
 {
- "version": 4,
+ "version": 5,
  "date": "2026-10-24",
  "doc": "claude/flip-robot-lines.md",
- "notes": "Text master for the shared robot lines. The voice script reads it. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags. They describe sounds and delivery, never actions; actions live in pose (hand poses in order). Robot moments (v2, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on a target word, a letter name or a Hebrew word. Pauses use [short pause] / [pause] / [long pause]. recipe = tone recipe 1-6 in the doc. status: approved = words seen and approved on 2026-10-19 (only tags changed in v2); draft = new, to review. From 2026-10-22 the review happens only on the Robot Line Review page (Robot lines tab); this file is synced from it. 2026-10-24: his first review on the page applied (kept lines approved; 9 rewritten from his notes; reveal-open-02 dropped and redrafted).",
+ "notes": "Text master for the shared robot lines. The voice script reads it. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags. They describe sounds and delivery, never actions; actions live in pose (hand poses in order). Robot moments (v2, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on a target word, a letter name or a Hebrew word. Pauses use [short pause] / [pause] / [long pause]. recipe = tone recipe 1-6 in the doc. status: approved = words seen and approved on 2026-10-19 (only tags changed in v2); draft = new, to review. From 2026-10-22 the review happens only on the Robot Line Review page (Robot lines tab); this file is synced from it. 2026-10-24: his first review on the page applied (kept lines approved; 9 rewritten from his notes; reveal-open-02 dropped and redrafted). 2026-10-24 (pass 5): all shared lines approved, including the rewrites; new pools tutorial-drag, tutorial-press, tutorial-done (the first word's tutorial), key and theme-open (theme keys), approved.",
  "letters": {
   "a": "Eigh",
   "b": "Bee",
@@ -121,7 +121,7 @@
       "wave"
      ],
      "recipe": 1,
-     "status": "draft"
+     "status": "approved"
     }
    ]
   },
@@ -136,7 +136,7 @@
       "giggle"
      ],
      "recipe": 3,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[robot giggles, high buzzing sounds] Hee hee… I know this one. [short pause] I know it so much.",
      "by": "his idea (review 2026-10-24); tags by Claude"
     },
@@ -186,7 +186,7 @@
       "chin"
      ],
      "recipe": 3,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[thoughtful] Hmm… yes… [robotic whirring] I see… [whispers] I see nothing.",
      "by": "his idea (review 2026-10-24); tags by Claude"
     },
@@ -253,7 +253,7 @@
      "text": "[whispers] Psst… [tiny robotic beep] you there?",
      "pose": [],
      "recipe": 1,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[whispers] Psst… [tiny robotic beep] is it safe?",
      "by": "his idea (review 2026-10-24); tags by Claude"
     },
@@ -359,7 +359,7 @@
       "chin"
      ],
      "recipe": null,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[long thinking noise] Uhhhhh… [little beep]",
      "by": "his idea (review 2026-10-24); tags by Claude"
     },
@@ -370,7 +370,7 @@
       "cover"
      ],
      "recipe": null,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[worried] Uh-oh… [robotic whirring down]",
      "by": "his idea (review 2026-10-24); tags by Claude"
     }
@@ -415,7 +415,7 @@
       "shrug"
      ],
      "recipe": 2,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[proudly] I remember! It's— [robotic malfunctioning sounds] [disappointed] …No. I remembered spaghetti again.",
      "by": "his idea (review 2026-10-24); tags by Claude"
     },
@@ -426,7 +426,7 @@
       "shrug"
      ],
      "recipe": 1,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[whispers] Let's try again. [soft robotic beep] [whispers] But quietly, so my memory doesn't hear.",
      "by": "his idea (review 2026-10-24); tags by Claude"
     }
@@ -486,7 +486,7 @@
       "pump"
      ],
      "recipe": 1,
-     "status": "draft",
+     "status": "approved",
      "dropped_text": "[very dramatic] Wait! It's coming… [gears grinding] it's coming… IT CAME!",
      "by": "Claude 2026-10-24, old line dropped in review"
     },
@@ -521,7 +521,7 @@
       "shrug"
      ],
      "recipe": 6,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[cheerful] I'll write it on my hand! [short pause] [robotic whirring down] …I have mittens.",
      "by": "his idea (review 2026-10-24); tags by Claude"
     }
@@ -557,7 +557,7 @@
       "pump"
      ],
      "recipe": 5,
-     "status": "draft"
+     "status": "approved"
     },
     {
      "id": "correct-04",
@@ -575,7 +575,7 @@
       "pump2"
      ],
      "recipe": 6,
-     "status": "revised",
+     "status": "approved",
      "old_text": "[cheers] Yes! [robot chuckles, high buzzing sounds] Eyebrows, dance!",
      "by": "his idea (review 2026-10-24); tags by Claude"
     }
@@ -886,6 +886,96 @@
      ],
      "recipe": 6,
      "status": "approved"
+    }
+   ]
+  },
+  "tutorial-drag": {
+   "moment": "First word ever, as the ghost hand drags a letter into a slot",
+   "when": "v1",
+   "lines": [
+    {
+     "id": "tutorial-drag-01",
+     "text": "Look! Take a letter… [soft robotic beep] and put it here!",
+     "pose": [
+      "point"
+     ],
+     "recipe": null,
+     "status": "approved",
+     "by": "Claude 2026-10-24"
+    }
+   ]
+  },
+  "tutorial-press": {
+   "moment": "First word ever, when every slot is full and the hand points at the dome",
+   "when": "v1",
+   "lines": [
+    {
+     "id": "tutorial-press-01",
+     "text": "Now press the big button! [excited robotic beeping] Yalla!",
+     "pose": [
+      "point"
+     ],
+     "recipe": null,
+     "status": "approved",
+     "by": "Claude 2026-10-24"
+    }
+   ]
+  },
+  "tutorial-done": {
+   "moment": "First word ever, after the first correct check (before his usual word and gag)",
+   "when": "v1",
+   "lines": [
+    {
+     "id": "tutorial-done-01",
+     "text": "Yes! [happy robotic beeping] Now you know everything. [whispers] More than me.",
+     "pose": [
+      "pump2"
+     ],
+     "recipe": null,
+     "status": "approved",
+     "by": "Claude 2026-10-24"
+    }
+   ]
+  },
+  "key": {
+   "moment": "A key is earned (stage 1 of a theme cleared); the theme screen shows the locked themes to pick from",
+   "when": "v1",
+   "lines": [
+    {
+     "id": "key-01",
+     "text": "[gasps] A key! [metal jingling] What does it open? [whispers] Pick one!",
+     "pose": [
+      "point"
+     ],
+     "recipe": null,
+     "status": "approved",
+     "by": "Claude 2026-10-24"
+    },
+    {
+     "id": "key-02",
+     "text": "A key! For me? [happy robotic beeping] No, no… for you!",
+     "pose": [
+      "pump"
+     ],
+     "recipe": null,
+     "status": "approved",
+     "by": "Claude 2026-10-24"
+    }
+   ]
+  },
+  "theme-open": {
+   "moment": "The kid used a key and a new theme opens",
+   "when": "v1",
+   "lines": [
+    {
+     "id": "theme-open-01",
+     "text": "[door creaking, robotic whirring] New words! [whispers] I don't remember any of them.",
+     "pose": [
+      "gasp"
+     ],
+     "recipe": null,
+     "status": "approved",
+     "by": "Claude 2026-10-24"
     }
    ]
   }

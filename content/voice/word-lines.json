@@ -1,8 +1,8 @@
 {
- "version": 9,
+ "version": 10,
  "date": "2026-10-24",
  "doc": "claude/flip-robot-lines.md",
- "notes": "Text master for the robot's word lines: the gag line after a correct answer, and the broken-Hebrew guess on a new picture. Kept in its own file instead of gag_line / he_line in claude/flip-word-list.json, so the picture batch and the voice work never overwrite each other's edits. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags; they describe sounds and delivery, never actions (actions live in the poses). pose = hand poses in order; recipe = tone recipe 1-6 in the doc; win = the picture's win move from the word list, which the gag line plays with. Writing rules from the human's review (2026-10-19, round 2): every gag says the word, clearly, best at the start; very simple English a beginner of 9-10 knows, about 10 spoken words or fewer; the fun is silly, childish and ridiculous, carried by sounds and acting (animal noises, squeaky voices, crashes, sneezes, dizzy spins) rather than wordplay or clever English. Robot moments (v4, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on the target word or a Hebrew word; pauses use [short pause] / [pause]. A Hebrew guess plays on a new picture (in place of a shared picture line, about 1 in 6 times the word comes up): mangled Hebrew, a silly beat, then the English word, a bridge from Hebrew to English. status: approved = words seen and approved by the human (only tags changed in v4); draft = new, to review. Animals and Transport approved 2026-10-19 (round 2); Food drafted 2026-10-19; Home drafted 2026-10-21. Approvals now live only on the Robot Line Review page (https://claude.ai/artifact/5fmw8W8FCej3MgeMkAtwmu, one tab per theme plus Robot lines): a line is done when he marked Keep there or it was approved earlier; Change or Drop sends it back to Claude. 2026-10-22: he kept every Food and Home line on the page (including the 12 earlier 'revised'/'draft' ones), so all 64 Food and Home words are approved. he_status = the Hebrew guess's own status where it differs. 2026-10-24: lines drafted for the 19 new animal and 21 new transport words (all 130 words now have a gag line), plus 4 new Hebrew guesses (hen, elephant, bag, map); helicopter and motorbike rewritten from his notes.",
+ "notes": "Text master for the robot's word lines: the gag line after a correct answer, and the broken-Hebrew guess on a new picture. Kept in its own file instead of gag_line / he_line in claude/flip-word-list.json, so the picture batch and the voice work never overwrite each other's edits. Voice: \"flip robot character\" (eLkzmL7sIxy7PLUgCfeT) on eleven_v4. [tags] are ElevenLabs audio tags; they describe sounds and delivery, never actions (actions live in the poses). pose = hand poses in order; recipe = tone recipe 1-6 in the doc; win = the picture's win move from the word list, which the gag line plays with. Writing rules from the human's review (2026-10-19, round 2): every gag says the word, clearly, best at the start; very simple English a beginner of 9-10 knows, about 10 spoken words or fewer; the fun is silly, childish and ridiculous, carried by sounds and acting (animal noises, squeaky voices, crashes, sneezes, dizzy spins) rather than wordplay or clever English. Robot moments (v4, 2026-10-21, his tag style): about one robot sound per line, between phrases, never on the target word or a Hebrew word; pauses use [short pause] / [pause]. A Hebrew guess plays on a new picture (in place of a shared picture line, about 1 in 6 times the word comes up): mangled Hebrew, a silly beat, then the English word, a bridge from Hebrew to English. status: approved = words seen and approved by the human (only tags changed in v4); draft = new, to review. Animals and Transport approved 2026-10-19 (round 2); Food drafted 2026-10-19; Home drafted 2026-10-21. Approvals now live only on the Robot Line Review page (https://claude.ai/artifact/5fmw8W8FCej3MgeMkAtwmu, one tab per theme plus Robot lines): a line is done when he marked Keep there or it was approved earlier; Change or Drop sends it back to Claude. 2026-10-22: he kept every Food and Home line on the page (including the 12 earlier 'revised'/'draft' ones), so all 64 Food and Home words are approved. he_status = the Hebrew guess's own status where it differs. 2026-10-24: lines drafted for the 19 new animal and 21 new transport words (all 130 words now have a gag line), plus 4 new Hebrew guesses (hen, elephant, bag, map); helicopter and motorbike rewritten from his notes. 2026-10-24 (pass 5): animals reviewed — 16 new animal gags and the elephant Hebrew guess approved; ant, bug and panda rewritten from his notes; transport and the hen Hebrew guess not reviewed yet.",
  "words": {
   "cat": {
    "theme": "animals",
@@ -40,7 +40,7 @@
     "point",
     "giggle"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "hen": {
@@ -52,7 +52,7 @@
     "point",
     "cover"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24",
    "he": "Tar-ne-go… tar-ne-gol… [tongue twisted, electronic glitches] [short pause] Hen! Much shorter.",
    "he_pose": [
@@ -70,7 +70,7 @@
     "chin",
     "shock"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "bat": {
@@ -89,25 +89,27 @@
    "theme": "animals",
    "recipe": 1,
    "win": "hop-spin",
-   "gag": "Ant! [tiny marching steps] Hup, two! Hup, two! [short pause] Me too! [clanking metal steps]",
+   "gag": "This is an ant. [tiny marching steps] We should be careful… [heavy clanking footsteps] not to step on one. [worried robotic beep]",
    "gag_pose": [
     "pump",
     "pump2"
    ],
-   "status": "draft",
-   "by": "Claude 2026-10-24"
+   "status": "revised",
+   "by": "his idea (review 2026-10-24, pass 5); tags by Claude",
+   "old_gag": "Ant! [tiny marching steps] Hup, two! Hup, two! [short pause] Me too! [clanking metal steps]"
   },
   "bug": {
    "theme": "animals",
    "recipe": 5,
    "win": "zoom",
-   "gag": "This is a bug. [tiny buzzing] Fly, bug, fly! [buzzing stops, electronic glitch] …Maybe tomorrow.",
+   "gag": "[tiny buzzing] This is a cute little bug. [loud swarm buzzing] Shoo! Shoo! [electronic glitch] This is not cute at all…",
    "gag_pose": [
     "point",
     "shrug"
    ],
-   "status": "draft",
-   "by": "Claude 2026-10-24"
+   "status": "revised",
+   "by": "his idea (review 2026-10-24, pass 5); tags by Claude",
+   "old_gag": "This is a bug. [tiny buzzing] Fly, bug, fly! [buzzing stops, electronic glitch] …Maybe tomorrow."
   },
   "frog": {
    "theme": "animals",
@@ -138,20 +140,21 @@
     "point",
     "pointUp"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "panda": {
    "theme": "animals",
    "recipe": 3,
    "win": "wobble-flop",
-   "gag": "This is a panda. [munching] Munch, munch, munch… [long pause, slow computer bleeps] …still munching.",
+   "gag": "This is a panda. [munching] [short pause] But not a kung fu one. [karate shout] Hi-ya! [electronic glitch]",
    "gag_pose": [
     "chin",
     "shrug"
    ],
-   "status": "draft",
-   "by": "Claude 2026-10-24"
+   "status": "revised",
+   "by": "his idea (review 2026-10-24, pass 5); tags by Claude",
+   "old_gag": "This is a panda. [munching] Munch, munch, munch… [long pause, slow computer bleeps] …still munching."
   },
   "fish": {
    "theme": "animals",
@@ -184,7 +187,7 @@
     "chin",
     "shrug"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "shark": {
@@ -196,7 +199,7 @@
     "shock",
     "wave"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "zebra": {
@@ -208,7 +211,7 @@
     "point",
     "cover"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "bird": {
@@ -247,7 +250,7 @@
     "chin",
     "giggle"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "horse": {
@@ -330,7 +333,7 @@
     "pointUp",
     "shrug"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "dolphin": {
@@ -342,7 +345,7 @@
     "wave",
     "scratch"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "penguin": {
@@ -354,7 +357,7 @@
     "point",
     "pump"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "kangaroo": {
@@ -366,7 +369,7 @@
     "gasp",
     "pump"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "elephant": {
@@ -378,14 +381,14 @@
     "shock",
     "chin"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24",
    "he": "PEEL! [short pause] Peel? Banana peel? [confused robotic beep] No, no… elephant!",
    "he_pose": [
     "gasp",
     "shrug"
    ],
-   "he_status": "draft"
+   "he_status": "approved"
   },
   "octopus": {
    "theme": "animals",
@@ -396,7 +399,7 @@
     "point",
     "scratch"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "butterfly": {
@@ -408,7 +411,7 @@
     "chin",
     "shrug"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "crocodile": {
@@ -420,7 +423,7 @@
     "point",
     "cover"
    ],
-   "status": "draft",
+   "status": "approved",
    "by": "Claude 2026-10-24"
   },
   "bus": {
@@ -1012,7 +1015,8 @@
     "chin",
     "pointUp"
    ],
-   "status": "approved"
+   "status": "approved",
+   "he_status": "approved"
   },
   "salad": {
    "theme": "food",
