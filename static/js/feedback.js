@@ -27,7 +27,8 @@
 //     clean-up's extra blocks puff away; the boost tray pops open; a boost
 //     the kid can't afford (`lockedTaps` one more) flickers the console's
 //     gear counter
-// The correct-check beat (slot pulse, TV flash, sparks) is celebrate.js.
+// The correct-check beat is celebrate.js's (the slot pulse, the cogs) and
+// picture.js's (the TV's win, its flash and sparks, BACKLOG B-222).
 // Every tween clears what it set when it ends, so the CSS render of state
 // is what stays.
 

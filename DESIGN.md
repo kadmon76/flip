@@ -168,9 +168,23 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - Second miss (the wrong check that leaves one bulb lit, every stage; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
 - Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on a stage with extra letters, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
   robot: Third miss moment (CHARACTER.md).
-- Correct: slots pulse once; TV screen flashes warm white (200ms); up to
-  40 sparks (amber, teal, cream) burst from the TV, 600ms, removed after;
-  small cogs, one per gear the word earns, fly from the TV into the console's gear counter, its count flipping up as each lands (600ms at most; reduced motion: the count just changes; B-218); robot: Correct moment (CHARACTER.md).
+- Correct: slots pulse once; the TV picture plays the word's own win
+  (BACKLOG B-222; `design/reference/tv-motion.html` layer 3 "Win"): its
+  subject does the word's `win` move once, inside the TV's mask, then
+  goes back to its idle (paused meanwhile): `cheer`, `bungee` and `drive`
+  (the subject blurred on its fast part, with its exhaust puffs) as the
+  prototype; `hop-spin` (a high hop with one full turn in the air, a
+  squash on landing), `wobble-flop` (wobbles, topples over to one side,
+  springs back up), `splash` (dips, leaps in an arc while teal and cream
+  drops fly), `pop` (a squash, a bouncy pop to 1.25, settles) and `zoom`
+  (shoots off the top, blurred, a beat with the screen empty, drops back
+  in from above); 1.2–1.9s each, every move ending exactly where it
+  started. A word without `motion` (or whose layers are not showing yet):
+  the whole picture does the `pop`. With it, once, the TV screen flashes
+  warm white (200ms) and up to 40 sparks (amber, teal, cream) burst from
+  the TV, 600ms, removed after. Reduced motion: the flash, and the
+  picture's opacity dips to 0.7 and back (400ms); no move, no sparks.
+  Small cogs, one per gear the word earns, fly from the TV into the console's gear counter, its count flipping up as each lands (600ms at most; reduced motion: the count just changes; B-218); robot: Correct moment (CHARACTER.md).
 - Never block input for more than 300ms. `prefers-reduced-motion`:
   replace motion with opacity fades; the dome glows steadily instead of
   pulsing or blinking (`next` keeps its lit look, shine and halo).

@@ -596,10 +596,11 @@ class StarsTests(TestCase):
 
 class CelebrateMotionSpecTests(TestCase):
     """static/js/motion.js motionFor() for the reward beats (BACKLOG B-110,
-    DESIGN.md "Motion"): a correct check pulses the boxes once and bursts up
-    to 40 confetti pieces over 600ms in total; earned stars pop in with
-    back.out(1.4), 200ms each. Reduced motion: fades only, no confetti, no
-    overshoot."""
+    DESIGN.md "Motion"): a correct check pulses the boxes once; earned
+    stars pop in with back.out(1.4), 200ms each. Reduced motion: fades
+    only, no overshoot. The TV's flash and its up to 40 sparks over 600ms
+    are picture.js's since BACKLOG B-222 (PictureWinTests); motion.js has
+    no spec for them any more."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
 
@@ -625,10 +626,13 @@ class CelebrateMotionSpecTests(TestCase):
         self.assertLessEqual(m['duration'], 0.6)
         self.assertNotIn('back', m['ease'])
 
-    def test_confetti_is_up_to_40_pieces_over_600ms(self):
-        m = self.motion('confetti', False)
-        self.assertEqual(m['count'], 40)
-        self.assertEqual(m['duration'], 0.6)
+    def test_the_sparks_and_the_flash_moved_to_picture_js(self):
+        script = (
+            f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
+            "for (const kind of ['confetti', 'flash']) { try { motionFor(kind, false); console.log('has ' + kind); } catch (e) { /* gone */ } }"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual((result.returncode, result.stdout), (0, ''), result.stderr)
 
     def test_star_pop_overshoots_200ms_per_star_one_after_another(self):
         m = self.motion('starPop', False)
@@ -640,8 +644,6 @@ class CelebrateMotionSpecTests(TestCase):
         pulse = self.motion('pulse', True)
         self.assertEqual((pulse['duration'], pulse['scale'], pulse['ease']), (0, 1, 'none'))
         self.assertGreater(pulse['fade'], 0)
-
-        self.assertEqual(self.motion('confetti', True)['count'], 0)
 
         star = self.motion('starPop', True)
         self.assertEqual((star['duration'], star['scale'], star['ease']), (0, 1, 'none'))
@@ -1117,9 +1119,10 @@ class ConsoleMotionSpecTests(TestCase):
     """static/js/motion.js motionFor() for the console and the feedback
     (BACKLOG B-114, DESIGN "Controls and states", "Feedback"): wrong blocks
     wiggle ±6px in 300ms; the rail shakes ±4px in 200ms; the lost bulb
-    flickers three times; the TV static lasts 150ms and the warm-white
-    flash 200ms; revealed blocks fly in 120ms apart; reset blocks hop back
-    in 300ms, 30ms apart. Reduced motion: opacity fades only."""
+    flickers three times; the TV static lasts 150ms; revealed blocks fly in
+    120ms apart; reset blocks hop back in 300ms, 30ms apart. Reduced
+    motion: opacity fades only. (The correct check's warm-white flash,
+    200ms, is picture.js's since BACKLOG B-222: PictureWinTests.)"""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
 
@@ -1147,11 +1150,10 @@ class ConsoleMotionSpecTests(TestCase):
         for m in (w, r):
             self.assertNotIn('back', m['ease'])
 
-    def test_bulb_flicker_tv_static_and_flash(self):
+    def test_bulb_flicker_and_tv_static(self):
         self.assertEqual(self.motion('flicker', False)['flashes'], 3)
         self.assertLessEqual(self.motion('flicker', False)['duration'], 0.3)
         self.assertEqual(self.motion('tvStatic', False)['duration'], 0.15)
-        self.assertEqual(self.motion('flash', False)['duration'], 0.2)
 
     def test_reveal_fly_in_and_reset_hop(self):
         f = self.motion('flyIn', False)
@@ -1164,12 +1166,12 @@ class ConsoleMotionSpecTests(TestCase):
         self.assertNotIn('back', h['ease'])
 
     def test_reduced_motion_is_fades_only(self):
-        for kind in ('wiggle', 'shake', 'flicker', 'tvStatic', 'flash', 'flyIn', 'hop'):
+        for kind in ('wiggle', 'shake', 'flicker', 'tvStatic', 'flyIn', 'hop'):
             m = self.motion(kind, True)
             self.assertEqual((m['duration'], m['scale'], m['ease']), (0, 1, 'none'), kind)
             for key in ('distance', 'flashes', 'height'):
                 self.assertEqual(m.get(key, 0), 0, (kind, key))
-        for kind in ('wiggle', 'flicker', 'tvStatic', 'flash', 'flyIn', 'hop'):
+        for kind in ('wiggle', 'flicker', 'tvStatic', 'flyIn', 'hop'):
             self.assertGreater(self.motion(kind, True)['fade'], 0, kind)
         self.assertEqual(self.motion('flyIn', True)['stagger'], 0.12)
 
@@ -10390,8 +10392,10 @@ class PictureLifeTests(TestCase):
             "out([P.lifeOf(m({})), P.lifeOf(m({ idle: 'sway', pivot: 'top' })), P.lifeOf(m({ pivot: 'center', idle: 'spin' })),"
             " P.lifeOf(m({ idle: 'tumble', pivot: 'left' })), P.lifeOf(m({ idle: 'toString', pivot: '__proto__' })),"
             " P.lifeOf({ image: '/a/duck.svg' }), P.lifeOf(m({ subject: '' })), P.lifeOf(m({ plate: null })), P.lifeOf({ motion: 'cat' }),"
-            " P.lifeOf(null), P.lifeOf(undefined), P.lifeOf('cat')]);")
-        self.assertEqual(res[0], {'subject': '/w/x-subject.webp', 'plate': '/w/x-plate.webp', 'idle': 'hop', 'origin': '50% 88%'})
+            " P.lifeOf(null), P.lifeOf(undefined), P.lifeOf('cat'),"
+            " [P.lifeOf(m({ win: 'cheer' })).win, P.lifeOf(m({ win: 'moonwalk' })).win, P.lifeOf(m({ win: 'constructor' })).win, P.lifeOf(m({ win: undefined })).win]]);")
+        wins = res.pop()
+        self.assertEqual(res[0], {'subject': '/w/x-subject.webp', 'plate': '/w/x-plate.webp', 'idle': 'hop', 'origin': '50% 88%', 'win': 'pop'})
         self.assertEqual(res[1]['origin'], '50% 12%')
         self.assertEqual([res[2]['idle'], res[2]['origin']], ['spin', '50% 50%'])
         # a move or a pivot the table does not have: still, from the centre
@@ -10399,8 +10403,8 @@ class PictureLifeTests(TestCase):
         self.assertEqual([res[4]['idle'], res[4]['origin']], [None, '50% 50%'])
         # no motion with both pictures: the still picture
         self.assertEqual(res[5:], [None] * 7)
-        # the win (BACKLOG B-222) is not read here
-        self.assertNotIn('win', self.code('picture.js').replace('window', ''))
+        # the win (BACKLOG B-222): the data's, else the pop
+        self.assertEqual(wins, ['cheer', 'pop', 'pop', 'pop'])
 
     def test_every_word_but_the_duck_has_its_two_layers(self):
         entries = {f'{t}/{w}': e for t, w, e in self.entries()}
@@ -10422,26 +10426,47 @@ class PictureLifeTests(TestCase):
         const tick = () => new Promise((r) => setTimeout(r, 0));
         const inside = (el, root) => { for (let e = el; e; e = e.parent) if (e === root) return true; return false; };
         class El {
-            constructor(name, parent = null) { this.name = name; this.parent = parent; this.attrs = {}; this.style = {}; this.kids = [];
-                this.cls = new Set(); this.isConnected = true; this.clientWidth = 151.2; this.pending = [];
+            // an element made by createElement is named by its class
+            // (a speck is 'mote'), the template's by the test
+            constructor(name, parent = null) { this.fixed = name; this.parent = parent; this.attrs = {}; this.style = {}; this.kids = [];
+                this.className = ''; this.cls = new Set(); this.isConnected = true; this.clientWidth = 151.2; this.pending = [];
                 const s = this.cls; this.classList = { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c),
                     toggle: (c, on) => (on ? s.add(c) : s.delete(c)) }; }
+            get name() { return this.fixed || (this.className === 'tv-mote' ? 'mote' : this.className.split(' ')[0]); }
             getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+            setAttribute(k, v) { this.attrs[k] = String(v); }
             set src(v) { this.attrs.src = v; calls.push(['src', this.name, v]); }
             decode() { calls.push(['decode', this.name]); return new Promise((res, rej) => this.pending.push({ res, rej })); }
+            // a stand-in Animation: cancel() rejects `finished` (marked
+            // handled, as the browser's), finish() resolves it
             animate(keyframes, options) {
-                const a = { target: this, keyframes, options, cancel: () => { live.delete(a); calls.push(['cancel', this.name]); } };
-                live.add(a); calls.push(['animate', this.name, keyframes, { ...options, iterations: String(options.iterations) }]); return a;
+                let done = null;
+                const finished = new Promise((res, rej) => { done = { res, rej }; });
+                finished.catch(() => {});
+                const a = { target: this, keyframes, options, finished, paused: false,
+                    cancel: () => { live.delete(a); calls.push(['cancel', this.name]); done.rej(new Error('AbortError')); },
+                    pause: () => { a.paused = true; calls.push(['pause', this.name]); },
+                    play: () => { a.paused = false; calls.push(['play', this.name]); },
+                    finish: () => { live.delete(a); done.res(a); } };
+                live.add(a);
+                calls.push(['animate', this.name, keyframes, 'iterations' in options ? { ...options, iterations: String(options.iterations) } : options]);
+                return a;
             }
             appendChild(c) { c.parent = this; this.kids.push(c); }
+            remove() { if (this.parent) this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; }
             set textContent(v) { this.kids.forEach((k) => { k.parent = null; }); this.kids = []; calls.push(['clear', this.name]); }
             getAnimations(o) { return [...live].filter((a) => (o && o.subtree ? inside(a.target, this) : a.target === this)); }
+            getBoundingClientRect() { return { left: 104, top: 121, width: 151.2, height: 110 }; }
         }
-        const card = new El('card'); const life = new El('life', card); const plate = new El('plate', life);
+        const card = new El('card'); const still = new El('still', card); const life = new El('life', card); const plate = new El('plate', life);
         const motes = new El('motes', life); const actor = new El('actor', life); const subject = new El('subject', actor);
-        const parts = { '.tv-life': life, '.tv-plate': plate, '.tv-motes': motes, '.tv-actor': actor, '.tv-subject': subject };
+        const fx = new El('fx', life); const flash = new El('flash', card); const body = new El('body');
+        const parts = { '.tv-life': life, '.tv-plate': plate, '.tv-motes': motes, '.tv-actor': actor, '.tv-subject': subject,
+            '.tv-fx': fx, '#play-image': still, '.tv-flash': flash };
         card.querySelector = (s) => parts[s] || null;
-        globalThis.document = { hidden: false, querySelector: (s) => (s === '#screen-play .card' ? card : null), createElement: () => new El('mote') };
+        globalThis.document = { hidden: false, body, querySelector: (s) => (s === '#screen-play .card' ? card : null),
+            querySelectorAll: (s) => (s === '.confetti' ? body.kids.filter((k) => k.className === 'confetti') : []),
+            createElement: () => new El(null) };
         globalThis.window = { matchMedia: () => ({ matches: reduced }) };
         globalThis.Image = class { set src(v) { prefetched.push(v); } };
         const decodeAll = async (ok = true) => { for (const el of [plate, subject]) { el.pending.splice(0).forEach((p) => (ok ? p.res() : p.rej(new Error('no')))); } await tick(); };
@@ -10467,7 +10492,7 @@ class PictureLifeTests(TestCase):
             prelude=self.FAKE)
         start, s1, decoded, locked, s2, again, prefetched, specks = res
         # the word starts: its plate and subject load and decode, its pivot set; nothing shows yet
-        self.assertEqual(start, [['clear', 'motes'], ['src', 'plate', '/w/breathe-plate.webp'], ['src', 'subject', '/w/breathe-subject.webp'],
+        self.assertEqual(start, [['clear', 'motes'], ['clear', 'fx'], ['src', 'plate', '/w/breathe-plate.webp'], ['src', 'subject', '/w/breathe-subject.webp'],
                                  ['decode', 'plate'], ['decode', 'subject']])
         self.assertEqual(s1, [False, 0, '50% 88%'])
         # decoded but not locked yet: still the still picture
@@ -10514,8 +10539,8 @@ class PictureLifeTests(TestCase):
             "out([duck, take(), on(), live.size]);",
             prelude=self.FAKE)
         duck, rest, is_on, n = res
-        self.assertEqual(duck, [[['clear', 'motes']], False, 0])
-        self.assertEqual([c[0] for c in rest], ['clear', 'clear'])
+        self.assertEqual(duck, [[['clear', 'motes'], ['clear', 'fx']], False, 0])
+        self.assertEqual([c[0] for c in rest], ['clear'] * 4)
         self.assertEqual([is_on, n], [False, 0])
 
     def test_a_new_word_leaving_or_a_hidden_page_stops_it(self):
@@ -10538,14 +10563,14 @@ class PictureLifeTests(TestCase):
             prelude=self.FAKE)
         nxt, s1, hidden, s2, hidden_again, shown, s3, left, s4, off, round2 = res
         cancels = ['cancel actor', 'cancel plate'] + ['cancel mote'] * 6
-        self.assertEqual(nxt, cancels + ['clear motes', 'src plate', 'src subject', 'decode plate', 'decode subject'])
+        self.assertEqual(nxt, cancels + ['clear motes', 'clear fx', 'src plate', 'src subject', 'decode plate', 'decode subject'])
         self.assertEqual(s1, [False, 0, 0])
-        self.assertEqual(hidden, cancels + ['clear motes'])
+        self.assertEqual(hidden, cancels + ['clear motes', 'clear fx'])
         self.assertEqual(s2, [True, 0])
         self.assertEqual(hidden_again, [])
         self.assertEqual(shown, ['animate actor', 'animate plate'] + ['animate mote'] * 6)
         self.assertEqual(s3, [True, 8])
-        self.assertEqual(left, cancels + ['clear motes'])
+        self.assertEqual(left, cancels + ['clear motes', 'clear fx'])
         self.assertEqual(s4, [False, 0])
         self.assertEqual(off, [])
         self.assertEqual(round2[:8], cancels)
@@ -10613,3 +10638,441 @@ class PictureLifeTests(TestCase):
         self.assertIn('const img = life ? [still, life] : still;', static)
         self.assertIn("tl.set(img, { x: f.x, opacity: 0.75 }, i * step);", static)
         self.assertIn("gsap.set([layer].concat(img), { clearProps: 'opacity,transform,backgroundPosition' })", static)
+
+
+class PictureWinTests(TestCase):
+    """Each word's own win on a correct answer (BACKLOG B-222; the approved
+    prototype is design/reference/tv-motion.html, layer 3 "Win"):
+    picture.js's table of win moves (cheer, bungee and drive the
+    prototype's, the others new, 1.2-1.9s, each ending where it started),
+    the drive's exhaust puffs and the splash's drops, the TV's flash and
+    sparks (moved from celebrate.js, played once) and reduced motion's
+    opacity pulse; its subscriber (the stand-ins of PictureLifeTests) plays
+    the win once as the word is checked correct, on the subject with its
+    idle paused, or the whole picture's pop when no layers show, and stops
+    it with the life."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+    PROTO = ROOT / 'design' / 'reference' / 'tv-motion.html'
+    NEW = ('hop-spin', 'wobble-flop', 'splash', 'pop', 'zoom')
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const P = await import('{(self.JS / 'picture.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    def entries(self):
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        for theme, url in index.items():
+            data = json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8'))
+            for word, entry in data.items():
+                yield theme, word, entry
+
+    def parse(self, transform):
+        """A transform as [(function, [numbers])] in order (units dropped)."""
+        return [(name, [float(re.sub(r'[a-z%]+$', '', a.strip())) for a in args.split(',')])
+                for name, args in re.findall(r'([a-zA-Z]+)\(([^)]*)\)', transform)]
+
+    def at_rest(self, fn, args):
+        if fn.startswith('scale'):
+            return all(a == 1 for a in args)
+        if fn == 'rotate':
+            return all(a % 360 == 0 for a in args)
+        return all(a == 0 for a in args)
+
+    # --- the table ---
+
+    def test_cheer_bungee_and_drive_are_the_prototypes(self):
+        proto = self.PROTO.read_text()
+        block = proto[proto.index('const WIN = {'):proto.index('\nfunction sparks()')]
+        res = self.run_node(
+            "const WIN0 = (() => { " + block + " return WIN; })();"
+            "out([WIN0, P.WIN.cheer, P.WIN.bungee, P.WIN.drive]);")
+        win0, cheer, bungee, drive = res
+        # their keyframes as the prototype's own, and its timing:
+        # `const dur = w.win === "drive" ? 1500 : w.win === "cheer" ? 1900 : 1400;`
+        for name, move, ms in (('cheer', cheer, 1900), ('bungee', bungee, 1400), ('drive', drive, 1500)):
+            self.assertEqual(move['keyframes'], win0[name], name)
+            self.assertEqual((move['duration'], move['easing']), (ms, 'ease-in-out'), name)
+        self.assertIn('const dur = w.win === "drive" ? 1500 : w.win === "cheer" ? 1900 : 1400;', proto)
+        self.assertIn('const a = actor.animate(WIN[w.win], { duration: dur, easing: "ease-in-out" });', proto)
+        self.assertEqual(drive['fx'], 'exhaust')
+        self.assertNotIn('fx', cheer)
+        self.assertNotIn('fx', bungee)
+
+    def test_every_win_in_the_data_is_in_the_table(self):
+        win = self.run_node("out(Object.keys(P.WIN));")
+        self.assertEqual(sorted(win), sorted(['cheer', 'bungee', 'drive', 'hop-spin', 'wobble-flop', 'splash', 'pop', 'zoom']))
+        used = {e['motion']['win'] for _, _, e in self.entries() if 'motion' in e}
+        self.assertEqual(used - set(win), set())
+
+    def test_the_new_moves_are_big_and_end_exactly_where_they_started(self):
+        win = self.run_node("out(P.WIN);")
+        for name, move in win.items():
+            # 1.2-1.9s each, played once
+            self.assertTrue(1200 <= move['duration'] <= 1900, name)
+            self.assertNotIn('iterations', move, name)
+            offsets = [k['offset'] for k in move['keyframes'] if 'offset' in k]
+            self.assertEqual(offsets, sorted(offsets), name)
+            if name == 'hop-spin':
+                continue
+            frames = [self.parse(k['transform']) for k in move['keyframes']]
+            # the same transform functions in every keyframe, so each tweens
+            self.assertEqual(len({tuple(fn for fn, _ in f) for f in frames}), 1, name)
+            # it starts and ends at rest (and unblurred)
+            for f in (frames[0], frames[-1]):
+                self.assertTrue(all(self.at_rest(fn, args) for fn, args in f), (name, f))
+            for k in (move['keyframes'][0], move['keyframes'][-1]):
+                self.assertIn(k.get('filter', 'none'), ('none',), name)
+        # only the drive and the zoom blur, and only on their fast part:
+        # off the picture or flying through it
+        blurred = {n for n, m in win.items() if any('blur' in k.get('filter', '') for k in m['keyframes'])}
+        self.assertEqual(blurred, {'drive', 'zoom'})
+        for k in win['zoom']['keyframes']:
+            y = dict(self.parse(k['transform']))['translateY'][0]
+            self.assertEqual('blur' in k['filter'], y <= -100, k)
+        big = lambda name, fn: [dict(self.parse(k['transform'])).get(fn, [0]) for k in win[name]['keyframes']]
+        # wobble-flop: wobbles both ways, then flops over to one side, lies
+        # there a moment and springs back up past upright
+        rot = [r[0] for r in big('wobble-flop', 'rotate')]
+        flop = rot.index(min(rot))
+        self.assertLessEqual(min(rot), -75)
+        self.assertTrue(min(rot[:flop]) < 0 < max(rot[:flop]))
+        self.assertIn(rot[flop + 2], rot[flop + 3:flop + 4])
+        self.assertGreater(max(rot[flop:]), 10)
+        # splash: dips, leaps up an arc tilting up then down, splashes in
+        ys = [t[1] for t in big('splash', 'translate')]
+        top = ys.index(min(ys))
+        self.assertGreater(max(ys[:top]), 0)
+        self.assertLessEqual(min(ys), -30)
+        tilt = [r[0] for r in big('splash', 'rotate')]
+        self.assertLess(min(tilt[:top + 1]), 0)
+        self.assertGreater(max(tilt[top:]), 0)
+        self.assertEqual(win['splash']['fx'], 'drops')
+        # pop: a squash, then the big pop to 1.25
+        sc = big('pop', 'scale')
+        peak = sc.index([1.25, 1.25])
+        self.assertTrue(any(x > 1 > y for x, y in sc[:peak]))
+        self.assertEqual(max(max(s) for s in sc), 1.25)
+        # zoom: shoots off the top, a beat away, drops back in from above
+        zy = [t[0] for t in big('zoom', 'translateY')]
+        gone = [i for i, y in enumerate(zy) if y <= -100]
+        self.assertGreaterEqual(len(gone), 2)
+        self.assertEqual(gone, list(range(gone[0], gone[-1] + 1)))
+        self.assertGreater(zy[gone[-1] + 1], 0)                    # it lands, squashed
+        # hop-spin: its own pivot (the picture's middle); a crouch, a high
+        # hop with one full turn ending before the landing, a squash on
+        # landing; at rest at both ends; each squash shifted down so feet on
+        # the bottom pivot stay on the ground
+        hop = win['hop-spin']
+        self.assertEqual(hop['pivot'], 'center')
+        keys = hop['keyframes']
+        num = lambda v: [float(re.sub(r'[a-z%]+$', '', a)) for a in v.split()]
+        for k in (keys[0], keys[-1]):
+            self.assertEqual(set(k) - {'offset', 'easing'}, {'translate', 'rotate', 'scale'})
+            self.assertEqual(num(k['translate']), [0, 0])
+            self.assertEqual(num(k['rotate'])[0] % 360, 0)
+            self.assertEqual(num(k['scale']), [1, 1])
+        self.assertEqual(num(keys[-1]['rotate']), [360])
+        turned = min(k['offset'] for k in keys if k.get('rotate') == '360deg')
+        lands = max((k for k in keys if 'translate' in k), key=lambda k: num(k['translate'])[1])
+        self.assertLess(turned, lands['offset'])
+        sx, sy = num(lands['scale'])
+        self.assertTrue(sx > 1 > sy)
+        self.assertLessEqual(min(num(k['translate'])[1] for k in keys if 'translate' in k), -25)
+        for k in keys:
+            if 'translate' in k and 'scale' in k and num(k['translate'])[1] > 0:
+                self.assertAlmostEqual(num(k['translate'])[1], (1 - num(k['scale'])[1]) * 38, delta=0.1)
+
+    def test_win_of_the_puffs_and_the_drops(self):
+        res = self.run_node(
+            "out([['cheer', 'drive', 'hop-spin', 'splash', 'pop'].map((n) => P.winOf(n)), P.winOf('nope'), P.winOf('constructor'), P.winOf(undefined),"
+            " P.EXHAUST, P.puffOf(P.EXHAUST[0], 151.2),"
+            " P.dropSpecs(1700, () => 0), P.dropSpecs(1700, () => 0.9999), P.DROPS, P.dropOf({ x: 0.3, y: 0.82, dx: -0.1, rise: 0.2, size: 0.03, duration: 600, delay: 272, colour: 'teal' }, 150),"
+            " P.fxOf('exhaust', 1500, 151.2).length, P.fxOf('drops', 1700, 151.2).map((p) => p.className), P.fxOf(null, 1400, 151.2)]);")
+        (wins, nope, ctor, none, exhaust, puff, lo, hi, DROPS, drop, n_puffs, drop_classes, no_fx) = res
+        cheer, drive, hop, splash, pop = wins
+        self.assertEqual(cheer['options'], {'duration': 1900, 'easing': 'ease-in-out'})
+        self.assertEqual([cheer['origin'], cheer['fx']], [None, None])
+        self.assertEqual([drive['options'], drive['fx']], [{'duration': 1500, 'easing': 'ease-in-out'}, 'exhaust'])
+        self.assertEqual([hop['origin'], hop['options']], ['50% 50%', {'duration': 1600}])
+        self.assertEqual([splash['fx'], pop['origin'], pop['options']], ['drops', None, {'duration': 1200}])
+        self.assertEqual([nope, ctor, none], [None, None, None])
+        # the drive's exhaust: the prototype's four puff() calls
+        proto = self.PROTO.read_text()
+        calls = re.findall(r'^\s*puff\((0[^)]*)\);', proto, flags=re.M)
+        self.assertEqual(len(calls), 4)
+        for spec, call in zip(exhaust, calls):
+            args = [a.strip() for a in call.split(',')]
+            delay = float(args[6]) if 'dur' not in args[6] else 1500 * float(args[6].split('*')[1])
+            self.assertEqual([spec[k] for k in ('x', 'y', 'dx', 'dy', 'size', 'duration')], [float(a) for a in args[:6]])
+            self.assertAlmostEqual(spec['delay'], delay)
+        # a puff as the prototype's: from where it is, drifting, swelling and fading
+        for line in ('{ transform: "translate(-50%,-50%) scale(0.3)", opacity: 0 },',
+                     '{ transform: "translate(-50%,-50%) scale(1)", opacity: 0.95, offset: 0.2 },',
+                     '{ transform: `translate(calc(-50% + ${dx * w}px), calc(-50% + ${dy * w}px)) scale(1.5)`, opacity: 0 }',
+                     '], { duration: dur, delay, easing: "ease-out", fill: "both" });',
+                     '.puff {', 'box-shadow: inset -2px -2px 0 rgba(0,0,0,0.12), 0 0 0 1.5px var(--ink);'):
+            self.assertIn(line, proto)
+        self.assertEqual(puff, {'className': 'tv-puff', 'left': '86%', 'top': '84%', 'size': '9.07px',
+                                'keyframes': [{'transform': 'translate(-50%,-50%) scale(0.3)', 'opacity': 0},
+                                              {'transform': 'translate(-50%,-50%) scale(1)', 'opacity': 0.95, 'offset': 0.2},
+                                              {'transform': 'translate(calc(-50% + 15.12px), calc(-50% + -4.54px)) scale(1.5)', 'opacity': 0}],
+                                'options': {'duration': 900, 'delay': 80, 'easing': 'ease-out', 'fill': 'both'}})
+        self.assertEqual(n_puffs, 4)
+        # the splash's drops: 8 as it leaves, 6 as it lands, teal and cream
+        # in turn, from the water line, out away from the middle
+        self.assertEqual(len(lo), 14)
+        self.assertEqual([d['delay'] for d in lo], [0.16 * 1700] * 8 + [0.74 * 1700] * 6)
+        self.assertEqual([d['colour'] for d in lo], ['teal', 'cream'] * 7)
+        self.assertEqual(lo[0], {'x': 0.3, 'y': 0.82, 'dx': -0.06, 'rise': 0.1, 'size': 0.026, 'duration': 550, 'delay': 272, 'colour': 'teal'})
+        for key, top in (('x', 0.7), ('dx', 0.22), ('rise', 0.26), ('size', 0.042), ('duration', 850)):
+            self.assertAlmostEqual(hi[0][key], top, delta=0.001 * top + 0.001)
+        self.assertEqual(DROPS['colours'], ['teal', 'cream'])
+        self.assertEqual(drop['className'], 'tv-drop teal')
+        self.assertEqual([drop['left'], drop['top'], drop['size']], ['30%', '82%', '4.5px'])
+        self.assertEqual(drop['keyframes'], [
+            {'offset': 0, 'transform': 'translate(-50%, -50%) scale(0.4)', 'opacity': 0, 'easing': 'ease-out'},
+            {'offset': 0.15, 'opacity': 1},
+            {'offset': 0.45, 'transform': 'translate(calc(-50% + -7.5px), calc(-50% - 30px)) scale(1)', 'easing': 'ease-in'},
+            {'offset': 0.7, 'opacity': 1},
+            {'offset': 1, 'transform': 'translate(calc(-50% + -15px), calc(-50% + 6px)) scale(0.7)', 'opacity': 0}])
+        self.assertEqual(drop['options'], {'duration': 600, 'delay': 272, 'fill': 'both'})
+        self.assertEqual(drop_classes, ['tv-drop teal', 'tv-drop cream'] * 7)
+        self.assertEqual(no_fx, [])
+
+    def test_the_flash_the_sparks_and_reduced_motions_pulse(self):
+        res = self.run_node(
+            "const r = { left: 100, top: 120, width: 160, height: 120 };"
+            "out([P.FLASH, P.PULSE, P.SPARKS, P.sparkSpecs(r, () => 0.5).slice(0, 2), P.sparkSpecs(r, () => 0)[0], P.sparkSpecs(r).length,"
+            " P.sparkSpecs(r).map((s) => s.colour).slice(0, 4), P.sparkOf(P.sparkSpecs(r, () => 0.5)[0])]);")
+        flash, pulse, sparks, half, low, n, colours, flight = res
+        # today's flash (0.9 to nothing, 200ms, GSAP's power2.out)
+        self.assertEqual(flash, {'keyframes': [{'opacity': 0.9}, {'opacity': 0}], 'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'})
+        # reduced motion: the prototype's pulse
+        self.assertEqual(pulse, {'keyframes': [{'opacity': 1}, {'opacity': 0.7}, {'opacity': 1}], 'duration': 400})
+        self.assertIn('actor.animate([{ opacity: 1 }, { opacity: 0.7 }, { opacity: 1 }], { duration: 400 });', self.PROTO.read_text())
+        # today's sparks: up to 40, 600ms, amber, teal glow and cream
+        self.assertEqual(sparks, {'count': 40, 'duration': 600, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)', 'fadeAt': 0.6,
+                                  'fadeEasing': 'cubic-bezier(0.11, 0, 0.5, 0)', 'colours': ['accent', 'primary', 'error']})
+        self.assertEqual(n, 40)
+        self.assertEqual(colours, ['accent', 'primary', 'error', 'accent'])
+        # evenly spread from the middle half of the picture, out past its
+        # edge, drifting down, turning (celebrate.js's numbers and order)
+        import math
+        cx, cy, w, h = 180, 180, 160, 120
+        for i, s in enumerate(half):
+            angle = i / 40 * 2 * math.pi
+            self.assertAlmostEqual(s['x0'], cx)
+            self.assertAlmostEqual(s['y0'], cy)
+            self.assertAlmostEqual(s['x1'], cx + math.cos(angle) * w * 0.825)
+            self.assertAlmostEqual(s['y1'], cy + math.sin(angle) * w * 0.825 + 25)
+            self.assertEqual([s['turn0'], s['turn1'], s['scale']], [180, 405, 0.95])
+        self.assertAlmostEqual(low['x0'], cx - w / 4)
+        self.assertAlmostEqual(low['y0'], cy - h / 4)
+        self.assertAlmostEqual(low['x1'], cx - w / 4 + math.cos(-0.3) * w * 0.55)
+        self.assertAlmostEqual(low['y1'], cy - h / 4 + math.sin(-0.3) * w * 0.55 + 10)
+        self.assertEqual([low['turn0'], low['turn1'], low['scale']], [0, 90, 0.7])
+        self.assertEqual(flight['keyframes'], [
+            {'offset': 0, 'transform': 'translate(180px, 180px) rotate(180deg) scale(0.95)', 'opacity': 1, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'},
+            {'offset': 0.6, 'opacity': 1, 'easing': 'cubic-bezier(0.11, 0, 0.5, 0)'},
+            {'offset': 1, 'transform': 'translate(312px, 205px) rotate(405deg) scale(0.95)', 'opacity': 0}])
+        self.assertEqual(flight['options'], {'duration': 600, 'fill': 'forwards'})
+
+    # --- the subscriber (PictureLifeTests' stand-ins) ---
+
+    WIN = """
+        data.cat.motion.win = 'cheer'; data.bat.motion.win = 'hop-spin'; data.bus.motion.win = 'drive';
+        const ready = async (i, o = {}) => { P.renderPicture(at(i, o)); await decodeAll(); P.renderPicture(at(i, { tuned: true, ...o })); };
+        const correct = (i, o = {}) => ({ ...at(i, { tuned: true, ...o }), current: { word: words[i].word, status: 'correct' } });
+        const layers = () => body.kids.filter((k) => k.className === 'confetti');
+        const anim = (name) => [...live].filter((a) => a.target.name === name);
+    """
+
+    def run_win(self, body):
+        return self.run_node(PictureLifeTests.FAKE + self.WIN + body)
+
+    def test_a_correct_check_plays_the_words_win_once(self):
+        res = self.run_win(
+            "await ready(0); take();"
+            "P.renderPicture(correct(0)); const c = take();"
+            "const sparkLayer = layers(); const pieces = sparkLayer[0].kids.map((k) => k.className);"
+            "const idlePaused = anim('actor').map((a) => a.paused); const origin = subject.style.transformOrigin;"
+            # a re-render in the same state plays nothing again
+            "P.renderPicture(correct(0)); P.renderPicture(correct(0, { lives: 3 })); const again = take();"
+            # the move ends: the idle plays on; the sparks land: their layer goes
+            "anim('subject')[0].finish(); await tick(); const after = take(); const idleNow = anim('actor').map((a) => a.paused);"
+            "anim('confetti-piece').forEach((a) => a.finish()); await tick(); const gone = layers().length;"
+            "out([c.map((x) => x.slice(0, 2)), c.filter((x) => x[1] === 'flash' || x[1] === 'subject').map((x) => x.slice(2)),"
+            " pieces.length, [...new Set(pieces)], sparkLayer[0].attrs, idlePaused, origin, again, after, idleNow, gone, fx.kids.length]);")
+        (calls, moves, n, kinds, attrs, paused, origin, again, after, idle_now, gone, n_fx) = res
+        # the flash, the idle paused, the subject's cheer, then 40 sparks
+        self.assertEqual(calls, [['animate', 'flash'], ['pause', 'actor'], ['animate', 'subject']] + [['animate', 'confetti-piece']] * 40)
+        self.assertEqual(moves[0], [[{'opacity': 0.9}, {'opacity': 0}], {'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'}])
+        cheer = self.run_node("out(P.WIN.cheer.keyframes);")
+        self.assertEqual(moves[1], [cheer, {'duration': 1900, 'easing': 'ease-in-out'}])
+        self.assertEqual(n, 40)
+        self.assertEqual(sorted(kinds), ['confetti-piece accent', 'confetti-piece error', 'confetti-piece primary'])
+        self.assertEqual(attrs, {'aria-hidden': 'true'})
+        self.assertEqual(paused, [True])
+        self.assertEqual(origin, '50% 88%')                     # the cat's pivot
+        self.assertEqual(again, [])
+        self.assertEqual(after, [['play', 'actor']])
+        self.assertEqual(idle_now, [False])
+        self.assertEqual(gone, 0)
+        self.assertEqual(n_fx, 0)                               # a cheer throws nothing
+
+    def test_the_drive_blows_puffs_and_the_hop_spin_turns_about_the_middle(self):
+        res = self.run_win(
+            "await ready(3); take(); P.renderPicture(correct(3)); const c = take();"
+            "const puffs = fx.kids.map((k) => [k.className, k.style.left, k.style.top, k.style.width, k.style.height]);"
+            "anim('tv-puff').slice(0, 2).forEach((a) => a.finish()); await tick(); const left = fx.kids.length;"
+            "await ready(1); take(); P.renderPicture(correct(1)); const hop = take();"
+            "out([c.filter((x) => x[1] === 'subject').map((x) => x[3]), c.filter((x) => x[1] === 'tv-puff').map((x) => x[3]), puffs, left,"
+            " subject.style.transformOrigin, hop.filter((x) => x[1] === 'subject').map((x) => x[3]), fx.kids.length]);")
+        drive, puff_opts, puffs, left, origin, hop, n_fx = res
+        self.assertEqual(drive, [{'duration': 1500, 'easing': 'ease-in-out'}])
+        self.assertEqual([o['delay'] for o in puff_opts], [80, 160, 1080, 1140])
+        self.assertEqual(puffs[0], ['tv-puff', '86%', '84%', '9.07px', '9.07px'])
+        self.assertEqual(len(puffs), 4)
+        self.assertEqual(left, 2)                               # a puff goes when its flight ends
+        self.assertEqual(origin, '50% 50%')                     # hop-spin's own pivot (the bat's is the top)
+        self.assertEqual(hop, [{'duration': 1600}])
+        self.assertEqual(n_fx, 0)                               # the bus's puffs went with its word
+
+    def test_the_splash_throws_drops(self):
+        res = self.run_win(
+            "data.cat.motion.win = 'splash'; await ready(0); take(); P.renderPicture(correct(0)); take();"
+            "out([fx.kids.map((k) => k.className), anim('tv-drop').length]);")
+        classes, n = res
+        self.assertEqual(classes, ['tv-drop teal', 'tv-drop cream'] * 7)
+        self.assertEqual(n, 14)
+
+    def test_no_layers_showing_the_whole_picture_pops(self):
+        res = self.run_win(
+            # the duck has no motion: its still picture pops, with the flash and the sparks
+            "await ready(2); take(); P.renderPicture(correct(2)); const duck = take(); const s1 = layers().length;"
+            # a word whose layers have not decoded by its check: the same
+            "P.renderPicture(at(0)); P.renderPicture(at(0, { tuned: true })); take(); const s2 = layers().length;"
+            "P.renderPicture(correct(0)); const early = take();"
+            "out([duck.map((x) => x.slice(0, 2)).filter((x) => x[1] !== 'confetti-piece'), duck.filter((x) => x[1] === 'still').map((x) => x.slice(2)),"
+            " s1, s2, early.map((x) => x.slice(0, 2)).filter((x) => x[1] !== 'confetti-piece'), layers().length]);")
+        duck, still_move, sparks_duck, cleared, early, sparks_early = res
+        pop = self.run_node("out(P.WIN.pop.keyframes);")
+        self.assertEqual(duck, [['animate', 'flash'], ['animate', 'still']])
+        self.assertEqual(still_move, [[pop, {'duration': 1200}]])
+        self.assertEqual(sparks_duck, 1)
+        self.assertEqual(cleared, 0)                             # the next word took the duck's sparks away
+        self.assertEqual(early, [['animate', 'flash'], ['animate', 'still']])
+        self.assertEqual(sparks_early, 1)
+
+    def test_reduced_motion_is_the_flash_and_a_pulse(self):
+        res = self.run_win(
+            "reduced = true; await ready(0); take(); P.renderPicture(correct(0)); const cat = take();"
+            "await ready(2); take(); P.renderPicture(correct(2)); const duck = take();"
+            "out([cat.map((x) => x.slice(1)), duck.map((x) => x[1]), layers().length, fx.kids.length]);")
+        cat, duck, n_layers, n_fx = res
+        self.assertEqual(cat, [['flash', [{'opacity': 0.9}, {'opacity': 0}], {'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'}],
+                               ['subject', [{'opacity': 1}, {'opacity': 0.7}, {'opacity': 1}], {'duration': 400}]])
+        self.assertEqual(duck, ['flash', 'still'])
+        self.assertEqual([n_layers, n_fx], [0, 0])               # no sparks, no puffs or drops
+
+    def test_a_new_word_leaving_or_a_hidden_page_stops_it(self):
+        res = self.run_win(
+            "data.cat.motion.win = 'drive'; await ready(0); take(); P.renderPicture(correct(0)); take();"
+            # the dome's next: the move, its puffs, the flash and the sparks stop; the idle is not played again
+            "P.renderPicture(at(1)); await tick(); const next = take(); const s1 = [live.size, layers().length, fx.kids.length];"
+            # the duck popping when the round ends
+            "await ready(2); P.renderPicture(correct(2)); take(); P.renderPicture({ ...correct(2), screen: 'round-end' }); const left = take();"
+            # a hidden page stops it; shown again, the life runs on and the win is not played again
+            "await ready(3); P.renderPicture(correct(3)); take(); document.hidden = true; P.renderPicture(correct(3)); await tick(); const hidden = take();"
+            "const s2 = [live.size, layers().length, fx.kids.length];"
+            "document.hidden = false; P.renderPicture(correct(3)); const shown = take();"
+            # a revealed word has no win
+            "await ready(0, { roundsStarted: 2 }); take(); P.renderPicture({ ...at(0, { tuned: true, roundsStarted: 2 }), current: { word: 'cat', status: 'revealed' } });"
+            "out([next.map((x) => x[0] + ' ' + x[1]), s1, left.map((x) => x[0] + ' ' + x[1]), hidden.map((x) => x[0] + ' ' + x[1]), s2,"
+            " shown.map((x) => x[0] + ' ' + x[1]), take(), layers().length]);")
+        nxt, s1, left, hidden, s2, shown, revealed, n_layers = res
+        cancelled = [c for c in nxt if c.startswith('cancel')]
+        for part in ('cancel subject', 'cancel actor', 'cancel tv-puff', 'cancel flash', 'cancel plate'):
+            self.assertIn(part, cancelled)
+        self.assertEqual(cancelled.count('cancel tv-puff'), 4)
+        self.assertNotIn('play actor', nxt)
+        self.assertEqual(s1, [0, 0, 0])
+        self.assertIn('cancel still', left)
+        self.assertIn('cancel flash', left)
+        self.assertIn('cancel subject', hidden)
+        self.assertIn('cancel flash', hidden)
+        self.assertNotIn('play actor', hidden)
+        self.assertEqual(s2, [0, 0, 0])
+        self.assertEqual([c for c in shown if c.startswith('animate')], ['animate actor', 'animate plate'] + ['animate mote'] * 6)
+        self.assertEqual(revealed, [])
+        self.assertEqual(n_layers, 0)
+
+    # --- wiring: celebrate.js, motion.js, the template, game.css ---
+
+    def test_the_flash_and_the_sparks_moved_here_from_celebrate_js(self):
+        celebrate = self.code('celebrate.js')
+        for word in ('tv-flash', 'confetti', 'flashTv', 'burstConfetti'):
+            self.assertNotIn(word, celebrate, word)
+        # the slots' pulse and the cogs stay there
+        self.assertIn('pulseBoxes();', celebrate)
+        self.assertIn('flyGears(', celebrate)
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'picture.js':
+                self.assertNotIn("'confetti'", self.code(f.name), f.name)
+                self.assertNotIn('.tv-flash', self.code(f.name), f.name)
+                self.assertNotIn('.tv-fx', self.code(f.name), f.name)
+        pic = self.code('picture.js')
+        # Web Animations only, as the life (no GSAP, timers or frames)
+        for word in ('gsap', 'setTimeout', 'requestAnimationFrame', 'setState'):
+            self.assertNotIn(word, pic, word)
+        self.assertEqual(re.findall(r'^let (\w+)', pic, flags=re.M), ['shown', 'dom'])
+
+    def test_the_fx_layer_and_its_look(self):
+        html = self.HTML.read_text()
+        life = html[html.index('<div class="tv-life" aria-hidden="true">'):html.index('<canvas class="tv-tune"')]
+        self.assertLess(life.index('class="tv-actor"'), life.index('<div class="tv-fx"></div>'))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 34)
+        fx = self.rule('#screen-play .tv-fx')
+        for decl in ('position: absolute;', 'inset: 0;'):
+            self.assertIn(decl, fx)
+        self.assertIn('pointer-events: none;', self.rule('#screen-play .tv-life'))
+        pieces = re.search(r'\n#screen-play \.tv-puff,\n#screen-play \.tv-drop\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        for decl in ('position: absolute;', 'opacity: 0;'):
+            self.assertIn(decl, pieces)
+        puff = self.rule('#screen-play .tv-puff')
+        self.assertIn('background: var(--cream);', puff)
+        self.assertIn('box-shadow: inset calc(-2 * var(--u)) calc(-2 * var(--u)) 0 var(--puff-shade), 0 0 0 calc(1.5 * var(--u)) var(--ink);', puff)
+        self.assertIn('--puff-shade: color-mix(in srgb, var(--ink) 14%, transparent);', self.css())
+        self.assertIn('box-shadow: 0 0 0 var(--u) var(--ink);', self.rule('#screen-play .tv-drop'))
+        self.assertIn('background: var(--teal-glow);', self.rule('#screen-play .tv-drop.teal'))
+        self.assertIn('background: var(--cream);', self.rule('#screen-play .tv-drop.cream'))
+        # the sparks' layer: fixed, click-through, never widening the page
+        for decl in ('position: fixed;', 'pointer-events: none;', 'overflow: hidden;'):
+            self.assertIn(decl, self.rule('.confetti'))
+        for role, colour in (('accent', 'amber'), ('primary', 'teal-glow'), ('error', 'cream')):
+            self.assertIn(f'color: var(--{colour});', self.rule(f'.confetti-piece.{role}'))

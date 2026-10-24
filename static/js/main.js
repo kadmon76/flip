@@ -7,7 +7,8 @@
 // play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
 // the TV's lock (tv.js) and the picture's life after it (picture.js,
-// BACKLOG B-221), screen renders. The kid's gears (gears.js,
+// BACKLOG B-221) with its win on a correct check (BACKLOG B-222), screen
+// renders. The kid's gears (gears.js,
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
 // kept in state.gears for the gear counters (cogs.js); and spent on boosts
 // (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
@@ -691,7 +692,7 @@ subscribe(renderCard);
 subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places the boost tray and the glowing slots on it
 subscribe(renderFeedback);    // after the card render: keys off its DOM (and the boost tray's)
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
-subscribe(renderPicture);     // after the TV: the picture's life once it has locked (BACKLOG B-221)
+subscribe(renderPicture);     // after the TV: the picture's life once it has locked (BACKLOG B-221), its win (B-222)
 subscribe(renderControls);
 subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
 subscribe(renderRoundEnd);
@@ -744,8 +745,8 @@ window.addEventListener('resize', () => {
     renderBoost(state, BOOST_TAPS);
 });
 
-// The picture's life (picture.js, BACKLOG B-221) stops while the page is
-// hidden and starts again when it shows.
+// The picture's life (picture.js, BACKLOG B-221) and its win (B-222) stop
+// while the page is hidden; the life starts again when it shows.
 document.addEventListener('visibilitychange', () => renderPicture(state));
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive

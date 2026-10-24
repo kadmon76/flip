@@ -67,6 +67,7 @@
     /* TV static on a wrong check: light and dark noise lines */
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
     --static-dark: color-mix(in srgb, var(--ink) 55%, transparent);
+    --puff-shade: color-mix(in srgb, var(--ink) 14%, transparent);   /* the win's exhaust puffs, their shaded side (B-222) */
 
     /* type (DESIGN.md "Type"): Andika Bold for the letter blocks,
        Courier Prime Bold for the split-flap logo and counter. The interim
@@ -720,10 +721,46 @@ body[data-screen="play"] .play-back-btn {
     opacity: 0;
 }
 
+/* The win's puffs and drops (BACKLOG B-222, picture.js): .tv-fx lies over
+   the subject, inside the TV's mask; picture.js places each piece (left,
+   top and size inline, from the picture's width) and removes it when its
+   flight ends. Puffs: the drive's exhaust, as the prototype's (cream, an
+   ink outline, the lower right shaded). Drops: the splash's, teal and
+   cream, outlined in ink. Invisible at rest. */
+#screen-play .tv-fx {
+    position: absolute;
+    inset: 0;
+}
+
+#screen-play .tv-puff,
+#screen-play .tv-drop {
+    position: absolute;
+    opacity: 0;
+}
+
+#screen-play .tv-puff {
+    border-radius: 50%;
+    background: var(--cream);
+    box-shadow: inset calc(-2 * var(--u)) calc(-2 * var(--u)) 0 var(--puff-shade), 0 0 0 calc(1.5 * var(--u)) var(--ink);
+}
+
+#screen-play .tv-drop {
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    box-shadow: 0 0 0 var(--u) var(--ink);
+}
+
+#screen-play .tv-drop.teal {
+    background: var(--teal-glow);
+}
+
+#screen-play .tv-drop.cream {
+    background: var(--cream);
+}
+
 /* Wrong check: static over the picture, fine light and dark noise lines
    on the tube; feedback.js flickers it for 150ms. Correct check: the
-   screen flashes warm white; celebrate.js fades it out over 200ms. Both
-   are invisible at rest and sit under the scanlines. */
+   screen flashes warm white; picture.js fades it out over 200ms (BACKLOG
+   B-222). Both are invisible at rest and sit under the scanlines. */
 #screen-play .tv-static,
 #screen-play .tv-flash {
     position: absolute;
@@ -2405,11 +2442,11 @@ body[data-screen="theme"] .header-gears {
     color: var(--brass-dark);
 }
 
-/* --- Sparks (celebrate.js's confetti, correct check) --- */
+/* --- Sparks (picture.js, correct check; BACKLOG B-222) --- */
 
-/* A fixed, click-through layer over the page; celebrate.js positions
-   the pieces from the TV picture's centre with GSAP and removes the layer
-   when the 600ms burst ends. overflow hidden so a piece flying past the
+/* A fixed, click-through layer over the page; picture.js flies the
+   pieces from the TV picture's middle with Web Animations and removes the
+   layer when the 600ms burst ends. overflow hidden so a piece flying past the
    edge never widens the page. Below the frame. */
 .confetti {
     position: fixed;
@@ -2420,7 +2457,7 @@ body[data-screen="theme"] .header-gears {
 }
 
 /* sparks (DESIGN "Feedback"): small glowing dots in amber, teal glow and
-   cream (the class names are celebrate.js's colour roles) */
+   cream (the class names are picture.js's colour roles, SPARKS.colours) */
 .confetti-piece {
     position: absolute;
     top: 0;
