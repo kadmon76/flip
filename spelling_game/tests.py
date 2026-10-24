@@ -596,10 +596,11 @@ class StarsTests(TestCase):
 
 class CelebrateMotionSpecTests(TestCase):
     """static/js/motion.js motionFor() for the reward beats (BACKLOG B-110,
-    DESIGN.md "Motion"): a correct check pulses the boxes once and bursts up
-    to 40 confetti pieces over 600ms in total; earned stars pop in with
-    back.out(1.4), 200ms each. Reduced motion: fades only, no confetti, no
-    overshoot."""
+    DESIGN.md "Motion"): a correct check pulses the boxes once; earned
+    stars pop in with back.out(1.4), 200ms each. Reduced motion: fades
+    only, no overshoot. The TV's flash and its up to 40 sparks over 600ms
+    are picture.js's since BACKLOG B-222 (PictureWinTests); motion.js has
+    no spec for them any more."""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
 
@@ -625,10 +626,13 @@ class CelebrateMotionSpecTests(TestCase):
         self.assertLessEqual(m['duration'], 0.6)
         self.assertNotIn('back', m['ease'])
 
-    def test_confetti_is_up_to_40_pieces_over_600ms(self):
-        m = self.motion('confetti', False)
-        self.assertEqual(m['count'], 40)
-        self.assertEqual(m['duration'], 0.6)
+    def test_the_sparks_and_the_flash_moved_to_picture_js(self):
+        script = (
+            f"import {{ motionFor }} from '{self.MODULE.as_uri()}';"
+            "for (const kind of ['confetti', 'flash']) { try { motionFor(kind, false); console.log('has ' + kind); } catch (e) { /* gone */ } }"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual((result.returncode, result.stdout), (0, ''), result.stderr)
 
     def test_star_pop_overshoots_200ms_per_star_one_after_another(self):
         m = self.motion('starPop', False)
@@ -640,8 +644,6 @@ class CelebrateMotionSpecTests(TestCase):
         pulse = self.motion('pulse', True)
         self.assertEqual((pulse['duration'], pulse['scale'], pulse['ease']), (0, 1, 'none'))
         self.assertGreater(pulse['fade'], 0)
-
-        self.assertEqual(self.motion('confetti', True)['count'], 0)
 
         star = self.motion('starPop', True)
         self.assertEqual((star['duration'], star['scale'], star['ease']), (0, 1, 'none'))
@@ -1117,9 +1119,10 @@ class ConsoleMotionSpecTests(TestCase):
     """static/js/motion.js motionFor() for the console and the feedback
     (BACKLOG B-114, DESIGN "Controls and states", "Feedback"): wrong blocks
     wiggle ±6px in 300ms; the rail shakes ±4px in 200ms; the lost bulb
-    flickers three times; the TV static lasts 150ms and the warm-white
-    flash 200ms; revealed blocks fly in 120ms apart; reset blocks hop back
-    in 300ms, 30ms apart. Reduced motion: opacity fades only."""
+    flickers three times; the TV static lasts 150ms; revealed blocks fly in
+    120ms apart; reset blocks hop back in 300ms, 30ms apart. Reduced
+    motion: opacity fades only. (The correct check's warm-white flash,
+    200ms, is picture.js's since BACKLOG B-222: PictureWinTests.)"""
 
     MODULE = Path(__file__).resolve().parent.parent / 'static' / 'js' / 'motion.js'
 
@@ -1147,11 +1150,10 @@ class ConsoleMotionSpecTests(TestCase):
         for m in (w, r):
             self.assertNotIn('back', m['ease'])
 
-    def test_bulb_flicker_tv_static_and_flash(self):
+    def test_bulb_flicker_and_tv_static(self):
         self.assertEqual(self.motion('flicker', False)['flashes'], 3)
         self.assertLessEqual(self.motion('flicker', False)['duration'], 0.3)
         self.assertEqual(self.motion('tvStatic', False)['duration'], 0.15)
-        self.assertEqual(self.motion('flash', False)['duration'], 0.2)
 
     def test_reveal_fly_in_and_reset_hop(self):
         f = self.motion('flyIn', False)
@@ -1164,12 +1166,12 @@ class ConsoleMotionSpecTests(TestCase):
         self.assertNotIn('back', h['ease'])
 
     def test_reduced_motion_is_fades_only(self):
-        for kind in ('wiggle', 'shake', 'flicker', 'tvStatic', 'flash', 'flyIn', 'hop'):
+        for kind in ('wiggle', 'shake', 'flicker', 'tvStatic', 'flyIn', 'hop'):
             m = self.motion(kind, True)
             self.assertEqual((m['duration'], m['scale'], m['ease']), (0, 1, 'none'), kind)
             for key in ('distance', 'flashes', 'height'):
                 self.assertEqual(m.get(key, 0), 0, (kind, key))
-        for kind in ('wiggle', 'flicker', 'tvStatic', 'flash', 'flyIn', 'hop'):
+        for kind in ('wiggle', 'flicker', 'tvStatic', 'flyIn', 'hop'):
             self.assertGreater(self.motion(kind, True)['fade'], 0, kind)
         self.assertEqual(self.motion('flyIn', True)['stagger'], 0.12)
 
@@ -1391,18 +1393,22 @@ class CharacterTests(TestCase):
         self.assertEqual(steps('roundStart'), [
             {'at': 0, 'sink': 0, 'head': 0, 'eyes': 'idle', 'brows': 'up', 'hands': 'wave', 'pop': 1},
             {'at': 0.6, 'brows': 'calm', 'hands': 'rest'}])
+        # each look's line (B-224): the word's Hebrew guess, else its pool
         self.assertEqual(variants('picture'), {
             'surprise': {'chance': 1 / 3, 'steps': [
                 {'at': 0, 'sink': 0, 'head': -10, 'look': [0, -22], 'eyes': 'wide', 'brows': 'up', 'hands': 'gasp', 'pop': 1},
-                {'at': 1.4, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+                {'at': 1.4, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
+                'lines': ['hebrew', 'picture-surprise']},
             'giggle': {'chance': 1 / 3, 'steps': [
                 {'at': 0, 'sink': 0, 'head': -8, 'look': [0, -22], 'eyes': 'happy', 'brows': 'happy', 'hands': 'giggle'},
                 {'at': 0.2, 'fx': 'giggle'},
-                {'at': 1.8, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+                {'at': 1.8, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
+                'lines': ['hebrew', 'picture-giggle']},
             'shock': {'chance': 1 / 3, 'steps': [
                 {'at': 0, 'sink': 0, 'head': -12, 'look': [0, -24], 'eyes': 'dots', 'brows': 'worried', 'hands': 'shock', 'pop': 1},
                 {'at': 0.5, 'eyes': 'wide'},
-                {'at': 1.9, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}]},
+                {'at': 1.9, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': -4}],
+                'lines': ['hebrew', 'picture-shock']},
         })
         for m in ('blockPlaced', 'blockReturned', 'filled'):
             self.assertEqual(steps(m), LP, m)
@@ -1457,9 +1463,11 @@ class CharacterTests(TestCase):
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
             'boostGiven', 'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
+        # (B-224: a whisper of pool `peek`, only while he is quiet)
         self.assertEqual(self.run_node("out(c.PEEK);"), {'wait': 1.6, 'every': 4.8, 'steps': [
             {'at': 0, 'sink': 104, 'look': [-26, -8], 'brows': 'up'}, {'at': 0.9, 'look': [26, -8]},
-            {'at': 1.6, 'look': [0, -10]}, {'at': 2.2, 'sink': 150, 'brows': 'calm'}]})
+            {'at': 1.6, 'look': [0, -10]}, {'at': 2.2, 'sink': 150, 'brows': 'calm'}],
+            'lines': ['peek'], 'ifQuiet': True})
 
     def test_every_part_a_step_names_exists(self):
         # every eyes / brows / hands / fx / pop a step names is in its
@@ -2209,6 +2217,35 @@ class PuppetRenderTests(TestCase):
         self.assertIn('applyStep', res['dropped'])
         self.assertEqual(res['again'], [])
 
+    def test_his_peeks_tell_on_peek_and_his_look_is_picked_by_the_word(self):
+        # BACKLOG B-224: renderRobot(state, onPeek): each idle peek tells
+        # onPeek as he comes up (main.js hands it audio.js peekLine, his
+        # whisper), and the next peek still will; the picture's look is
+        # picked by the word's key (picksFor), the look audio.js's line
+        # (picture-<look>) goes with
+        res = self.run_node(
+            "c.renderRobot(theme); c.renderRobot(st()); take();"
+            "const due = []; const real = globalThis.gsap.delayedCall;"
+            "globalThis.gsap.delayedCall = (t, fn, args) => due.push([t, fn, args || []]);"
+            "let peeks = 0; const onPeek = () => { peeks++; };"
+            "c.renderRobot(st({ idleBeat: 'sunk' }), onPeek);"
+            "const step = due.find(([, fn, args]) => fn.name === 'applyStep' && args[0].peek); due.length = 0; step[1](...step[2]);"
+            "const first = due.find(([, fn]) => fn.name === 'peekOnce'); due.length = 0; const before = peeks; first[1](...first[2]);"
+            "const next = due.find(([, fn]) => fn.name === 'peekOnce');"
+            "const peek = [first[0], before, peeks, next[0], next[2][0] === onPeek, due.filter(([, fn]) => fn.name === 'applyStep').length];"
+            "globalThis.gsap.delayedCall = real; const hands = { surprise: 'gasp', giggle: 'giggle', shock: 'shock' }; const looks = [];"
+            "for (const w of ['cat', 'dog', 'fox', 'bus', 'egg', 'sofa', 'lemon', 'key']) {"
+            " const on = (tuned) => st({ tuned, current: { word: w, status: 'playing', placed: put('-'.repeat(w.length)) } });"
+            " c.renderRobot(theme); c.renderRobot(on(false)); take(); c.renderRobot(on(true));"
+            " const first = take().find((e) => e[0] === 'delayedCall' && e[2] === 'applyStep')[3][0];"
+            " looks.push([first.hands, hands[c.picksFor(['picture'], c.snapshot(on(true))).picture]]); }"
+            "out([peek, looks]);")
+        peek, looks = res
+        self.assertEqual(peek, [1.6, 0, 1, 4.8, True, 3])
+        for shown, picked in looks:
+            self.assertEqual(shown, picked)
+        self.assertGreater(len({shown for shown, _ in looks}), 1)
+
     def test_wiring(self):
         js = self.ROOT / 'static' / 'js'
         code = lambda f: re.sub(r'/\*.*?\*/|//[^\n]*', '', (js / f).read_text(), flags=re.S)
@@ -2331,9 +2368,13 @@ class AudioTests(TestCase):
             [0, 5, 9, 9, 0, -1])
 
     def test_channels(self):
-        # the TV's tune-in hiss (B-214) is an effect, like the swipe
+        # the TV's tune-in hiss (B-214) is an effect, like the swipe, and
+        # so is the round end's tada (B-224: under his end line); the
+        # word he says on a correct check and his lines (B-223, B-224) are
+        # his voice
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx'})
+                         {'correct': 'voice', 'error': 'voice', 'tada': 'fx', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
+                          'word': 'voice', 'line': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -2348,7 +2389,8 @@ class AudioTests(TestCase):
             ['flip.muted', False, 'true', True, 'false', False, False, False, False, 'no throw', False])
 
     def test_nothing_plays_on_load_and_a_gesture_unlocks(self):
-        # init() downloads every clip once and plays nothing, with no
+        # init() downloads every clip once (and fetches his new voice's
+        # manifest, B-223) and plays nothing, with no
         # AudioContext yet; the first pointerup / touchend / click /
         # keydown makes one context, resumes it and plays one silent
         # sample (iOS opens the output on that), then the clips decode.
@@ -2356,14 +2398,15 @@ class AudioTests(TestCase):
         # suspended (the phone switched apps) resumes it again; one
         # finding it running does nothing.
         self.assertEqual(self.run_node(
-            "a.init(); const before = [fetched.length, new Set(fetched).size, ctxs.length, log.length, Object.keys(listeners).sort()];"
+            "a.init(); const before = [fetched.length, new Set(fetched).size, fetched.filter((u) => u === '/static/voice/manifest.json').length,"
+            " ctxs.length, log.length, Object.keys(listeners).sort()];"
             "a.play('swipe'); const early = log.length;"
             "listeners.touchend(); const c = ctxs[0]; const first = [ctxs.length, c.state, c.resumes, log.map((e) => e.src)];"
             "await settle(); clear(); a.play('swipe'); const after = kinds();"
             "listeners.click(); const quiet = [ctxs.length, c.resumes];"
             "c.state = 'interrupted'; listeners.pointerup();"
             "out([before, early, first, after, quiet, [c.state, c.resumes], Object.keys(listeners).length]);"),
-            [[25, 25, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
+            [[26, 26, 1, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
              [1, 'running', 1, ['silence']], ['swipe'], [1, 1], ['running', 2], 4])
 
     def test_no_web_audio_means_silent_not_broken(self):
@@ -2396,7 +2439,8 @@ class AudioTests(TestCase):
             "const word = made[made.length - 1]; const voiceCut = sounding();"
             "clear(); a.play('correct'); a.play('tada'); a.play('swipe');"
             "out([voiceCut, kinds(), word.paused, ended]);"),
-            [[], ['swipe'], False, 0])
+            # the effects (the tada since B-224, the swipe) may overlap it
+            [[], ['tada', 'swipe'], False, 0])
 
     def test_muted_means_no_sound_at_all(self):
         self.assertEqual(self.run_node(
@@ -3253,7 +3297,7 @@ class StageTests(TestCase):
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
-        self.assertIn('current: makeWord(state.words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
+        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
         # nothing else writes a round's stage; leaving a round clears it
         main = self.code('main.js')
         self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
@@ -3644,7 +3688,7 @@ class StageStartTests(TestCase):
         main = self.code('main.js')
         # since B-208 the pick goes through pickRound (the theme's missed
         # words back, then pickWords by the stage)
-        self.assertIn("import { pickRound, makeWord } from './round.js';", main)
+        self.assertIn("import { pickRound, makeWord, swapForStruggle } from './round.js';", main)
         self.assertNotIn('makeCurrent', main)
         self.assertNotIn('shuffle', main)
         start = self.function('startRound')
@@ -3652,7 +3696,7 @@ class StageStartTests(TestCase):
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
         nxt = self.function('onNext')
-        self.assertIn('current: makeWord(state.words[nextIndex], state.round.stage, newTileId),', nxt)
+        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', nxt)
 
     def test_the_reveal_keeps_a_locked_letter_locked(self):
         # the reveal moved to drag.js with B-207 (a pure transition)
@@ -7090,6 +7134,391 @@ class StageRoundTests(TestCase):
         self.assertEqual({words.index('sheep') for words in rounds if 'sheep' in words}, {0, 1, 2, 3, 4})
 
 
+class StruggleSwapTests(TestCase):
+    """Struggle help (BACKLOG B-220, PROGRESSION.md "Guardrails"): after
+    three words in a row of a round that were not clean (a wrong check, a
+    boost or a reveal), the next two words not yet shown are swapped for
+    solved words of the theme's earlier stages (round.js swapForStruggle,
+    pure, run through node with a seeded Math.random; main.js onNext
+    applies it before the next word). Nothing on stage 1 or when no earlier
+    word is solved; words swapped out stay unsolved and come back. On a
+    full test theme, the frozen sparse data and today's theme files."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    FULL = StageRoundTests.FULL
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"const M = await import('{(self.JS / 'missed.js').as_uri()}');"
+            "const seeded = (s) => () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            # a round's word as main.js startRound makes it
+            "const entry = (data, w) => ({ word: w, image: data[w].image, audio: data[w].audio, break: data[w].break });"
+            "const entries = (data, names) => names.map((w) => entry(data, w));"
+            "const names = (words) => words.map((e) => e.word);"
+            # results that are not clean: a wrong check (then right), a
+            # boost, a reveal; and a clean one
+            "const wrong = (w) => ({ word: w, correct: true, clean: false, boosted: false });"
+            "const boost = (w) => ({ word: w, correct: true, clean: false, boosted: true });"
+            "const reveal = (w) => ({ word: w, correct: false, clean: false, boosted: false });"
+            "const clean = (w) => ({ word: w, correct: true, clean: true, boosted: false });"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    def full(self):
+        return {w: {'image': f'/{w}.svg', 'audio': f'/{w}.mp3', 'stage': s}
+                for s, words in self.FULL.items() for w in words}
+
+    def sparse(self, theme):
+        return json.loads((self.ROOT / SPARSE_DATA / f'{theme}.json').read_text())
+
+    def stage_of(self, data, word):
+        return data[word]['stage']
+
+    # --- round.js swapForStruggle ---
+
+    def test_three_not_clean_swap_the_next_two_for_solved_words_of_the_stage_before(self):
+        data = self.full()
+        solved = self.FULL[1] + self.FULL[2]
+        runs = {
+            'reveals': "[reveal(w[0]), reveal(w[1]), reveal(w[2])]",
+            'wrong checks': "[wrong(w[0]), wrong(w[1]), wrong(w[2])]",
+            'boosts': "[boost(w[0]), boost(w[1]), boost(w[2])]",
+            'mixed': "[wrong(w[0]), boost(w[1]), reveal(w[2])]",
+        }
+        for label, run in runs.items():
+            res = self.run_node(
+                f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])};"
+                "const words = entries(data, w);"
+                f"out(Array.from({{ length: 40 }}, (_, i) => R.swapForStruggle(words, 2, {run}, data, 3,"
+                f" {json.dumps(solved)}, seeded(i + 1))));")
+            seen = set()
+            for words in res:
+                self.assertEqual([e['word'] for e in words[:3]], self.FULL[3][:3], label)
+                swapped = [e['word'] for e in words[3:]]
+                self.assertEqual(len(set(swapped)), 2, label)
+                # the nearest earlier stage first: stage 2 has five solved words
+                self.assertLessEqual(set(swapped), set(self.FULL[2]), label)
+                for e in words[3:]:
+                    self.assertEqual(e, {'word': e['word'], 'image': f"/{e['word']}.svg", 'audio': f"/{e['word']}.mp3"})
+                seen |= set(swapped)
+            # each stage's words at random
+            self.assertEqual(seen, set(self.FULL[2]), label)
+
+    def test_the_nearest_earlier_stage_first_then_the_ones_before(self):
+        data = self.full()
+        # stage 5: one solved word on stage 4, none on 3, one on 2
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[5])};"
+            "const words = entries(data, w); const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            f"out(Array.from({{ length: 20 }}, (_, i) => names(R.swapForStruggle(words, 2, run, data, 5,"
+            f" {json.dumps(self.FULL[1] + ['frog', 'mole'])}, seeded(i + 1)))));")
+        for words in res:
+            self.assertEqual(words, self.FULL[5][:3] + ['mole', 'frog'])
+        # long: stage 5 first
+        long = self.FULL['long'][:5]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(long)};"
+            "const words = entries(data, w); const run = [boost(w[0]), reveal(w[1]), wrong(w[2])];"
+            f"out(Array.from({{ length: 20 }}, (_, i) => names(R.swapForStruggle(words, 2, run, data, 'long',"
+            f" {json.dumps(self.FULL[1] + self.FULL[5])}, seeded(i + 1)))));")
+        for words in res:
+            self.assertEqual(words[:3], long[:3])
+            self.assertLessEqual(set(words[3:]), set(self.FULL[5]))
+            self.assertEqual(len(set(words)), 5)
+
+    def test_fewer_solved_earlier_words_than_places(self):
+        data = self.full()
+        w = self.FULL[2]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(w)}; const words = entries(data, w);"
+            "const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            # one solved earlier word: it takes the first place, the other stays
+            "const one = names(R.swapForStruggle(words, 2, run, data, 2, ['cat', 'frog', 'fish']));"
+            # a solved earlier word already in the round is not taken again
+            "const round = entries(data, ['cat', ...w.slice(1)]);"
+            "const run2 = [reveal('cat'), reveal(w[1]), reveal(w[2])];"
+            "const inRound = names(R.swapForStruggle(round, 2, run2, data, 2, ['cat', 'dog']));"
+            "out([one, inRound]);")
+        one, in_round = res
+        self.assertEqual(one, w[:3] + ['cat', w[4]])
+        self.assertEqual(in_round, ['cat'] + w[1:3] + ['dog', w[4]])
+
+    def test_nothing_changes_on_stage_1_without_the_run_or_with_nothing_solved_before(self):
+        data = self.full()
+        everything = [w for words in self.FULL.values() for w in words]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const all = {json.dumps(everything)};"
+            "const at = (stage) => { const w = Object.keys(data).filter((k) => data[k].stage === stage).slice(0, 5);"
+            " return { w, words: entries(data, w), run: [reveal(w[0]), reveal(w[1]), reveal(w[2])] }; };"
+            "const s1 = at(1), s3 = at(3); const rand = () => 0.5;"
+            "const same = (words, ...args) => R.swapForStruggle(words, ...args) === words;"
+            "out({"
+            # stage 1, and anything that is not a stage (read as stage 1)
+            " stage1: same(s1.words, 2, s1.run, data, 1, all, rand),"
+            " notStages: [null, undefined, '3', 'Long', 0, 6].map((st) => same(s3.words, 2, s3.run, data, st, all, rand)),"
+            # a clean word among the last three
+            " cleanFirst: same(s3.words, 2, [clean(s3.w[0]), reveal(s3.w[1]), reveal(s3.w[2])], data, 3, all, rand),"
+            " cleanLast: same(s3.words, 2, [reveal(s3.w[0]), reveal(s3.w[1]), clean(s3.w[2])], data, 3, all, rand),"
+            " cleanBeforeRun: !same(s3.words, 3, [clean(s3.w[0]), reveal(s3.w[1]), reveal(s3.w[2]), reveal(s3.w[3])], data, 3, all, rand),"
+            " runBroken: same(s3.words, 3, [reveal(s3.w[0]), reveal(s3.w[1]), clean(s3.w[2]), reveal(s3.w[3])], data, 3, all, rand),"
+            # only two words done; a word without a result
+            " two: same(s3.words, 1, s3.run.slice(0, 2), data, 3, all, rand),"
+            " hole: same(s3.words, 2, [reveal(s3.w[0]), undefined, reveal(s3.w[2])], data, 3, all, rand),"
+            " short: same(s3.words, 2, s3.run.slice(0, 2), data, 3, all, rand),"
+            # nothing solved before the stage: none, only its own words, only later ones
+            " none: same(s3.words, 2, s3.run, data, 3, [], rand),"
+            " own: same(s3.words, 2, s3.run, data, 3, s3.w, rand),"
+            " later: same(s3.words, 2, s3.run, data, 3, all.filter((k) => [4, 5, 'long'].includes(data[k].stage)), rand),"
+            # no data; the last word of the round (nothing left to swap)
+            " noData: same(s3.words, 2, s3.run, null, 3, all, rand),"
+            " last: same(s3.words, 4, [...s3.run, reveal(s3.w[3]), reveal(s3.w[4])], data, 3, all, rand),"
+            "});")
+        self.assertTrue(res['stage1'])
+        self.assertEqual(res['notStages'], [True] * 6)
+        for key in ('cleanFirst', 'cleanLast', 'runBroken', 'two', 'hole', 'short', 'none', 'own', 'later', 'noData', 'last'):
+            self.assertTrue(res[key], key)
+        # the run is the last three words, whatever came before them
+        self.assertTrue(res['cleanBeforeRun'])
+
+    def test_only_the_next_words_not_yet_shown(self):
+        data = self.full()
+        solved = self.FULL[1] + self.FULL[2]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])}; const words = entries(data, w);"
+            f"const solved = {json.dumps(solved)};"
+            # after the fourth word: only the fifth is left
+            "const fourth = names(R.swapForStruggle(words, 3, [clean(w[0]), reveal(w[1]), wrong(w[2]), boost(w[3])], data, 3, solved));"
+            # a longer round: only the two after the run
+            f"const eight = entries(data, [...w, ...{json.dumps(self.FULL[4][:3])}]);"
+            "const long = names(R.swapForStruggle(eight, 2, [reveal(w[0]), reveal(w[1]), reveal(w[2])], data, 3, solved));"
+            "out([fourth, long]);")
+        fourth, long = res
+        self.assertEqual(fourth[:4], self.FULL[3][:4])
+        self.assertIn(fourth[4], self.FULL[2])
+        self.assertEqual(long[:3], self.FULL[3][:3])
+        self.assertLessEqual(set(long[3:5]), set(self.FULL[2]))
+        self.assertEqual(long[5:], self.FULL[4][:3])
+
+    def test_a_word_swapped_in_or_already_easy_is_never_swapped_out(self):
+        data = self.full()
+        solved = self.FULL[1] + self.FULL[2]
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])}; const words = entries(data, w);"
+            f"const solved = {json.dumps(solved)};"
+            "const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            "const swapped = R.swapForStruggle(words, 2, run, data, 3, solved, seeded(3));"
+            # the swapped-in fourth word is not clean either: the fifth stays
+            "const again = R.swapForStruggle(swapped, 3, [...run, reveal(swapped[3].word)], data, 3, solved, seeded(4));"
+            # a review word (solved, stage 1) next stays; the one after it is swapped
+            "const review = entries(data, [...w.slice(0, 3), 'cat', w[4]]);"
+            "const kept = names(R.swapForStruggle(review, 2, run, data, 3, solved, seeded(5)));"
+            # both next words already easy: nothing changes
+            "const easy = entries(data, [...w.slice(0, 3), 'cat', 'frog']);"
+            "out([again === swapped, kept, R.swapForStruggle(easy, 2, run, data, 3, solved) === easy]);")
+        again_same, kept, easy_same = res
+        self.assertTrue(again_same)
+        self.assertEqual(kept[:4], self.FULL[3][:3] + ['cat'])
+        self.assertIn(kept[4], self.FULL[2])
+        self.assertTrue(easy_same)
+
+    def test_words_swapped_out_stay_unsolved_and_come_back(self):
+        # a stage-3 round with moose missed last time; three reveals, the
+        # swap, the two swapped-in words right; then the round end's
+        # records (progress.js, missed.js afterRound) and the next round
+        data = self.full()
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const solved = {json.dumps(self.FULL[1] + self.FULL[2])};"
+            "const rows = [];"
+            "for (let s = 1; s <= 20; s++) {"
+            "  const w = R.pickRound(data, 5, 3, ['moose'], solved, seeded(s)); const words = entries(data, w);"
+            "  const results = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            "  const swapped = names(R.swapForStruggle(words, 2, results, data, 3, solved, seeded(s + 50)));"
+            "  results.push(clean(swapped[3]), clean(swapped[4]));"
+            "  const { progress, justCleared } = P.afterRound({ solved, cleared: [1, 2] }, data, 3, results);"
+            "  const missed = M.afterRound(['moose'], results);"
+            "  const next = R.pickRound(data, 5, 3, missed, progress.solved, seeded(s + 100));"
+            "  rows.push({ w, swapped, solved: progress.solved, cleared: progress.cleared, justCleared, missed, next });"
+            "}"
+            "out(rows);")
+        for row in res:
+            self.assertEqual(set(row['w']), set(self.FULL[3]))
+            out = row['w'][3:]
+            self.assertLessEqual(set(row['swapped'][3:]), set(self.FULL[2]))
+            for word in out:
+                self.assertNotIn(word, row['solved'])
+                self.assertIn(word, row['next'])
+            self.assertEqual(row['cleared'], [1, 2])
+            self.assertFalse(row['justCleared'])
+            # a missed word swapped out stays missed
+            if 'moose' in out:
+                self.assertIn('moose', row['missed'])
+            self.assertEqual(set(row['next']), set(self.FULL[3]))
+        self.assertTrue(any('moose' in row['w'][3:] for row in res))
+
+    def test_the_sparse_data(self):
+        animals = self.sparse('animals')
+        transportation = self.sparse('transportation')
+        res = self.run_node(
+            f"const A = {json.dumps(animals)}; const T = {json.dumps(transportation)};"
+            "const play = (data, stage, solved, s) => { const w = R.pickRound(data, 5, stage, [], solved, seeded(s));"
+            " const words = entries(data, w); const run = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            " const after = R.swapForStruggle(words, 2, run, data, stage, solved, seeded(s + 7));"
+            " return { w, after: names(after), same: after === words }; };"
+            "const seeds = Array.from({ length: 30 }, (_, i) => i + 1);"
+            "out({"
+            # animals stage 4 (bird, lion, horse; fish and duck fill from stage 3)
+            " a4: seeds.map((s) => play(A, 4, ['cat', 'dog', 'frog', 'fish', 'duck'], s)),"
+            # transportation long: taxi (stage 4), then stage 3's car or truck
+            " tLong: seeds.map((s) => play(T, 'long', ['bus', 'car', 'truck', 'taxi'], s)),"
+            # transportation stage 3: bus, the only earlier word, is in the round already
+            " t3: seeds.map((s) => play(T, 3, ['bus'], s)),"
+            # stage 1: never
+            " a1: seeds.map((s) => play(A, 1, Object.keys(A), s)),"
+            "});")
+        easy = {'cat', 'dog', 'frog', 'fish', 'duck'}
+        for row in res['a4']:
+            self.assertEqual(row['after'][:3], row['w'][:3])
+            self.assertLessEqual(set(row['after'][3:]), easy)
+            self.assertEqual(len(set(row['after'])), 5)
+            for i in (3, 4):
+                if row['w'][i] in ('fish', 'duck'):
+                    self.assertEqual(row['after'][i], row['w'][i])
+        for row in res['tLong']:
+            self.assertEqual(row['after'][3], 'taxi')
+            self.assertIn(row['after'][4], ('car', 'truck'))
+        for row in res['t3'] + res['a1']:
+            self.assertTrue(row['same'])
+
+    def test_todays_theme_files(self):
+        # whatever the live data holds: every stage after a theme's first
+        # swaps in words of the stage before it (all of them solved)
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        themes = {t: json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8')) for t, url in index.items()}
+        res = self.run_node(
+            f"const themes = {json.dumps(themes)};"
+            f"const S = await import('{(self.JS / 'stage.js').as_uri()}');"
+            "const rows = [];"
+            "for (const [theme, data] of Object.entries(themes)) {"
+            "  const stages = S.stagesOf(data);"
+            "  stages.forEach((stage, k) => {"
+            "    const solved = Object.keys(data).filter((w) => stages.indexOf(data[w].stage) < k);"
+            "    const w = R.pickRound(data, 5, stage, [], solved, seeded(k + 1)); const words = entries(data, w);"
+            "    const after = R.swapForStruggle(words, 2, [reveal(w[0]), wrong(w[1]), boost(w[2])], data, stage, solved, seeded(k + 9));"
+            "    rows.push({ theme, stage, before: k ? stages[k - 1] : null, w, after: names(after), same: after === words,"
+            "      stages: names(after).map((x) => data[x].stage) });"
+            "  });"
+            "}"
+            "out(rows);")
+        self.assertTrue(res)
+        for row in res:
+            label = f"{row['theme']} {row['stage']}"
+            if row['before'] is None:
+                self.assertTrue(row['same'], label)
+                continue
+            self.assertEqual(row['after'][:3], row['w'][:3], label)
+            self.assertEqual(row['stages'][3:], [row['before']] * 2, label)
+            self.assertEqual(len(set(row['after'])), 5, label)
+
+    def test_swap_for_struggle_is_pure(self):
+        code = self.code('round.js')
+        self.assertIn('export const STRUGGLE_RUN = 3;', code)
+        self.assertIn('export const STRUGGLE_SWAP = 2;', code)
+        swap = self.function('swapForStruggle', 'round.js')
+        self.assertNotRegex(swap, r'localStorage|document|window|state\.|setState')
+        self.assertNotRegex(code, r'\nlet |\nvar ')
+        # the inputs are not changed
+        data = self.full()
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const w = {json.dumps(self.FULL[3])}; const words = entries(data, w);"
+            f"const solved = {json.dumps(self.FULL[1])}; const results = [reveal(w[0]), reveal(w[1]), reveal(w[2])];"
+            "const before = JSON.stringify([words, results, data, solved]);"
+            "const after = R.swapForStruggle(words, 2, results, data, 2, solved);"
+            "out([before === JSON.stringify([words, results, data, solved]), after !== words, after[0] === words[0]]);")
+        self.assertEqual(res, [True, True, True])
+
+    # --- main.js: applied before the next word ---
+
+    def test_main_applies_it_before_the_next_word(self):
+        nxt = self.function('onNext')
+        data = self.full()
+        res = self.run_node(
+            f"const data = {json.dumps(data)}; const solved = {json.dumps(self.FULL[1] + self.FULL[2])};"
+            "const play = (stage, w, results) => {"
+            "  const state = { theme: 'animals', data, words: entries(data, w), gears: 0,"
+            "    round: { index: 2, size: 5, stage, results }, current: { word: w[2], status: 'revealed' } };"
+            "  const before = state.words; let sets = 0; const asked = [];"
+            "  const setState = (p) => { sets++; Object.assign(state, p); };"
+            "  const swapForStruggle = (...args) => R.swapForStruggle(...args);"
+            "  const progressFor = (theme) => { asked.push(theme); return { solved, cleared: [1, 2] }; };"
+            "  const stopWord = () => {}; const armIdle = () => {}; const recordMissed = () => {};"
+            "  const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const loadProgress = () => ({});"
+            "  const addGears = () => 0; const GEARS = { round: 2 }; const LIVES = 3; const newTileId = () => 't';"
+            "  const makeWord = (e, st) => ({ word: e.word, stage: st, status: 'playing' });"
+            f"  {nxt}"
+            "  onNext();"
+            "  return { sets, asked, same: state.words === before, words: names(state.words), current: state.current,"
+            "    index: state.round.index, results: state.round.results };"
+            "};"
+            f"const w3 = {json.dumps(self.FULL[3])}; const w1 = {json.dumps(self.FULL[1])};"
+            "out({"
+            # the third word left without a result counts as not clean too
+            " swap: play(3, w3, [reveal(w3[0]), boost(w3[1])]),"
+            " cleanRun: play(3, w3, [clean(w3[0]), reveal(w3[1]), reveal(w3[2])]),"
+            " stage1: play(1, w1, [reveal(w1[0]), reveal(w1[1]), reveal(w1[2])]),"
+            "});")
+        swap = res['swap']
+        self.assertEqual(swap['sets'], 1)                 # the swap and the next word: one setState
+        self.assertEqual(swap['asked'], ['animals'])
+        self.assertFalse(swap['same'])
+        self.assertEqual(swap['words'][:3], self.FULL[3][:3])
+        self.assertLessEqual(set(swap['words'][3:]), set(self.FULL[2]))
+        self.assertEqual(swap['current'], {'word': swap['words'][3], 'stage': 3, 'status': 'playing'})
+        self.assertEqual(swap['index'], 3)
+        self.assertEqual(swap['results'][2], {'word': 'sheep', 'correct': False, 'clean': False})
+        for key in ('cleanRun', 'stage1'):
+            self.assertTrue(res[key]['same'], key)
+            self.assertEqual(res[key]['sets'], 1, key)
+        self.assertEqual(res['cleanRun']['current']['word'], self.FULL[3][3])
+        self.assertEqual(res['stage1']['current']['word'], self.FULL[1][3])
+
+    def test_the_wiring(self):
+        main = self.code('main.js')
+        self.assertIn("import { pickRound, makeWord, swapForStruggle } from './round.js';", main)
+        self.assertEqual(main.count('swapForStruggle('), 1)
+        nxt = self.function('onNext')
+        other = nxt.index('} else {', nxt.index('if (nextIndex >= round.size) {'))
+        call = nxt.index('const words = swapForStruggle(state.words, round.index, results, state.data, round.stage, progressFor(state.theme).solved);')
+        self.assertLess(other, call)
+        branch = nxt[call:]
+        self.assertLess(branch.index('setState({'), branch.index('            words,\n'))
+        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', branch)
+        for name in ('startRound', 'onCheck', 'onPlayAgain', 'onPlayBack', 'leaveRound'):
+            self.assertNotIn('swapForStruggle', self.function(name), name)
+        # the kid isn't told: no other module knows of it (no moment, sound,
+        # motion or mark on the screen)
+        for path in sorted(self.JS.glob('*.js')):
+            if path.name not in ('round.js', 'main.js'):
+                self.assertNotRegex(self.code(path.name), r'(?i)struggle|swapped', path.name)
+
+
 class RoundEndStagesTests(TestCase):
     """The round-end's stage bulbs (BACKLOG B-216): under the stars, one
     bulb per stage the theme's data has words in, lit = cleared; the bulb
@@ -7878,6 +8307,7 @@ class GearsTests(TestCase):
             "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false });"
             "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
             "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't'; const LIVES = 3;"
+            "const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });"
             + nxt +
             "onNext(); const mid = [state.screen, state.gears, calls.slice()];"
             "onNext(); out([mid, [state.screen, state.gears, calls.slice()], state.round.results]);")
@@ -8462,6 +8892,20 @@ class BoostTests(TestCase):
         self.assertEqual(first[1], ['boostMenu', 'boostMenu,lockedTaps'])
         self.assertEqual(store, [None, 5, 1, 'd c u k', [2]])
 
+    def test_a_boost_notes_its_kind_for_his_line(self):
+        # BACKLOG B-224: pay notes which boost the word took (`boostKind`),
+        # for the robot's line on it (character.js snapshot); nothing when
+        # the boost is not paid
+        res = self.run_main(
+            "const duck = word('duck', 'dcuk', { extras: 'bz' });"
+            "reset(duck, 9); onBoost(); onBoostPick('remember'); onBoostSlot(1); const r = state.current.boostKind;"
+            "reset(duck, 9); onBoost(); onBoostPick('first'); const f = state.current.boostKind;"
+            "reset(duck, 9); onBoost(); onBoostPick('cleanup'); const c = state.current.boostKind;"
+            "reset(duck, 1); onBoost(); onBoostPick('first'); const none = state.current.boostKind;"
+            "reset(duck, 5); stored = 1; onBoost(); onBoostPick('cleanup'); const short = state.current.boostKind;"
+            "out([r, f, c, none === undefined, short === undefined]);")
+        self.assertEqual(res, ['remember', 'first', 'cleanup', True, True])
+
     def test_no_tray_while_the_button_is_off_or_a_control_is_held(self):
         res = self.run_main(
             "const go = (cur, o = {}) => { reset(cur, 9); Object.assign(state, o); onBoost(); return state.boostMenu; };"
@@ -8526,7 +8970,15 @@ class BoostTests(TestCase):
         self.assertEqual(snaps, [1, 1, -1, -1, 0])
         self.assertEqual(shake, ['speakerLocked'])                  # can't afford: his head-shake
         robot = self.function('renderRobot', 'character.js')
-        self.assertIn("playMoments(moments, {}, moments.includes('boostGiven') ? boostLands(prev, now, reducedMotion()) : 0);", robot)
+        # (B-224: waitFor is the same wait, shared with audio.js's line)
+        self.assertIn('playMoments(moments, picksFor(moments, now), waitFor(moments, prev, now, reducedMotion()), onPeek);', robot)
+        self.assertEqual(self.run_node(
+            "const c = await import('" + (self.JS / 'character.js').as_uri() + "');"
+            "const st = (cur) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0, nudges: 0,"
+            " tuned: true, round: { index: 0, size: 5, results: [] }, current: cur });"
+            "const snap = (cur) => c.snapshot(st(cur)); const a = word('duck', 'dcuk', { status: 'wrong' }); const b = B.giveLetter(a, 1);"
+            "out([c.waitFor(['boostGiven'], snap(a), snap(b)), c.waitFor(['boostGiven'], snap(a), snap(b), true),"
+            " c.waitFor(['wrong'], snap(a), snap(b)), c.waitFor([], snap(a), snap(b))]);"), [0.6, 0.4, 0, 0])
         self.assertIn('const wait = Math.max(startDelay(performance.now() - last.changedAt) / 1000, delay);',
                       self.function('playMoments', 'character.js'))
 
@@ -8774,3 +9226,1853 @@ class ThemeDataTests(TestCase):
             self.assertEqual(waiting, [('zoo', 'emu', 'no voice')])
             self.assertEqual(dict(files[str(Path('static') / 'config' / 'themes.json')]),
                              {'zoo': '/static/data/zoo.json'})
+
+
+class CorrectWordVoiceTests(TestCase):
+    """BACKLOG B-223: on a correct check the robot says the word, clean and
+    complete, from the word's own clip, then one line: on `correct` the
+    word's gag, else a line of pool `correct`; on `streak` a line of pool
+    `streak`, else the gag, else pool `correct`; with none of them the
+    prototype correct clip, after the word. Both are his voice (the
+    analyser). audio.js fetches static/voice/manifest.json once at init (a
+    missing or broken one is empty); the word's clip and gags are fetched
+    and decoded when the word starts; a clip not ready at the check is
+    skipped. Nothing over the word; the line is cut by the next voice
+    clip, a speaker tap or leaving the word. Stand-in manifests."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+    STATE = ROOT / 'static' / 'js' / 'state.js'
+    CHARACTER = ROOT / 'static' / 'js' / 'character.js'
+    MANIFEST = ROOT / 'static' / 'voice' / 'manifest.json'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        # Fakes as AudioTests', plus: the manifest's fetch answers with
+        # `MAN` (undefined: 404; an Error: its JSON fails; `NOJSON`: a
+        # response with no json()); a source's stop() calls its onended
+        # later, as a browser does, and `end(file)` ends the source playing
+        # `file` by itself; decodes of the URLs in `hold` wait until
+        # `release(url)`; console.error is counted in `errors`. `a` is
+        # audio.js, `S` state.js, `C` character.js. `played()` are the
+        # files started so far (folders under static/sounds/ and
+        # static/voice/), `on()` the ones playing now, `kinds()` the kinds
+        # audio.js started them as (from the source's analyser link: 'v'
+        # his voice, 'o' straight out). `st(o)` is a play-screen state on
+        # animals' "cat" (its clip /static/voice/words/animals/cat.mp3),
+        # `correct(o)` the same word checked correct (first of the round),
+        # `streak(o)` the third correct word in a row ("cat" again).
+        script = (
+            "const log = []; const listeners = {}; const made = []; const fetched = []; const missing = new Set();"
+            "const ctxs = []; const sources = []; const decodes = []; const hold = new Set(); const held = {};"
+            "let MAN; const NOJSON = {}; const errors = []; console.error = (...x) => errors.push(x.join(' '));"
+            "globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.on = {}; made.push(this); }"
+            " addEventListener(t, fn) { this.on[t] = fn; }"
+            " play() { this.paused = false; log.push({ op: 'play', src: this.src, el: true }); return Promise.resolve(); }"
+            " pause() { this.paused = true; log.push({ op: 'pause', src: this.src }); } };"
+            "globalThis.fetch = (url) => { fetched.push(url);"
+            " if (url === '/static/voice/manifest.json') {"
+            "  if (MAN === undefined) return Promise.resolve({ ok: false });"
+            "  if (MAN === NOJSON) return Promise.resolve({ ok: true });"
+            "  return Promise.resolve({ ok: true, json: () => (MAN instanceof Error ? Promise.reject(MAN) : Promise.resolve(MAN)) }); }"
+            " return Promise.resolve({ ok: !missing.has(url), arrayBuffer: () => Promise.resolve({ url }) }); };"
+            "const an = { name: 'analyser', fftSize: 0, connect() {}, getByteTimeDomainData(x) { x.fill(200); } };"
+            "globalThis.AudioContext = class { constructor() { this.state = 'suspended'; this.destination = { name: 'out' }; ctxs.push(this); }"
+            " resume() { this.state = 'running'; return Promise.resolve(); }"
+            " createAnalyser() { return an; }"
+            " createBuffer() { return { url: 'silence' }; }"
+            " decodeAudioData(data) { decodes.push(data.url);"
+            "  if (hold.has(data.url)) return new Promise((r) => { held[data.url] = () => r({ url: data.url }); });"
+            "  return Promise.resolve({ url: data.url }); }"
+            " createBufferSource() { const s = { buffer: null, on: false, to: null, connect(t) { s.to = t; },"
+            "   start() { s.on = true; log.push({ op: 'play', src: s.buffer.url, to: s.to && s.to.name }); },"
+            "   stop() { if (!s.on) return; s.on = false; log.push({ op: 'stop', src: s.buffer.url });"
+            "     setTimeout(() => s.onended && s.onended(), 0); } };"
+            "   sources.push(s); return s; } };"
+            "globalThis.document = { addEventListener(t, fn, c) { listeners[t] = fn; } };"
+            f"const a = await import('{self.MODULE.as_uri()}');"
+            f"const S = await import('{self.STATE.as_uri()}');"
+            f"const C = await import('{self.CHARACTER.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const tick = () => new Promise((r) => setTimeout(r, 0));"
+            "const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };"
+            "const ready = async () => { a.init(); listeners.pointerup(); await settle(); };"
+            "const short = (src) => decodeURIComponent(src.replace('/static/sounds/', '').replace('/static/voice/', ''));"
+            "const played = () => log.filter((e) => e.op === 'play' && e.src !== 'silence').map((e) => short(e.src));"
+            "const kinds = () => log.filter((e) => e.op === 'play' && e.src !== 'silence' && !e.el).map((e) => (e.to === 'analyser' ? 'v' : 'o'));"
+            "const on = () => sources.filter((s) => s.on && s.buffer.url !== 'silence').map((s) => short(s.buffer.url));"
+            "const src = (file) => sources.filter((s) => s.buffer && short(s.buffer.url) === file).pop();"
+            "const end = async (file) => { const s = src(file); s.on = false; s.onended(); await settle(); };"
+            "const release = async (url) => { held[url](); await settle(); };"
+            "const clear = () => { log.length = 0; };"
+            "const man = (...files) => ({ voice_id: 'v', model_id: 'm', output_format: 'mp3',"
+            " clips: Object.fromEntries(files.map((f) => [f, { id: f, text: f, made: '2026-10-24' }])) });"
+            "const put = (ids) => ids.map((id) => (id ? { letter: 'x', tileId: id } : null));"
+            "const CAT = '/static/voice/words/animals/cat.mp3';"
+            "const st = (o = {}) => ({ screen: 'play', theme: 'animals', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3,"
+            " speaking: false, muted: false, pressed: null, lockedTaps: 0, nudges: 0, tuned: true,"
+            " round: { index: 0, size: 5, results: [] },"
+            " current: { word: 'cat', audio: CAT, status: 'playing', placed: put(['t1', 't2', null]) }, ...o });"
+            "const correct = (o = {}) => st({ current: { word: 'cat', audio: CAT, status: 'correct', placed: put(['t1', 't2', 't3']) },"
+            " round: { index: 0, size: 5, results: [{ correct: true }] }, ...o });"
+            "const three = { index: 2, size: 5, results: [{ correct: true }, { correct: true }, { correct: true }] };"
+            "const streak = (o = {}) => st({ round: { ...three, results: [] }, ...o });"
+            "const streakDone = (o = {}) => st({ current: { word: 'cat', audio: CAT, status: 'correct', placed: put(['t1', 't2', 't3']) },"
+            " round: three, ...o });"
+            # a word showing, its clips loaded, then checked correct
+            "const check = async (o = {}) => { S.setState(st(o)); await settle(); clear(); S.setState(correct(o)); await settle(); };"
+            "const checkStreak = async (o = {}) => { S.setState(streak(o)); await settle(); clear(); S.setState(streakDone(o)); await settle(); };"
+            f"{body}"
+        )
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    # --- pure helpers ---
+
+    def test_the_manifest_lists_its_clips_and_a_broken_one_lists_none(self):
+        self.assertEqual(self.run_node(
+            "out([a.VOICE_BASE, a.MANIFEST_URL, a.listedClips(man('words/animals/cat.mp3', 'robot/correct-01.mp3')),"
+            " [null, undefined, 3, 'x', [], {}, { clips: null }, { clips: [] }, { clips: 'x' }, { clip: { a: 1 } }].map((m) => a.listedClips(m)),"
+            " a.listedClips({ clips: {} })]);"),
+            ['/static/voice/', '/static/voice/manifest.json', ['words/animals/cat.mp3', 'robot/correct-01.mp3'],
+             [[], [], [], [], [], [], [], [], [], []], []])
+
+    def test_urls_pools_and_gags(self):
+        files = ['words/animals/cat.mp3', 'letters/a.mp3', 'robot/correct-01.mp3', 'robot/correct-02.mp3',
+                 'robot/streak-01.mp3', 'robot/end-low-01.mp3', 'robot/picture-surprise-02.mp3', 'robot/correct.mp3',
+                 'gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'gags/animals/dog-2.mp3', 'gags/animals/bat.mp3',
+                 'gags/food/cat.mp3', 'hebrew/animals/cat.mp3']
+        res = self.run_node(
+            f"const files = {json.dumps(files)};"
+            "out([a.voiceUrl('gags/animals/cat-2.mp3'), a.voiceUrl('robot/a b.mp3', '/x/'),"
+            " files.map((f) => a.poolOf(f)),"
+            " a.poolClips(files, 'correct'), a.poolClips(files, 'streak'), a.poolClips(files, 'end-low'), a.poolClips(files, 'wrong'),"
+            " a.poolClips([], 'correct'),"
+            " a.gagClips(files, 'animals', 'cat'), a.gagClips(files, 'animals', 'dog'), a.gagClips(files, 'animals', 'bat'),"
+            " a.gagClips(files, 'animals', 'ant'), a.gagClips(files, 'food', 'cat'), a.gagClips(files, null, 'cat'),"
+            " a.gagClips(files, 'animals', null), a.gagClips([], 'animals', 'cat'),"
+            " a.linePools(), a.linePools({ x: { lines: ['gag', 'p'] }, y: { lines: ['p', 'q', 'hebrew'] }, z: {} }, {})]);")
+        self.assertEqual(res, [
+            '/static/voice/gags/animals/cat-2.mp3', '/x/robot/a%20b.mp3',
+            [None, None, 'correct', 'correct', 'streak', 'end-low', 'picture-surprise', None, None, None, None, None, None, None],
+            ['robot/correct-01.mp3', 'robot/correct-02.mp3'], ['robot/streak-01.mp3'], ['robot/end-low-01.mp3'], [], [],
+            # the first gag and the second when it exists, only the ones listed
+            ['gags/animals/cat.mp3', 'gags/animals/cat-2.mp3'], ['gags/animals/dog-2.mp3'], ['gags/animals/bat.mp3'],
+            [], ['gags/food/cat.mp3'], [], [], [],
+            # the pools the moment table's lines name (B-223: correct,
+            # streak; B-224: every moment's, PEEK's), not the word's own
+            # clips (gag, hebrew)
+            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'wrong', 'mumble', 'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
+
+    def test_the_moment_table_says_the_word_on_a_correct_check(self):
+        # character.js MOMENTS: correct and streak say the word, then the
+        # first of their lines with a clip; the prototype clip stays as
+        # their sound; no other moment says the word
+        self.assertEqual(self.run_node(
+            "out([C.MOMENTS.correct.word, C.MOMENTS.correct.lines, C.MOMENTS.correct.sound,"
+            " C.MOMENTS.streak.word, C.MOMENTS.streak.lines, C.MOMENTS.streak.sound,"
+            " Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].word)]);"),
+            [True, ['gag', 'correct'], 'correct', True, ['streak', 'gag', 'correct'], 'correct', ['correct', 'streak']])
+
+    def test_say_plan_order_and_fallbacks(self):
+        res = self.run_node(
+            "const W = 'w', G = ['g1', 'g2'], P = { correct: ['c1', 'c2', 'c3'], streak: ['s1', 's2'] };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u);"
+            "const r0 = () => 0, r9 = () => 0.99;"
+            "out(["
+            # correct: the word, then a gag at random
+            " a.sayPlan('correct', { word: W, gags: G, pools: P }, all, r0), a.sayPlan('correct', { word: W, gags: G, pools: P }, all, r9),"
+            # no gag: a correct line; nor a correct line: the prototype clip
+            " a.sayPlan('correct', { word: W, gags: [], pools: P }, all, r9), a.sayPlan('correct', { word: W, gags: [], pools: { streak: ['s1'] } }, all, r0),"
+            " a.sayPlan('correct', { word: W }, all), a.sayPlan('correct', {}, all),"
+            # streak: a streak line, else the gag, else a correct line, else the prototype
+            " a.sayPlan('streak', { word: W, gags: G, pools: P }, all, r9), a.sayPlan('streak', { word: W, gags: G, pools: { correct: ['c1'] } }, all, r0),"
+            " a.sayPlan('streak', { word: W, gags: [], pools: { correct: ['c1'] } }, all, r0), a.sayPlan('streak', { word: W, gags: [], pools: {} }, all),"
+            # a clip not ready is skipped: the word, a gag, a whole group
+            " a.sayPlan('correct', { word: W, gags: G, pools: P }, not('w', 'g1'), r0), a.sayPlan('correct', { word: W, gags: G, pools: P }, not('g1', 'g2'), r0),"
+            " a.sayPlan('streak', { word: W, gags: G, pools: P }, not('s1', 's2', 'g1', 'g2', 'c1', 'c2', 'c3', 'w')),"
+            # a moment that does not say the word: no word, its own sound
+            " a.sayPlan('wrong', { word: W, gags: G, pools: P }, all), a.sayPlan('nope', { word: W }, all)]);")
+        # (B-224 adds fx and letter, none on these)
+        plan = lambda word, line, sound: {'fx': None, 'word': word, 'line': line, 'sound': sound, 'letter': None}
+        self.assertEqual(res, [
+            plan('w', 'g1', None), plan('w', 'g2', None),
+            plan('w', 'c3', None), plan('w', None, 'correct'),
+            plan('w', None, 'correct'), plan(None, None, 'correct'),
+            plan('w', 's2', None), plan('w', 'g1', None),
+            plan('w', 'c1', None), plan('w', None, 'correct'),
+            plan(None, 'g2', None), plan('w', 'c1', None),
+            plan(None, None, 'correct'),
+            plan(None, None, 'error'), plan(None, None, None)])
+
+    # --- the manifest at init ---
+
+    def test_init_fetches_the_manifest_once_and_the_line_pools_clips(self):
+        # once, at init; then the clips of the pools the moments name
+        # (B-223: correct, streak; B-224: wrong and the others) are
+        # downloaded and decoded; pools no moment names (greet), gags,
+        # Hebrew guesses, letters and words wait (a word's own come when
+        # it starts)
+        res = self.run_node(
+            "MAN = man('words/animals/cat.mp3', 'robot/correct-01.mp3', 'robot/streak-01.mp3', 'robot/wrong-01.mp3',"
+            " 'robot/greet-01.mp3', 'gags/animals/cat.mp3', 'hebrew/animals/cat.mp3', 'letters/a.mp3');"
+            "await ready(); const voice = fetched.filter((u) => u.startsWith('/static/voice/'));"
+            "out([voice, decodes.filter((u) => u.startsWith('/static/voice/')), errors]);")
+        self.assertEqual(res, [
+            ['/static/voice/manifest.json', '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3',
+             '/static/voice/robot/streak-01.mp3'],
+            ['/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'], []])
+
+    def test_a_missing_or_broken_manifest_is_empty_with_no_error(self):
+        # 404, JSON that fails, a response without json(), a fetch that
+        # throws, the wrong shape: nothing listed, nothing thrown or logged;
+        # a correct check still says the word, then the prototype clip
+        res = self.run_node(
+            "const cases = [undefined, new Error('bad json'), NOJSON, { clips: ['robot/correct-01.mp3'] }, 'x'];"
+            "const res = [];"
+            "for (const m of cases) {"
+            " MAN = m; fetched.length = 0; a.init(); await settle();"
+            " res.push(fetched.filter((u) => u.startsWith('/static/voice/')));"
+            "}"
+            "const f = globalThis.fetch; globalThis.fetch = (u) => { if (u.endsWith('manifest.json')) throw new Error('no'); return f(u); };"
+            "a.init(); await settle(); globalThis.fetch = f; listeners.pointerup(); await settle();"
+            "S.subscribe(a.renderSound); Math.random = () => 0; await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([res, atCheck, played(), errors]);")
+        self.assertEqual(res, [[['/static/voice/manifest.json']] * 5, ['words/animals/cat.mp3'],
+                               ['words/animals/cat.mp3', 'correct/bingo.mp3'], []])
+
+    def test_the_real_manifest_today(self):
+        # static/voice/manifest.json as it is: the 130 words and 26
+        # letters, no gag and no shared line yet, so a correct check says
+        # the word, then the prototype correct clip, as before B-223
+        manifest = json.loads(self.MANIFEST.read_text())
+        res = self.run_node(
+            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound); Math.random = () => 0.99;"
+            "const listed = a.listedClips(MAN);"
+            "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
+            " a.gagClips(listed, 'animals', 'cat'), listed.includes('words/animals/cat.mp3'), atCheck, played()]);")
+        self.assertEqual(res[:5], [156, 130, [0] * 21, [], True])
+        self.assertEqual(res[5:], [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/you have a spelling superpower.mp3']])
+
+    # --- a new word ---
+
+    def test_a_new_word_fetches_and_decodes_its_clip_and_gags(self):
+        # when the word starts (a new word, renderSound): its own clip and
+        # its listed gags, fetched and decoded; a re-render fetches nothing
+        # again; the next word lets them go and fetches its own; the same
+        # word again in a new round keeps its clips
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'gags/animals/dog.mp3', 'gags/food/cat.mp3');"
+            "await ready(); S.subscribe(a.renderSound); const mark = () => { const n = fetched.length; return () => fetched.slice(n); };"
+            "const voice = (l) => l.filter((u) => u.startsWith('/static/voice/'));"
+            "let since = mark(); S.setState(st()); await settle(); const first = [voice(since()), voice(decodes)];"
+            "since = mark(); S.setState(st()); await settle(); const again = since();"
+            "since = mark(); S.setState(st({ round: { index: 1, size: 5, results: [{ correct: true }] },"
+            " current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing', placed: put([null, null, null]) } }));"
+            "await settle(); const next = since();"
+            "since = mark(); S.setState(st({ roundsStarted: 2, round: { index: 0, size: 5, results: [] },"
+            " current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing', placed: put([null, null, null]) } }));"
+            "await settle(); const same = since();"
+            "since = mark(); S.setState({ screen: 'theme', current: { word: null, placed: [] } }); await settle();"
+            "out([first, again, next, same, since(), played()]);")
+        self.assertEqual(res, [
+            [['/static/voice/words/animals/cat.mp3', '/static/voice/gags/animals/cat.mp3', '/static/voice/gags/animals/cat-2.mp3'],
+             ['/static/voice/words/animals/cat.mp3', '/static/voice/gags/animals/cat.mp3', '/static/voice/gags/animals/cat-2.mp3']],
+            [], ['/static/voice/words/animals/dog.mp3', '/static/voice/gags/animals/dog.mp3'], [], [], []])
+
+    def test_before_the_first_gesture_they_are_fetched_and_decode_on_it(self):
+        # a word shown before any gesture (the dev hook): fetched, not
+        # decoded; the first gesture decodes them, and a check after it
+        # says the word
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); a.init(); await settle(); S.subscribe(a.renderSound);"
+            "S.setState(st()); await settle(); const before = [fetched.filter((u) => u.startsWith('/static/voice/')).length, decodes.length];"
+            "listeners.pointerup(); await settle();"
+            "clear(); S.setState(correct()); await settle(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([before, decodes.filter((u) => u.startsWith('/static/voice/')), atCheck, played()]);")
+        self.assertEqual(res, [[3, 0], ['/static/voice/words/animals/cat.mp3', '/static/voice/gags/animals/cat.mp3'],
+                               ['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'gags/animals/cat.mp3']])
+
+    def test_the_manifest_after_the_word_still_brings_its_gags(self):
+        # the manifest arriving after the word started (a slow network):
+        # the word showing gets its gags then
+        res = self.run_node(
+            "let open; const f = globalThis.fetch;"
+            "globalThis.fetch = (u) => (u.endsWith('manifest.json') ? new Promise((r) => { open = () => { r(f(u)); }; }) : f(u));"
+            "MAN = man('gags/animals/cat.mp3'); a.init(); listeners.pointerup(); S.subscribe(a.renderSound);"
+            "S.setState(st()); await settle(); const before = fetched.filter((u) => u.startsWith('/static/voice/'));"
+            "open(); await settle(); clear(); S.setState(correct()); await settle(); await end('words/animals/cat.mp3');"
+            "out([before, played()]);")
+        self.assertEqual(res, [['/static/voice/words/animals/cat.mp3'], ['words/animals/cat.mp3', 'gags/animals/cat.mp3']])
+
+    # --- the correct check ---
+
+    def test_correct_says_the_word_then_the_gag_both_his_voice(self):
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'robot/correct-01.mp3');"
+            "await ready(); S.subscribe(a.renderSound);"
+            "const res = [];"
+            "for (const r of [0, 0.99]) {"
+            " Math.random = () => r; await check(); const atCheck = [played(), on(), kinds(), a.voiceWave() && a.voiceWave().length];"
+            " await end('words/animals/cat.mp3'); const line = played()[1];"
+            " res.push([atCheck, played(), kinds(), on(), a.voiceWave() && a.voiceWave()[0]]);"
+            " await end(line); res.push([on(), a.voiceWave()]);"
+            " S.setState({ round: { index: 1, size: 5, results: [{ correct: true }] }, current: { word: null, placed: [] }, screen: 'theme' });"
+            "}"
+            "out(res);")
+        self.assertEqual(res, [
+            [[['words/animals/cat.mp3'], ['words/animals/cat.mp3'], ['v'], 512],
+             ['words/animals/cat.mp3', 'gags/animals/cat.mp3'], ['v', 'v'], ['gags/animals/cat.mp3'], 200],
+            [[], None],
+            [[['words/animals/cat.mp3'], ['words/animals/cat.mp3'], ['v'], 512],
+             ['words/animals/cat.mp3', 'gags/animals/cat-2.mp3'], ['v', 'v'], ['gags/animals/cat-2.mp3'], 200],
+            [[], None]])
+
+    def test_correct_without_a_gag_says_a_correct_line_else_the_prototype(self):
+        res = self.run_node(
+            "MAN = man('robot/correct-01.mp3', 'robot/correct-02.mp3', 'robot/streak-01.mp3', 'gags/animals/dog.mp3');"
+            "await ready(); S.subscribe(a.renderSound); Math.random = () => 0.6;"
+            "await check(); await end('words/animals/cat.mp3'); const pool = played();"
+            "out(pool);")
+        self.assertEqual(res, ['words/animals/cat.mp3', 'robot/correct-02.mp3'])
+        res = self.run_node(
+            "MAN = man('robot/streak-01.mp3', 'words/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "Math.random = () => 0;"
+            "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            "out([atCheck, played(), kinds()]);")
+        # no gag, no correct line: the prototype correct clip, after the word
+        self.assertEqual(res, [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/bingo.mp3'], ['v', 'v']])
+
+    def test_streak_says_the_word_then_a_streak_line_else_the_gag_else_a_correct_line(self):
+        files = ['robot/streak-01.mp3', 'gags/animals/cat.mp3', 'robot/correct-01.mp3']
+        res = [self.run_node(
+            f"MAN = man(...{json.dumps(files[k:])}); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "await checkStreak(); const atCheck = played(); await end('words/animals/cat.mp3'); out([atCheck, played(), kinds()]);")
+            for k in range(len(files) + 1)]
+        self.assertEqual(res, [
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'robot/streak-01.mp3'], ['v', 'v']],
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'gags/animals/cat.mp3'], ['v', 'v']],
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'robot/correct-01.mp3'], ['v', 'v']],
+            [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/bingo.mp3'], ['v', 'v']]])
+        # the streak is momentsFor's: the third correct in a row
+        self.assertEqual(self.run_node(
+            "out([C.momentsFor(C.snapshot(streak()), C.snapshot(streakDone())), C.momentsFor(C.snapshot(st()), C.snapshot(correct()))]);"),
+            [['streak'], ['correct']])
+
+    def test_a_clip_not_ready_at_the_check_is_skipped_never_waited_for(self):
+        # the word still decoding: the line comes at once, and nothing
+        # starts when the word's decode ends later; the gag still
+        # decoding: the next choice (a correct line); a word that failed
+        # to download: skipped too
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3', 'robot/correct-01.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "hold.add(CAT); await check(); const word = played(); await release(CAT); const later = played();"
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] } }); hold.clear();"
+            "hold.add('/static/voice/gags/animals/cat.mp3'); S.setState(st({ roundsStarted: 2 })); await settle(); clear();"
+            "S.setState(correct({ roundsStarted: 2 })); await settle(); await end('words/animals/cat.mp3'); const gag = played();"
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] } }); missing.add('/static/voice/words/animals/dog.mp3');"
+            "const dog = { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', placed: put([null, null, null]) };"
+            "S.setState(st({ roundsStarted: 3, current: { ...dog, status: 'playing' } })); await settle(); clear();"
+            "S.setState(st({ roundsStarted: 3, current: { ...dog, status: 'correct' }, round: { index: 0, size: 5, results: [{ correct: true }] } }));"
+            "await settle();"
+            "out([word, later, gag, played()]);")
+        self.assertEqual(res, [['gags/animals/cat.mp3'], ['gags/animals/cat.mp3'],
+                               ['words/animals/cat.mp3', 'robot/correct-01.mp3'], ['robot/correct-01.mp3']])
+
+    # --- nothing over the word; what cuts the line ---
+
+    def test_nothing_of_his_starts_over_the_word(self):
+        # while he says the word: his clips due are dropped (the word
+        # plays on, whole), effects still play; the line comes only when
+        # the word has ended
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "await check(); ['error', 'locked', 'correct'].forEach(a.play);"
+            "S.setState({ lockedTaps: 1 }); await settle(); const dropped = [played(), on()];"
+            "a.play('swipe'); const fx = on();"
+            "await end('words/animals/cat.mp3'); const after = on();"
+            "out([dropped, fx, after, log.filter((e) => e.op === 'stop').map((e) => short(e.src))]);")
+        # (the tada, an effect since B-224, is not his voice)
+        self.assertEqual(res[0], [['words/animals/cat.mp3'], ['words/animals/cat.mp3']])
+        # the swipe, an effect, plays over the word
+        self.assertEqual([res[1][0], res[1][1].split('/')[0], len(res[1])], ['words/animals/cat.mp3', 'swipe', 2])
+        self.assertIn('gags/animals/cat.mp3', res[2])
+        self.assertEqual(res[3], [])       # nothing was stopped
+
+    def test_the_line_is_his_voice_clip_like_any_other(self):
+        # cut by the next voice clip, by a speaker tap, by leaving the word
+        # (the next word, the round end with its tada, the back arrow)
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "const res = []; let n = 1;"
+            "const say = async () => { S.setState({ screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } });"
+            " await check({ roundsStarted: ++n }); await end('words/animals/cat.mp3'); };"
+            "await say(); a.play('error'); res.push(on().map((f) => f.split('/')[0]));"
+            "await say(); S.setState({ speaking: true }); a.speakWord(CAT, () => {}); res.push([on(), made[made.length - 1].paused]);"
+            "S.setState({ speaking: false });"
+            "await say(); S.setState(st({ roundsStarted: n, round: { index: 1, size: 5, results: [{ correct: true }] },"
+            " current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing', placed: put([null, null, null]) } }));"
+            "res.push(on());"
+            "await say(); S.setState({ ...correct({ roundsStarted: n }), screen: 'round-end', round: { index: 4, size: 5,"
+            " results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) } }); res.push(on().map((f) => f.split('/')[0]));"
+            "await say(); S.setState({ screen: 'stages', current: { word: null, placed: [] } });"
+            " res.push(on().filter((f) => !f.startsWith('celebration/')));"
+            "out(res);")
+        # (the round end's tada, an effect since B-224, plays on; only his
+        # voice is checked after it)
+        self.assertEqual(res, [['error'], [[], False], [], ['celebration'], []])
+
+    def test_a_speaker_tap_or_leaving_while_he_says_the_word_drops_the_line(self):
+        # a tap on the speaker while he says the word: the word starts again
+        # from the speaker (the <audio> element), his line never comes;
+        # leaving the word while he says it: his word stops, no line
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "await check(); S.setState({ speaking: true }); a.speakWord(CAT, () => {}); await settle();"
+            "const tap = [played(), on(), made.length];"
+            "S.setState({ speaking: false, screen: 'theme', current: { word: null, placed: [] } });"
+            "await check({ roundsStarted: 2 }); S.setState({ screen: 'stages', current: { word: null, placed: [] } }); await settle();"
+            "out([tap, played(), on()]);")
+        self.assertEqual(res, [[['words/animals/cat.mp3', 'words/animals/cat.mp3'], [], 1],
+                               ['words/animals/cat.mp3'], []])
+
+    def test_nothing_over_the_speakers_word(self):
+        # the word playing from the speaker at the check: he says nothing
+        # (no second word over it, and his line is dropped, not queued)
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "S.setState(st()); await settle(); S.setState({ speaking: true }); a.speakWord(CAT, () => {}); clear();"
+            "S.setState({ ...correct(), speaking: true }); await settle(); const atCheck = played();"
+            "made[made.length - 1].on.ended(); S.setState({ speaking: false }); await settle();"
+            "out([atCheck, played()]);")
+        self.assertEqual(res, [[], []])
+
+    def test_muted_he_says_nothing_and_the_mute_stops_his_say(self):
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "await check({ muted: true }); const muted = played();"
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] }, muted: false });"
+            "await check({ roundsStarted: 2 }); S.setState({ muted: true }); await settle(); const cut = [on(), played()];"
+            "S.setState({ muted: false }); await settle();"
+            "out([muted, cut, played(), on()]);")
+        self.assertEqual(res, [[], [[], ['words/animals/cat.mp3']], ['words/animals/cat.mp3'], []])
+
+    def test_the_speaker_still_plays_the_word_as_before(self):
+        # speakWord (BACKLOG B-215) is unchanged: an <audio> element of the
+        # word's file, not through the context or his analyser
+        res = self.run_node(
+            "MAN = man('gags/animals/cat.mp3'); await ready(); S.setState({ speaking: true });"
+            "let ended = 0; a.speakWord(CAT, () => ended++); const el = made[made.length - 1];"
+            "const wave = a.voiceWave(); el.on.ended();"
+            "out([el.src, el.paused, wave, ended, sources.filter((s) => s.buffer && s.buffer.url === CAT).length]);")
+        self.assertEqual(res, ['/static/voice/words/animals/cat.mp3', False, None, 1, 0])
+
+    def test_only_audio_js_reads_static_voice_and_nothing_writes_there(self):
+        # the manifest and the clips are read by audio.js alone, with GET
+        # fetches; static/voice/ is content (CLAUDE.md)
+        js_dir = self.ROOT / 'static' / 'js'
+        strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
+        readers = [f.name for f in sorted(js_dir.rglob('*.js')) if '/static/voice/' in strip(f.read_text())]
+        self.assertEqual(readers, ['audio.js'])
+        code = strip(self.MODULE.read_text())
+        self.assertNotRegex(code, r"method\s*:")
+        self.assertEqual(code.count('fetch('), 2)   # the clips' download and the manifest
+
+
+class MomentLinesTests(TestCase):
+    """BACKLOG B-224: character.js's moment table names, per moment, the
+    pool of his new lines (`lines`); audio.js plays a random clip of it that
+    the manifest lists, else the moment's prototype clip (or nothing). The
+    picture: the word's Hebrew guess, else his look's pool; the round end by
+    its stars, the tada an effect under the line; a boost by its kind. After
+    his letter lands (hintGiven, boostGiven) its name, after his line or
+    alone. One clip at a time, never over the word, nothing while muted; a
+    line that can't play now is dropped; a moment that comes on its own
+    (`ifQuiet`) never cuts him. His idle peeks whisper (peekLine). Run
+    through node with CorrectWordVoiceTests' stand-ins and stand-in
+    manifests."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+    STATE = ROOT / 'static' / 'js' / 'state.js'
+    CHARACTER = ROOT / 'static' / 'js' / 'character.js'
+    MANIFEST = ROOT / 'static' / 'voice' / 'manifest.json'
+    ROBOT_LINES = ROOT / 'content' / 'voice' / 'robot-lines.json'
+
+    # the pools the table names (B-223's correct and streak among them)
+    POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'wrong', 'mumble',
+             'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
+             'boost-first', 'boost-clean', 'peek']
+    # BACKLOG B-224: the pools not wired here (each a "Later / not now" line)
+    UNWIRED = ['greet', 'murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow']
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    # On top of CorrectWordVoiceTests' harness: a source records the time
+    # it was started for (`when(file)`, the context's clock standing at
+    # 100); `P('ca-')` placed slots (tile t<i>), `W(cur, o)` a play-screen
+    # state on "cat" (`cur` merged into its word), `ends(n)` a finished
+    # round with n words right; `hush()` silences everything (a mute and
+    # unmute); `go(from, to)` the files started by the change from `from`
+    # to `to`, with nothing playing before it; `lineMan(...)` a manifest
+    # listing one clip of every pool the table names, plus `extra`.
+    def run_node(self, body):
+        prelude = (
+            f"const POOLS = {json.dumps(self.POOLS)};"
+            "{ const cbs = AudioContext.prototype.createBufferSource;"
+            "  AudioContext.prototype.createBufferSource = function () { const s = cbs.call(this); const go = s.start;"
+            "   s.start = (w) => { s.when = w; go(); }; return s; }; }"
+            "Object.defineProperty(AudioContext.prototype, 'currentTime', { get() { return 100; }, configurable: true });"
+            "const when = (file) => { const x = src(file); return x ? x.when : null; };"
+            "const P = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const W = (cur = {}, o = {}) => st({ current: { word: 'cat', audio: CAT, status: 'playing', placed: P('---'), ...cur }, ...o });"
+            "const DONE = { index: 0, size: 5, results: [{ correct: true }] };"
+            "const ends = (n) => ({ index: 4, size: 5, results: [0, 1, 2, 3, 4].map((i) => ({ correct: i < n })) });"
+            "const END = (n) => ({ ...W(), screen: 'round-end', round: ends(n) });"
+            "const STAGES = { screen: 'stages', current: { word: null, placed: [] } };"
+            "const lineMan = (...extra) => man(...POOLS.map((p) => `robot/${p}-01.mp3`), ...extra);"
+            "const hush = async () => { S.setState({ muted: true }); await settle(); S.setState({ muted: false }); await settle(); };"
+            "const go = async (from, to) => { await hush(); S.setState(from); await settle(); await hush(); clear();"
+            " S.setState(to); await settle(); return played(); };"
+            # the second miss on "cat": his letter "a" in slot 1
+            "const MISS2 = [W({ placed: P('tac') }, { lives: 2 }),"
+            " W({ status: 'wrong', placed: [P('t')[0], { letter: 'a', tileId: 't9', locked: true, hint: true }, P('--c')[2]] }, { lives: 1 })];"
+            # boosts on "cat" (as boost.js leaves them): Remember this one
+            # on slot 2 ("t", the block there hops back first), First
+            # letter ("c" from slot 2 into slot 0), Clean-up
+            "const BOOST = {"
+            " remember: [W({ placed: P('tac') }), W({ placed: [P('t')[0], P('-a')[1], { letter: 't', tileId: 't0', locked: true, boost: true }],"
+            "  boosts: 1, boostKind: 'remember' })],"
+            " first: [W({ placed: P('tac') }), W({ placed: [{ letter: 'c', tileId: 't2', locked: true, boost: true }, P('-a')[1], null],"
+            "  boosts: 1, boostKind: 'first' })],"
+            " cleanup: [W({ placed: P('tac') }), W({ placed: P('tac'), boosts: 1, boostKind: 'cleanup' })] };"
+            # every moment with a line, from -> to
+            "const T = {"
+            " roundStart: [STAGES, W({}, { tuned: false })],"
+            " picture: [W({}, { tuned: false }), W({}, { tuned: true })],"
+            " filledEarly: [W({ placed: P('ca-') }), W({ placed: P('cat') })],"
+            " domeNudge: [W({ status: 'correct', placed: P('cat') }, { round: DONE }), W({ status: 'correct', placed: P('cat') }, { round: DONE, nudges: 1 })],"
+            " kidIdle: [W(), W({}, { idleBeat: 'sunk' })],"
+            " wake: [W({}, { idleBeat: 'sunk' }), W({}, { idleBeat: 'over' })],"
+            " wrong: [W({ placed: P('tac') }), W({ status: 'wrong', placed: P('tac') }, { lives: 2 })],"
+            " secondMiss: MISS2,"
+            " thirdMiss: [W({ placed: P('tac') }, { lives: 1 }), W({ status: 'revealed', placed: P('cat') }, { lives: 0 })],"
+            " end3: [W(), END(5)], end2: [W(), END(4)], end1: [W(), END(2)], end0: [W(), END(0)],"
+            " speakerLocked: [W({ placed: P('tac') }), W({ placed: P('tac') }, { lockedTaps: 1 })],"
+            " boostRemember: BOOST.remember, boostFirst: BOOST.first, boostCleanup: BOOST.cleanup };"
+            "const look = () => C.picksFor(['picture'], C.snapshot(W({}, { tuned: true }))).picture;"
+        )
+        return CorrectWordVoiceTests.run_node(self, prelude + body)
+
+    # --- the table (character.js) ---
+
+    def test_the_table_names_a_pool_per_moment(self):
+        # the starting map (BACKLOG B-224, DECISIONS)
+        res = self.run_node(
+            "const L = C.linesOf;"
+            "out({ roundStart: L('roundStart'), surprise: L('picture', { variant: 'surprise' }),"
+            " giggle: L('picture', { variant: 'giggle' }), shock: L('picture', { variant: 'shock' }), firstLook: L('picture'),"
+            " filledEarly: L('filledEarly'), domeNudge: L('domeNudge'), kidIdle: L('kidIdle'), peek: C.PEEK.lines, wake: L('wake'),"
+            " wrong: L('wrong'), wrongPeek: L('wrongPeek'), hintGiven: L('hintGiven'), thirdMiss: L('thirdMiss'),"
+            " stars: [0, 1, 2, 3].map((n) => L(n >= 2 ? 'roundEndGood' : 'roundEnd', { stars: n })),"
+            " speakerLocked: L('speakerLocked'),"
+            " boosts: ['remember', 'first', 'cleanup', null].map((k) => L('boostGiven', { boostKind: k })),"
+            " correct: L('correct'), streak: L('streak'),"
+            " none: ['blockPlaced', 'blockReturned', 'filled', 'nope'].map((m) => L(m)),"
+            " ifQuiet: Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].ifQuiet), peekQuiet: C.PEEK.ifQuiet,"
+            " letter: Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].letter).map((m) => [m, C.MOMENTS[m].letter]),"
+            " sounds: Object.fromEntries(Object.keys(C.MOMENTS).map((m) => [m, C.MOMENTS[m].sound])) });")
+        self.assertEqual(res['roundStart'], ['start'])
+        for v in ('surprise', 'giggle', 'shock'):
+            self.assertEqual(res[v], ['hebrew', f'picture-{v}'])
+        self.assertEqual(res['firstLook'], ['hebrew', 'picture-surprise'])
+        self.assertEqual([res['filledEarly'], res['domeNudge']], [['press'], ['press']])
+        self.assertEqual([res['kidIdle'], res['peek'], res['wake']], [['idle'], ['peek'], ['wake']])
+        self.assertEqual([res['wrong'], res['wrongPeek']], [['wrong', 'mumble'], ['mumble']])
+        self.assertEqual([res['hintGiven'], res['thirdMiss']], [['hint'], ['reveal-open']])
+        self.assertEqual(res['stars'], [['end-low'], ['end-low'], ['end-mid'], ['end-high']])
+        self.assertEqual(res['speakerLocked'], ['no-gears'])
+        self.assertEqual(res['boosts'], [['boost-slot'], ['boost-first'], ['boost-clean'], []])
+        self.assertEqual([res['correct'], res['streak']], [['gag', 'correct'], ['streak', 'gag', 'correct']])
+        self.assertEqual(res['none'], [[], [], [], []])
+        # the moments that come on their own; the letter's slot field
+        self.assertEqual(res['ifQuiet'], ['picture', 'kidIdle', 'domeNudge'])
+        self.assertTrue(res['peekQuiet'])
+        self.assertEqual(res['letter'], [['hintGiven', 'hint'], ['boostGiven', 'boost']])
+        # the prototype column is as it was (the tada is now an effect)
+        self.assertEqual(res['sounds'], {
+            'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
+            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
+            'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'speakerLocked': 'locked',
+            'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
+
+    def test_the_pools_are_the_contents_and_the_unwired_ones_are_listed_later(self):
+        # every pool the table names is one of content/voice/robot-lines.json's;
+        # the ones it does not name are B-224's list, each with a line in
+        # BACKLOG "Later / not now"
+        content = set(json.loads(self.ROBOT_LINES.read_text())['pools'])
+        pools = self.run_node("out(a.linePools());")
+        self.assertEqual(pools, self.POOLS)
+        self.assertLessEqual(set(pools), content)
+        self.assertEqual(content - set(pools), set(self.UNWIRED))
+        backlog = (self.ROOT / 'BACKLOG.md').read_text()
+        later = backlog[backlog.index('## Later / not now'):]
+        for pool in self.UNWIRED:
+            self.assertEqual(len(re.findall(rf'^- .*`{re.escape(pool)}`', later, flags=re.M)), 1, pool)
+
+    # --- pure helpers (audio.js) ---
+
+    def test_the_hebrew_guess_the_letter_clip_and_pick_line(self):
+        files = ['hebrew/animals/cat.mp3', 'hebrew/food/egg.mp3', 'letters/a.mp3', 'letters/z.mp3', 'gags/animals/cat.mp3',
+                 'robot/wrong-01.mp3', 'robot/mumble-01.mp3', 'robot/mumble-02.mp3']
+        res = self.run_node(
+            f"const files = {json.dumps(files)};"
+            "const clips = { gags: ['g'], hebrew: ['h'], pools: { wrong: ['w1', 'w2'], mumble: ['m1'] } };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u);"
+            "out([a.hebrewClips(files, 'animals', 'cat'), a.hebrewClips(files, 'animals', 'dog'), a.hebrewClips(files, 'food', 'cat'),"
+            " a.hebrewClips(files, null, 'cat'), a.hebrewClips(files, 'animals', null), a.hebrewClips([], 'animals', 'cat'),"
+            " ['a', 'z', 'A', 'b', '', 'ab', '1', null, undefined, 3].map((l) => a.letterClip(files, l)),"
+            " a.WORD_LINES,"
+            " a.pickLine(['hebrew', 'wrong'], clips, all), a.pickLine(['wrong', 'mumble'], clips, all, () => 0.99),"
+            " a.pickLine(['wrong', 'mumble'], clips, not('w1', 'w2')), a.pickLine(['gag'], clips, all),"
+            " a.pickLine(['wrong'], clips, not('w1', 'w2')), a.pickLine([], clips, all), a.pickLine(['nope'], {}, all)]);")
+        self.assertEqual(res, [
+            ['hebrew/animals/cat.mp3'], [], [], [], [], [],
+            ['letters/a.mp3', 'letters/z.mp3', 'letters/a.mp3', None, None, None, None, None, None, None],
+            {'gag': 'gags', 'hebrew': 'hebrew'},
+            # the first group with a ready clip, a random clip of it
+            'h', 'w2', 'm1', 'g', None, None, None])
+
+    def test_say_plan_for_each_kind_of_moment(self):
+        res = self.run_node(
+            "const pools = { 'picture-giggle': ['pg'], press: ['pr'], wrong: ['w'], mumble: ['m'], hint: ['hi'],"
+            " 'end-high': ['eh'], 'end-low': ['el'], 'boost-first': ['bf'] };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u); const r0 = () => 0;"
+            "const plan = (m, c, how = {}, ready = all) => a.sayPlan(m, { word: 'W', gags: [], hebrew: [], pools, ...c }, ready, r0, how);"
+            "out({"
+            " pictureHe: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }), picture: plan('picture', {}, { variant: 'giggle' }),"
+            " pictureNone: plan('picture', {}, { variant: 'shock' }), pictureNotReady: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }, not('he')),"
+            " filledEarly: plan('filledEarly', {}), filledNone: plan('filledEarly', { pools: {} }),"
+            " wrong: plan('wrong', {}), wrongMumble: plan('wrong', {}, {}, not('w')), wrongNone: plan('wrong', { pools: {} }),"
+            " hint: plan('hintGiven', { letter: 'L' }), hintAlone: plan('hintGiven', { letter: 'L', pools: {} }),"
+            " hintNoLetter: plan('hintGiven', { letter: 'L' }, {}, not('L')),"
+            " end3: plan('roundEndGood', {}, { stars: 3 }), end2: plan('roundEndGood', {}, { stars: 2 }), end0: plan('roundEnd', {}, { stars: 0 }),"
+            " boostFirst: plan('boostGiven', { letter: 'L' }, { boostKind: 'first' }), boostSlot: plan('boostGiven', { letter: 'L' }, { boostKind: 'remember' }),"
+            " locked: plan('speakerLocked', {}), roundStart: plan('roundStart', {}), placed: plan('blockPlaced', { letter: 'L' }),"
+            " chain: a.voiceChain([plan('wrongPeek', {}), plan('hintGiven', { letter: 'L' })]),"
+            " chainProto: a.voiceChain([plan('wrongPeek', { pools: {} }), plan('hintGiven', { letter: 'L', pools: {} })]),"
+            " chainWord: a.voiceChain([plan('correct', { gags: ['g'] })]), chainFx: a.voiceChain([plan('roundEnd', { pools: {} })]),"
+            " chainAt: a.voiceChain([plan('wrongPeek', {}), plan('hintGiven', { letter: 'L' })], [0.6, 3.1]),"
+            " startsAt: a.voiceChain([plan('wrongPeek', { pools: {} }), plan('hintGiven', { letter: 'L', pools: {} })], [0, 2.5]),"
+            " starts: [C.startsOf(['wrongPeek', 'hintGiven']), C.startsOf(['roundStart', 'picture'], { picture: 'giggle' }),"
+            "  C.startsOf(['wrong']), C.startsOf([])] });")
+        p = lambda fx=None, word=None, line=None, sound=None, letter=None: {
+            'fx': fx, 'word': word, 'line': line, 'sound': sound, 'letter': letter}
+        # the picture: the word's Hebrew guess, else his look's pool, else nothing
+        self.assertEqual(res['pictureHe'], p(line='he'))
+        self.assertEqual(res['picture'], p(line='pg'))
+        self.assertEqual(res['pictureNone'], p())
+        self.assertEqual(res['pictureNotReady'], p(line='pg'))
+        # the swipe is an effect: it plays with his line, or alone
+        self.assertEqual(res['filledEarly'], p(fx='swipe', line='pr'))
+        self.assertEqual(res['filledNone'], p(fx='swipe'))
+        # wrong, else mumble, else the prototype clip
+        self.assertEqual([res['wrong'], res['wrongMumble'], res['wrongNone']], [p(line='w'), p(line='m'), p(sound='error')])
+        # his letter: its name after his line, or alone; not ready: none
+        self.assertEqual([res['hint'], res['hintAlone'], res['hintNoLetter']], [p(line='hi', letter='L'), p(letter='L'), p(line='hi')])
+        # the round end by its stars; the tada an effect with it
+        self.assertEqual([res['end3'], res['end2'], res['end0']], [p(fx='tada', line='eh'), p(fx='tada'), p(fx='tada', line='el')])
+        self.assertEqual([res['boostFirst'], res['boostSlot']], [p(line='bf', letter='L'), p(letter='L')])
+        self.assertEqual([res['locked'], res['roundStart'], res['placed']], [p(sound='locked'), p(), p(fx='swipe')])
+        # one after the other: the line (or prototype), then the letter
+        self.assertEqual(res['chain'], [{'url': 'm', 'kind': 'line'}, {'url': 'hi', 'kind': 'line'}, {'url': 'L', 'kind': 'line'}])
+        self.assertEqual(res['chainProto'], [{'pool': 'error'}, {'url': 'L', 'kind': 'line'}])
+        self.assertEqual(res['chainWord'], [{'url': 'W', 'kind': 'word'}, {'url': 'g', 'kind': 'line'}])
+        self.assertEqual(res['chainFx'], [])
+        # each moment's first clip no sooner than the moment starts in his
+        # script (character.js startsOf: his letter when his peek is over)
+        self.assertEqual(res['chainAt'], [{'url': 'm', 'kind': 'line', 'at': 0.6}, {'url': 'hi', 'kind': 'line', 'at': 3.1},
+                                          {'url': 'L', 'kind': 'line'}])
+        self.assertEqual(res['startsAt'], [{'pool': 'error'}, {'url': 'L', 'kind': 'line', 'at': 2.5}])
+        self.assertEqual(res['starts'], [[0, 2.5], [0, 0.6], [0], []])
+
+    def test_the_letter_he_placed_and_his_look_on_a_picture(self):
+        res = self.run_node(
+            "const snap = (s) => C.snapshot(s);"
+            "const [m0, m1] = MISS2.map(snap);"
+            "const lt = (k) => BOOST[k].map(snap);"
+            "const picks = [];"
+            "for (let r = 1; r <= 4; r++) for (let i = 0; i < 5; i++) for (const w of ['cat', 'dog', 'fox', 'bus', 'egg', 'key', 'sofa', 'lemon'])"
+            " picks.push(C.picksFor(['picture'], { key: `${r}:${i}:${w}` }).picture);"
+            "const count = (v) => picks.filter((x) => x === v).length;"
+            "out([C.letterGiven('hintGiven', m0, m1, 'cat'), C.letterGiven('hintGiven', m1, m1, 'cat'),"
+            " C.letterGiven('boostGiven', ...lt('remember'), 'cat'), C.letterGiven('boostGiven', ...lt('first'), 'cat'),"
+            " C.letterGiven('boostGiven', ...lt('cleanup'), 'cat'), C.letterGiven('wrongPeek', m0, m1, 'cat'),"
+            " C.letterGiven('hintGiven', m0, m1, null), C.letterGiven('hintGiven', m0, { ...m1, hint: 7 }, 'cat'),"
+            " lt('remember')[1].boostKind, snap(W()).boostKind, C.NONE.boostKind,"
+            " C.momentsFor(...lt('first')), C.momentsFor(m0, m1),"
+            " [count('surprise'), count('giggle'), count('shock')],"
+            " C.picksFor(['picture'], { key: '1:0:cat' }), C.picksFor(['picture'], { key: '1:0:cat' }),"
+            " C.picksFor(['roundStart'], { key: '1:0:cat' }), C.picksFor(['picture'], { key: null }),"
+            " [0, 1, 7].map((n) => C.rollOf('x' + n)).every((r) => r >= 0 && r < 1)]);")
+        self.assertEqual(res[:8], ['a', None, 't', 'c', None, None, None, None])
+        self.assertEqual(res[8:11], ['remember', None, None])
+        self.assertEqual(res[11:13], [['boostGiven'], ['wrongPeek', 'hintGiven']])
+        # a third each, about (160 words' pictures)
+        for n in res[13]:
+            self.assertTrue(35 <= n <= 72, res[13])
+        # the same key, the same look; only the picture's is picked so
+        self.assertEqual(res[14], res[15])
+        self.assertIn(res[14]['picture'], ['surprise', 'giggle', 'shock'])
+        self.assertEqual(res[16:], [{}, {}, True])
+
+    # --- what plays (audio.js renderSound) ---
+
+    def test_each_moment_says_a_line_of_its_pool(self):
+        res = self.run_node(
+            "MAN = lineMan('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "Math.random = () => 0; const res = {};"
+            "for (const [k, [from, to]] of Object.entries(T)) res[k] = [await go(from, to), kinds()];"
+            "out([res, look()]);")
+        res, look = res
+        line = lambda pool: [[f'robot/{pool}-01.mp3'], ['v']]
+        expect = {
+            'roundStart': line('start'), 'picture': line(f'picture-{look}'),
+            'filledEarly': [['swipe/swipe1.mp3', 'robot/press-01.mp3'], ['o', 'v']],
+            'domeNudge': line('press'), 'kidIdle': line('idle'), 'wake': line('wake'), 'wrong': line('wrong'),
+            'secondMiss': line('mumble'), 'thirdMiss': line('reveal-open'),
+            'end3': [['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v']],
+            'end2': [['celebration/tada.mp3', 'robot/end-mid-01.mp3'], ['o', 'v']],
+            'end1': [['celebration/tada.mp3', 'robot/end-low-01.mp3'], ['o', 'v']],
+            'end0': [['celebration/tada.mp3', 'robot/end-low-01.mp3'], ['o', 'v']],
+            'speakerLocked': line('no-gears'), 'boostRemember': line('boost-slot'), 'boostFirst': line('boost-first'),
+            'boostCleanup': line('boost-clean'),
+        }
+        self.assertEqual(res, expect)
+
+    def test_with_no_clip_in_the_pool_the_prototype_sound_or_nothing(self):
+        # static/voice/manifest.json as it is today: no shared line yet, so
+        # every moment plays what it played before B-224 (nothing where it
+        # had nothing; the tada now as an effect); only the letter names
+        # are new
+        manifest = json.loads(self.MANIFEST.read_text())
+        res = self.run_node(
+            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound);"
+            "Math.random = () => 0; const res = {};"
+            "for (const [k, [from, to]] of Object.entries(T)) res[k] = [await go(from, to), kinds()];"
+            "await go(...MISS2); await end('error/actually that is cleverly wrong.mp3'); const miss = [played(), kinds(), when('letters/a.mp3')];"
+            "const boost = []; for (const k of ['remember', 'first', 'cleanup']) { await go(...BOOST[k]); boost.push([played(), on().map(when)]); }"
+            "out([res, miss, boost]);")
+        res, miss, boost = res
+        err = [['error/actually that is cleverly wrong.mp3'], ['v']]
+        self.assertEqual(res, {
+            'roundStart': [[], []], 'picture': [[], []], 'filledEarly': [['swipe/swipe1.mp3'], ['o']],
+            'domeNudge': [[], []], 'kidIdle': [[], []], 'wake': [[], []], 'wrong': err, 'secondMiss': err, 'thirdMiss': err,
+            'end3': [['celebration/tada.mp3'], ['o']], 'end2': [['celebration/tada.mp3'], ['o']],
+            'end1': [['celebration/tada.mp3'], ['o']], 'end0': [['celebration/tada.mp3'], ['o']],
+            'speakerLocked': [['error/hmm no.mp3'], ['v']],
+            # his letter's name alone, as it lands (below); the clean-up: nothing
+            'boostRemember': [['letters/t.mp3'], ['v']], 'boostFirst': [['letters/c.mp3'], ['v']], 'boostCleanup': [[], []]})
+        # the second miss: the error clip, then his letter's name
+        self.assertEqual(miss[:2], [['error/actually that is cleverly wrong.mp3', 'letters/a.mp3'], ['v', 'v']])
+        self.assertAlmostEqual(miss[2], 102.5)      # when his peek is over
+        # a boost's letter: its name when it lands (the hop and the fly-in,
+        # 0.6s, boostLands), the context's clock at 100
+        self.assertEqual([b[0] for b in boost], [['letters/t.mp3'], ['letters/c.mp3'], []])
+        self.assertAlmostEqual(boost[0][1][0], 100.6)
+        self.assertAlmostEqual(boost[1][1][0], 100.6)
+
+    def test_the_picture_says_the_hebrew_guess_else_the_line_of_his_look(self):
+        res = self.run_node(
+            "MAN = lineMan('hebrew/animals/cat.mp3', 'hebrew/animals/dog.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "const he = await go(...T.picture);"
+            "const dog = (o = {}) => st({ current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing',"
+            " placed: P('---') }, round: { index: 1, size: 5, results: [{ correct: true }] }, ...o });"
+            "const dogHe = await go(dog({ tuned: false }), dog());"
+            # the word's guess not decoded yet: skipped, never waited for
+            "S.setState(STAGES); hold.add('/static/voice/hebrew/animals/cat.mp3'); await settle();"
+            "const later = await go(W({}, { roundsStarted: 2, tuned: false }), W({}, { roundsStarted: 2 }));"
+            "const lookLater = C.picksFor(['picture'], C.snapshot(W({}, { roundsStarted: 2 }))).picture;"
+            "await release('/static/voice/hebrew/animals/cat.mp3'); const after = played();"
+            "out([he, dogHe, later, lookLater, after, fetched.filter((u) => u.includes('/hebrew/'))]);")
+        he, dog_he, later, look_later, after, fetched = res
+        self.assertEqual(he, ['hebrew/animals/cat.mp3'])
+        self.assertEqual(dog_he, ['hebrew/animals/dog.mp3'])
+        self.assertEqual(later, [f'robot/picture-{look_later}-01.mp3'])
+        self.assertEqual(after, later)          # nothing starts when it decodes
+        # fetched with its word, as it starts: cat, dog, cat again
+        self.assertEqual(fetched, ['/static/voice/hebrew/animals/cat.mp3', '/static/voice/hebrew/animals/dog.mp3',
+                                   '/static/voice/hebrew/animals/cat.mp3'])
+        # a word without a guess: the line of his look, which is the look
+        # the robot shows (character.js renderRobot picks it the same way)
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); const out1 = await go(...T.picture);"
+            "out([out1, look()]);")
+        self.assertEqual(res[0], [f'robot/picture-{res[1]}-01.mp3'])
+        robot = re.sub(r'/\*.*?\*/|//[^\n]*', '', self.CHARACTER.read_text(), flags=re.S)
+        self.assertIn('playMoments(moments, picksFor(moments, now), waitFor(moments, prev, now, reducedMotion()), onPeek);', robot)
+
+    def test_his_letter_s_name_after_his_line_or_alone(self):
+        res = self.run_node(
+            "MAN = lineMan('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3'); await ready(); S.subscribe(a.renderSound);"
+            # the second miss: mumble, then his hint line, then the letter
+            "await go(...MISS2); const s1 = played(); await end('robot/mumble-01.mp3'); const s2 = [...played(), when('robot/hint-01.mp3')];"
+            "await end('robot/hint-01.mp3'); const s3 = [played(), kinds(), on()]; await end('letters/a.mp3'); const s4 = on();"
+            "const boost = {}; for (const k of ['remember', 'first', 'cleanup']) {"
+            " const first = await go(...BOOST[k]); const at = when(first[0]);"
+            " await end(first[0]); boost[k] = [first, at, played(), kinds()]; }"
+            "out([s1, s2, s3, s4, boost]);")
+        s1, s2, s3, s4, boost = res
+        self.assertEqual(s1, ['robot/mumble-01.mp3'])
+        # his hint line when his peek is over (2.5s after the miss), with
+        # his pointing at the letter
+        self.assertEqual(s2[:2], ['robot/mumble-01.mp3', 'robot/hint-01.mp3'])
+        self.assertAlmostEqual(s2[2], 102.5)
+        self.assertEqual(s3, [['robot/mumble-01.mp3', 'robot/hint-01.mp3', 'letters/a.mp3'], ['v', 'v', 'v'], ['letters/a.mp3']])
+        self.assertEqual(s4, [])
+        # a boost: his line as its letter lands (0.6s: the block in its
+        # slot hops back, the letter flies in; the clean-up's puff 0.3s),
+        # then the letter's name; the clean-up has none
+        self.assertEqual(boost['remember'][0], ['robot/boost-slot-01.mp3'])
+        self.assertAlmostEqual(boost['remember'][1], 100.6)
+        self.assertEqual(boost['remember'][2:], [['robot/boost-slot-01.mp3', 'letters/t.mp3'], ['v', 'v']])
+        self.assertEqual(boost['first'][0], ['robot/boost-first-01.mp3'])
+        self.assertAlmostEqual(boost['first'][1], 100.6)
+        self.assertEqual(boost['first'][2:], [['robot/boost-first-01.mp3', 'letters/c.mp3'], ['v', 'v']])
+        self.assertEqual(boost['cleanup'][0], ['robot/boost-clean-01.mp3'])
+        self.assertAlmostEqual(boost['cleanup'][1], 100.3)
+        self.assertEqual(boost['cleanup'][2:], [['robot/boost-clean-01.mp3'], ['v']])
+
+    def test_a_word_loads_the_names_of_its_letters(self):
+        # with the word, as it starts (B-223's loadWord): its letters'
+        # names that the manifest lists, once each; the next word's own
+        res = self.run_node(
+            "MAN = man('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3', 'letters/o.mp3', 'letters/d.mp3');"
+            "await ready(); S.subscribe(a.renderSound); const voice = () => fetched.filter((u) => u.includes('/letters/'));"
+            "S.setState(W()); await settle(); const cat = voice(); fetched.length = 0;"
+            "S.setState(st({ round: { index: 1, size: 5, results: [{ correct: true }] }, current: { word: 'good',"
+            " audio: '/static/voice/words/x/good.mp3', status: 'playing', placed: P('----') } })); await settle();"
+            "out([cat, voice(), decodes.filter((u) => u.includes('/letters/'))]);")
+        self.assertEqual(res, [
+            ['/static/voice/letters/c.mp3', '/static/voice/letters/a.mp3', '/static/voice/letters/t.mp3'],
+            ['/static/voice/letters/o.mp3', '/static/voice/letters/d.mp3'],
+            ['/static/voice/letters/c.mp3', '/static/voice/letters/a.mp3', '/static/voice/letters/t.mp3',
+             '/static/voice/letters/o.mp3', '/static/voice/letters/d.mp3']])
+
+    # --- his voice's rules ---
+
+    def test_a_moment_that_comes_on_its_own_never_cuts_him(self):
+        # the dome nudge while he says the word and his gag: dropped (the
+        # gag plays on, whole); when he is quiet, it plays. The picture
+        # while his round-start line plays, kid idle while his wrong line
+        # plays: dropped. A moment from the kid's action (his head-shake)
+        # cuts the line playing, as any voice clip does.
+        res = self.run_node(
+            "MAN = lineMan('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const done = (n) => correct({ nudges: n });"
+            "await check(); S.setState(done(1)); await settle(); const overWord = [played(), on()];"
+            "await end('words/animals/cat.mp3'); S.setState(done(2)); await settle();"
+            "const overGag = [played(), on(), log.filter((e) => e.op === 'stop' && short(e.src).startsWith('gags/')).length];"
+            "await end('gags/animals/cat.mp3'); S.setState(done(3)); await settle(); const quiet = on();"
+            "S.setState(done(4)); await settle(); const overPress = on();"
+            "S.setState({ ...done(4), lockedTaps: 1 }); await settle(); const cut = on();"
+            "await hush(); S.setState(STAGES); await settle(); clear(); S.setState(W({}, { roundsStarted: 2, tuned: false })); await settle();"
+            "S.setState(W({}, { roundsStarted: 2 })); await settle(); const picture = [played(), on()];"
+            "await go(...T.wrong); S.setState(W({ status: 'wrong', placed: P('tac') }, { lives: 2, idleBeat: 'sunk' })); await settle();"
+            "const idle = on();"
+            "out([overWord, overGag, quiet, overPress, cut, picture, idle]);")
+        over_word, over_gag, quiet, over_press, cut, picture, idle = res
+        self.assertEqual(over_word, [['words/animals/cat.mp3'], ['words/animals/cat.mp3']])
+        self.assertEqual(over_gag, [['words/animals/cat.mp3', 'gags/animals/cat.mp3'], ['gags/animals/cat.mp3'], 0])
+        self.assertEqual(quiet, ['robot/press-01.mp3'])
+        self.assertEqual(over_press, ['robot/press-01.mp3'])     # its own line plays on, not started again
+        self.assertEqual(cut, ['robot/no-gears-01.mp3'])
+        self.assertEqual(picture, [['robot/start-01.mp3'], ['robot/start-01.mp3']])
+        self.assertEqual(idle, ['robot/wrong-01.mp3'])
+
+    def test_one_clip_at_a_time_never_over_the_word_and_nothing_muted(self):
+        res = self.run_node(
+            "MAN = lineMan('letters/a.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            # one at a time: the wrong line cuts the press line
+            "await go(...T.filledEarly); S.setState(W({ status: 'wrong', placed: P('cat') }, { lives: 2 })); await settle();"
+            "const one = [on(), log.filter((e) => e.op === 'stop').map((e) => short(e.src))];"
+            # the speaker's word playing: no line of his starts, of any moment
+            "const res = [];"
+            "for (const k of ['wrong', 'picture', 'speakerLocked', 'secondMiss']) {"
+            " await hush(); S.setState(T[k][0]); await settle(); await hush(); S.setState({ speaking: true }); a.speakWord(CAT, () => {});"
+            " clear(); S.setState({ ...T[k][1], speaking: true }); await settle(); res.push(played()); S.setState({ speaking: false }); }"
+            # muted: nothing, of any moment
+            "const muted = [];"
+            "for (const [k, [from, to]] of Object.entries(T)) { await hush(); S.setState({ ...from, muted: true }); await settle(); clear();"
+            " S.setState({ ...to, muted: true }); await settle(); muted.push(played().length); }"
+            "out([one, res, muted]);")
+        one, speaking, muted = res
+        # (the swipe, an effect, plays on)
+        self.assertEqual(one, [['swipe/swipe1.mp3', 'robot/wrong-01.mp3'], ['robot/press-01.mp3']])
+        self.assertEqual(speaking, [[], [], [], []])
+        self.assertEqual(set(muted), {0})
+
+    def test_a_line_that_cannot_play_now_is_dropped_not_queued(self):
+        # not decoded yet: the next of its pools (wrong -> mumble), else the
+        # prototype clip; nothing starts when it decodes later. His letter's
+        # name not decoded: dropped from the chain.
+        res = self.run_node(
+            "['wrong-01', 'mumble-01', 'hint-01'].forEach((id) => hold.add(`/static/voice/robot/${id}.mp3`));"
+            "hold.add('/static/voice/letters/a.mp3');"
+            "MAN = lineMan('letters/a.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const wrong = await go(...T.wrong);"
+            "await release('/static/voice/robot/mumble-01.mp3'); const mumble = await go(...T.wrong);"
+            "const miss = await go(...MISS2); await end('robot/mumble-01.mp3'); const missAll = played();"
+            "await release('/static/voice/robot/wrong-01.mp3'); await release('/static/voice/robot/hint-01.mp3');"
+            "await release('/static/voice/letters/a.mp3'); const after = played();"
+            "out([wrong, mumble, missAll, after]);")
+        self.assertEqual(res, [['error/actually that is cleverly wrong.mp3'], ['robot/mumble-01.mp3'],
+                               ['robot/mumble-01.mp3'], ['robot/mumble-01.mp3']])
+
+    def test_the_round_end_s_tada_is_an_effect_under_his_line(self):
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "await go(...T.end3); const both = [on(), kinds(), on().map(when)];"
+            "await end('robot/end-high-01.mp3'); const after = on();"
+            "out([both, after]);")
+        self.assertEqual(res, [[['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v'], [0, 0]], ['celebration/tada.mp3']])
+
+    def test_leaving_the_word_stops_his_voice(self):
+        # whatever he is saying of the word stops when it is left: the
+        # next word, the round end (its tada and line start), the back arrow
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const next = W({}, { round: { index: 1, size: 5, results: [{ correct: true }] }, tuned: false });"
+            "await go(...T.domeNudge); const pressing = on(); S.setState(next); await settle(); const atNext = on();"
+            "await go(...T.wrong); S.setState(END(4)); await settle(); const atEnd = on();"
+            "await go(...T.wrong); S.setState(STAGES); await settle(); const back = on();"
+            "out([pressing, atNext, atEnd, back]);")
+        self.assertEqual(res, [['robot/press-01.mp3'], [], ['celebration/tada.mp3', 'robot/end-mid-01.mp3'], []])
+
+    def test_his_peeks_whisper_only_while_he_is_quiet(self):
+        res = self.run_node(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "await go(...T.kidIdle); await end('robot/idle-01.mp3'); clear();"
+            "a.peekLine(); const first = [played(), kinds()]; a.peekLine(); const again = [played(), on()];"
+            "await end('robot/peek-01.mp3'); await go(...T.wrong); clear(); a.peekLine(); const overWrong = [played(), on()];"
+            "await hush(); S.setState({ muted: true }); clear(); a.peekLine(); const muted = played(); S.setState({ muted: false });"
+            "S.setState({ speaking: true }); a.peekLine(); const speaking = played(); S.setState({ speaking: false });"
+            "S.setState(END(5)); await hush(); clear(); a.peekLine(); const off = played();"
+            "out([first, again, overWrong, muted, speaking, off]);")
+        self.assertEqual(res, [[['robot/peek-01.mp3'], ['v']], [['robot/peek-01.mp3'], ['robot/peek-01.mp3']],
+                               [[], ['robot/wrong-01.mp3']], [], [], []])
+        # no peek clip listed: nothing
+        self.assertEqual(self.run_node(
+            "MAN = man('robot/idle-01.mp3'); await ready(); S.subscribe(a.renderSound); await go(...T.kidIdle);"
+            "await end('robot/idle-01.mp3'); clear(); a.peekLine(); out(played());"), [])
+
+    def test_the_wiring(self):
+        strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
+        js = self.ROOT / 'static' / 'js'
+        main = strip((js / 'main.js').read_text())
+        self.assertIn("import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';", main)
+        self.assertIn('subscribe((s) => renderRobot(s, peekLine));', main)
+        self.assertNotIn('subscribe(renderRobot);', main)
+        audio = strip(self.MODULE.read_text())
+        self.assertIn("import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf } from './character.js';", audio)
+        # leaving the word stops his voice (no say flag any more)
+        render = audio[audio.index('export function renderSound('):]
+        self.assertIn('stopVoice();\n        loadWord(state);', render)
+        self.assertNotIn('stopSay', audio)
+        # character.js still never touches state or sound
+        character = strip(self.CHARACTER.read_text())
+        for word in ('setState', 'AudioContext', 'new Audio', "from './audio.js'"):
+            self.assertNotIn(word, character)
+
+
+class PictureLifeTests(TestCase):
+    """The TV picture's life (BACKLOG B-221; the approved prototype is
+    design/reference/tv-motion.html, layer 2 "Life"): picture.js's table of
+    idle moves (sway and rumble the prototype's, the others new, small,
+    starting and ending at rest), the pivots, the plate's glow and the
+    specks; lifeOf reads a word's data entry (`motion` with both pictures,
+    or the still picture); its subscriber (stand-ins for the DOM and Web
+    Animations) loads a word's two layers as it starts, shows them once the
+    picture has locked (state.tuned) and both have decoded, runs the life
+    with Element.animate only, and cancels it on a new word, on leaving the
+    play screen and while the page is hidden; reduced motion shows the
+    layers still. main.js, the template, game.css and feedback.js's static
+    wire it."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const P = await import('{(self.JS / 'picture.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start)]
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    def entries(self):
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        for theme, url in index.items():
+            data = json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8'))
+            for word, entry in data.items():
+                yield theme, word, entry
+
+    # --- the table ---
+
+    def test_sway_and_rumble_are_the_prototypes(self):
+        idle, pivots = self.run_node("out([P.IDLE, P.PIVOTS]);")
+        self.assertEqual(idle['sway'], {
+            'keyframes': [{'transform': 'rotate(-1.8deg)'}, {'transform': 'rotate(1.8deg)'}],
+            'duration': 3200, 'direction': 'alternate', 'easing': 'ease-in-out',
+            # it starts halfway through its first swing, at rest
+            'iterationStart': 0.5,
+        })
+        self.assertEqual(idle['rumble'], {
+            'keyframes': [
+                {'transform': 'translateY(0) scaleY(1)'},
+                {'transform': 'translateY(-0.9%) scaleY(1.008)', 'offset': 0.18},
+                {'transform': 'translateY(0) scaleY(0.994)', 'offset': 0.36},
+                {'transform': 'translateY(0) scaleY(1)'},
+            ],
+            'duration': 950, 'easing': 'ease-in-out',
+        })
+        # the backlog's pivots (the prototype's bat 51% 14%, its taxi 50% 88%)
+        self.assertEqual(pivots, {'top': '50% 12%', 'bottom': '50% 88%', 'center': '50% 50%'})
+        # the prototype's own lines, so a change there shows up here
+        proto = (self.ROOT / 'design' / 'reference' / 'tv-motion.html').read_text()
+        for line in ('sway:   { kf: [{ transform: "rotate(-1.8deg)" }, { transform: "rotate(1.8deg)" }], opt: { duration: 3200, direction: "alternate", easing: "ease-in-out" } },',
+                     '{ transform: "translateY(0) scaleY(1)" },',
+                     '{ transform: "translateY(-0.9%) scaleY(1.008)", offset: 0.18 },',
+                     '{ transform: "translateY(0) scaleY(0.994)", offset: 0.36 },',
+                     '], opt: { duration: 950, easing: "ease-in-out" } }',
+                     '{ duration: 4200, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }',
+                     'glowAnim = $("plate").animate([{ filter: "brightness(1)" }, { filter: "brightness(1.07)" }],',
+                     'for (let i = 0; i < 6; i++) {',
+                     'm.style.left = (18 + Math.random() * 64) + "%";',
+                     'm.style.top = (55 + Math.random() * 35) + "%";',
+                     '{ opacity: 0.3, offset: 0.3 },',
+                     '{ transform: `translate(${(Math.random() - 0.5) * 30}px, -${40 + Math.random() * 50}px)`, opacity: 0 }',
+                     '], { duration: 9000 + Math.random() * 7000, delay: Math.random() * 6000, iterations: Infinity, easing: "linear" }));',
+                     '.mote { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--cream); opacity: 0; }'):
+            self.assertIn(line, proto)
+
+    def parse(self, transform):
+        """A keyframe's transform as { function: [numbers] } (units dropped)."""
+        out = {}
+        for name, args in re.findall(r'([a-zA-Z]+)\(([^)]*)\)', transform):
+            out[name] = [float(re.sub(r'[a-z%]+$', '', a.strip())) for a in args.split(',')]
+        return out
+
+    def test_the_new_moves_are_small_loops_that_start_and_end_at_rest(self):
+        idle = self.run_node("out(P.IDLE);")
+        self.assertEqual(sorted(idle), sorted(['sway', 'rumble', 'bob', 'hop', 'wobble', 'float', 'breathe', 'spin']))
+        # every move the data asks for is in the table
+        used = {e['motion']['idle'] for _, _, e in self.entries() if 'motion' in e}
+        self.assertEqual(used - set(idle), set())
+        rest = {'translateY': 0, 'translateX': 0, 'rotate': 0}
+        for name in ('bob', 'hop', 'wobble', 'float', 'breathe', 'spin'):
+            move = idle[name]
+            frames = [self.parse(k['transform']) for k in move['keyframes']]
+            # a loop of 1-3.5s, played forwards (no alternate: the loop is the duration)
+            self.assertTrue(1000 <= move['duration'] <= 3500, name)
+            self.assertNotIn('direction', move, name)
+            self.assertNotIn('iterationStart', move, name)
+            # the same transform functions in every keyframe, so each one
+            # tweens on its own
+            self.assertEqual(len({tuple(f) for f in frames}), 1, name)
+            # it starts and ends at rest, so the subject never jumps off
+            # the still picture as the layers come in
+            for f in (frames[0], frames[-1]):
+                for fn, args in f.items():
+                    want = 1 if fn.startswith('scale') else rest[fn]
+                    self.assertTrue(all(a == want for a in args), (name, f))
+            # small: at most 2% of the picture, 3 degrees (spin about 10),
+            # a squash or swell within 3%
+            for f in frames:
+                for fn, args in f.items():
+                    for a in args:
+                        if fn.startswith('translate'):
+                            self.assertLessEqual(abs(a), 2, (name, f))
+                        elif fn == 'rotate':
+                            self.assertLessEqual(abs(a), 10 if name == 'spin' else 3, (name, f))
+                        else:
+                            self.assertTrue(0.97 <= a <= 1.03, (name, f))
+        biggest = lambda name, fn: max(abs(a) for k in idle[name]['keyframes'] for a in self.parse(k['transform']).get(fn, [0]))
+        self.assertEqual(biggest('spin', 'rotate'), 10)
+        self.assertEqual(max(a for k in idle['breathe']['keyframes'] for a in self.parse(k['transform'])['scale']), 1.02)
+        # a hop goes up, lands squashed (wider, lower) and pauses
+        hop = [self.parse(k['transform']) for k in idle['hop']['keyframes']]
+        self.assertLess(min(f['translateY'][0] for f in hop), 0)
+        self.assertTrue(any(f['scale'][0] > 1 > f['scale'][1] and f['translateY'][0] == 0 for f in hop))
+        self.assertLessEqual(idle['hop']['keyframes'][-2]['offset'], 0.5)
+        # a float tilts, a bob does not; a wobble rocks both ways
+        self.assertNotEqual(biggest('float', 'rotate'), 0)
+        self.assertNotIn('rotate', self.parse(idle['bob']['keyframes'][0]['transform']))
+        wob = [self.parse(k['transform'])['rotate'][0] for k in idle['wobble']['keyframes']]
+        self.assertTrue(min(wob) < 0 < max(wob))
+
+    def test_idle_of_glow_of_and_the_specks(self):
+        res = self.run_node(
+            "const i = P.idleOf('sway'); const g = P.glowOf();"
+            "const lo = P.moteSpecs(() => 0); const hi = P.moteSpecs(() => 0.9999); const half = P.moteSpecs(() => 0.5);"
+            "let k = 0; const seq = P.moteSpecs(() => [0.1, 0.2, 0.3, 0.4, 0.5, 0.6][k++ % 6]);"
+            "out([i.keyframes, { ...i.options, iterations: String(i.options.iterations) }, P.idleOf('nope'), P.idleOf('constructor'), P.idleOf(null),"
+            " g.keyframes, { ...g.options, iterations: String(g.options.iterations) }, P.GLOW, P.MOTES,"
+            " lo.length, lo[0], hi[0], half[0], seq[0],"
+            " P.moteOf(half[0]).keyframes, { ...P.moteOf(half[0]).options, iterations: String(P.moteOf(half[0]).options.iterations) },"
+            " P.moteOf({ dx: -7.5, dy: 40, duration: 9000, delay: 0 }, 1.5).keyframes[2].transform,"
+            " P.scaleOf(151.2), P.scaleOf(201.6), P.scaleOf(0), P.scaleOf(undefined)]);")
+        (keyframes, options, nope, ctor, none, glow, glow_opts, GLOW, MOTES, n, lo, hi, half, seq,
+         frames, mote_opts, scaled, s1, s2, s0, su) = res
+        self.assertEqual(keyframes, [{'transform': 'rotate(-1.8deg)'}, {'transform': 'rotate(1.8deg)'}])
+        self.assertEqual(options, {'duration': 3200, 'direction': 'alternate', 'easing': 'ease-in-out', 'iterationStart': 0.5, 'iterations': 'Infinity'})
+        self.assertEqual([nope, ctor, none], [None, None, None])
+        # the plate's glow: brightness 1 -> 1.07, 4.2s each way, forever
+        self.assertEqual(glow, [{'filter': 'brightness(1)'}, {'filter': 'brightness(1.07)'}])
+        self.assertEqual(glow_opts, {'duration': 4200, 'direction': 'alternate', 'easing': 'ease-in-out', 'iterations': 'Infinity'})
+        self.assertEqual(GLOW['duration'], 4200)
+        # about 6 dim specks: the prototype's numbers
+        self.assertEqual(MOTES, {'count': 6, 'left': {'least': 18, 'range': 64}, 'top': {'least': 55, 'range': 35}, 'drift': 30,
+                                 'rise': {'least': 40, 'range': 50}, 'duration': {'least': 9000, 'range': 7000}, 'delay': 6000,
+                                 'peak': 0.3, 'peakAt': 0.3, 'width': 151.2})
+        self.assertEqual(n, 6)
+        self.assertEqual(lo, {'left': 18, 'top': 55, 'dx': -15, 'dy': 40, 'duration': 9000, 'delay': 0})
+        for key, top in (('left', 82), ('top', 90), ('dx', 15), ('dy', 90), ('duration', 16000), ('delay', 6000)):
+            self.assertAlmostEqual(hi[key], top, delta=top * 0.0001 + 0.01)
+        self.assertEqual(half, {'left': 50, 'top': 72.5, 'dx': 0, 'dy': 65, 'duration': 12500, 'delay': 3000})
+        # the prototype's order: left, top, then dx, dy, duration, delay
+        self.assertEqual(seq, {'left': 18 + 0.1 * 64, 'top': 55 + 0.2 * 35, 'dx': (0.3 - 0.5) * 30, 'dy': 40 + 0.4 * 50,
+                               'duration': 9000 + 0.5 * 7000, 'delay': 0.6 * 6000})
+        # each fades in to 0.3 a third of the way and out as it rises,
+        # linearly, again and again
+        self.assertEqual(frames, [{'transform': 'translate(0px, 0px)', 'opacity': 0}, {'opacity': 0.3, 'offset': 0.3},
+                                  {'transform': 'translate(0px, -65px)', 'opacity': 0}])
+        self.assertEqual(mote_opts, {'duration': 12500, 'delay': 3000, 'iterations': 'Infinity', 'easing': 'linear'})
+        # the px scale with the TV picture (151.2px wide at 360)
+        self.assertEqual(scaled, 'translate(-11.25px, -60px)')
+        self.assertEqual([s1, s2, s0, su], [1, 201.6 / 151.2, 1, 1])
+
+    def test_life_of_a_data_entry(self):
+        res = self.run_node(
+            "const m = (o) => ({ image: '/w/x.webp', motion: { subject: '/w/x-subject.webp', plate: '/w/x-plate.webp', idle: 'hop', pivot: 'bottom', win: 'pop', ...o } });"
+            "out([P.lifeOf(m({})), P.lifeOf(m({ idle: 'sway', pivot: 'top' })), P.lifeOf(m({ pivot: 'center', idle: 'spin' })),"
+            " P.lifeOf(m({ idle: 'tumble', pivot: 'left' })), P.lifeOf(m({ idle: 'toString', pivot: '__proto__' })),"
+            " P.lifeOf({ image: '/a/duck.svg' }), P.lifeOf(m({ subject: '' })), P.lifeOf(m({ plate: null })), P.lifeOf({ motion: 'cat' }),"
+            " P.lifeOf(null), P.lifeOf(undefined), P.lifeOf('cat'),"
+            " [P.lifeOf(m({ win: 'cheer' })).win, P.lifeOf(m({ win: 'moonwalk' })).win, P.lifeOf(m({ win: 'constructor' })).win, P.lifeOf(m({ win: undefined })).win]]);")
+        wins = res.pop()
+        self.assertEqual(res[0], {'subject': '/w/x-subject.webp', 'plate': '/w/x-plate.webp', 'idle': 'hop', 'origin': '50% 88%', 'win': 'pop'})
+        self.assertEqual(res[1]['origin'], '50% 12%')
+        self.assertEqual([res[2]['idle'], res[2]['origin']], ['spin', '50% 50%'])
+        # a move or a pivot the table does not have: still, from the centre
+        self.assertEqual([res[3]['idle'], res[3]['origin']], [None, '50% 50%'])
+        self.assertEqual([res[4]['idle'], res[4]['origin']], [None, '50% 50%'])
+        # no motion with both pictures: the still picture
+        self.assertEqual(res[5:], [None] * 7)
+        # the win (BACKLOG B-222): the data's, else the pop
+        self.assertEqual(wins, ['cheer', 'pop', 'pop', 'pop'])
+
+    def test_every_word_but_the_duck_has_its_two_layers(self):
+        entries = {f'{t}/{w}': e for t, w, e in self.entries()}
+        res = self.run_node(f"const E = {json.dumps(entries)}; out(Object.fromEntries(Object.entries(E).map(([k, e]) => [k, P.lifeOf(e)])));")
+        still = sorted(k for k, v in res.items() if v is None)
+        self.assertEqual(still, ['animals/duck'])
+        for key, life in res.items():
+            if life is None:
+                continue
+            for pic in (life['plate'], life['subject']):
+                self.assertTrue((self.ROOT / pic.lstrip('/')).exists(), (key, pic))
+            self.assertIsNotNone(life['idle'], key)
+            self.assertNotEqual(life['origin'], None, key)
+
+    # --- the subscriber (stand-ins for the DOM and Web Animations) ---
+
+    FAKE = """
+        const calls = []; const live = new Set(); let reduced = false; const prefetched = [];
+        const tick = () => new Promise((r) => setTimeout(r, 0));
+        const inside = (el, root) => { for (let e = el; e; e = e.parent) if (e === root) return true; return false; };
+        class El {
+            // an element made by createElement is named by its class
+            // (a speck is 'mote'), the template's by the test
+            constructor(name, parent = null) { this.fixed = name; this.parent = parent; this.attrs = {}; this.style = {}; this.kids = [];
+                this.className = ''; this.cls = new Set(); this.isConnected = true; this.clientWidth = 151.2; this.pending = [];
+                const s = this.cls; this.classList = { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c),
+                    toggle: (c, on) => (on ? s.add(c) : s.delete(c)) }; }
+            get name() { return this.fixed || (this.className === 'tv-mote' ? 'mote' : this.className.split(' ')[0]); }
+            getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+            setAttribute(k, v) { this.attrs[k] = String(v); }
+            set src(v) { this.attrs.src = v; calls.push(['src', this.name, v]); }
+            decode() { calls.push(['decode', this.name]); return new Promise((res, rej) => this.pending.push({ res, rej })); }
+            // a stand-in Animation: cancel() rejects `finished` (marked
+            // handled, as the browser's), finish() resolves it
+            animate(keyframes, options) {
+                let done = null;
+                const finished = new Promise((res, rej) => { done = { res, rej }; });
+                finished.catch(() => {});
+                const a = { target: this, keyframes, options, finished, paused: false,
+                    cancel: () => { live.delete(a); calls.push(['cancel', this.name]); done.rej(new Error('AbortError')); },
+                    pause: () => { a.paused = true; calls.push(['pause', this.name]); },
+                    play: () => { a.paused = false; calls.push(['play', this.name]); },
+                    finish: () => { live.delete(a); done.res(a); } };
+                live.add(a);
+                calls.push(['animate', this.name, keyframes, 'iterations' in options ? { ...options, iterations: String(options.iterations) } : options]);
+                return a;
+            }
+            appendChild(c) { c.parent = this; this.kids.push(c); }
+            remove() { if (this.parent) this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; }
+            set textContent(v) { this.kids.forEach((k) => { k.parent = null; }); this.kids = []; calls.push(['clear', this.name]); }
+            getAnimations(o) { return [...live].filter((a) => (o && o.subtree ? inside(a.target, this) : a.target === this)); }
+            getBoundingClientRect() { return { left: 104, top: 121, width: 151.2, height: 110 }; }
+        }
+        const card = new El('card'); const still = new El('still', card); const life = new El('life', card); const plate = new El('plate', life);
+        const motes = new El('motes', life); const actor = new El('actor', life); const subject = new El('subject', actor);
+        const fx = new El('fx', life); const flash = new El('flash', card); const body = new El('body');
+        const parts = { '.tv-life': life, '.tv-plate': plate, '.tv-motes': motes, '.tv-actor': actor, '.tv-subject': subject,
+            '.tv-fx': fx, '#play-image': still, '.tv-flash': flash };
+        card.querySelector = (s) => parts[s] || null;
+        globalThis.document = { hidden: false, body, querySelector: (s) => (s === '#screen-play .card' ? card : null),
+            querySelectorAll: (s) => (s === '.confetti' ? body.kids.filter((k) => k.className === 'confetti') : []),
+            createElement: () => new El(null) };
+        globalThis.window = { matchMedia: () => ({ matches: reduced }) };
+        globalThis.Image = class { set src(v) { prefetched.push(v); } };
+        const decodeAll = async (ok = true) => { for (const el of [plate, subject]) { el.pending.splice(0).forEach((p) => (ok ? p.res() : p.rej(new Error('no')))); } await tick(); };
+        const M = (idle, pivot) => ({ subject: '/w/' + idle + '-subject.webp', plate: '/w/' + idle + '-plate.webp', idle, pivot, win: 'pop' });
+        const data = { cat: { image: '/w/cat.webp', motion: M('breathe', 'bottom') }, bat: { image: '/w/bat.webp', motion: M('sway', 'top') },
+            duck: { image: '/a/duck.svg' }, bus: { image: '/w/bus.webp', motion: M('rumble', 'bottom') } };
+        const words = [{ word: 'cat' }, { word: 'bat' }, { word: 'duck' }, { word: 'bus' }];
+        const at = (index, o = {}) => ({ screen: 'play', roundsStarted: 1, data, words, round: { index }, current: { word: words[index].word }, tuned: false, ...o });
+        const take = () => calls.splice(0);
+        const on = () => card.cls.has('life-on');
+        const kinds = (c) => c.map((x) => x[0] + ' ' + x[1]);
+    """
+
+    def test_a_word_loads_its_layers_and_shows_them_once_locked_and_decoded(self):
+        res = self.run_node(
+            "P.renderPicture(at(0)); const start = take(); const s1 = [on(), live.size, actor.style.transformOrigin];"
+            # decoded first, then the lock
+            "await decodeAll(); const decoded = [take(), on(), live.size];"
+            "P.renderPicture(at(0, { tuned: true })); const locked = take(); const s2 = [on(), live.size, motes.kids.length];"
+            # a re-render in the same state starts nothing new
+            "P.renderPicture(at(0, { tuned: true })); P.renderPicture(at(0, { tuned: true, lives: 2 })); const again = take();"
+            "out([start, s1, decoded, locked, s2, again, prefetched, motes.kids.map((m) => [m.style.left.endsWith('%'), m.style.top.endsWith('%'), m.className])]);",
+            prelude=self.FAKE)
+        start, s1, decoded, locked, s2, again, prefetched, specks = res
+        # the word starts: its plate and subject load and decode, its pivot set; nothing shows yet
+        self.assertEqual(start, [['clear', 'motes'], ['clear', 'fx'], ['src', 'plate', '/w/breathe-plate.webp'], ['src', 'subject', '/w/breathe-subject.webp'],
+                                 ['decode', 'plate'], ['decode', 'subject']])
+        self.assertEqual(s1, [False, 0, '50% 88%'])
+        # decoded but not locked yet: still the still picture
+        self.assertEqual(decoded, [[], False, 0])
+        # at the lock: the layers show and the life starts, Web Animations only
+        self.assertEqual([c[:2] for c in locked], [['animate', 'actor'], ['animate', 'plate']] + [['animate', 'mote']] * 6)
+        self.assertEqual(locked[0][2:], [[{'transform': 'scale(1)', 'easing': 'ease-in-out'}, {'transform': 'scale(1.02)', 'easing': 'ease-in-out'}, {'transform': 'scale(1)'}],
+                                         {'duration': 3200, 'iterations': 'Infinity'}])
+        self.assertEqual(locked[1][2:], [[{'filter': 'brightness(1)'}, {'filter': 'brightness(1.07)'}],
+                                         {'duration': 4200, 'direction': 'alternate', 'easing': 'ease-in-out', 'iterations': 'Infinity'}])
+        for c in locked[2:]:
+            self.assertEqual(c[3]['iterations'], 'Infinity')
+            self.assertEqual(c[3]['easing'], 'linear')
+        self.assertEqual(s2, [True, 8, 6])
+        self.assertEqual(again, [])
+        # the next word's layers start loading now
+        self.assertEqual(prefetched, ['/w/sway-plate.webp', '/w/sway-subject.webp'])
+        self.assertEqual(specks, [[True, True, 'tv-mote']] * 6)
+
+    def test_layers_still_loading_at_the_lock_show_when_they_have_decoded(self):
+        res = self.run_node(
+            "P.renderPicture(at(1)); P.renderPicture(at(1, { tuned: true })); take(); const s1 = [on(), live.size];"
+            "await decodeAll(); const late = take(); const s2 = [on(), live.size, actor.style.transformOrigin];"
+            # one that fails to load: the still picture stays
+            "P.renderPicture(at(3)); P.renderPicture(at(3, { tuned: true })); take(); await decodeAll(false); const failed = [take(), on(), live.size];"
+            # one that decodes after its word has gone: nothing shows
+            "P.renderPicture(at(0)); const pend = [plate.pending.length, subject.pending.length]; P.renderPicture(at(2)); take();"
+            "await decodeAll(); P.renderPicture(at(2, { tuned: true })); const stale = [take(), on(), live.size];"
+            "out([s1, kinds(late), s2, failed, pend, stale]);",
+            prelude=self.FAKE)
+        s1, late, s2, failed, pend, stale = res
+        self.assertEqual(s1, [False, 0])
+        self.assertEqual(late, ['animate actor', 'animate plate'] + ['animate mote'] * 6)
+        self.assertEqual(s2, [True, 8, '50% 12%'])
+        self.assertEqual(failed, [[], False, 0])
+        self.assertEqual(pend, [1, 1])
+        self.assertEqual(stale, [[], False, 0])
+
+    def test_a_word_without_motion_shows_its_still_picture(self):
+        res = self.run_node(
+            "P.renderPicture(at(2)); P.renderPicture(at(2, { tuned: true })); await decodeAll(); const duck = [take(), on(), live.size];"
+            # a data entry missing, or no data at all
+            "P.renderPicture(at(0, { data: null, tuned: true })); P.renderPicture({ ...at(1, { tuned: true }), current: { word: 'owl' } }); await decodeAll();"
+            "out([duck, take(), on(), live.size]);",
+            prelude=self.FAKE)
+        duck, rest, is_on, n = res
+        self.assertEqual(duck, [[['clear', 'motes'], ['clear', 'fx']], False, 0])
+        self.assertEqual([c[0] for c in rest], ['clear'] * 4)
+        self.assertEqual([is_on, n], [False, 0])
+
+    def test_a_new_word_leaving_or_a_hidden_page_stops_it(self):
+        res = self.run_node(
+            "const run = async (i) => { P.renderPicture(at(i)); await decodeAll(); P.renderPicture(at(i, { tuned: true })); };"
+            "await run(0); take();"
+            # the next word: everything is cancelled at once and the layers hide until its own lock
+            "P.renderPicture(at(1)); const next = take(); const s1 = [on(), live.size, motes.kids.length];"
+            "await decodeAll(); P.renderPicture(at(1, { tuned: true })); take();"
+            # the page hidden: the life stops, the layers stay; shown: it starts again
+            "document.hidden = true; P.renderPicture(at(1, { tuned: true })); const hidden = take(); const s2 = [on(), live.size];"
+            "P.renderPicture(at(1, { tuned: true })); const hiddenAgain = take();"
+            "document.hidden = false; P.renderPicture(at(1, { tuned: true })); const shown = take(); const s3 = [on(), live.size];"
+            # leaving the play screen (the round end, the back arrow)
+            "P.renderPicture({ ...at(1, { tuned: true }), screen: 'round-end' }); const left = take(); const s4 = [on(), live.size];"
+            "P.renderPicture({ ...at(0), screen: 'stages', current: { word: null } }); const off = take();"
+            # the same word in a new round is a new word
+            "await run(0); take(); P.renderPicture(at(0, { roundsStarted: 2 })); const round2 = take();"
+            "out([kinds(next), s1, kinds(hidden), s2, hiddenAgain, kinds(shown), s3, kinds(left), s4, off, kinds(round2)]);",
+            prelude=self.FAKE)
+        nxt, s1, hidden, s2, hidden_again, shown, s3, left, s4, off, round2 = res
+        cancels = ['cancel actor', 'cancel plate'] + ['cancel mote'] * 6
+        self.assertEqual(nxt, cancels + ['clear motes', 'clear fx', 'src plate', 'src subject', 'decode plate', 'decode subject'])
+        self.assertEqual(s1, [False, 0, 0])
+        self.assertEqual(hidden, cancels + ['clear motes', 'clear fx'])
+        self.assertEqual(s2, [True, 0])
+        self.assertEqual(hidden_again, [])
+        self.assertEqual(shown, ['animate actor', 'animate plate'] + ['animate mote'] * 6)
+        self.assertEqual(s3, [True, 8])
+        self.assertEqual(left, cancels + ['clear motes', 'clear fx'])
+        self.assertEqual(s4, [False, 0])
+        self.assertEqual(off, [])
+        self.assertEqual(round2[:8], cancels)
+        # the same pictures are not set again (they are loaded already)
+        self.assertNotIn('src plate', round2)
+        self.assertIn('decode plate', round2)
+
+    def test_reduced_motion_shows_the_layers_still(self):
+        res = self.run_node(
+            "reduced = true; P.renderPicture(at(0)); await decodeAll(); P.renderPicture(at(0, { tuned: true }));"
+            "out([on(), live.size, motes.kids.length, calls.filter((c) => c[0] === 'animate').length]);",
+            prelude=self.FAKE)
+        self.assertEqual(res, [True, 0, 0, 0])
+
+    # --- wiring: main.js, the template, game.css, feedback.js ---
+
+    def test_main_wires_it_after_the_tv_and_on_visibility_changes(self):
+        main = self.code('main.js')
+        self.assertIn("import { renderPicture } from './picture.js';", main)
+        self.assertIn('subscribe(renderPicture);', main)
+        self.assertLess(main.index('subscribe((s) => renderTv(s, onTuned));'), main.index('subscribe(renderPicture);'))
+        self.assertIn("document.addEventListener('visibilitychange', () => renderPicture(state));", main)
+        pic = self.code('picture.js')
+        # it never sets state and runs no script per frame: Web Animations
+        # only, cancelled through getAnimations (no animation handle kept)
+        for word in ('setState', "from './state.js'", 'requestAnimationFrame', 'gsap', 'setTimeout', 'setInterval', 'addEventListener'):
+            self.assertNotIn(word, pic, word)
+        self.assertIn('getAnimations({ subtree: true })', pic)
+        self.assertEqual(re.findall(r'^let (\w+)', pic, flags=re.M), ['shown', 'dom'])
+        # only picture.js puts the layers on
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'picture.js':
+                self.assertNotIn('life-on', self.code(f.name), f.name)
+
+    def test_the_layers_sit_over_the_picture_under_the_tune_in_and_take_no_taps(self):
+        html = self.HTML.read_text()
+        card = html[html.index('<div class="card">'):html.index('<div class="plate">')]
+        order = [card.index(s) for s in ('id="play-image"', '<div class="tv-life" aria-hidden="true">', 'class="tv-plate"', 'class="tv-motes"',
+                                         '<div class="tv-actor"><img class="tv-subject" src="" alt="" /></div>', 'class="tv-tune"',
+                                         'class="tv-roll"', 'class="tv-static"', 'class="tv-flash"')]
+        self.assertEqual(order, sorted(order))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 33)
+        life = self.rule('#screen-play .tv-life')
+        for decl in ('position: absolute;', 'inset: 0;', 'pointer-events: none;', 'visibility: hidden;'):
+            self.assertIn(decl, life)
+        self.assertIn('visibility: visible;', self.rule('#screen-play .card.life-on .tv-life'))
+        self.assertIn('visibility: hidden;', self.rule('#screen-play .card.life-on #play-image'))
+        # framed exactly like the new word pictures (cover, the whole tube)
+        shared = re.search(r'\n#screen-play \.card \.tv-life img,\n#screen-play \.tv-motes,\n#screen-play \.tv-actor\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        for decl in ('position: absolute;', 'inset: 0;', 'width: 100%;', 'height: 100%;'):
+            self.assertIn(decl, shared)
+        fit = self.rule('#screen-play .card .tv-life img')
+        for decl in ('object-fit: cover;', 'aspect-ratio: auto;', 'border-radius: 0;'):
+            self.assertIn(decl, fit)
+        words = self.rule('#screen-play .card img[src*="/images/words/"]')
+        for decl in ('width: 100%;', 'height: 100%;', 'object-fit: cover;', 'border-radius: 0;'):
+            self.assertIn(decl, words)
+        mote = self.rule('#screen-play .tv-mote')
+        for decl in ('width: calc(3 * var(--u));', 'height: calc(3 * var(--u));', 'border-radius: 50%;', 'background: var(--cream);', 'opacity: 0;'):
+            self.assertIn(decl, mote)
+
+    def test_the_wrong_check_static_jitters_the_layers_too(self):
+        static = self.function('staticTv', 'feedback.js')
+        self.assertIn("const life = document.querySelector('#screen-play .tv-life');", static)
+        self.assertIn('const img = life ? [still, life] : still;', static)
+        self.assertIn("tl.set(img, { x: f.x, opacity: 0.75 }, i * step);", static)
+        self.assertIn("gsap.set([layer].concat(img), { clearProps: 'opacity,transform,backgroundPosition' })", static)
+
+
+class PictureWinTests(TestCase):
+    """Each word's own win on a correct answer (BACKLOG B-222; the approved
+    prototype is design/reference/tv-motion.html, layer 3 "Win"):
+    picture.js's table of win moves (cheer, bungee and drive the
+    prototype's, the others new, 1.2-1.9s, each ending where it started),
+    the drive's exhaust puffs and the splash's drops, the TV's flash and
+    sparks (moved from celebrate.js, played once) and reduced motion's
+    opacity pulse; its subscriber (the stand-ins of PictureLifeTests) plays
+    the win once as the word is checked correct, on the subject with its
+    idle paused, or the whole picture's pop when no layers show, and stops
+    it with the life."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+    PROTO = ROOT / 'design' / 'reference' / 'tv-motion.html'
+    NEW = ('hop-spin', 'wobble-flop', 'splash', 'pop', 'zoom')
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"{prelude}"
+            f"const P = await import('{(self.JS / 'picture.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    def rule(self, selector):
+        return re.search(r'(?<!,)\n' + re.escape(selector) + r'\s*{(.*?)}', self.css(), flags=re.S).group(1)
+
+    def entries(self):
+        index = json.loads((self.ROOT / 'static' / 'config' / 'themes.json').read_text())
+        for theme, url in index.items():
+            data = json.loads((self.ROOT / url.lstrip('/')).read_text(encoding='utf-8'))
+            for word, entry in data.items():
+                yield theme, word, entry
+
+    def parse(self, transform):
+        """A transform as [(function, [numbers])] in order (units dropped)."""
+        return [(name, [float(re.sub(r'[a-z%]+$', '', a.strip())) for a in args.split(',')])
+                for name, args in re.findall(r'([a-zA-Z]+)\(([^)]*)\)', transform)]
+
+    def at_rest(self, fn, args):
+        if fn.startswith('scale'):
+            return all(a == 1 for a in args)
+        if fn == 'rotate':
+            return all(a % 360 == 0 for a in args)
+        return all(a == 0 for a in args)
+
+    # --- the table ---
+
+    def test_cheer_bungee_and_drive_are_the_prototypes(self):
+        proto = self.PROTO.read_text()
+        block = proto[proto.index('const WIN = {'):proto.index('\nfunction sparks()')]
+        res = self.run_node(
+            "const WIN0 = (() => { " + block + " return WIN; })();"
+            "out([WIN0, P.WIN.cheer, P.WIN.bungee, P.WIN.drive]);")
+        win0, cheer, bungee, drive = res
+        # their keyframes as the prototype's own, and its timing:
+        # `const dur = w.win === "drive" ? 1500 : w.win === "cheer" ? 1900 : 1400;`
+        for name, move, ms in (('cheer', cheer, 1900), ('bungee', bungee, 1400), ('drive', drive, 1500)):
+            self.assertEqual(move['keyframes'], win0[name], name)
+            self.assertEqual((move['duration'], move['easing']), (ms, 'ease-in-out'), name)
+        self.assertIn('const dur = w.win === "drive" ? 1500 : w.win === "cheer" ? 1900 : 1400;', proto)
+        self.assertIn('const a = actor.animate(WIN[w.win], { duration: dur, easing: "ease-in-out" });', proto)
+        self.assertEqual(drive['fx'], 'exhaust')
+        self.assertNotIn('fx', cheer)
+        self.assertNotIn('fx', bungee)
+
+    def test_every_win_in_the_data_is_in_the_table(self):
+        win = self.run_node("out(Object.keys(P.WIN));")
+        self.assertEqual(sorted(win), sorted(['cheer', 'bungee', 'drive', 'hop-spin', 'wobble-flop', 'splash', 'pop', 'zoom']))
+        used = {e['motion']['win'] for _, _, e in self.entries() if 'motion' in e}
+        self.assertEqual(used - set(win), set())
+
+    def test_the_new_moves_are_big_and_end_exactly_where_they_started(self):
+        win = self.run_node("out(P.WIN);")
+        for name, move in win.items():
+            # 1.2-1.9s each, played once
+            self.assertTrue(1200 <= move['duration'] <= 1900, name)
+            self.assertNotIn('iterations', move, name)
+            offsets = [k['offset'] for k in move['keyframes'] if 'offset' in k]
+            self.assertEqual(offsets, sorted(offsets), name)
+            if name == 'hop-spin':
+                continue
+            frames = [self.parse(k['transform']) for k in move['keyframes']]
+            # the same transform functions in every keyframe, so each tweens
+            self.assertEqual(len({tuple(fn for fn, _ in f) for f in frames}), 1, name)
+            # it starts and ends at rest (and unblurred)
+            for f in (frames[0], frames[-1]):
+                self.assertTrue(all(self.at_rest(fn, args) for fn, args in f), (name, f))
+            for k in (move['keyframes'][0], move['keyframes'][-1]):
+                self.assertIn(k.get('filter', 'none'), ('none',), name)
+        # only the drive and the zoom blur, and only on their fast part:
+        # off the picture or flying through it
+        blurred = {n for n, m in win.items() if any('blur' in k.get('filter', '') for k in m['keyframes'])}
+        self.assertEqual(blurred, {'drive', 'zoom'})
+        for k in win['zoom']['keyframes']:
+            y = dict(self.parse(k['transform']))['translateY'][0]
+            self.assertEqual('blur' in k['filter'], y <= -100, k)
+        big = lambda name, fn: [dict(self.parse(k['transform'])).get(fn, [0]) for k in win[name]['keyframes']]
+        # wobble-flop: wobbles both ways, then flops over to one side, lies
+        # there a moment and springs back up past upright
+        rot = [r[0] for r in big('wobble-flop', 'rotate')]
+        flop = rot.index(min(rot))
+        self.assertLessEqual(min(rot), -75)
+        self.assertTrue(min(rot[:flop]) < 0 < max(rot[:flop]))
+        self.assertIn(rot[flop + 2], rot[flop + 3:flop + 4])
+        self.assertGreater(max(rot[flop:]), 10)
+        # splash: dips, leaps up an arc tilting up then down, splashes in
+        ys = [t[1] for t in big('splash', 'translate')]
+        top = ys.index(min(ys))
+        self.assertGreater(max(ys[:top]), 0)
+        self.assertLessEqual(min(ys), -30)
+        tilt = [r[0] for r in big('splash', 'rotate')]
+        self.assertLess(min(tilt[:top + 1]), 0)
+        self.assertGreater(max(tilt[top:]), 0)
+        self.assertEqual(win['splash']['fx'], 'drops')
+        # pop: a squash, then the big pop to 1.25
+        sc = big('pop', 'scale')
+        peak = sc.index([1.25, 1.25])
+        self.assertTrue(any(x > 1 > y for x, y in sc[:peak]))
+        self.assertEqual(max(max(s) for s in sc), 1.25)
+        # zoom: shoots off the top, a beat away, drops back in from above
+        zy = [t[0] for t in big('zoom', 'translateY')]
+        gone = [i for i, y in enumerate(zy) if y <= -100]
+        self.assertGreaterEqual(len(gone), 2)
+        self.assertEqual(gone, list(range(gone[0], gone[-1] + 1)))
+        self.assertGreater(zy[gone[-1] + 1], 0)                    # it lands, squashed
+        # hop-spin: its own pivot (the picture's middle); a crouch, a high
+        # hop with one full turn ending before the landing, a squash on
+        # landing; at rest at both ends; each squash shifted down so feet on
+        # the bottom pivot stay on the ground
+        hop = win['hop-spin']
+        self.assertEqual(hop['pivot'], 'center')
+        keys = hop['keyframes']
+        num = lambda v: [float(re.sub(r'[a-z%]+$', '', a)) for a in v.split()]
+        for k in (keys[0], keys[-1]):
+            self.assertEqual(set(k) - {'offset', 'easing'}, {'translate', 'rotate', 'scale'})
+            self.assertEqual(num(k['translate']), [0, 0])
+            self.assertEqual(num(k['rotate'])[0] % 360, 0)
+            self.assertEqual(num(k['scale']), [1, 1])
+        self.assertEqual(num(keys[-1]['rotate']), [360])
+        turned = min(k['offset'] for k in keys if k.get('rotate') == '360deg')
+        lands = max((k for k in keys if 'translate' in k), key=lambda k: num(k['translate'])[1])
+        self.assertLess(turned, lands['offset'])
+        sx, sy = num(lands['scale'])
+        self.assertTrue(sx > 1 > sy)
+        self.assertLessEqual(min(num(k['translate'])[1] for k in keys if 'translate' in k), -25)
+        for k in keys:
+            if 'translate' in k and 'scale' in k and num(k['translate'])[1] > 0:
+                self.assertAlmostEqual(num(k['translate'])[1], (1 - num(k['scale'])[1]) * 38, delta=0.1)
+
+    def test_win_of_the_puffs_and_the_drops(self):
+        res = self.run_node(
+            "out([['cheer', 'drive', 'hop-spin', 'splash', 'pop'].map((n) => P.winOf(n)), P.winOf('nope'), P.winOf('constructor'), P.winOf(undefined),"
+            " P.EXHAUST, P.puffOf(P.EXHAUST[0], 151.2),"
+            " P.dropSpecs(1700, () => 0), P.dropSpecs(1700, () => 0.9999), P.DROPS, P.dropOf({ x: 0.3, y: 0.82, dx: -0.1, rise: 0.2, size: 0.03, duration: 600, delay: 272, colour: 'teal' }, 150),"
+            " P.fxOf('exhaust', 1500, 151.2).length, P.fxOf('drops', 1700, 151.2).map((p) => p.className), P.fxOf(null, 1400, 151.2)]);")
+        (wins, nope, ctor, none, exhaust, puff, lo, hi, DROPS, drop, n_puffs, drop_classes, no_fx) = res
+        cheer, drive, hop, splash, pop = wins
+        self.assertEqual(cheer['options'], {'duration': 1900, 'easing': 'ease-in-out'})
+        self.assertEqual([cheer['origin'], cheer['fx']], [None, None])
+        self.assertEqual([drive['options'], drive['fx']], [{'duration': 1500, 'easing': 'ease-in-out'}, 'exhaust'])
+        self.assertEqual([hop['origin'], hop['options']], ['50% 50%', {'duration': 1600}])
+        self.assertEqual([splash['fx'], pop['origin'], pop['options']], ['drops', None, {'duration': 1200}])
+        self.assertEqual([nope, ctor, none], [None, None, None])
+        # the drive's exhaust: the prototype's four puff() calls
+        proto = self.PROTO.read_text()
+        calls = re.findall(r'^\s*puff\((0[^)]*)\);', proto, flags=re.M)
+        self.assertEqual(len(calls), 4)
+        for spec, call in zip(exhaust, calls):
+            args = [a.strip() for a in call.split(',')]
+            delay = float(args[6]) if 'dur' not in args[6] else 1500 * float(args[6].split('*')[1])
+            self.assertEqual([spec[k] for k in ('x', 'y', 'dx', 'dy', 'size', 'duration')], [float(a) for a in args[:6]])
+            self.assertAlmostEqual(spec['delay'], delay)
+        # a puff as the prototype's: from where it is, drifting, swelling and fading
+        for line in ('{ transform: "translate(-50%,-50%) scale(0.3)", opacity: 0 },',
+                     '{ transform: "translate(-50%,-50%) scale(1)", opacity: 0.95, offset: 0.2 },',
+                     '{ transform: `translate(calc(-50% + ${dx * w}px), calc(-50% + ${dy * w}px)) scale(1.5)`, opacity: 0 }',
+                     '], { duration: dur, delay, easing: "ease-out", fill: "both" });',
+                     '.puff {', 'box-shadow: inset -2px -2px 0 rgba(0,0,0,0.12), 0 0 0 1.5px var(--ink);'):
+            self.assertIn(line, proto)
+        self.assertEqual(puff, {'className': 'tv-puff', 'left': '86%', 'top': '84%', 'size': '9.07px',
+                                'keyframes': [{'transform': 'translate(-50%,-50%) scale(0.3)', 'opacity': 0},
+                                              {'transform': 'translate(-50%,-50%) scale(1)', 'opacity': 0.95, 'offset': 0.2},
+                                              {'transform': 'translate(calc(-50% + 15.12px), calc(-50% + -4.54px)) scale(1.5)', 'opacity': 0}],
+                                'options': {'duration': 900, 'delay': 80, 'easing': 'ease-out', 'fill': 'both'}})
+        self.assertEqual(n_puffs, 4)
+        # the splash's drops: 8 as it leaves, 6 as it lands, teal and cream
+        # in turn, from the water line, out away from the middle
+        self.assertEqual(len(lo), 14)
+        self.assertEqual([d['delay'] for d in lo], [0.16 * 1700] * 8 + [0.74 * 1700] * 6)
+        self.assertEqual([d['colour'] for d in lo], ['teal', 'cream'] * 7)
+        self.assertEqual(lo[0], {'x': 0.3, 'y': 0.82, 'dx': -0.06, 'rise': 0.1, 'size': 0.026, 'duration': 550, 'delay': 272, 'colour': 'teal'})
+        for key, top in (('x', 0.7), ('dx', 0.22), ('rise', 0.26), ('size', 0.042), ('duration', 850)):
+            self.assertAlmostEqual(hi[0][key], top, delta=0.001 * top + 0.001)
+        self.assertEqual(DROPS['colours'], ['teal', 'cream'])
+        self.assertEqual(drop['className'], 'tv-drop teal')
+        self.assertEqual([drop['left'], drop['top'], drop['size']], ['30%', '82%', '4.5px'])
+        self.assertEqual(drop['keyframes'], [
+            {'offset': 0, 'transform': 'translate(-50%, -50%) scale(0.4)', 'opacity': 0, 'easing': 'ease-out'},
+            {'offset': 0.15, 'opacity': 1},
+            {'offset': 0.45, 'transform': 'translate(calc(-50% + -7.5px), calc(-50% - 30px)) scale(1)', 'easing': 'ease-in'},
+            {'offset': 0.7, 'opacity': 1},
+            {'offset': 1, 'transform': 'translate(calc(-50% + -15px), calc(-50% + 6px)) scale(0.7)', 'opacity': 0}])
+        self.assertEqual(drop['options'], {'duration': 600, 'delay': 272, 'fill': 'both'})
+        self.assertEqual(drop_classes, ['tv-drop teal', 'tv-drop cream'] * 7)
+        self.assertEqual(no_fx, [])
+
+    def test_the_flash_the_sparks_and_reduced_motions_pulse(self):
+        res = self.run_node(
+            "const r = { left: 100, top: 120, width: 160, height: 120 };"
+            "out([P.FLASH, P.PULSE, P.SPARKS, P.sparkSpecs(r, () => 0.5).slice(0, 2), P.sparkSpecs(r, () => 0)[0], P.sparkSpecs(r).length,"
+            " P.sparkSpecs(r).map((s) => s.colour).slice(0, 4), P.sparkOf(P.sparkSpecs(r, () => 0.5)[0])]);")
+        flash, pulse, sparks, half, low, n, colours, flight = res
+        # today's flash (0.9 to nothing, 200ms, GSAP's power2.out)
+        self.assertEqual(flash, {'keyframes': [{'opacity': 0.9}, {'opacity': 0}], 'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'})
+        # reduced motion: the prototype's pulse
+        self.assertEqual(pulse, {'keyframes': [{'opacity': 1}, {'opacity': 0.7}, {'opacity': 1}], 'duration': 400})
+        self.assertIn('actor.animate([{ opacity: 1 }, { opacity: 0.7 }, { opacity: 1 }], { duration: 400 });', self.PROTO.read_text())
+        # today's sparks: up to 40, 600ms, amber, teal glow and cream
+        self.assertEqual(sparks, {'count': 40, 'duration': 600, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)', 'fadeAt': 0.6,
+                                  'fadeEasing': 'cubic-bezier(0.11, 0, 0.5, 0)', 'colours': ['accent', 'primary', 'error']})
+        self.assertEqual(n, 40)
+        self.assertEqual(colours, ['accent', 'primary', 'error', 'accent'])
+        # evenly spread from the middle half of the picture, out past its
+        # edge, drifting down, turning (celebrate.js's numbers and order)
+        import math
+        cx, cy, w, h = 180, 180, 160, 120
+        for i, s in enumerate(half):
+            angle = i / 40 * 2 * math.pi
+            self.assertAlmostEqual(s['x0'], cx)
+            self.assertAlmostEqual(s['y0'], cy)
+            self.assertAlmostEqual(s['x1'], cx + math.cos(angle) * w * 0.825)
+            self.assertAlmostEqual(s['y1'], cy + math.sin(angle) * w * 0.825 + 25)
+            self.assertEqual([s['turn0'], s['turn1'], s['scale']], [180, 405, 0.95])
+        self.assertAlmostEqual(low['x0'], cx - w / 4)
+        self.assertAlmostEqual(low['y0'], cy - h / 4)
+        self.assertAlmostEqual(low['x1'], cx - w / 4 + math.cos(-0.3) * w * 0.55)
+        self.assertAlmostEqual(low['y1'], cy - h / 4 + math.sin(-0.3) * w * 0.55 + 10)
+        self.assertEqual([low['turn0'], low['turn1'], low['scale']], [0, 90, 0.7])
+        self.assertEqual(flight['keyframes'], [
+            {'offset': 0, 'transform': 'translate(180px, 180px) rotate(180deg) scale(0.95)', 'opacity': 1, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'},
+            {'offset': 0.6, 'opacity': 1, 'easing': 'cubic-bezier(0.11, 0, 0.5, 0)'},
+            {'offset': 1, 'transform': 'translate(312px, 205px) rotate(405deg) scale(0.95)', 'opacity': 0}])
+        self.assertEqual(flight['options'], {'duration': 600, 'fill': 'forwards'})
+
+    # --- the subscriber (PictureLifeTests' stand-ins) ---
+
+    WIN = """
+        data.cat.motion.win = 'cheer'; data.bat.motion.win = 'hop-spin'; data.bus.motion.win = 'drive';
+        const ready = async (i, o = {}) => { P.renderPicture(at(i, o)); await decodeAll(); P.renderPicture(at(i, { tuned: true, ...o })); };
+        const correct = (i, o = {}) => ({ ...at(i, { tuned: true, ...o }), current: { word: words[i].word, status: 'correct' } });
+        const layers = () => body.kids.filter((k) => k.className === 'confetti');
+        const anim = (name) => [...live].filter((a) => a.target.name === name);
+    """
+
+    def run_win(self, body):
+        return self.run_node(PictureLifeTests.FAKE + self.WIN + body)
+
+    def test_a_correct_check_plays_the_words_win_once(self):
+        res = self.run_win(
+            "await ready(0); take();"
+            "P.renderPicture(correct(0)); const c = take();"
+            "const sparkLayer = layers(); const pieces = sparkLayer[0].kids.map((k) => k.className);"
+            "const idlePaused = anim('actor').map((a) => a.paused); const origin = subject.style.transformOrigin;"
+            # a re-render in the same state plays nothing again
+            "P.renderPicture(correct(0)); P.renderPicture(correct(0, { lives: 3 })); const again = take();"
+            # the move ends: the idle plays on; the sparks land: their layer goes
+            "anim('subject')[0].finish(); await tick(); const after = take(); const idleNow = anim('actor').map((a) => a.paused);"
+            "anim('confetti-piece').forEach((a) => a.finish()); await tick(); const gone = layers().length;"
+            "out([c.map((x) => x.slice(0, 2)), c.filter((x) => x[1] === 'flash' || x[1] === 'subject').map((x) => x.slice(2)),"
+            " pieces.length, [...new Set(pieces)], sparkLayer[0].attrs, idlePaused, origin, again, after, idleNow, gone, fx.kids.length]);")
+        (calls, moves, n, kinds, attrs, paused, origin, again, after, idle_now, gone, n_fx) = res
+        # the flash, the idle paused, the subject's cheer, then 40 sparks
+        self.assertEqual(calls, [['animate', 'flash'], ['pause', 'actor'], ['animate', 'subject']] + [['animate', 'confetti-piece']] * 40)
+        self.assertEqual(moves[0], [[{'opacity': 0.9}, {'opacity': 0}], {'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'}])
+        cheer = self.run_node("out(P.WIN.cheer.keyframes);")
+        self.assertEqual(moves[1], [cheer, {'duration': 1900, 'easing': 'ease-in-out'}])
+        self.assertEqual(n, 40)
+        self.assertEqual(sorted(kinds), ['confetti-piece accent', 'confetti-piece error', 'confetti-piece primary'])
+        self.assertEqual(attrs, {'aria-hidden': 'true'})
+        self.assertEqual(paused, [True])
+        self.assertEqual(origin, '50% 88%')                     # the cat's pivot
+        self.assertEqual(again, [])
+        self.assertEqual(after, [['play', 'actor']])
+        self.assertEqual(idle_now, [False])
+        self.assertEqual(gone, 0)
+        self.assertEqual(n_fx, 0)                               # a cheer throws nothing
+
+    def test_the_drive_blows_puffs_and_the_hop_spin_turns_about_the_middle(self):
+        res = self.run_win(
+            "await ready(3); take(); P.renderPicture(correct(3)); const c = take();"
+            "const puffs = fx.kids.map((k) => [k.className, k.style.left, k.style.top, k.style.width, k.style.height]);"
+            "anim('tv-puff').slice(0, 2).forEach((a) => a.finish()); await tick(); const left = fx.kids.length;"
+            "await ready(1); take(); P.renderPicture(correct(1)); const hop = take();"
+            "out([c.filter((x) => x[1] === 'subject').map((x) => x[3]), c.filter((x) => x[1] === 'tv-puff').map((x) => x[3]), puffs, left,"
+            " subject.style.transformOrigin, hop.filter((x) => x[1] === 'subject').map((x) => x[3]), fx.kids.length]);")
+        drive, puff_opts, puffs, left, origin, hop, n_fx = res
+        self.assertEqual(drive, [{'duration': 1500, 'easing': 'ease-in-out'}])
+        self.assertEqual([o['delay'] for o in puff_opts], [80, 160, 1080, 1140])
+        self.assertEqual(puffs[0], ['tv-puff', '86%', '84%', '9.07px', '9.07px'])
+        self.assertEqual(len(puffs), 4)
+        self.assertEqual(left, 2)                               # a puff goes when its flight ends
+        self.assertEqual(origin, '50% 50%')                     # hop-spin's own pivot (the bat's is the top)
+        self.assertEqual(hop, [{'duration': 1600}])
+        self.assertEqual(n_fx, 0)                               # the bus's puffs went with its word
+
+    def test_the_splash_throws_drops(self):
+        res = self.run_win(
+            "data.cat.motion.win = 'splash'; await ready(0); take(); P.renderPicture(correct(0)); take();"
+            "out([fx.kids.map((k) => k.className), anim('tv-drop').length]);")
+        classes, n = res
+        self.assertEqual(classes, ['tv-drop teal', 'tv-drop cream'] * 7)
+        self.assertEqual(n, 14)
+
+    def test_no_layers_showing_the_whole_picture_pops(self):
+        res = self.run_win(
+            # the duck has no motion: its still picture pops, with the flash and the sparks
+            "await ready(2); take(); P.renderPicture(correct(2)); const duck = take(); const s1 = layers().length;"
+            # a word whose layers have not decoded by its check: the same
+            "P.renderPicture(at(0)); P.renderPicture(at(0, { tuned: true })); take(); const s2 = layers().length;"
+            "P.renderPicture(correct(0)); const early = take();"
+            "out([duck.map((x) => x.slice(0, 2)).filter((x) => x[1] !== 'confetti-piece'), duck.filter((x) => x[1] === 'still').map((x) => x.slice(2)),"
+            " s1, s2, early.map((x) => x.slice(0, 2)).filter((x) => x[1] !== 'confetti-piece'), layers().length]);")
+        duck, still_move, sparks_duck, cleared, early, sparks_early = res
+        pop = self.run_node("out(P.WIN.pop.keyframes);")
+        self.assertEqual(duck, [['animate', 'flash'], ['animate', 'still']])
+        self.assertEqual(still_move, [[pop, {'duration': 1200}]])
+        self.assertEqual(sparks_duck, 1)
+        self.assertEqual(cleared, 0)                             # the next word took the duck's sparks away
+        self.assertEqual(early, [['animate', 'flash'], ['animate', 'still']])
+        self.assertEqual(sparks_early, 1)
+
+    def test_reduced_motion_is_the_flash_and_a_pulse(self):
+        res = self.run_win(
+            "reduced = true; await ready(0); take(); P.renderPicture(correct(0)); const cat = take();"
+            "await ready(2); take(); P.renderPicture(correct(2)); const duck = take();"
+            "out([cat.map((x) => x.slice(1)), duck.map((x) => x[1]), layers().length, fx.kids.length]);")
+        cat, duck, n_layers, n_fx = res
+        self.assertEqual(cat, [['flash', [{'opacity': 0.9}, {'opacity': 0}], {'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)'}],
+                               ['subject', [{'opacity': 1}, {'opacity': 0.7}, {'opacity': 1}], {'duration': 400}]])
+        self.assertEqual(duck, ['flash', 'still'])
+        self.assertEqual([n_layers, n_fx], [0, 0])               # no sparks, no puffs or drops
+
+    def test_a_new_word_leaving_or_a_hidden_page_stops_it(self):
+        res = self.run_win(
+            "data.cat.motion.win = 'drive'; await ready(0); take(); P.renderPicture(correct(0)); take();"
+            # the dome's next: the move, its puffs, the flash and the sparks stop; the idle is not played again
+            "P.renderPicture(at(1)); await tick(); const next = take(); const s1 = [live.size, layers().length, fx.kids.length];"
+            # the duck popping when the round ends
+            "await ready(2); P.renderPicture(correct(2)); take(); P.renderPicture({ ...correct(2), screen: 'round-end' }); const left = take();"
+            # a hidden page stops it; shown again, the life runs on and the win is not played again
+            "await ready(3); P.renderPicture(correct(3)); take(); document.hidden = true; P.renderPicture(correct(3)); await tick(); const hidden = take();"
+            "const s2 = [live.size, layers().length, fx.kids.length];"
+            "document.hidden = false; P.renderPicture(correct(3)); const shown = take();"
+            # a revealed word has no win
+            "await ready(0, { roundsStarted: 2 }); take(); P.renderPicture({ ...at(0, { tuned: true, roundsStarted: 2 }), current: { word: 'cat', status: 'revealed' } });"
+            "out([next.map((x) => x[0] + ' ' + x[1]), s1, left.map((x) => x[0] + ' ' + x[1]), hidden.map((x) => x[0] + ' ' + x[1]), s2,"
+            " shown.map((x) => x[0] + ' ' + x[1]), take(), layers().length]);")
+        nxt, s1, left, hidden, s2, shown, revealed, n_layers = res
+        cancelled = [c for c in nxt if c.startswith('cancel')]
+        for part in ('cancel subject', 'cancel actor', 'cancel tv-puff', 'cancel flash', 'cancel plate'):
+            self.assertIn(part, cancelled)
+        self.assertEqual(cancelled.count('cancel tv-puff'), 4)
+        self.assertNotIn('play actor', nxt)
+        self.assertEqual(s1, [0, 0, 0])
+        self.assertIn('cancel still', left)
+        self.assertIn('cancel flash', left)
+        self.assertIn('cancel subject', hidden)
+        self.assertIn('cancel flash', hidden)
+        self.assertNotIn('play actor', hidden)
+        self.assertEqual(s2, [0, 0, 0])
+        self.assertEqual([c for c in shown if c.startswith('animate')], ['animate actor', 'animate plate'] + ['animate mote'] * 6)
+        self.assertEqual(revealed, [])
+        self.assertEqual(n_layers, 0)
+
+    # --- wiring: celebrate.js, motion.js, the template, game.css ---
+
+    def test_the_flash_and_the_sparks_moved_here_from_celebrate_js(self):
+        celebrate = self.code('celebrate.js')
+        for word in ('tv-flash', 'confetti', 'flashTv', 'burstConfetti'):
+            self.assertNotIn(word, celebrate, word)
+        # the slots' pulse and the cogs stay there
+        self.assertIn('pulseBoxes();', celebrate)
+        self.assertIn('flyGears(', celebrate)
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'picture.js':
+                self.assertNotIn("'confetti'", self.code(f.name), f.name)
+                self.assertNotIn('.tv-flash', self.code(f.name), f.name)
+                self.assertNotIn('.tv-fx', self.code(f.name), f.name)
+        pic = self.code('picture.js')
+        # Web Animations only, as the life (no GSAP, timers or frames)
+        for word in ('gsap', 'setTimeout', 'requestAnimationFrame', 'setState'):
+            self.assertNotIn(word, pic, word)
+        self.assertEqual(re.findall(r'^let (\w+)', pic, flags=re.M), ['shown', 'dom'])
+
+    def test_the_fx_layer_and_its_look(self):
+        html = self.HTML.read_text()
+        life = html[html.index('<div class="tv-life" aria-hidden="true">'):html.index('<canvas class="tv-tune"')]
+        self.assertLess(life.index('class="tv-actor"'), life.index('<div class="tv-fx"></div>'))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 34)
+        fx = self.rule('#screen-play .tv-fx')
+        for decl in ('position: absolute;', 'inset: 0;'):
+            self.assertIn(decl, fx)
+        self.assertIn('pointer-events: none;', self.rule('#screen-play .tv-life'))
+        pieces = re.search(r'\n#screen-play \.tv-puff,\n#screen-play \.tv-drop\s*{(.*?)}', self.css(), flags=re.S).group(1)
+        for decl in ('position: absolute;', 'opacity: 0;'):
+            self.assertIn(decl, pieces)
+        puff = self.rule('#screen-play .tv-puff')
+        self.assertIn('background: var(--cream);', puff)
+        self.assertIn('box-shadow: inset calc(-2 * var(--u)) calc(-2 * var(--u)) 0 var(--puff-shade), 0 0 0 calc(1.5 * var(--u)) var(--ink);', puff)
+        self.assertIn('--puff-shade: color-mix(in srgb, var(--ink) 14%, transparent);', self.css())
+        self.assertIn('box-shadow: 0 0 0 var(--u) var(--ink);', self.rule('#screen-play .tv-drop'))
+        self.assertIn('background: var(--teal-glow);', self.rule('#screen-play .tv-drop.teal'))
+        self.assertIn('background: var(--cream);', self.rule('#screen-play .tv-drop.cream'))
+        # the sparks' layer: fixed, click-through, never widening the page
+        for decl in ('position: fixed;', 'pointer-events: none;', 'overflow: hidden;'):
+            self.assertIn(decl, self.rule('.confetti'))
+        for role, colour in (('accent', 'amber'), ('primary', 'teal-glow'), ('error', 'cream')):
+            self.assertIn(f'color: var(--{colour});', self.rule(f'.confetti-piece.{role}'))

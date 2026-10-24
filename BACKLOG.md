@@ -479,7 +479,7 @@ Build order: stages replace levels → lever rule → stage rounds and clearing 
   - After three words in a row in a round that were not clean (a wrong check, a boost or a reveal), the next two words not yet shown are swapped for solved words from the theme's earlier stages. Swapped-out words stay unsolved and come back in later rounds. Nothing happens on stage 1, or when no earlier word is solved. The kid isn't told.
   - A pure `swapForStruggle(...)` in round.js, tested through `node`; main.js applies it before the next word.
   - Screenshots: `struggle-swap.png` (the swapped-in word on the play screen, after three forced misses). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/90
 
 ## M4b — The robot's new voice
 Decided by the human on 2026-10-19 (per word: the clean word, then its own gag line; shared lines per moment; Hebrew guesses only where funny) and 2026-10-21/22 (the voice "FLIP ROBIT -FINAL" on Eleven v4, clean words with "!"). The clips are made by `tools/voices.py` into `static/voice/` and listed in `static/voice/manifest.json` (DECISIONS 2026-10-22); since 2026-10-23 every word's `audio` in the theme data is its new clip (`words/<theme>/<word>.mp3`, DECISIONS 2026-10-23).
@@ -497,7 +497,7 @@ Line pools and what each moment wants: `content/voice/robot-lines.json` (`pools`
   - Docs: CHARACTER.md's moment map ("Correct", "3 correct in a row") and its "Voice lines…" paragraph; CLAUDE.md's audio.js bullet (the manifest, the new clips, and that `static/voice/` is read-only content).
   - Tests: the helpers above; the order word → line; the fallbacks (no gag, no pool line, no clip at all); nothing over the word.
   - Screenshots: `correct-talking.png` (right after a correct check, the scope mouth showing his voice). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/90
 
 ### B-224 His shared lines on the moments, the Hebrew guess, the letter names
 - why: the robot's personality lives in his lines (CHARACTER.md, `claude/flip-robot-lines.md`); the prototype clips don't fit him (human, 2026-10-10).
@@ -509,7 +509,7 @@ Line pools and what each moment wants: `content/voice/robot-lines.json` (`pools`
   - Pure helpers (moment → pool, pool → its clips, the picture's choice, the letter clip) tested through `node` with stand-in manifests.
   - Docs: CHARACTER.md moment map (the pool per moment); DESIGN.md "Sound" where it lists the pools.
   - Screenshots: `picture-talking.png` (a new picture, him saying his line). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/90
 
 ## M5 — Living pictures
 Approved by the human on 2026-10-18 (prototype v3: "every word picture should be lively with a humorous approach, with the humour emphasised in the correct-word animation"). Reference: `design/reference/tv-motion.html` (serve the repo root and open `/design/reference/tv-motion.html`), layers 2 "Life" and 3 "Win"; its layer 1 is B-214. The data is read-only. A word entry's optional `motion` object has `subject` and `plate` (image paths: the cutout and the background with the subject painted out), `idle` (`sway`, `bob`, `hop`, `rumble`, `wobble`, `float`, `breathe` or `spin`), `pivot` (`top`, `bottom` or `center`) and `win` (`cheer`, `drive`, `bungee`, `hop-spin`, `wobble-flop`, `splash`, `pop` or `zoom`); later it may also carry `face` or `win_image` (see "Later").
@@ -527,7 +527,7 @@ Build order: life → win.
   - A new `picture.js` (a subscriber after `renderTv`) renders the layers and runs the life; it never mutates state; its tables and pure helpers are tested through `node`; CLAUDE.md's architecture list names it. The data has no `face` or `win_image` yet; leave the peek and win frames out.
   - DESIGN.md records the life layer next to the TV lines.
   - Screenshots: `life-cat.png`, `life-bus.png`, `life-helicopter.png`, `life-duck-still.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/90
 
 ### B-222 Each word's own win on a correct answer
 - why: the correct answer is where each picture's joke pays off (the human's example: the bat opens its wings), instead of the same burst on every word.
@@ -539,7 +539,7 @@ Build order: life → win.
   - Performance: as B-221; a win move may also blur its subject for its fast part (the prototype's `drive`).
   - It lives in `picture.js` (B-221); CLAUDE.md's celebrate.js bullet says the TV's win, flash and sparks now start there. DESIGN.md "Feedback" (Correct) is updated.
   - Screenshots, each mid-move: `win-cat-cheer.png`, `win-taxi-drive.png`, `win-dog-hop-spin.png`, `win-helicopter-zoom.png`, plus `win-reduced.png`. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/90
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
@@ -573,3 +573,10 @@ Build order: life → win.
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
 - A dome-aimed point pose for the robot's dome nudge (B-212 reuses `point`, turned 32° down, while the dome is ~13° down from his hand at 360); tune it on `design/reference/robot-puppet.html` with the human.
 - `tools/shot.mjs`: a `--reduced-motion` flag (`Emulation.setEmulatedMedia`) and a `--step-timeout <ms>` option, so reduced-motion shots and long real-flow runs don't need a throwaway copy (B-210, B-211, B-212 used one).
+- His `greet` lines (theme screen, first open; `content/voice/robot-lines.json`): not wired by B-224; he is not on the theme screen yet.
+- His `murmur` lines (a block placed, neutral, never a hint): not wired by B-224; needs a rule for how often, so they don't come with every block.
+- His `reveal-close` lines (third miss, after the letters fly in): not wired by B-224, which plays `reveal-open` at the miss; needs a second line timed to the reveal's end.
+- His `sticker` lines (a new sticker): not wired by B-224; no moment for a new sticker yet (it shows only on the round end, where he is not drawn).
+- His `stage` lines (a stage cleared): not wired by B-224; no stage-up moment yet (the round end's bulb pop, B-216, has no robot).
+- His `gear` lines (the first gear of a session): not wired by B-224; no moment for it yet.
+- His `boost-slow` line (the slow say boost, before the slow word): not wired by B-224; waits for the slow say boost (above).

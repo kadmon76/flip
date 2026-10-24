@@ -76,6 +76,24 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   the play screen is hidden. Reduced motion: the picture fades in over
   250ms instead of the snow and roll (no hiss), then locks; no bar, no
   flicker.
+- **TV picture life** (BACKLOG B-221; `design/reference/tv-motion.html`
+  layer 2 "Life"): from the lock, a word whose data has `motion` shows as
+  two layers framed exactly like its picture (they line up pixel for
+  pixel): the plate (the background, the subject painted out), its glow
+  breathing (brightness 1 → 1.07, 4.2s each way) under about 6 dim cream
+  specks drifting up (at most 0.3 opacity, 9–16s each), and over it the
+  subject (the cutout) looping its `idle` move around its `pivot` (`top`
+  50% 12%, `bottom` 50% 88%, `center` 50% 50%): `sway` and `rumble` as
+  the prototype, `bob`, `hop`, `wobble`, `float`, `breathe` and `spin` in
+  the same small scale (at most about 2% of the picture or 3°, `spin`
+  ±10°; loops of 1–3.5s), every move starting from rest so nothing jumps
+  at the lock. The tune-in still rolls the full picture; a word without
+  `motion` keeps its still picture. The quiet bar, the dim flicker and
+  the wrong-check static show over the layers (they jitter with the
+  static); the layers take no taps. Transforms, opacity and the plate's
+  brightness only, no script per frame; stopped on a new word, off the
+  play screen and while the page is hidden. Reduced motion: the two
+  layers show still.
 - **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
   lives bulbs. Right: split-flap counter "2 / 5".
 - **Slot rail:** brass, full safe width, directly below the machine
@@ -150,9 +168,23 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - Second miss (the wrong check that leaves one bulb lit, every stage; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
 - Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on a stage with extra letters, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
   robot: Third miss moment (CHARACTER.md).
-- Correct: slots pulse once; TV screen flashes warm white (200ms); up to
-  40 sparks (amber, teal, cream) burst from the TV, 600ms, removed after;
-  small cogs, one per gear the word earns, fly from the TV into the console's gear counter, its count flipping up as each lands (600ms at most; reduced motion: the count just changes; B-218); robot: Correct moment (CHARACTER.md).
+- Correct: slots pulse once; the TV picture plays the word's own win
+  (BACKLOG B-222; `design/reference/tv-motion.html` layer 3 "Win"): its
+  subject does the word's `win` move once, inside the TV's mask, then
+  goes back to its idle (paused meanwhile): `cheer`, `bungee` and `drive`
+  (the subject blurred on its fast part, with its exhaust puffs) as the
+  prototype; `hop-spin` (a high hop with one full turn in the air, a
+  squash on landing), `wobble-flop` (wobbles, topples over to one side,
+  springs back up), `splash` (dips, leaps in an arc while teal and cream
+  drops fly), `pop` (a squash, a bouncy pop to 1.25, settles) and `zoom`
+  (shoots off the top, blurred, a beat with the screen empty, drops back
+  in from above); 1.2–1.9s each, every move ending exactly where it
+  started. A word without `motion` (or whose layers are not showing yet):
+  the whole picture does the `pop`. With it, once, the TV screen flashes
+  warm white (200ms) and up to 40 sparks (amber, teal, cream) burst from
+  the TV, 600ms, removed after. Reduced motion: the flash, and the
+  picture's opacity dips to 0.7 and back (400ms); no move, no sparks.
+  Small cogs, one per gear the word earns, fly from the TV into the console's gear counter, its count flipping up as each lands (600ms at most; reduced motion: the count just changes; B-218); robot: Correct moment (CHARACTER.md).
 - Never block input for more than 300ms. `prefers-reduced-motion`:
   replace motion with opacity fades; the dome glows steadily instead of
   pulsing or blinking (`next` keeps its lit look, shine and halo).
@@ -163,13 +195,20 @@ a block snapping into a slot and for star pops. Block pick-up: scale 1.08,
 shadow lifts, 120ms.
 
 ## Sound
-On by default, mute toggle remembered. Existing clips in `static/sounds/`:
-correct → `correct/`, wrong → `error/`, round end → `celebration/tada.mp3`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`,
-block into slot → `swipe/` (not a block back to the bench or the reset
-lever; the reveal fly-in plays the error clip only). One voice clip at a
+On by default, mute toggle remembered. The robot's voice: on each moment
+a line of his new voice from the pool CHARACTER.md's moment map names
+("His lines", B-224; the clips `static/voice/manifest.json` lists; on a
+new picture the word's Hebrew guess when it has one; after his letter
+lands, the second miss or a letter boost, its name, `letters/`), and
+where the pool has no clip yet the existing clip in `static/sounds/`, or
+nothing where the moment has none:
+correct → the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong (also the second miss and the reveal) → `error/`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`.
+Round end → `celebration/tada.mp3`, an effect under his end line (B-224).
+Block into slot → `swipe/` (not a block back to the bench or the reset
+lever; the reveal fly-in plays no swipe, only his `reveal-open` line or the error clip). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. The swipe and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
+dropped. The swipe, the round end's tada and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)

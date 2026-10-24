@@ -1,9 +1,9 @@
 // celebrate.js — one-shot motion for the two reward beats (DESIGN
-// "Feedback", "Motion"): a correct check pulses the slots once, flashes
-// the TV screen warm white and bursts sparks (the confetti pieces, styled
-// as sparks in game.css) from the TV, and small cogs, one per gear the
-// word earns, fly from the TV into the console's gear counter, whose
-// count flips up as they land (BACKLOG B-218); the round-end screen pops the
+// "Feedback", "Motion"): a correct check pulses the slots once and small
+// cogs, one per gear the word earns, fly from the TV into the console's
+// gear counter, whose count flips up as they land (BACKLOG B-218); the
+// TV's own win, its warm flash and its sparks start in picture.js
+// (BACKLOG B-222); the round-end screen pops the
 // earned stars in one after another and, when the round cleared its
 // stage, then lights that stage's bulb with a pop (BACKLOG B-216). It
 // runs as a state subscriber after
@@ -11,7 +11,7 @@
 // one it saw and starts a tween only on the transition (status became
 // 'correct', screen became 'round-end'); a re-render in the same state
 // does nothing. Nothing here
-// is game state: the confetti pieces and the flying cogs exist only for
+// is game state: the flying cogs exist only for
 // their flight and are removed from the DOM when it ends; every tween
 // clears what it set, and the count the gear counter holds while the
 // cogs fly ends as the one cogs.js rendered from state.
@@ -19,9 +19,6 @@
 import { motionFor } from './motion.js';
 import { wordGears } from './gears.js';
 import { cog, countText, showCount } from './cogs.js';
-
-// Palette roles the confetti pieces cycle through (colours in game.css).
-const CONFETTI_COLOURS = ['accent', 'primary', 'error'];
 
 // Render cache (like the `tiles` Map in card.js): what the last render
 // showed, so a transition can be told from a re-render; `gears` is the
@@ -40,11 +37,9 @@ export function renderCelebrate(state) {
 
     if (status === 'correct' && prev.status !== 'correct') {
         pulseBoxes();
-        flashTv();
-        burstConfetti();
         flyGears(prev.gears, state.gears, wordGears((state.round.results || [])[state.round.index]));
     } else if (status !== 'correct' && prev.status === 'correct') {
-        settle(document.querySelectorAll('#letter-boxes .letter-box, #screen-play .tv-flash'));
+        settle(document.querySelectorAll('#letter-boxes .letter-box'));
         settleGears(state.gears);
     }
 
@@ -89,76 +84,6 @@ function pulseBoxes() {
     } else if (m.fade > 0) {
         gsap.fromTo(boxes, { opacity: 0.4 }, { opacity: 1, duration: m.fade, ease: m.ease, onComplete: done });
     }
-}
-
-// --- Correct: TV flash ---
-
-// The TV screen lights up warm white (the .tv-flash layer over the
-// picture) and fades back within m.duration (200ms). It is an opacity
-// fade either way, so reduced motion keeps it (at the `fade` length).
-function flashTv() {
-    const layer = document.querySelector('#screen-play .tv-flash');
-    if (!layer) return;
-    const m = motionFor('flash', reducedMotion());
-    gsap.killTweensOf(layer);
-    gsap.fromTo(layer, { opacity: 0.9 }, {
-        opacity: 0,
-        duration: m.duration || m.fade,
-        ease: 'power2.out',
-        onComplete: () => gsap.set(layer, { clearProps: 'opacity' }),
-    });
-}
-
-// --- Correct: confetti (sparks from the TV) ---
-
-function rand(min, max) {
-    return min + Math.random() * (max - min);
-}
-
-// `m.count` small sparks in palette colours (amber, teal glow, cream)
-// start inside the TV picture (.card) and fly outward past its edge,
-// fading, over `m.duration`.
-// They live in a fixed, click-through layer appended to <body> that is
-// removed when the timeline ends, so input is never blocked and nothing
-// stays in the DOM. Reduced motion: count 0, no confetti.
-function burstConfetti() {
-    const m = motionFor('confetti', reducedMotion());
-    if (m.count === 0 || m.duration === 0) return;
-    const card = document.querySelector('#screen-play .card');
-    if (!card) return;
-
-    const r = card.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-
-    const layer = document.createElement('div');
-    layer.className = 'confetti';
-    layer.setAttribute('aria-hidden', 'true');
-    const tl = gsap.timeline({ onComplete: () => layer.remove() });
-
-    for (let i = 0; i < m.count; i++) {
-        const piece = document.createElement('span');
-        piece.className = `confetti-piece ${CONFETTI_COLOURS[i % CONFETTI_COLOURS.length]}`;
-        layer.appendChild(piece);
-
-        // Evenly spread directions with a little jitter; start somewhere
-        // in the middle half of the card and end past its edge, with a
-        // slight downward drift so the pieces look like they are falling.
-        const angle = (i / m.count) * Math.PI * 2 + rand(-0.3, 0.3);
-        const dist = rand(r.width * 0.55, r.width * 1.1);
-        const sx = cx + rand(-r.width / 4, r.width / 4);
-        const sy = cy + rand(-r.height / 4, r.height / 4);
-        gsap.set(piece, { x: sx, y: sy, rotation: rand(0, 360), scale: rand(0.7, 1.2) });
-        tl.to(piece, {
-            x: sx + Math.cos(angle) * dist,
-            y: sy + Math.sin(angle) * dist + rand(10, 40),
-            rotation: `+=${rand(90, 360)}`,
-            duration: m.duration,
-            ease: m.ease,
-        }, 0);
-        tl.to(piece, { opacity: 0, duration: m.duration * 0.4, ease: 'power1.in' }, m.duration * 0.6);
-    }
-    document.body.appendChild(layer);
 }
 
 // --- Correct: cogs fly into the gear counter (BACKLOG B-218) ---

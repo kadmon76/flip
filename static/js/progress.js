@@ -20,7 +20,9 @@
 //
 // main.js reads a theme's progress in startRound (the stage picked on
 // the stage map, or for play again currentStage; its `solved` words for
-// round.js pickRound) and records a finished round once, in onNext's
+// round.js pickRound), again in onNext before each next word (its
+// `solved` words for round.js swapForStruggle, the struggle help, BACKLOG
+// B-220) and records a finished round once, in onNext's
 // round-end branch (record), as it records the missed words; a round
 // left with the back button records nothing. It keeps a copy of load()
 // in state.progress (read at start-up and again after each record), from

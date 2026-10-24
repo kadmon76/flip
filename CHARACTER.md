@@ -75,28 +75,45 @@ Pose and movement change together; never more than one change per 300ms.
 `prefers-reduced-motion`: pose swaps only, no sliding.
 
 ## Moment map
-| Moment | Pose / movement | Sound (M1: existing clips only) | How often |
-|---|---|---|---|
-| Round start | waves with both hands, eyebrows up, pops up; then hands to rest | — | always |
-| Picture shown | looks up at the TV, one of three at random: surprise (wide eyes, gasp, pop), giggle (happy eyes, fist at his mouth, head wiggle), shock (dot eyes, worried, arms out, pop, then wide eyes); then rest, head a little turned | — | always (a third each) |
-| Block placed (into a slot: from the bench, from another slot, or swapping one out) | rest pose, a glance down, then ahead; while the kid drags a block his eyes and head follow it | swipe | always |
-| Block returned (to the bench by tap, drag or the reset lever) | as Block placed | — | always |
-| All slots filled | points at the dome, eyes wide; about 4 in 10 times extra excited (double pop, finger wagging, eyebrows jumping); from the third round, as Block placed | swipe | first 2 rounds since the page was loaded (not stored) |
-| Dome nudge (the word answered, correct or revealed, and the dome not pressed 4s after the answer; again every 8s until it is) | points at the dome (eyes wide, eyebrows up, head turned to it), pops up, wags the pointing finger, then rest | — (no fitting clip yet) | every 8s |
-| Kid idle 10s | thinks (squint, frown, fist at his chin), sinks, then every few seconds peeks over the edge with no hands showing, looking left and right, until the kid's next input | — | once per word, while the word is open (an answered word gets the dome nudge instead) |
-| Wake up (the kid's next input after the idle sink) | pops up, eyes wide | — | after Kid idle |
-| Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | always |
-| Wrong check that leaves one bulb lit | ducks to his eyes (no hands), looks left and right, shivers, comes back | error clip | always |
-| Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | always |
-| Boost given (`boostGiven`, B-219: a boost the kid paid for) | as his letter lands in its slot (or as the clean-up's extra blocks have puffed away): his second-miss letter's steps, happy, small pop, points up at it | — | every boost |
-| Third miss | covers his eyes (dot eyes, worried), then relief (happy eyes) as the blocks fly in | error clip | always |
-| Correct | fist pump, happy eyes, pop | correct clip | always |
-| 3 correct in a row | two fists pumping, double pop, cap sparks | correct clip | always |
-| Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | tada | always |
-| Speaker locked (from B-219: a boost the kid can't afford; the speaker always plays the word since B-215) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | every time |
+| Moment | Pose / movement | Sound | His lines (B-224) | How often |
+|---|---|---|---|---|
+| Round start | waves with both hands, eyebrows up, pops up; then hands to rest | — | `start` | always |
+| Picture shown | looks up at the TV, one of three at random: surprise (wide eyes, gasp, pop), giggle (happy eyes, fist at his mouth, head wiggle), shock (dot eyes, worried, arms out, pop, then wide eyes); then rest, head a little turned | — | the word's Hebrew guess (`hebrew/<theme>/<word>.mp3`), else his look's: `picture-surprise`, `picture-giggle` or `picture-shock`; only while he is quiet | always (a third each) |
+| Block placed (into a slot: from the bench, from another slot, or swapping one out) | rest pose, a glance down, then ahead; while the kid drags a block his eyes and head follow it | swipe | — | always |
+| Block returned (to the bench by tap, drag or the reset lever) | as Block placed | — | — | always |
+| All slots filled | points at the dome, eyes wide; about 4 in 10 times extra excited (double pop, finger wagging, eyebrows jumping); from the third round, as Block placed | swipe | `press` (from the third round, as Block placed: none) | first 2 rounds since the page was loaded (not stored) |
+| Dome nudge (the word answered, correct or revealed, and the dome not pressed 4s after the answer; again every 8s until it is) | points at the dome (eyes wide, eyebrows up, head turned to it), pops up, wags the pointing finger, then rest | — (no fitting clip yet) | `press`; only while he is quiet | every 8s |
+| Kid idle 10s | thinks (squint, frown, fist at his chin), sinks, then every few seconds peeks over the edge with no hands showing, looking left and right, until the kid's next input | — | `idle`; each peek, as he comes up: `peek` (a whisper); both only while he is quiet | once per word, while the word is open (an answered word gets the dome nudge instead) |
+| Wake up (the kid's next input after the idle sink) | pops up, eyes wide | — | `wake` | after Kid idle |
+| Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | `wrong`, else `mumble` | always |
+| Wrong check that leaves one bulb lit | ducks to his eyes (no hands), looks left and right, shivers, comes back | error clip | `mumble` | always |
+| Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | after the line before it: `hint`, then his letter's name (`letters/<letter>.mp3`, "Eigh!" … "Zee!"), or the name alone | always |
+| Boost given (`boostGiven`, B-219: a boost the kid paid for) | as his letter lands in its slot (or as the clean-up's extra blocks have puffed away): his second-miss letter's steps, happy, small pop, points up at it | — | as it lands, by the boost: `boost-slot` (Remember this one), `boost-first` (First letter), `boost-clean` (Clean-up); then, for a letter, its name, or the name alone | every boost |
+| Third miss | covers his eyes (dot eyes, worried), then relief (happy eyes) as the blocks fly in | error clip | `reveal-open` | always |
+| Correct | fist pump, happy eyes, pop | he says the word, clean and complete (the word's own clip, as his voice), then one line: the word's gag (`gags/<theme>/<word>.mp3`, or its `-2`, at random), else a line of pool `correct`; with neither, a correct clip after the word (B-223) | after the word: `gag`, else `correct` | always |
+| 3 correct in a row | two fists pumping, double pop, cap sparks | he says the word as on Correct, then a line of pool `streak`, else the word's gag, else a line of pool `correct`; with none, a correct clip after the word (B-223) | after the word: `streak`, else `gag`, else `correct` | always |
+| Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | tada (an effect, under his line) | by the stars: 3 `end-high`, 2 `end-mid`, 0–1 `end-low` | always |
+| Speaker locked (from B-219: a boost the kid can't afford; the speaker always plays the word since B-215) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | `no-gears` | every time |
 
-Voice lines (the ~60-line pool, pre-generated AI voice, his own quirks
-after the target word) are a later item; M1 uses the existing clips.
+Voice lines: his new voice (pre-generated AI voice; `tools/voices.py`
+makes the clips into `static/voice/`, read-only content, and
+`static/voice/manifest.json` lists them; the lines are
+`content/voice/robot-lines.json`'s pools and each word's gag and Hebrew
+guess in `content/voice/word-lines.json`) arrives in batches. The game
+plays what the manifest lists. On each moment he says a random clip of
+the first pool in "His lines" that has one (`robot/<pool>-NN.mp3`; the
+word's gag and Hebrew guess are its own clips); a moment with no new clip
+yet keeps its existing clip from `static/sounds/` (Sound), or says
+nothing where it has none. On a correct check he says the word himself,
+then his line after it (B-223, the two Correct rows above); after his
+letter lands (the second miss, a letter boost) he says its name (B-224).
+The word he says and his lines are his voice, so he talks with them
+(Talking, above), while the word the speaker plays is not. A moment that
+comes on its own (the picture, kid idle and his peeks, the dome nudge)
+says its line only while he is quiet: due while one of his clips plays,
+it is dropped, never cutting him. Pools not wired yet: `greet`,
+`murmur`, `reveal-close`, `sticker`, `stage`, `gear`, `boost-slow`
+(BACKLOG "Later / not now").
 
 ## Rules
 - The target word is always spoken clean and complete; a quirk may

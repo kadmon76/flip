@@ -279,7 +279,9 @@ export function renderTv(state, onLock) {
 }
 
 // The next word's picture starts loading now, so its tune-in rarely has
-// to wait for it.
+// to wait for it. (A word the struggle help swaps in as the next word
+// starts, BACKLOG B-220, was not fetched ahead: its snow holds while its
+// picture loads, 2s at most.)
 function prefetch(word) {
     if (word && word.image) new Image().src = word.image;
 }

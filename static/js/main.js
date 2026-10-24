@@ -1,10 +1,14 @@
 // main.js — wiring: theme selection and the theme's stage map (BACKLOG
 // B-217: a theme card opens its stage screen, a station there starts a
 // round of its stage), round flow (its progress recorded at the round
-// end), the console controls (check dome, reset lever, speaker), the
-// header's mute toggle and the play screen's back button, the kid-idle
+// end; the struggle help, BACKLOG B-220: after three words in a row that
+// were not clean the next two are easier ones), the console controls
+// (check dome, reset lever, speaker), the header's mute toggle and the
+// play screen's back button, the kid-idle
 // timer and the dome-nudge timer for the robot and his voice's frames,
-// the TV's lock (tv.js), screen renders. The kid's gears (gears.js,
+// the TV's lock (tv.js) and the picture's life after it (picture.js,
+// BACKLOG B-221) with its win on a correct check (BACKLOG B-222), screen
+// renders. The kid's gears (gears.js,
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
 // kept in state.gears for the gear counters (cogs.js); and spent on boosts
 // (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
@@ -16,8 +20,9 @@ import { renderCard } from './card.js';
 import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';
 import { renderFeedback } from './feedback.js';
 import { renderTv } from './tv.js';
+import { renderPicture } from './picture.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
-import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
@@ -30,7 +35,7 @@ import { renderStageMap } from './stagemap.js';
 import { renderFlaps } from './flaps.js';
 import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
 import { stagesOf } from './stage.js';
-import { pickRound, makeWord } from './round.js';
+import { pickRound, makeWord, swapForStruggle } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
 
@@ -317,7 +322,15 @@ function onCheck(extra = {}) {
 // were added at their checks). A round left with the back button never
 // gets here, so it records nothing and earns no round gears (B-201). The
 // next word starts by the round's stage rules, as the first did (BACKLOG
-// B-215).
+// B-215). Before it starts, the struggle help (BACKLOG B-220, round.js
+// swapForStruggle; PROGRESSION.md "Guardrails"): when this word and the
+// two before it were not clean (a wrong check, a boost or a reveal), the
+// next two words are swapped for solved words of the theme's earlier
+// stages (progress.js: the solved words as the round started; nothing is
+// recorded before its end), in the same setState as the next word, with
+// no sign to the kid. Not on stage 1, nor when no earlier word is solved.
+// The words swapped out have no result, so the round end records nothing
+// about them: they stay unsolved and come back in a later round.
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
@@ -340,9 +353,11 @@ function onNext(extra = {}) {
             ...extra,
         });
     } else {
+        const words = swapForStruggle(state.words, round.index, results, state.data, round.stage, progressFor(state.theme).solved);
         setState({
+            words,
             round: { ...round, index: nextIndex, results },
-            current: makeWord(state.words[nextIndex], state.round.stage, newTileId),
+            current: makeWord(words[nextIndex], state.round.stage, newTileId),
             lives: LIVES,
             speaking: false,
             lastInput: performance.now(),
@@ -425,10 +440,10 @@ function onBoostClose() {
 
 // A boost tapped in the tray. One the kid can't afford is not spent: the
 // tray closes and `lockedTaps` goes up by one (the robot shakes his head
-// with his "hmm no", character.js speakerLocked; the gear counter
-// flickers, feedback.js). "Remember this one" makes the slots that aren't
-// locked glow for the kid to pick one (onBoostSlot); "First letter" and
-// "Clean-up" happen at once.
+// with his `no-gears` line, else "hmm no", character.js speakerLocked;
+// the gear counter flickers, feedback.js). "Remember this one" makes the
+// slots that aren't locked glow for the kid to pick one (onBoostSlot);
+// "First letter" and "Clean-up" happen at once.
 function onBoostPick(kind) {
     if (state.screen !== 'play' || state.boostMenu !== 'tray') return;
     const { current } = state;
@@ -458,13 +473,14 @@ function onBoostSlot(index) {
 
 // The boost happens: its gears are taken (gears.js spend) and `next`
 // (the word after it) is shown, in one setState with the count after it.
-// The robot's boostGiven (character.js) and the motion (feedback.js) key
-// on the change. Not enough gears in the store after all: nothing is
-// spent, as onBoostPick.
+// The word notes which boost it took (`boostKind`: his line, B-224). The
+// robot's boostGiven (character.js) and the motion (feedback.js) key on
+// the change. Not enough gears in the store after all: nothing is spent,
+// as onBoostPick.
 function pay(kind, next) {
     const gears = spendGears(COSTS[kind]);
     if (gears === null) setState({ boostMenu: null, lockedTaps: state.lockedTaps + 1 });
-    else setState({ boostMenu: null, gears, current: next });
+    else setState({ boostMenu: null, gears, current: { ...next, boostKind: kind } });
 }
 
 // --- The TV (BACKLOG B-214, tv.js) ---
@@ -676,8 +692,9 @@ subscribe(renderCard);
 subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places the boost tray and the glowing slots on it
 subscribe(renderFeedback);    // after the card render: keys off its DOM (and the boost tray's)
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
+subscribe(renderPicture);     // after the TV: the picture's life once it has locked (BACKLOG B-221), its win (B-222)
 subscribe(renderControls);
-subscribe(renderRobot);
+subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
 subscribe(renderRoundEnd);
 subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter
 subscribe(renderGallery);
@@ -727,6 +744,10 @@ window.addEventListener('resize', () => {
     renderCard(state);
     renderBoost(state, BOOST_TAPS);
 });
+
+// The picture's life (picture.js, BACKLOG B-221) and its win (B-222) stop
+// while the page is hidden; the life starts again when it shows.
+document.addEventListener('visibilitychange', () => renderPicture(state));
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.
