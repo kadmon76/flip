@@ -90,6 +90,8 @@ Pose and movement change together; never more than one change per 300ms.
 | Tutorial: drag (the picture has locked and the kid has placed no letter; coach.js `coachStep` 'drag'; instead of Picture shown) | points, eyes wide, while the ghost mitten carries a letter to the slot | — | `tutorial-drag` | the tutorial word only |
 | Tutorial: press (every slot full; instead of All slots filled) | points at the dome, eyes wide, while the ghost mitten taps it | swipe | `tutorial-press` | the tutorial word only |
 | Tutorial: done (the tutorial word checked correct; instead of Correct or 3 in a row) | as Correct | he says the word as on Correct, then a line of pool `tutorial-done`, else the word's gag, else `correct` | after the word: `tutorial-done`, else `gag`, else `correct` | once per player |
+| Key earned (the round end of a round that brought a theme key; keys.js, human 2026-10-24) | not drawn there yet; the steps are a point with wide eyes | — | after his round-end line: `key` | when a round brings a key |
+| Theme opened (a key opens a locked theme on the theme screen) | not drawn there yet; the steps are a gasp | — | `theme-open` | each theme opened |
 | Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | `wrong`, else `mumble` | always |
 | Wrong check that leaves one bulb lit | ducks to his eyes (no hands), looks left and right, shivers, comes back | error clip | `mumble` | always |
 | Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | after the line before it: `hint`, then his letter's name (`letters/<letter>.mp3`, "Eigh!" … "Zee!"), or the name alone | always |
@@ -117,8 +119,8 @@ The word he says and his lines are his voice, so he talks with them
 comes on its own (the picture, kid idle and his peeks, the dome nudge)
 says its line only while he is quiet: due while one of his clips plays,
 it is dropped, never cutting him. Pools not wired yet: `murmur`,
-`reveal-close`, `sticker`, `stage`, `gear`, `boost-slow`, `key`,
-`theme-open` (BACKLOG "Later / not now").
+`reveal-close`, `sticker`, `stage`, `gear`, `boost-slow` (BACKLOG
+"Later / not now").
 
 ## Rules
 - The target word is always spoken clean and complete; a quirk may

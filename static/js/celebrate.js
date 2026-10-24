@@ -5,7 +5,9 @@
 // TV's own win, its warm flash and its sparks start in picture.js
 // (BACKLOG B-222); the round-end screen pops the
 // earned stars in one after another and, when the round cleared its
-// stage, then lights that stage's bulb with a pop (BACKLOG B-216). It
+// stage, then lights that stage's bulb with a pop (BACKLOG B-216), and
+// then pops in the theme key the round earned (human, 2026-10-24); on the
+// theme screen a key opening a theme pops the card's padlock off. It
 // runs as a state subscriber after
 // card.js, the round-end render and the gear counters' (cogs.js), compares the new state with the last
 // one it saw and starts a tween only on the transition (status became
@@ -23,7 +25,7 @@ import { cog, countText, showCount } from './cogs.js';
 // Render cache (like the `tiles` Map in card.js): what the last render
 // showed, so a transition can be told from a re-render; `gears` is the
 // count it last saw (state.gears), the count before a word's gears.
-let last = { screen: null, status: null, gears: null };
+let last = { screen: null, status: null, gears: null, opened: [] };
 
 function reducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -33,7 +35,8 @@ export function renderCelebrate(state) {
     const { screen, current } = state;
     const status = screen === 'play' && current.word ? current.status : null;
     const prev = last;
-    last = { screen, status, gears: state.gears };
+    const opened = (state.keys && state.keys.opened) || [];
+    last = { screen, status, gears: state.gears, opened };
 
     if (status === 'correct' && prev.status !== 'correct') {
         pulseBoxes();
@@ -46,10 +49,78 @@ export function renderCelebrate(state) {
     if (screen === 'round-end' && prev.screen !== 'round-end') {
         popStars();
         if (state.round.justCleared) popBulb(state.round.stage);
+        if (state.round.keyEarned) popKey(!!state.round.justCleared);
     } else if (screen !== 'round-end' && prev.screen === 'round-end') {
         settle(document.querySelectorAll('#round-stars .fill'));
         settleBulbs(document.querySelectorAll('#round-stages .bulb'));
+        settle(document.querySelectorAll('#round-key'));
     }
+
+    // a key opened a theme, here on the theme screen
+    if (screen === 'theme' && prev.screen === 'theme') {
+        opened.filter((t) => !prev.opened.includes(t)).forEach(unlock);
+    } else if (screen !== 'theme' && prev.screen === 'theme') {
+        settleLocks();
+    }
+}
+
+// --- Theme keys (human, 2026-10-24) ---
+
+// The round's key (locks.js has shown it) pops in once the stars have
+// (starsDone), and after the stage bulb's pop when the round cleared its
+// stage (`afterBulb`): it scales up from 0 with the overshoot and turns
+// into place. Reduced motion: it fades in.
+function popKey(afterBulb) {
+    const key = document.getElementById('round-key');
+    if (!key || key.hidden) return;
+    const m = motionFor('keyPop', reducedMotion());
+    const stars = document.querySelectorAll('#round-stars .earned .fill').length;
+    const delay = starsDone(stars) + (afterBulb ? motionFor('bulbPop', false).duration : 0);
+    gsap.killTweensOf(key);
+    const done = () => gsap.set(key, { clearProps: 'transform,opacity' });
+    if (m.duration > 0) {
+        gsap.fromTo(key, { scale: 0, rotation: m.turn }, {
+            scale: m.scale, rotation: 0, duration: m.duration, ease: m.ease, delay, onComplete: done,
+        });
+    } else if (m.fade > 0) {
+        gsap.fromTo(key, { opacity: 0 }, { opacity: 1, duration: m.fade, delay, onComplete: done });
+    }
+}
+
+// The card of `theme` has just been opened (the render dropped its
+// `is-locked` class, which hides the padlock): its padlock shows for the
+// moment it rises, swells, turns and fades away, and the picture
+// brightens from the locked dim. Reduced motion: the padlock fades out.
+function unlock(theme) {
+    const card = document.querySelector(`#theme-buttons .theme-btn[data-theme="${theme}"]`);
+    const lock = card && card.querySelector('.padlock');
+    if (!lock) return;
+    const m = motionFor('unlock', reducedMotion());
+    const img = card.querySelector('img');
+    gsap.killTweensOf([lock, img]);
+    const done = () => {
+        gsap.set(lock, { clearProps: 'display,transform,opacity,y,scale,rotation' });
+        if (img) gsap.set(img, { clearProps: 'filter' });
+    };
+    gsap.set(lock, { display: 'block' });
+    if (img) gsap.fromTo(img, { filter: 'grayscale(0.85) brightness(0.55)' }, { filter: 'grayscale(0) brightness(1)', duration: m.duration || m.fade });
+    if (m.duration > 0) {
+        gsap.fromTo(lock, { y: 0, scale: 1, rotation: 0, opacity: 1 }, {
+            y: -m.height, scale: m.scale, rotation: m.turn, opacity: 0, duration: m.duration, ease: m.ease, onComplete: done,
+        });
+    } else {
+        gsap.fromTo(lock, { opacity: 1 }, { opacity: 0, duration: m.fade, onComplete: done });
+    }
+}
+
+// Leaving the theme screen: an unlock still running stops.
+function settleLocks() {
+    const locks = document.querySelectorAll('#theme-buttons .padlock');
+    const imgs = document.querySelectorAll('#theme-buttons .theme-btn img');
+    if (!locks.length) return;
+    gsap.killTweensOf([...locks, ...imgs]);
+    gsap.set(locks, { clearProps: 'display,transform,opacity,y,scale,rotation' });
+    gsap.set(imgs, { clearProps: 'filter' });
 }
 
 // Stop a running celebration on `els` and drop the inline transform and

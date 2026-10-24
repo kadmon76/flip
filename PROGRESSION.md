@@ -7,7 +7,7 @@ starting values; the human may change any of them. Backlog: M4.
 
 ## Principles
 - **A learning game, not a business.** Gears are earned only by playing
-  and spent on boosts (later also on new themes). No real money in the
+  and spent on boosts; new themes open with theme keys (below). No real money in the
   game now.
 - **The word is always hearable, on every stage.** The robot forgot the
   spelling, not the word. The speaker always plays the word.
@@ -118,8 +118,13 @@ change.
   is now the theme's 5 words of that stage.
 - Progress is saved in the kid's browser for everyone (like the sticker
   book); saving it to an account comes with login.
-- All themes stay open. Buying a theme with gears waits until Food and
-  Home are in the game.
+- Theme keys (human, 2026-10-24; replaces "all themes stay open"):
+  Animals and Food are open from the start. Clearing a theme's first
+  stage earns a key, and the kid picks which locked theme it opens. A
+  kid who finishes 6 rounds in a row without a key, holding none, gets
+  one anyway, so nobody stays stuck with the same themes. Gears stay for
+  boosts only (a theme is not bought with gears). Keys are per player
+  (keys.js).
 - Slow say waits for the robot's new voice clips.
 
 ## Open questions (for play-testing)
