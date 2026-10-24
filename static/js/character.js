@@ -316,6 +316,20 @@ export const MOMENTS = {
         sound: null,
         lines: ['wake'],
     },
+    // A player picked on the start screen (human, 2026-10-24): the theme
+    // screen comes up and he greets the kid. He is not drawn there yet, so
+    // only his voice shows it; the steps are his wave for when he is.
+    greet: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'happy', brows: 'up', hands: 'wave', pop: 1 },
+            { at: 1.2, hands: 'rest', eyes: 'idle', brows: 'calm' },
+        ],
+        sound: null,
+        lines: ['greet'],
+        // it comes with the tap that unlocks the sound: audio.js waits
+        // for a clip of the pool to decode instead of skipping it
+        waitReady: true,
+    },
     wrong: {
         steps: [
             { at: 0, sink: 0, head: 6, eyes: 'confused', brows: 'puzzled', hands: 'shrug', shake: true },
@@ -738,6 +752,8 @@ export function snapshot(state) {
 // word, so he looks up at the picture and not at the snow. A new round
 // starts with his wave at once.
 export function momentsFor(prev, now) {
+    // The start screen's player tap (main.js onPlayer): he greets the kid.
+    if (now.screen === 'theme' && prev.screen === 'start') return ['greet'];
     if (now.screen === 'round-end') {
         if (prev.screen === 'round-end') return [];
         return [now.stars >= 2 ? 'roundEndGood' : 'roundEnd'];

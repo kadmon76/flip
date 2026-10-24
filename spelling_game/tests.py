@@ -1459,7 +1459,7 @@ class CharacterTests(TestCase):
             {**point, 'pop': 1}, {'at': 0.3, 'fx': 'wag'},
             {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]}])
         self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
-            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
+            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake', 'greet',
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
             'boostGiven', 'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
@@ -1568,7 +1568,7 @@ class CharacterTests(TestCase):
         sounds = self.run_node("out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.soundsFor([m])])));")
         self.assertEqual(sounds, {
             'roundStart': [], 'picture': [], 'blockPlaced': ['swipe'], 'blockReturned': [],
-            'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
+            'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [], 'greet': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
             'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
@@ -1839,7 +1839,7 @@ class PuppetTests(TestCase):
         self.assertEqual(self.run_node(
             "out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.variantsOf(m).map((v) => v.steps[0].hands || null)])));"), {
             'roundStart': ['wave'], 'picture': ['gasp', 'giggle', 'shock'], 'blockPlaced': ['rest'], 'blockReturned': ['rest'],
-            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'], 'wrong': ['shrug'],
+            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'], 'greet': ['wave'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
             'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
             'domeNudge': ['point']})
@@ -3258,7 +3258,8 @@ class StageTests(TestCase):
         theme = html[html.index('<div id="screen-theme"'):html.index('<div id="screen-stages"')]
         self.assertLess(theme.index('id="theme-buttons"'), theme.index('<div class="actions">'))
         actions = theme[theme.index('<div class="actions">'):]
-        self.assertEqual(re.findall(r'<button id="([^"]+)"', theme), ['stickers-btn'])
+        # the switch-player button first, top left (2026-10-24)
+        self.assertEqual(re.findall(r'<button id="([^"]+)"', theme), ['player-btn', 'stickers-btn'])
         self.assertIn('id="stickers-btn"', actions)
         self.assertNotIn('aria-pressed', theme)
 
@@ -5098,6 +5099,9 @@ class MissedWordsTests(TestCase):
             else:
                 self.assertNotIn('flip.missed', text, path.name)
         code = self.code('missed.js')
+        # its one import: players.js keyOf, the key kept per player (2026-10-24)
+        self.assertEqual(re.findall(r'^import .*$', code, flags=re.M), ["import { keyOf } from './players.js';"])
+        code = re.sub(r'^import .*$', '', code, flags=re.M)
         for word in ('document', 'window', 'import', 'state'):
             self.assertNotIn(word, code, word)
         self.assertNotIn('localStorage', self.code('main.js'))
@@ -6967,7 +6971,8 @@ class ProgressTests(TestCase):
         for word in ('document', 'window', 'state.', 'setState'):
             self.assertNotIn(word, code, word)
         self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
-                         ["import { STAGES, isStage, stagesOf } from './stage.js';"])
+                         ["import { STAGES, isStage, stagesOf } from './stage.js';",
+                          "import { keyOf } from './players.js';"])
         # every read and write in try/catch
         for fn in ('storage', 'load', 'save'):
             self.assertIn('try {', self.function(fn, 'progress.js'), fn)
@@ -8017,8 +8022,10 @@ class StageMapTests(TestCase):
         nxt = self.function('onNext')
         self.assertLess(nxt.index('recordProgress('), nxt.index('progress: loadProgress(),'))
         self.assertLess(nxt.index('progress: loadProgress(),'), nxt.index("screen: 'round-end',"))
-        self.assertEqual(len(re.findall(r'\bprogress: ', main)), 2)
-        self.assertEqual(main.count('loadProgress()'), 2)
+        # and when a player starts (startAs, the start screen, 2026-10-24)
+        self.assertIn('progress: loadProgress(), gears: loadGears(),', self.function('startAs'))
+        self.assertEqual(len(re.findall(r'\bprogress: ', main)), 3)
+        self.assertEqual(main.count('loadProgress()'), 3)
 
     def test_no_round_starts_once_the_kid_has_left_the_screen_the_tap_came_from(self):
         # review fix: a station tapped, then the stage screen's back arrow
@@ -8220,6 +8227,9 @@ class GearsTests(TestCase):
                 self.assertNotIn('flip.gears', path.read_text(), path.name)
         code = self.code('gears.js')
         self.assertIn("export const KEY = 'flip.gears.v1';", code)
+        # its one import: players.js keyOf, the key kept per player (2026-10-24)
+        self.assertEqual(re.findall(r'^import .*$', code, flags=re.M), ["import { keyOf } from './players.js';"])
+        code = re.sub(r'^import .*$', '', code, flags=re.M)
         for word in ('document', 'window', 'setState', 'import '):
             self.assertNotIn(word, code, word)
         self.assertNotRegex(code, r'(?m)^(let|var) ')
@@ -9374,7 +9384,7 @@ class CorrectWordVoiceTests(TestCase):
             # the pools the moment table's lines name (B-223: correct,
             # streak; B-224: every moment's, PEEK's), not the word's own
             # clips (gag, hebrew)
-            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'wrong', 'mumble', 'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
+            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'greet', 'wrong', 'mumble', 'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
 
     def test_the_moment_table_says_the_word_on_a_correct_check(self):
         # character.js MOMENTS: correct and streak say the word, then the
@@ -9421,19 +9431,21 @@ class CorrectWordVoiceTests(TestCase):
 
     def test_init_fetches_the_manifest_once_and_the_line_pools_clips(self):
         # once, at init; then the clips of the pools the moments name
-        # (B-223: correct, streak; B-224: wrong and the others) are
-        # downloaded and decoded; pools no moment names (greet), gags,
+        # (B-223: correct, streak; B-224: wrong and the others; the start
+        # screen's greet, 2026-10-24) are downloaded and decoded; pools no
+        # moment names (murmur), gags,
         # Hebrew guesses, letters and words wait (a word's own come when
         # it starts)
         res = self.run_node(
             "MAN = man('words/animals/cat.mp3', 'robot/correct-01.mp3', 'robot/streak-01.mp3', 'robot/wrong-01.mp3',"
-            " 'robot/greet-01.mp3', 'gags/animals/cat.mp3', 'hebrew/animals/cat.mp3', 'letters/a.mp3');"
+            " 'robot/greet-01.mp3', 'robot/murmur-01.mp3', 'gags/animals/cat.mp3', 'hebrew/animals/cat.mp3', 'letters/a.mp3');"
             "await ready(); const voice = fetched.filter((u) => u.startsWith('/static/voice/'));"
             "out([voice, decodes.filter((u) => u.startsWith('/static/voice/')), errors]);")
         self.assertEqual(res, [
-            ['/static/voice/manifest.json', '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3',
-             '/static/voice/robot/streak-01.mp3'],
-            ['/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'], []])
+            ['/static/voice/manifest.json', '/static/voice/robot/greet-01.mp3', '/static/voice/robot/wrong-01.mp3',
+             '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'],
+            ['/static/voice/robot/greet-01.mp3', '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3',
+             '/static/voice/robot/streak-01.mp3'], []])
 
     def test_a_missing_or_broken_manifest_is_empty_with_no_error(self):
         # 404, JSON that fails, a response without json(), a fetch that
@@ -9468,7 +9480,7 @@ class CorrectWordVoiceTests(TestCase):
             "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
             " a.gagClips(listed, 'animals', 'cat'), listed.includes('words/animals/cat.mp3'), atCheck, played()]);")
-        self.assertEqual(res[:5], [156, 130, [0] * 21, [], True])
+        self.assertEqual(res[:5], [156, 130, [0] * 22, [], True])
         self.assertEqual(res[5:], [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/you have a spelling superpower.mp3']])
 
     # --- a new word ---
@@ -9717,11 +9729,11 @@ class MomentLinesTests(TestCase):
     ROBOT_LINES = ROOT / 'content' / 'voice' / 'robot-lines.json'
 
     # the pools the table names (B-223's correct and streak among them)
-    POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'wrong', 'mumble',
+    POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'greet', 'wrong', 'mumble',
              'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
              'boost-first', 'boost-clean', 'peek']
     # BACKLOG B-224: the pools not wired here (each a "Later / not now" line)
-    UNWIRED = ['greet', 'murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow',
+    UNWIRED = ['murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow',
                'tutorial-drag', 'tutorial-press', 'tutorial-done', 'key', 'theme-open']
 
     def setUp(self):
@@ -9822,7 +9834,7 @@ class MomentLinesTests(TestCase):
         # the prototype column is as it was (the tada is now an effect)
         self.assertEqual(res['sounds'], {
             'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
-            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
+            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
             'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'speakerLocked': 'locked',
             'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
 
@@ -11089,3 +11101,122 @@ class PictureWinTests(TestCase):
             self.assertIn(decl, self.rule('.confetti'))
         for role, colour in (('accent', 'amber'), ('primary', 'teal-glow'), ('error', 'cream')):
             self.assertIn(f'color: var(--{colour});', self.rule(f'.confetti-piece.{role}'))
+
+
+class PlayersTests(TestCase):
+    """Players on one device (human, 2026-10-24): static/js/players.js is
+    the only reader and writer of localStorage `flip.players.v1` and names
+    each save module's key per player (keyOf); start.js's startView is the
+    start screen's pure part; character.js greets on the start screen's
+    tap. Run through node with an in-memory localStorage."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    STORE = """
+        const store = new Map(Object.entries(SEED));
+        globalThis.localStorage = {
+            getItem: (k) => (store.has(k) ? store.get(k) : null),
+            setItem: (k, v) => { store.set(k, String(v)); },
+            removeItem: (k) => { store.delete(k); },
+        };
+        const dump = () => Object.fromEntries([...store.entries()].sort());
+    """
+
+    def run_node(self, body, seed=None):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const SEED = {json.dumps(seed or {})};"
+            + self.STORE
+            + f"const P = await import('{(self.JS / 'players.js').as_uri()}');"
+            + f"const G = await import('{(self.JS / 'gears.js').as_uri()}');"
+            + f"const St = await import('{(self.JS / 'stickers.js').as_uri()}');"
+            + f"const V = await import('{(self.JS / 'start.js').as_uri()}');"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def test_no_player_yet_the_keys_are_as_before(self):
+        # before anyone picks a picture (and in the save modules' own
+        # tests) a save's key is its base key
+        self.assertEqual(self.run_node(
+            "out([P.load(), P.keyOf('flip.gears.v1'), G.add(3), dump()]);"),
+            [{'list': [], 'current': None}, 'flip.gears.v1', 3, {'flip.gears.v1': '3'}])
+
+    def test_the_first_player_takes_over_the_old_saves_the_second_starts_fresh(self):
+        old = {'flip.gears.v1': '7', 'flip.stickers.v1': '{"animals":["cat"]}'}
+        res = self.run_node(
+            "const saves = ['flip.stickers.v1', 'flip.progress.v1', 'flip.gears.v1', 'flip.missed.v1'];"
+            "const a = P.add('fox', saves); const first = [G.load(), St.load(), P.keyOf('flip.gears.v1')];"
+            "const b = P.add('panda', saves); const second = [G.load(), St.load(), G.add(2)];"
+            "P.select('p1'); const back = [G.load(), St.load()];"
+            "out([a, b, first, second, back, dump()]);", seed=old)
+        a, b, first, second, back, store = res
+        self.assertEqual(a, {'list': [{'id': 'p1', 'pic': 'fox'}], 'current': 'p1'})
+        self.assertEqual(b, {'list': [{'id': 'p1', 'pic': 'fox'}, {'id': 'p2', 'pic': 'panda'}], 'current': 'p2'})
+        self.assertEqual(first, [7, {'animals': ['cat']}, 'flip.gears.v1@p1'])
+        self.assertEqual(second, [0, {}, 2])
+        self.assertEqual(back, [7, {'animals': ['cat']}])
+        # the old unscoped saves are gone, moved to the first player
+        self.assertNotIn('flip.gears.v1', store)
+        self.assertNotIn('flip.stickers.v1', store)
+        self.assertEqual([store['flip.gears.v1@p1'], store['flip.gears.v1@p2']], ['7', '2'])
+
+    def test_a_picture_is_one_players_and_the_device_holds_six(self):
+        res = self.run_node(
+            "const r = [P.add('fox'), P.add('fox'), P.add('unicorn')];"
+            "for (const pic of ['cat', 'dog', 'frog', 'lion', 'panda']) P.add(pic);"
+            "out([r[1], r[2], P.load().list.length, P.add('penguin'), P.freePics(P.load().list), P.select('p9'), P.load().current]);")
+        self.assertEqual(res, [None, None, 6, None, ['penguin', 'rabbit'], None, 'p6'])
+
+    def test_a_corrupt_store_is_cleaned(self):
+        bad = {'flip.players.v1': json.dumps({'list': [
+            {'id': 'p1', 'pic': 'fox'}, {'id': 'p1', 'pic': 'cat'}, {'id': 'x', 'pic': 'dog'},
+            {'id': 'p3', 'pic': 'dragon'}, None, {'id': 'p4', 'pic': 'lion'}], 'current': 'p3'})}
+        self.assertEqual(self.run_node("out([P.load(), P.nextId(P.load().list)]);", seed=bad),
+                         [{'list': [{'id': 'p1', 'pic': 'fox'}, {'id': 'p4', 'pic': 'lion'}], 'current': None}, 'p5'])
+        self.assertEqual(self.run_node("out(P.load());", seed={'flip.players.v1': '{oops'}), {'list': [], 'current': None})
+
+    def test_the_start_screen_view(self):
+        res = self.run_node(
+            "const two = [{ id: 'p1', pic: 'fox' }, { id: 'p2', pic: 'cat' }];"
+            "const six = ['cat', 'dog', 'fox', 'frog', 'lion', 'panda'].map((pic, i) => ({ id: `p${i + 1}`, pic }));"
+            "out([V.startView([], false), V.startView(two, false), V.startView(two, true), V.startView(six, false)]);")
+        none, two, picking, full = res
+        # no player yet: the picker at once, every picture, no back arrow
+        self.assertEqual(none, {'cards': [], 'plus': False, 'picker': True,
+                                'pics': ['cat', 'dog', 'fox', 'frog', 'lion', 'panda', 'penguin', 'rabbit'], 'back': False})
+        self.assertEqual(two, {'cards': [{'id': 'p1', 'pic': 'fox'}, {'id': 'p2', 'pic': 'cat'}], 'plus': True,
+                               'picker': False, 'pics': [], 'back': False})
+        self.assertEqual(picking['pics'], ['dog', 'frog', 'lion', 'panda', 'penguin', 'rabbit'])
+        self.assertTrue(picking['back'])
+        self.assertFalse(full['plus'])
+
+    def test_the_robot_greets_when_a_player_starts(self):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const C = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const s = (screen) => ({ ...C.NONE, screen });"
+            "out([C.momentsFor(s('start'), s('theme')), C.momentsFor(s('theme'), s('start')), C.momentsFor(s('stages'), s('theme')),"
+            " C.MOMENTS.greet.lines, !!C.MOMENTS.greet.waitReady]);")
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout.strip()), [['greet'], [], [], ['greet'], True])
+
+    def test_players_js_alone_names_the_players_key_and_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            if path.name != 'players.js':
+                self.assertNotIn('flip.players', path.read_text(), path.name)
+        code = re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / 'players.js').read_text(), flags=re.S)
+        for word in ('document', 'window', 'setState', 'import '):
+            self.assertNotIn(word, code, word)
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+        # the game opens on the start screen
+        self.assertIn("screen: 'start',", (self.JS / 'state.js').read_text())

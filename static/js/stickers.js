@@ -12,6 +12,9 @@
 // an array, non-string entries, duplicates) is dropped on read, so the
 // book is always a clean object of unique word arrays.
 
+import { keyOf } from './players.js';
+
+// The book's key; kept per player (players.js keyOf: `flip.stickers.v1@p1`).
 export const KEY = 'flip.stickers.v1';
 
 function storage() {
@@ -24,7 +27,7 @@ export function load() {
     const store = storage();
     let raw = null;
     try {
-        raw = store ? store.getItem(KEY) : null;
+        raw = store ? store.getItem(keyOf(KEY)) : null;
     } catch {
         return {};
     }
@@ -48,7 +51,7 @@ function save(book) {
     const store = storage();
     if (!store) return;
     try {
-        store.setItem(KEY, JSON.stringify(book));
+        store.setItem(keyOf(KEY), JSON.stringify(book));
     } catch {
         // quota or private mode: the round still plays, nothing to do
     }

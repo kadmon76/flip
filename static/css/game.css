@@ -492,6 +492,139 @@ body[data-screen="play"] .play-back-btn {
     width: calc(var(--flap-w) * 0.72);
 }
 
+/* --- Start screen: who's playing (human, 2026-10-24; start.js) --- */
+
+/* The robot over the players' cards, the pair centred between the logo
+   and the bottom of the safe area: the puppet's parts stacked on their
+   shared 505 canvas (the play screen's .puppet), still, his right mitten
+   waving (character.js HANDS: rest L 150,340 -8deg; wave R 400,196 14deg;
+   HAND_SHAPES widths 86 and 83). The canvas's empty top and bottom are
+   cut by the negative margins. Smaller on a short screen. */
+.start-robot {
+    position: relative;
+    flex: 0 0 auto;
+    width: clamp(160px, 100vh - 500px, 230px);
+    aspect-ratio: 1 / 1;
+    margin: auto 0 -14%;
+    filter: drop-shadow(3px 6px 6px var(--shadow-contact));
+    pointer-events: none;
+}
+
+.start-robot img,
+.start-robot svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.start-visor .ball {
+    fill: var(--teal-glow);
+}
+
+.start-robot .start-hand {
+    inset: auto;
+    height: auto;
+    transform: translate(-50%, -50%) rotate(var(--r));
+}
+
+.start-robot .start-hand-L {
+    left: calc(100% * 150 / 505);
+    top: calc(100% * 340 / 505);
+    width: calc(100% * 86 / 505);
+    --r: -8deg;
+}
+
+.start-robot .start-hand-R {
+    left: calc(100% * 400 / 505);
+    top: calc(100% * 196 / 505);
+    width: calc(100% * 83 / 505);
+    --r: 14deg;
+}
+
+/* The cards: three to a row, square cream panels with the player's
+   animal picture (the word picture's cutout); the new-player card shows
+   a plus. The picker uses the same grid. */
+.player-grid {
+    width: 100%;
+    max-width: 330px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+#player-cards {
+    margin-bottom: auto;
+}
+
+.player-picker {
+    width: 100%;
+    margin-bottom: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.player-picker[hidden],
+.player-grid[hidden],
+#picker-back-btn[hidden] {
+    display: none;
+}
+
+.player-card {
+    aspect-ratio: 1 / 1;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.player-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.player-card:active {
+    transform: scale(0.96);
+}
+
+.player-new svg {
+    width: 42%;
+    height: 42%;
+}
+
+.player-new svg .stroke {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+
+/* The theme screen's switch-player button: the player's picture on a
+   small icon button, top left (human, 2026-10-24). */
+.theme-top {
+    flex: 0 0 auto;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.player-btn img {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+}
+
 /* --- Theme screen --- */
 
 /* The theme cards centred between the logo and the stickers button,

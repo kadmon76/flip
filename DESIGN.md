@@ -212,12 +212,14 @@ dropped. The swipe, the round end's tada and the TV's tune-in hiss (B-214, made 
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
-Theme, stage map, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
+Start (who's playing; 2026-10-24), theme, stage map, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
 darkened 40% as backdrop, the same frame, cream panels with a brass
 border in CSS, the palette and fonts above, and icons instead of English
 labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
 theme's picture, not its name. These are placeholders; a design pass
 will replace them.
+
+Start screen (human, 2026-10-24): the game opens on it. The robot, still and waving, stacked from his puppet parts (not the old still poses), over a grid of square cream cards, three to a row: one per player on the device showing the animal picture the kid picked (a word picture's cutout), and a new-player card with a plus while there is room (6 players at most). A card is the start. The picker shows the pictures no player has taken; with no player yet it shows at once and has no back arrow. No names, no text. The theme screen has the player's picture on a small icon button, top left, back to the start screen to switch player.
 
 Conventions on these screens: numbers are Courier Prime split-flaps; "sticker" is an amber disc with a light star (dark = none); earned / unearned, mastered / missed and a theme's stages cleared / not cleared are lit / dark (stars, bulbs), never ticks, crosses or outlines. There is no level picker: how hard a round is comes from its theme's stage (PROGRESSION.md "Stages", B-215).
 
