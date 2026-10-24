@@ -86,6 +86,10 @@ Pose and movement change together; never more than one change per 300ms.
 | Kid idle 10s | thinks (squint, frown, fist at his chin), sinks, then every few seconds peeks over the edge with no hands showing, looking left and right, until the kid's next input | — | `idle`; each peek, as he comes up: `peek` (a whisper); both only while he is quiet | once per word, while the word is open (an answered word gets the dome nudge instead) |
 | Wake up (the kid's next input after the idle sink) | pops up, eyes wide | — | `wake` | after Kid idle |
 | Greet (a player tapped on the start screen; the theme screen comes up; 2026-10-24) | not drawn there yet: on the start screen he stands still, waving, built from his puppet parts; the moment's steps are his wave | — | `greet`; the tap is the one that unlocks the sound, so audio.js waits for a `greet` clip to decode (`waitReady`) instead of skipping it | each time a player starts |
+| Tutorial: round start (a player's first word ever, `state.tutorial`; 2026-10-24) | as Round start, before the picture locks | — | none (the drag line comes as the picture locks) | the tutorial word only |
+| Tutorial: drag (the picture has locked and the kid has placed no letter; coach.js `coachStep` 'drag'; instead of Picture shown) | points, eyes wide, while the ghost mitten carries a letter to the slot | — | `tutorial-drag` | the tutorial word only |
+| Tutorial: press (every slot full; instead of All slots filled) | points at the dome, eyes wide, while the ghost mitten taps it | swipe | `tutorial-press` | the tutorial word only |
+| Tutorial: done (the tutorial word checked correct; instead of Correct or 3 in a row) | as Correct | he says the word as on Correct, then a line of pool `tutorial-done`, else the word's gag, else `correct` | after the word: `tutorial-done`, else `gag`, else `correct` | once per player |
 | Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | `wrong`, else `mumble` | always |
 | Wrong check that leaves one bulb lit | ducks to his eyes (no hands), looks left and right, shivers, comes back | error clip | `mumble` | always |
 | Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | after the line before it: `hint`, then his letter's name (`letters/<letter>.mp3`, "Eigh!" … "Zee!"), or the name alone | always |
@@ -112,9 +116,9 @@ The word he says and his lines are his voice, so he talks with them
 (Talking, above), while the word the speaker plays is not. A moment that
 comes on its own (the picture, kid idle and his peeks, the dome nudge)
 says its line only while he is quiet: due while one of his clips plays,
-it is dropped, never cutting him. Pools not wired yet: `greet`,
-`murmur`, `reveal-close`, `sticker`, `stage`, `gear`, `boost-slow`
-(BACKLOG "Later / not now").
+it is dropped, never cutting him. Pools not wired yet: `murmur`,
+`reveal-close`, `sticker`, `stage`, `gear`, `boost-slow`, `key`,
+`theme-open` (BACKLOG "Later / not now").
 
 ## Rules
 - The target word is always spoken clean and complete; a quirk may

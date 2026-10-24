@@ -71,7 +71,9 @@ export function clean(parsed) {
         if (typeof p.id !== 'string' || !/^p\d+$/.test(p.id) || ids.has(p.id)) continue;
         if (!PICS.includes(p.pic)) continue;
         ids.add(p.id);
-        out.list.push({ id: p.id, pic: p.pic, name: cleanName(p.name) });
+        const player = { id: p.id, pic: p.pic, name: cleanName(p.name) };
+        if (p.tutored === true) player.tutored = true;   // saw the first word's tutorial
+        out.list.push(player);
     }
     out.current = ids.has(parsed.current) ? parsed.current : null;
     return out;
@@ -156,6 +158,17 @@ function adopt(id, saves) {
             // blocked storage: that save stays where it is
         }
     }
+}
+
+// Player `id` has seen the first word's tutorial (human, 2026-10-24; it
+// never comes back for them). Returns the players, or null for an unknown
+// id.
+export function markTutored(id) {
+    const players = load();
+    if (!players.list.some((p) => p.id === id)) return null;
+    const next = { ...players, list: players.list.map((p) => (p.id === id ? { ...p, tutored: true } : p)) };
+    save(next);
+    return next;
 }
 
 // Make player `id` current. Returns the players, or null for an unknown id.

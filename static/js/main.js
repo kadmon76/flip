@@ -38,7 +38,8 @@ import { stagesOf } from './stage.js';
 import { pickRound, makeWord, swapForStruggle } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
-import { load as loadPlayers, add as addPlayer, select as selectPlayer } from './players.js';
+import { load as loadPlayers, add as addPlayer, select as selectPlayer, markTutored } from './players.js';
+import { renderCoach, resetCoach } from './coach.js';
 // The save modules' keys, for the first player to take over the saves
 // made before players existed (players.js add); each key stays named only
 // in its own module.
@@ -176,6 +177,23 @@ function onPickBack() {
     setState({ picking: false });
 }
 
+// The first word's tutorial (coach.js; human, 2026-10-24): for a player
+// who has not seen it and has solved no word yet (a kid with progress
+// from before players knows the game), on the first word of their round.
+function needsTutorial() {
+    const me = (state.players || []).find((p) => p.id === state.player);
+    if (!me || me.tutored) return false;
+    return Object.values(state.progress || {}).every((t) => !t || !Array.isArray(t.solved) || t.solved.length === 0);
+}
+
+// The tutorial's word is answered (correct or revealed): it never comes
+// back for this player.
+function tutorialSeen() {
+    if (!state.tutorial) return;
+    const players = markTutored(state.player);
+    if (players) setState({ players: players.list });
+}
+
 // The theme screen's player button: back to the start screen, to switch.
 function onSwitchPlayer() {
     if (state.screen !== 'theme') return;
@@ -259,6 +277,7 @@ async function startRound({ name, dataUrl }, chosen = null) {
         screen: 'play',
         round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },
         current: makeWord(words[0], stage, newTileId),
+        tutorial: needsTutorial(),
         lives: LIVES,
         pressed: null,
         speaking: false,
@@ -352,9 +371,11 @@ function onCheck(extra = {}) {
         results[round.index].newSticker = clean && addSticker(state.theme, current.word);
         const gears = addGears(wordGears(results[round.index]));
         setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, gears, ...extra });
+        tutorialSeen();
         armNudge();
     } else if (lives - 1 <= 0) {
         setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
+        tutorialSeen();
         armNudge();
     } else {
         // The miss that leaves one bulb lit also gives one letter, on
@@ -416,6 +437,7 @@ function onNext(extra = {}) {
             progress: loadProgress(),
             gears: addGears(GEARS.round),
             screen: 'round-end',
+            tutorial: false,
             speaking: false,
             idleBeat: null,
             nudges: 0,
@@ -428,6 +450,7 @@ function onNext(extra = {}) {
             words,
             round: { ...round, index: nextIndex, results },
             current: makeWord(words[nextIndex], state.round.stage, newTileId),
+            tutorial: false,
             lives: LIVES,
             speaking: false,
             lastInput: performance.now(),
@@ -766,6 +789,7 @@ subscribe(renderFeedback);    // after the card render: keys off its DOM (and th
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
 subscribe(renderPicture);     // after the TV: the picture's life once it has locked (BACKLOG B-221), its win (B-222)
 subscribe(renderControls);
+subscribe(renderCoach);       // after the card and the controls: the ghost mitten finds the tiles, slots and dome
 subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
 subscribe(renderRoundEnd);
 subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter
@@ -821,6 +845,8 @@ loadThemes();
 // and the boost tray or its glowing slots follow (boosttray.js).
 window.addEventListener('resize', () => {
     renderCard(state);
+    resetCoach();
+    renderCoach(state);
     renderBoost(state, BOOST_TAPS);
 });
 

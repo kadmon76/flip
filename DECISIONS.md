@@ -1591,3 +1591,11 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - not now: renaming or removing a player (a "Later / not now" line).
 - tests: `PlayersTests.test_names_the_kid_types`; the players' and start view's expected shapes carry `name` and `naming`.
 - reversible: yes; a stored name is ignored by a version without names.
+
+## 2026-10-24 — A guided first word: the robot and a ghost mitten show a new player what to do (chat, no backlog id)
+- chose: a player's first word ever is a tutorial (`state.tutorial`, main.js `startRound`: the player has no `tutored` mark and has solved no word in the theme's progress, so a kid who played before players existed is not tutored again). coach.js shows a ghost mitten, the robot's pointing mitten image, with no words: it carries a letter from the bench to the first empty slot, on a loop, until the kid places one; once every slot is full it taps the dome. The robot says `tutorial-drag` as the picture locks (instead of his picture look), `tutorial-press` when the slots are full (instead of `press`), and on the correct check the word, then `tutorial-done` (instead of a gag). When the word is answered (correct or revealed) players.js `markTutored` notes it; the next word, and any later round, has no tutorial.
+- because: the human, 2026-10-24, chose "a guided first word" for the tutorial, so a 9-year-old with no English learns the drag and the dome by doing it, not by reading.
+- chose: the mitten is an existing puppet part, not a new drawn object, so no DESIGN.md exception; DESIGN.md notes it (before "Assets"). `tutorial-drag`, `tutorial-press` and `tutorial-done` leave BACKLOG "Later / not now" and `MomentLinesTests.UNWIRED`; CHARACTER.md's "not wired yet" list drops `greet` (wired in #97) and adds `key` and `theme-open`.
+- docs: CLAUDE.md (coach.js bullet; players.js `markTutored`), CHARACTER.md moment map (four tutorial rows), DESIGN.md (the tutorial note).
+- tests: new `TutorialTests` (4); the moment-table, sound, hand-pose and pool lists name the tutorial moments; `init` now fetches `correct-01` first (the pools follow the moment table's order, and `tutorialDone` names `correct` before `greet`).
+- reversible: yes; a stored `tutored` mark is ignored by a version without the tutorial.

@@ -15,6 +15,12 @@ export const state = {
     // The picture picked for a new player while the kid types their name
     // (the name step, human 2026-10-24), else null.
     naming: null,
+    // The word showing is the player's first word ever: coach.js shows the
+    // tutorial on it (its step is coach.js coachStep, from the word's
+    // state) and the robot says his tutorial lines (character.js). Set by
+    // main.js startRound for a player who has not seen it and has solved
+    // no word, cleared with the next word.
+    tutorial: false,
     themes: [],                 // [{ name, dataUrl, image, words: [{ word, image }], stages }] from themes.json and the data files; image is the first word's; stages: stage.js stagesOf(data), the stages the data has words in (BACKLOG B-217)
     // The theme being played: set when its card is tapped (its stage
     // screen, BACKLOG B-217) and kept through its rounds, their round end

@@ -1459,7 +1459,8 @@ class CharacterTests(TestCase):
             {**point, 'pop': 1}, {'at': 0.3, 'fx': 'wag'},
             {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]}])
         self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
-            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake', 'greet',
+            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
+            'tutorialWave', 'tutorialDrag', 'tutorialPress', 'tutorialDone', 'greet',
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
             'boostGiven', 'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
@@ -1568,7 +1569,8 @@ class CharacterTests(TestCase):
         sounds = self.run_node("out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.soundsFor([m])])));")
         self.assertEqual(sounds, {
             'roundStart': [], 'picture': [], 'blockPlaced': ['swipe'], 'blockReturned': [],
-            'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [], 'greet': [],
+            'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
+            'tutorialWave': [], 'tutorialDrag': [], 'tutorialPress': ['swipe'], 'tutorialDone': ['correct'], 'greet': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
             'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
@@ -1839,7 +1841,8 @@ class PuppetTests(TestCase):
         self.assertEqual(self.run_node(
             "out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.variantsOf(m).map((v) => v.steps[0].hands || null)])));"), {
             'roundStart': ['wave'], 'picture': ['gasp', 'giggle', 'shock'], 'blockPlaced': ['rest'], 'blockReturned': ['rest'],
-            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'], 'greet': ['wave'], 'wrong': ['shrug'],
+            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'],
+            'tutorialWave': ['wave'], 'tutorialDrag': ['point'], 'tutorialPress': ['point'], 'tutorialDone': ['pump2'], 'greet': ['wave'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
             'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
             'domeNudge': ['point']})
@@ -8040,7 +8043,7 @@ class StageMapTests(TestCase):
             "let arrive = null; globalThis.fetch = () => new Promise((r) => { arrive = () => r({ json: () => ({ cat: { stage: 1 } }) }); });"
             "const progressFor = () => ({ solved: [], cleared: [] }); const currentStage = () => 1; const missedWords = () => [];"
             "const pickRound = () => ['cat']; const makeWord = (w, stage) => ({ word: w.word, stage }); const newTileId = () => 't1';"
-            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const LIVES = 3;"
+            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const LIVES = 3; const needsTutorial = () => false;"
             + start +
             "const go = async (from, theme, leave, stage = 1) => {"
             " Object.assign(state, { screen: from, theme, startingRound: false, round: null });"
@@ -8273,7 +8276,7 @@ class GearsTests(TestCase):
         const { isBoosted } = await import('BOOST');
         const checkedWrong = (c) => ({ ...c, status: 'wrong' });
         const giveHint = (c) => c; const afterHint = (c) => c; const revealed = (c) => ({ ...c, status: 'revealed' });
-        const armNudge = () => {};
+        const armNudge = () => {}; const tutorialSeen = () => {};
         const word = (w, letters, lives, boosts = 0) => {
             state.lives = lives; state.round = { index: 0, size: 5, results: [] };
             state.current = { word: w, status: 'playing', boosts, placed: letters.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) };
@@ -9384,17 +9387,18 @@ class CorrectWordVoiceTests(TestCase):
             # the pools the moment table's lines name (B-223: correct,
             # streak; B-224: every moment's, PEEK's), not the word's own
             # clips (gag, hebrew)
-            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'greet', 'wrong', 'mumble', 'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
+            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'tutorial-drag', 'tutorial-press', 'tutorial-done', 'correct', 'greet', 'wrong', 'mumble', 'reveal-open', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
 
     def test_the_moment_table_says_the_word_on_a_correct_check(self):
         # character.js MOMENTS: correct and streak say the word, then the
         # first of their lines with a clip; the prototype clip stays as
-        # their sound; no other moment says the word
+        # their sound; so does the tutorial's correct check (tutorialDone,
+        # 2026-10-24); no other moment says the word
         self.assertEqual(self.run_node(
             "out([C.MOMENTS.correct.word, C.MOMENTS.correct.lines, C.MOMENTS.correct.sound,"
             " C.MOMENTS.streak.word, C.MOMENTS.streak.lines, C.MOMENTS.streak.sound,"
             " Object.keys(C.MOMENTS).filter((m) => C.MOMENTS[m].word)]);"),
-            [True, ['gag', 'correct'], 'correct', True, ['streak', 'gag', 'correct'], 'correct', ['correct', 'streak']])
+            [True, ['gag', 'correct'], 'correct', True, ['streak', 'gag', 'correct'], 'correct', ['tutorialDone', 'correct', 'streak']])
 
     def test_say_plan_order_and_fallbacks(self):
         res = self.run_node(
@@ -9442,9 +9446,9 @@ class CorrectWordVoiceTests(TestCase):
             "await ready(); const voice = fetched.filter((u) => u.startsWith('/static/voice/'));"
             "out([voice, decodes.filter((u) => u.startsWith('/static/voice/')), errors]);")
         self.assertEqual(res, [
-            ['/static/voice/manifest.json', '/static/voice/robot/greet-01.mp3', '/static/voice/robot/wrong-01.mp3',
-             '/static/voice/robot/correct-01.mp3', '/static/voice/robot/streak-01.mp3'],
-            ['/static/voice/robot/greet-01.mp3', '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/correct-01.mp3',
+            ['/static/voice/manifest.json', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/greet-01.mp3',
+             '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/streak-01.mp3'],
+            ['/static/voice/robot/correct-01.mp3', '/static/voice/robot/greet-01.mp3', '/static/voice/robot/wrong-01.mp3',
              '/static/voice/robot/streak-01.mp3'], []])
 
     def test_a_missing_or_broken_manifest_is_empty_with_no_error(self):
@@ -9480,7 +9484,7 @@ class CorrectWordVoiceTests(TestCase):
             "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
             " a.gagClips(listed, 'animals', 'cat'), listed.includes('words/animals/cat.mp3'), atCheck, played()]);")
-        self.assertEqual(res[:5], [156, 130, [0] * 22, [], True])
+        self.assertEqual(res[:5], [156, 130, [0] * 25, [], True])
         self.assertEqual(res[5:], [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/you have a spelling superpower.mp3']])
 
     # --- a new word ---
@@ -9729,12 +9733,11 @@ class MomentLinesTests(TestCase):
     ROBOT_LINES = ROOT / 'content' / 'voice' / 'robot-lines.json'
 
     # the pools the table names (B-223's correct and streak among them)
-    POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'greet', 'wrong', 'mumble',
-             'reveal-open', 'correct', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
+    POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'tutorial-drag',
+             'tutorial-press', 'tutorial-done', 'correct', 'greet', 'wrong', 'mumble', 'reveal-open', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
              'boost-first', 'boost-clean', 'peek']
     # BACKLOG B-224: the pools not wired here (each a "Later / not now" line)
-    UNWIRED = ['murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow',
-               'tutorial-drag', 'tutorial-press', 'tutorial-done', 'key', 'theme-open']
+    UNWIRED = ['murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow', 'key', 'theme-open']
 
     def setUp(self):
         if shutil.which('node') is None:
@@ -9834,7 +9837,8 @@ class MomentLinesTests(TestCase):
         # the prototype column is as it was (the tada is now an effect)
         self.assertEqual(res['sounds'], {
             'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
-            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
+            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'tutorialWave': None, 'tutorialDrag': None,
+            'tutorialPress': 'swipe', 'tutorialDone': 'correct', 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
             'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'speakerLocked': 'locked',
             'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
 
@@ -11243,3 +11247,77 @@ class PlayersTests(TestCase):
         self.assertEqual(naming, {'cards': [], 'plus': False, 'picker': False, 'pics': [], 'back': False, 'naming': 'dog'})
         # a picture already taken never gets a name step
         self.assertIsNone(taken)
+
+
+class TutorialTests(TestCase):
+    """The first word's tutorial (human, 2026-10-24): coach.js's step and
+    target (pure), the robot's tutorial moments (character.js), and the
+    player's tutorial seen (players.js markTutored). Through node."""
+
+    JS = Path(__file__).resolve().parent.parent / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const store = new Map(); globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null),"
+            " setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };"
+            f"const K = await import('{(self.JS / 'coach.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'players.js').as_uri()}');"
+            "const cur = (placed, status = 'playing', tray) => ({ word: 'cat', status, placed,"
+            " tray: tray || [{ id: 't1', letter: 't', used: false }, { id: 't2', letter: 'c', used: true }, { id: 't3', letter: 'a', used: false }] });"
+            "const C1 = { letter: 'c', tileId: 't2', locked: true };"
+            "const st = (current, more = {}) => ({ screen: 'play', tutorial: true, tuned: true, current, ...more });"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def test_the_step(self):
+        res = self.run_node(
+            "const A = { letter: 'a', tileId: 't3' }, T = { letter: 't', tileId: 't1' };"
+            "out([K.coachStep(st(cur([C1, null, null]))), K.coachStep(st(cur([C1, A, null]))), K.coachStep(st(cur([C1, A, T]))),"
+            " K.coachStep(st(cur([C1, A, T], 'wrong'))), K.coachStep(st(cur([C1, A, T], 'correct'))),"
+            " K.coachStep(st(cur([C1, null, null]), { tutorial: false })), K.coachStep(st(cur([C1, null, null]), { tuned: false })),"
+            " K.coachStep(st(cur([C1, null, null]), { screen: 'theme' })), K.coachStep(null)]);")
+        # drag until the kid places a letter (the given one does not
+        # count), nothing while slots are still empty, press when full,
+        # nothing after a check or without the tutorial
+        self.assertEqual(res, ['drag', None, 'press', None, None, None, None, None, None])
+
+    def test_the_drag_target(self):
+        res = self.run_node(
+            "out([K.dragTarget(cur([C1, null, null])), K.dragTarget(cur([C1, { letter: 'a', tileId: 't3' }, null])),"
+            " K.dragTarget(cur([C1, null, null], 'playing', [{ id: 'x', letter: 'q', used: false }, { id: 'y', letter: 'a', used: false, gone: true }])),"
+            " K.dragTarget(cur([C1, { letter: 'a', tileId: 't3' }, { letter: 't', tileId: 't1' }])), K.dragTarget(null)]);")
+        self.assertEqual(res, [{'index': 1, 'tileId': 't3'}, {'index': 2, 'tileId': 't1'}, {'index': 1, 'tileId': 'x'}, None, None])
+
+    def test_the_robot_on_the_tutorial_word(self):
+        res = self.run_node(
+            "const word = (s) => ({ ...s, roundsStarted: 1, round: { index: 0, size: 5, results: [] }, lives: 3, idleBeat: null,"
+            " lockedTaps: 0, nudges: 0, data: {} });"
+            "const snap = (s) => C.snapshot(word(s));"
+            "const start = snap(st(cur([C1, null, null]), { tuned: false }));"
+            "const tuned = snap(st(cur([C1, null, null])));"
+            "const full = snap(st(cur([C1, { letter: 'a', tileId: 't3' }, { letter: 't', tileId: 't1' }])));"
+            "const one = snap(st(cur([C1, { letter: 'a', tileId: 't3' }, null])));"
+            "const done = C.snapshot({ ...word(st(cur([C1, { letter: 'a', tileId: 't3' }, { letter: 't', tileId: 't1' }], 'correct'))),"
+            " round: { index: 0, size: 5, results: [{ correct: true }] } });"
+            "const plain = (s) => ({ ...s, tutorial: false, tutor: null });"
+            "out([C.momentsFor(C.NONE, start), C.momentsFor(start, tuned), C.momentsFor(C.NONE, tuned), C.momentsFor(one, full),"
+            " C.momentsFor(full, done), C.momentsFor(C.NONE, plain(start)), C.momentsFor(start, plain(tuned)), C.momentsFor(plain(full), plain(done)),"
+            " ['tutorialDrag', 'tutorialPress', 'tutorialDone'].map((m) => C.MOMENTS[m].lines), C.MOMENTS.tutorialWave.lines || null]);")
+        self.assertEqual(res, [
+            ['tutorialWave'], ['tutorialDrag'], ['tutorialDrag'], ['tutorialPress'], ['tutorialDone'],
+            ['roundStart'], ['picture'], ['correct'],
+            [['tutorial-drag'], ['tutorial-press'], ['tutorial-done', 'gag', 'correct']], None])
+
+    def test_seen_once_per_player(self):
+        res = self.run_node(
+            "P.add('fox', [], 'Noa'); P.add('cat');"
+            "out([P.markTutored('p1'), P.markTutored('p9'), P.load().list.map((p) => !!p.tutored)]);")
+        self.assertEqual(res[0]['list'][0], {'id': 'p1', 'pic': 'fox', 'name': 'Noa', 'tutored': True})
+        self.assertEqual(res[1:], [None, [True, False]])
