@@ -506,7 +506,7 @@ Line pools and what each moment wants: `content/voice/robot-lines.json` (`pools`
   - With the word's clip ready, nothing changes: the word, then the line as B-223 and B-224 built it.
   - The rule is in audio.js's pure part (`sayPlan` or `pickLine`), tested through `node` with stand-in manifests: a correct check with the word not ready never picks a gag (`correct`, `streak`, `tutorialDone`); with the word ready, the gag as today.
   - Screenshots: `correct-no-word.png` (a correct check with the word's clip held back, the scope mouth showing his shared line). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/102
 
 ### B-224 His shared lines on the moments, the Hebrew guess, the letter names
 - why: the robot's personality lives in his lines (CHARACTER.md, `claude/flip-robot-lines.md`); the prototype clips don't fit him (human, 2026-10-10).
