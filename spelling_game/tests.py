@@ -4844,7 +4844,8 @@ class MissedWordsTests(TestCase):
     the words a round missed per theme in localStorage `flip.missed.v1`
     (shape { "<theme>": ["horse", ...] }, the oldest miss first; read and
     written only there), and round.js pickRound brings up to two of them
-    back in the theme's next round, in random places; run through node
+    back in the theme's next round of their stage or a later one (human
+    2026-10-25), in random places; run through node
     with a fake localStorage and a seeded Math.random. The wiring in
     main.js (the pick at startRound, the record at the round end only) is
     checked in the source."""
@@ -4999,55 +5000,75 @@ class MissedWordsTests(TestCase):
                     f" JSON.stringify(R.pickWords(data, 5, {json.dumps(stage)}, ['cat', 'bird'], seeded(i + 1)))));")
                 self.assertEqual(same, [True] * 20, (stage, missed))
 
-    def test_the_two_oldest_missed_words_come_back_on_every_stage(self):
+    def test_the_two_oldest_missed_words_the_kid_has_reached_come_back(self):
+        # human 2026-10-25: a missed word comes back only on its own stage
+        # or a later one; a miss of a later stage waits for its stage
         data = self.content('animals')
         missed = ['tiger', 'rabbit', 'lion', 'wolf']
-        for stage in (1, 3, 5):
-            for words in self.rounds(data, stage, missed):
-                self.assertEqual(len(words), 5, stage)
-                self.assertEqual(len(set(words)), 5, stage)
-                self.assertLessEqual(set(words), set(data), stage)
-                self.assertLessEqual({'tiger', 'rabbit'}, set(words), stage)
-                # up to two come back: the newer misses of other stages
-                # (lion on 4, wolf on 5) wait for a later round
-                if stage != 5:
-                    self.assertEqual(set(words) & set(missed), {'tiger', 'rabbit'}, stage)
-        # since B-216 (PROGRESSION.md "Rounds") a newer miss of the round's
-        # own stage comes as one of the stage's words: stage 5 is tiger,
-        # rabbit (back), then its other words, mouse, bear and wolf
+        # stages 1 and 3: all four are later (lion 4, the others 5), so
+        # none comes back and the pick is the stage's own (pickWords)
+        for stage in (1, 3):
+            same = self.run_node(
+                f"const data = {json.dumps(data)};"
+                "out(Array.from({ length: 20 }, (_, i) => JSON.stringify(R.pickRound(data, 5, "
+                f"{stage}, {json.dumps(missed)}, [], seeded(i + 1))) ==="
+                f" JSON.stringify(R.pickWords(data, 5, {stage}, [], seeded(i + 1)))));")
+            self.assertEqual(same, [True] * 20, stage)
+        # stage 4: only lion is reached; it comes back, the other places
+        # are bird and horse (the stage), then fish and duck (stage 3)
+        for words in self.rounds(data, 4, missed):
+            self.assertEqual(len(set(words)), 5)
+            self.assertEqual(set(words), {'lion', 'bird', 'horse', 'fish', 'duck'})
+        # stage 5: all four are reached; up to two come back, the oldest
+        # (tiger, rabbit); since B-216 (PROGRESSION.md "Rounds") a newer
+        # miss of the round's own stage comes as one of the stage's words:
+        # tiger, rabbit (back), then its other words, mouse, bear and wolf
         for words in self.rounds(data, 5, missed):
             self.assertEqual(set(words), {'tiger', 'rabbit', 'mouse', 'bear', 'wolf'})
 
+    def test_a_missed_long_word_waits_for_the_long_stage(self):
+        # human 2026-10-25: helicopter and scooter (long) were missed, and
+        # came back in a stage 1 round of transportation. Now stage 1 is
+        # its own pick: bus, then car and truck, then two of stage 4
+        data = self.content('transportation')
+        stage4 = {'taxi', 'boat', 'plane', 'train'}
+        for words in self.rounds(data, 1, ['helicopter', 'scooter']):
+            self.assertLessEqual({'bus', 'car', 'truck'}, set(words))
+            self.assertEqual(len(set(words) & stage4), 2)
+            self.assertFalse(set(words) & {'helicopter', 'scooter'})
+        # on the long stage they come back, with three of the other long words
+        for words in self.rounds(data, 'long', ['helicopter', 'scooter']):
+            self.assertEqual(set(words), {'helicopter', 'scooter', 'bicycle', 'motorbike', 'submarine'})
+
     def test_one_missed_word_comes_back_and_the_others_follow_the_stage(self):
-        # animals stage 1 with horse (stage 4) missed: horse, then the
-        # stage's cat and dog, frog (stage 2) and one of fish and duck
+        # animals stage 4 with frog (stage 2) missed: frog, then the
+        # stage's bird, lion and horse, and one of fish and duck (stage 3)
         data = self.content('animals')
         seen = set()
-        for words in self.rounds(data, 1, ['horse']):
-            self.assertIn('horse', words)
-            self.assertLessEqual({'cat', 'dog', 'frog'}, set(words))
+        for words in self.rounds(data, 4, ['frog']):
+            self.assertIn('frog', words)
+            self.assertLessEqual({'bird', 'lion', 'horse'}, set(words))
             seen |= set(words)
-        self.assertEqual(seen, {'horse', 'cat', 'dog', 'frog', 'fish', 'duck'})
-        # transportation stage 1: two long words missed come back, and the
-        # other places are bus, then car and truck (stage 2 has none)
+        self.assertEqual(seen, {'frog', 'bird', 'lion', 'horse', 'fish', 'duck'})
+        # transportation stage 4 with bus (stage 1) missed: bus, then its
+        # four words
         data = self.content('transportation')
-        for words in self.rounds(data, 1, ['helicopter', 'submarine']):
-            self.assertEqual(set(words), {'helicopter', 'submarine', 'bus', 'car', 'truck'})
-        # stage 4: the other four places are its four words
-        for words in self.rounds(data, 4, ['helicopter']):
-            self.assertEqual(set(words), {'helicopter', 'taxi', 'boat', 'plane', 'train'})
+        for words in self.rounds(data, 4, ['bus']):
+            self.assertEqual(set(words), {'bus', 'taxi', 'boat', 'plane', 'train'})
 
     def test_missed_words_come_back_in_random_places(self):
         data = self.content('animals')
         for stage in (1, 4):
-            rounds = self.rounds(data, stage, ['tiger', 'rabbit'])
-            for word in ('tiger', 'rabbit'):
+            rounds = self.rounds(data, stage, ['cat', 'dog'])
+            for word in ('cat', 'dog'):
                 self.assertEqual({words.index(word) for words in rounds}, {0, 1, 2, 3, 4}, (stage, word))
 
     def test_words_the_theme_no_longer_has_are_skipped(self):
+        # unicorn and dragon are gone and cat comes once: the two back are
+        # cat and frog, so dog (stage 1) is not in a stage 5 round
         data = self.content('animals')
-        for words in self.rounds(data, 1, ['unicorn', 'tiger', 'tiger', 'dragon', 'lion', 'bear']):
-            self.assertEqual(set(words) & {'tiger', 'lion', 'bear'}, {'tiger', 'lion'})
+        for words in self.rounds(data, 5, ['unicorn', 'cat', 'cat', 'dragon', 'frog', 'dog']):
+            self.assertEqual(set(words) & {'cat', 'frog', 'dog'}, {'cat', 'frog'})
 
     def test_a_theme_with_every_word_missed_still_gets_a_full_round(self):
         data = {w: {'image': f'/{w}.svg'} for w in ('ant', 'bee', 'cow', 'pig', 'yak', 'emu')}
@@ -7014,7 +7035,8 @@ class ProgressTests(TestCase):
 class StageRoundTests(TestCase):
     """A round of a stage (BACKLOG B-216, PROGRESSION.md "Rounds"):
     round.js pickRound(data, size, stage, missed, solved) takes up to
-    MISSED_BACK missed words, then the stage's unsolved words, then its
+    MISSED_BACK missed words of the stage or an earlier one (human
+    2026-10-25), then the stage's unsolved words, then its
     solved words, then the earlier stages' words (the nearest first),
     then, only if still short, the later stages' (the nearest first); five
     words in random order. Run through node with a seeded Math.random, on
@@ -7108,16 +7130,21 @@ class StageRoundTests(TestCase):
         solved = ['elephant', 'kangaroo', 'giraffe']
         for words in self.rounds(data, 'long', solved=solved):
             self.assertEqual(set(words), set(self.FULL['long']) - set(solved))
-        # two missed words back: three places for stage 3, its three
-        # unsolved words first
-        for words in self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck']):
-            self.assertEqual(set(words), {'cat', 'mole', 'sheep', 'shark', 'moose'})
+        # two missed words back (cat, stage 1; frog, stage 2): three places
+        # for stage 3, its three unsolved words first
+        for words in self.rounds(data, 3, missed=['cat', 'frog'], solved=['fish', 'duck']):
+            self.assertEqual(set(words), {'cat', 'frog', 'sheep', 'shark', 'moose'})
         # four of five solved: the one unsolved, then two of the solved
-        rounds = self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck', 'sheep', 'shark'])
+        rounds = self.rounds(data, 3, missed=['cat', 'frog'], solved=['fish', 'duck', 'sheep', 'shark'])
         for words in rounds:
-            self.assertLessEqual({'cat', 'mole', 'moose'}, set(words))
+            self.assertLessEqual({'cat', 'frog', 'moose'}, set(words))
             self.assertEqual(len(set(words) & {'fish', 'duck', 'sheep', 'shark'}), 2)
-        self.assertEqual({w for words in rounds for w in words}, {'cat', 'mole', 'moose', 'fish', 'duck', 'sheep', 'shark'})
+        self.assertEqual({w for words in rounds for w in words}, {'cat', 'frog', 'moose', 'fish', 'duck', 'sheep', 'shark'})
+        # a miss of a later stage (mole, stage 4) waits for its stage: a
+        # stage 3 round brings back only cat
+        for words in self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck']):
+            self.assertIn('cat', words)
+            self.assertNotIn('mole', words)
 
     def test_the_earlier_stages_review_before_the_later_stages_fill(self):
         # a stage of two words: the nearest earlier stage fills the rest,

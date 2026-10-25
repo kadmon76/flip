@@ -68,12 +68,13 @@ export const MISSED_BACK = 2;
 // ones) from the theme's other words; a missed word after the first
 // MISSED_BACK takes its place there like any word of its stage. All in
 // random order. With no such missed word it is pickWords exactly. A `stage`
-// that is not a stage reads as stage 1, as in pickWords.
+// that is not a stage reads as stage 1, as in pickWords; a missed word
+// with no stage in the data comes back on every stage, as before.
 export function pickRound(data, size, stage, missed = [], solved = [], rand = Math.random) {
     const names = Object.keys(data);
     const list = Array.isArray(missed) ? missed : [];
     const at = isStage(stage) ? STAGES.indexOf(stage) : 0;
-    const reached = (w) => !!data[w] && isStage(data[w].stage) && STAGES.indexOf(data[w].stage) <= at;
+    const reached = (w) => !data[w] || !isStage(data[w].stage) || STAGES.indexOf(data[w].stage) <= at;
     const remembered = list.filter((w, i) => names.includes(w) && list.indexOf(w) === i && reached(w));
     const back = remembered.slice(0, Math.min(MISSED_BACK, size));
     if (!back.length) return pickWords(data, size, stage, solved, rand);
