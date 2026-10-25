@@ -180,7 +180,9 @@ export const FX = {
 //     effects: they play whatever his line is.
 //   - `word: true` (a correct check: correct, streak; B-223): the target
 //     word first, clean and complete, from the word's own clip, then,
-//     when it ends, his line.
+//     when it ends, his line. 'gag' plays only after the word: with the
+//     word's clip not ready at the check, the gag is skipped too and the
+//     next of the lines plays alone (B-225; audio.js sayPlan).
 //   - `letter` (B-224): after his line he says the name of the letter he
 //     just put in a slot (letterGiven: the snapshot field holding its
 //     slot), or the name alone with no line.
@@ -322,7 +324,7 @@ export const MOMENTS = {
     // (instead of the picture's look); once every slot is full, he points
     // at the dome (as filledEarly) and says to press it; on its correct
     // check he says the word and then his tutorial-done line (else the
-    // word's gag).
+    // word's gag, only after the word, B-225).
     // the tutorial word's round start: his wave, with no line, so his
     // drag line comes as the picture tunes in
     tutorialWave: {
