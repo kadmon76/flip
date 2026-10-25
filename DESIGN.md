@@ -31,6 +31,8 @@ Exception (BACKLOG B-219): the boost tray (a small brass plate over the bench, j
 
 Tutorial (human, 2026-10-24): on a player's first word a ghost mitten shows what to do, with no words: the robot's own pointing mitten (`ui/robot/hand-point.png`, a puppet part, not a new object) carries a letter from the bench to the first empty slot on a loop, and once every slot is full taps the check dome. It never takes taps; it goes as the kid does the step. Under reduced motion it stays still at the slot or the dome (at the slot, fading in and out).
 
+Exception (theme keys, human 2026-10-24): the brass key and the padlock (the key holder on the theme screen, the key a round earned on the round end, the padlock over a locked theme's card) are new scene objects drawn in code (inline SVG, lit from the upper left like the gear counter's cog) until the Claude Design pass replaces them.
+
 ## Assets (`static/images/ui/`)
 | File | What | Shown at (CSS px, 360 wide) |
 |---|---|---|
@@ -220,8 +222,10 @@ Start (who's playing; 2026-10-24), theme, stage map, round-end and sticker book 
 darkened 40% as backdrop, the same frame, cream panels with a brass
 border in CSS, the palette and fonts above, and icons instead of English
 labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the
-theme's picture, not its name. These are placeholders; a design pass
+theme's picture, not its name, two to a row. These are placeholders; a design pass
 will replace them.
+
+Theme keys (human, 2026-10-24): a locked theme's card shows its picture greyed and dimmed under a brass padlock. While the kid holds a key the locked cards glow amber and their padlocks rock now and then, and the key holder (a brass key and the count in split-flaps) shows top right, beside the player's name; a tap on a glowing card opens it: the padlock rises, swells, turns and fades away and the picture brightens (`unlock`), and the robot says his theme-open line. With no key a locked card does nothing. On the round end the key a round earned pops in right of the stage bulbs after the stars (`keyPop`), and the robot says his key line after his end line.
 
 Start screen (human, 2026-10-24): the game opens on it. The robot, still and waving, stacked from his puppet parts (not the old still poses), over a grid of square cream cards, three to a row: one per player on the device showing the animal picture the kid picked (a word picture's cutout), and a new-player card with a plus while there is room (6 players at most). A card is the start. The picker shows the pictures no player has taken; with no player yet it shows at once and has no back arrow. A picture picked opens the name step: the picture, a cream name field (Andika Bold 24px, centred, any language, optional, 12 characters at most), back and go (a check mark); go or the keyboard's enter adds the player and starts. Each card shows the player's name under the picture (cut with an ellipsis when long). The theme screen has the player's picture on a small icon button, top left, back to the start screen to switch player, and their name beside it in cream.
 

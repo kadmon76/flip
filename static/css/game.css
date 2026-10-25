@@ -42,6 +42,8 @@
     --teal-lo: color-mix(in srgb, var(--teal) 85%, #000);
     --teal-glow-hi: color-mix(in srgb, var(--teal-glow) 85%, #fff);   /* the robot's cap glow and sparks */
     --amber-hi: color-mix(in srgb, var(--amber) 85%, #fff);
+    --amber-glow: color-mix(in srgb, var(--amber) 55%, transparent);      /* a locked theme's glow while a key is held */
+    --amber-glow-hi: color-mix(in srgb, var(--amber) 70%, transparent);
     --amber-deep-lo: color-mix(in srgb, var(--amber-deep) 85%, #000);
     --bulb-off-hi: color-mix(in srgb, var(--bulb-off) 85%, #fff);
     --bulb-off-lo: color-mix(in srgb, var(--bulb-off) 85%, #000);
@@ -716,13 +718,16 @@ body[data-screen="play"] .play-back-btn {
 
 /* The theme cards centred between the logo and the stickers button,
    which sits at the bottom of the safe area. */
+/* Two to a row (human, 2026-10-24: with theme keys the kid must see
+   the locked themes beside the open ones; four stacked cards scrolled at
+   360x740). */
 #theme-buttons {
     margin: auto 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-items: center;
+    gap: 14px;
+    width: min(100%, 494px);
 }
 
 /* One cream card per theme showing the theme's picture (the first
@@ -739,6 +744,7 @@ body[data-screen="play"] .play-back-btn {
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    position: relative;
     width: min(240px, 100%, (100vh - 280px) / 2);
     aspect-ratio: 1 / 1;
     padding: 8px;
@@ -763,12 +769,12 @@ body[data-screen="play"] .play-back-btn {
 .theme-btn .stage-bulbs {
     flex: 0 0 auto;
     margin-top: 8px;
-    gap: 10px;
+    gap: 6px;
 }
 
 .theme-btn .stage-bulbs .bulb {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
 }
 
 .theme-btn:active {
@@ -2738,4 +2744,177 @@ body[data-screen="theme"] .header-gears {
     user-select: none;
     -webkit-user-drag: none;
     filter: drop-shadow(3px 6px 6px var(--shadow-contact));
+}
+
+/* --- Theme keys (keys.js, locks.js; human, 2026-10-24) --- */
+
+/* The key and the padlock, drawn in code as the gear counter's cog is
+   (interim scene objects, DESIGN "The layer model", its exception for
+   theme keys): brass lit from the upper left, a dark rim at the lower
+   right, a light one at the upper left, the face, the holes in the
+   bench's deep brown; the padlock's shackle in dark brass. */
+.key-icon,
+.padlock {
+    display: block;
+    flex: 0 0 auto;
+}
+
+.key-icon svg,
+.padlock svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    filter: drop-shadow(1px 2px 1.5px var(--shadow-contact));
+}
+
+.key-icon .key-lo,
+.padlock .key-lo {
+    fill: var(--brass-dark-lo);
+}
+
+.key-icon .key-hi,
+.padlock .key-hi {
+    fill: var(--brass-hi);
+}
+
+.key-icon .key-face,
+.padlock .key-face {
+    fill: var(--brass);
+}
+
+.key-icon .key-hole,
+.padlock .key-hole {
+    fill: var(--bench-deep);
+}
+
+.padlock .lock-shackle {
+    fill: none;
+    stroke: var(--brass-dark);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+}
+
+/* A locked theme's card: its picture and bulbs dimmed, a padlock over
+   the picture's middle. Open cards hide the padlock (celebrate.js shows
+   it for the moment it pops off). */
+.theme-btn .padlock {
+    position: absolute;
+    /* centred on the picture: 44% wide, its middle at 50% across and 42%
+       down the square card (no CSS translate: GSAP moves it as it pops
+       off, celebrate.js) */
+    left: 28%;
+    top: 20%;
+    width: 44%;
+    aspect-ratio: 1 / 1;
+    display: none;
+    pointer-events: none;
+}
+
+.theme-btn.is-locked .padlock {
+    display: block;
+}
+
+.theme-btn.is-locked img,
+.theme-btn.is-locked .stage-bulbs {
+    filter: grayscale(0.85) brightness(0.55);
+}
+
+.theme-btn.is-locked:not(.can-open) {
+    cursor: default;
+}
+
+.theme-btn.is-locked:not(.can-open):active {
+    transform: none;
+}
+
+/* A key is held: the locked cards glow amber and their padlocks rock,
+   so the kid sees a tap opens one. */
+.theme-btn.can-open {
+    box-shadow:
+        0 0 0 3px var(--amber),
+        0 0 18px 6px var(--amber-glow);
+    animation: key-glow 1.6s ease-in-out infinite;
+}
+
+.theme-btn.can-open .padlock svg {
+    animation: lock-rock 1.6s ease-in-out infinite;
+    transform-origin: 50% 20%;
+}
+
+@keyframes key-glow {
+    50% {
+        box-shadow:
+            0 0 0 3px var(--amber-hi),
+            0 0 26px 10px var(--amber-glow-hi);
+    }
+}
+
+@keyframes lock-rock {
+    0%, 60%, 100% { rotate: 0deg; }
+    70% { rotate: -10deg; }
+    80% { rotate: 8deg; }
+    90% { rotate: -4deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-btn.can-open,
+    .theme-btn.can-open .padlock svg {
+        animation: none;
+    }
+}
+
+/* The key holder, top right of the theme screen, beside the player:
+   a brass key and the keys held in split-flap digits; shown only while
+   a key can open something (locks.js). */
+.key-holder {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+    --flap-w: 20px;
+    --flap-h: 26px;
+    --flap-font: 20px;
+}
+
+.key-holder[hidden] {
+    display: none;
+}
+
+.key-holder .key-icon {
+    width: 40px;
+    height: 40px;
+}
+
+/* The round end: the key a round earned, right of the stage bulbs (the
+   bulbs stay centred); celebrate.js pops it in after the stars and the
+   bulb. */
+.round-stage-row {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    margin-top: -8px;
+}
+
+.round-stage-row .stage-bulbs {
+    margin-top: 0;
+}
+
+.round-key {
+    position: absolute;
+    left: 100%;
+    top: -9px;
+    width: 36px;
+    height: 36px;
+    margin-left: 12px;
+}
+
+.round-key[hidden] {
+    display: none;
+}
+
+.round-key .key-icon {
+    width: 100%;
+    height: 100%;
 }
