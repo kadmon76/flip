@@ -121,6 +121,10 @@ change.
 - All themes stay open. Buying a theme with gears waits until Food and
   Home are in the game.
 - Slow say waits for the robot's new voice clips.
+- Struggle help takes the nearest earlier stage's solved words first (each
+  stage's at random), keeps a next word that already is one, and swaps
+  fewer than 2 when fewer are solved; the swapped-in words play by the
+  round's stage rules.
 
 ## Open questions (for play-testing)
 - Are 5 words per stage and "every word solved once" the right bar?

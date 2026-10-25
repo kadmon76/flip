@@ -499,6 +499,15 @@ Line pools and what each moment wants: `content/voice/robot-lines.json` (`pools`
   - Screenshots: `correct-talking.png` (right after a correct check, the scope mouth showing his voice). Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/90
 
+### B-225 Apply #86 answer to B-223
+- why: a gag never plays without the word (the human, issue #86 B, 2026-10-23); CHARACTER.md "Rules": the target word is always spoken, a quirk may follow it, never replace it. Today, when the word's clip is not ready at a correct check, his line plays alone, and that line can be the word's gag.
+- acceptance:
+  - On a correct check (moments `correct`, `streak` and the tutorial's `tutorialDone`), when the word's clip is not ready, the word's gag is skipped too: his line is a ready clip of the first of the moment's other lines that has one (`tutorial-done`, `streak`, `correct`), else the prototype `correct` clip, as today. A gag never plays without the word (CHARACTER.md "Rules").
+  - With the word's clip ready, nothing changes: the word, then the line as B-223 and B-224 built it.
+  - The rule is in audio.js's pure part (`sayPlan` or `pickLine`), tested through `node` with stand-in manifests: a correct check with the word not ready never picks a gag (`correct`, `streak`, `tutorialDone`); with the word ready, the gag as today.
+  - Screenshots: `correct-no-word.png` (a correct check with the word's clip held back, the scope mouth showing his shared line). Checklist passes.
+- status:
+
 ### B-224 His shared lines on the moments, the Hebrew guess, the letter names
 - why: the robot's personality lives in his lines (CHARACTER.md, `claude/flip-robot-lines.md`); the prototype clips don't fit him (human, 2026-10-10).
 - acceptance:
