@@ -9448,7 +9448,8 @@ class CorrectWordVoiceTests(TestCase):
             # streak: a streak line, else the gag, else a correct line, else the prototype
             " a.sayPlan('streak', { word: W, gags: G, pools: P }, all, r9), a.sayPlan('streak', { word: W, gags: G, pools: { correct: ['c1'] } }, all, r0),"
             " a.sayPlan('streak', { word: W, gags: [], pools: { correct: ['c1'] } }, all, r0), a.sayPlan('streak', { word: W, gags: [], pools: {} }, all),"
-            # a clip not ready is skipped: the word, a gag, a whole group
+            # a clip not ready is skipped: the word (and with it the gags,
+            # B-225: a gag never plays without the word), a gag, a whole group
             " a.sayPlan('correct', { word: W, gags: G, pools: P }, not('w', 'g1'), r0), a.sayPlan('correct', { word: W, gags: G, pools: P }, not('g1', 'g2'), r0),"
             " a.sayPlan('streak', { word: W, gags: G, pools: P }, not('s1', 's2', 'g1', 'g2', 'c1', 'c2', 'c3', 'w')),"
             # a moment that does not say the word: no word, its own sound
@@ -9461,7 +9462,7 @@ class CorrectWordVoiceTests(TestCase):
             plan('w', None, 'correct'), plan(None, None, 'correct'),
             plan('w', 's2', None), plan('w', 'g1', None),
             plan('w', 'c1', None), plan('w', None, 'correct'),
-            plan(None, 'g2', None), plan('w', 'c1', None),
+            plan(None, 'c1', None), plan('w', 'c1', None),
             plan(None, None, 'correct'),
             plan(None, None, 'error'), plan(None, None, None)])
 
@@ -9627,10 +9628,11 @@ class CorrectWordVoiceTests(TestCase):
             [['streak'], ['correct']])
 
     def test_a_clip_not_ready_at_the_check_is_skipped_never_waited_for(self):
-        # the word still decoding: the line comes at once, and nothing
-        # starts when the word's decode ends later; the gag still
-        # decoding: the next choice (a correct line); a word that failed
-        # to download: skipped too
+        # the word still decoding: the line comes at once, never the gag
+        # (B-225: a gag never plays without the word, so a correct line),
+        # and nothing starts when the word's decode ends later; the gag
+        # still decoding: the next choice (a correct line); a word that
+        # failed to download: skipped too
         res = self.run_node(
             "MAN = man('gags/animals/cat.mp3', 'robot/correct-01.mp3'); await ready(); S.subscribe(a.renderSound);"
             "hold.add(CAT); await check(); const word = played(); await release(CAT); const later = played();"
@@ -9643,7 +9645,7 @@ class CorrectWordVoiceTests(TestCase):
             "S.setState(st({ roundsStarted: 3, current: { ...dog, status: 'correct' }, round: { index: 0, size: 5, results: [{ correct: true }] } }));"
             "await settle();"
             "out([word, later, gag, played()]);")
-        self.assertEqual(res, [['gags/animals/cat.mp3'], ['gags/animals/cat.mp3'],
+        self.assertEqual(res, [['robot/correct-01.mp3'], ['robot/correct-01.mp3'],
                                ['words/animals/cat.mp3', 'robot/correct-01.mp3'], ['robot/correct-01.mp3']])
 
     # --- nothing over the word; what cuts the line ---
@@ -9744,6 +9746,117 @@ class CorrectWordVoiceTests(TestCase):
         code = strip(self.MODULE.read_text())
         self.assertNotRegex(code, r"method\s*:")
         self.assertEqual(code.count('fetch('), 2)   # the clips' download and the manifest
+
+
+class GagNeedsTheWordTests(TestCase):
+    """BACKLOG B-225 (issue #86 B): a gag never plays without the word
+    (CHARACTER.md "Rules"). On a correct check (correct, streak, the
+    tutorial's tutorialDone), with the word's clip not ready, the word's gag
+    is skipped too: his line is a ready clip of the first of the moment's
+    other lines that has one (tutorial-done, streak, correct), else the
+    prototype correct clip. With the word ready, nothing changes. Run
+    through node with CorrectWordVoiceTests' stand-ins and stand-in
+    manifests."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    MODULE = ROOT / 'static' / 'js' / 'audio.js'
+    STATE = ROOT / 'static' / 'js' / 'state.js'
+    CHARACTER = ROOT / 'static' / 'js' / 'character.js'
+
+    MOMENTS = ['correct', 'streak', 'tutorialDone']
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_node(self, body):
+        return CorrectWordVoiceTests.run_node(self, body)
+
+    def test_say_plan_never_picks_a_gag_without_the_word(self):
+        # per moment and per set of pools, the line at four random draws:
+        # the word held back (not ready), the word with no clip at all, and
+        # the word ready
+        res = self.run_node(
+            "const W = 'w', G = ['g1', 'g2'];"
+            "const all = () => true; const notW = (u) => u !== 'w';"
+            "const rs = [0, 0.3, 0.6, 0.99].map((r) => () => r);"
+            "const POOLS = [{ correct: ['c1'], streak: ['s1'], 'tutorial-done': ['t1'] }, { correct: ['c1'] }, {}];"
+            "const lines = (m, clips, ready) => POOLS.map((pools) => rs.map((r) => a.sayPlan(m, { ...clips, pools }, ready, r).line));"
+            "const res = {};"
+            f"for (const m of {json.dumps(self.MOMENTS)}) res[m] = {{"
+            " held: lines(m, { word: W, gags: G }, notW), noClip: lines(m, { gags: G }, all), ready: lines(m, { word: W, gags: G }, all),"
+            " heldPlan: a.sayPlan(m, { word: W, gags: G, pools: {} }, notW, rs[0]),"
+            " readyPlan: a.sayPlan(m, { word: W, gags: G, pools: {} }, all, rs[0]),"
+            " gagHeld: a.sayPlan(m, { word: W, gags: G, pools: POOLS[1] }, (u) => !['g1', 'g2'].includes(u), rs[0]) };"
+            "out(res);")
+        gags = ['g1', 'g1', 'g2', 'g2']
+        first = {'correct': None, 'streak': 's1', 'tutorialDone': 't1'}
+        for m in self.MOMENTS:
+            r = res[m]
+            # not ready, or no clip: the first of its other lines with a
+            # ready clip (correct's first other line is pool correct), else
+            # nothing, and so the prototype correct clip
+            for case in ('held', 'noClip'):
+                self.assertEqual(r[case], [[first[m] or 'c1'] * 4, ['c1'] * 4, [None] * 4], (m, case))
+                self.assertFalse({'g1', 'g2'} & {x for row in r[case] for x in row}, (m, case))
+            self.assertEqual(r['heldPlan'], {'fx': None, 'word': None, 'line': None, 'sound': 'correct', 'letter': None}, m)
+            # ready: unchanged, the word, then its lines as B-223 and B-224
+            # built them (the gag where it comes first among the ready)
+            self.assertEqual(r['ready'], [[first[m]] * 4 if first[m] else gags, gags, gags], m)
+            self.assertEqual(r['readyPlan'], {'fx': None, 'word': 'w', 'line': 'g1', 'sound': None, 'letter': None}, m)
+            # the word ready, its gags not: the next line, as before
+            self.assertEqual(r['gagHeld'], {'fx': None, 'word': 'w', 'line': 'c1', 'sound': None, 'letter': None}, m)
+
+    def test_other_moments_keep_their_lines(self):
+        # the rule takes only 'gag' out, and only from a plan with no word:
+        # a moment that says no word keeps its own lines
+        res = self.run_node(
+            "const pools = { wrong: ['w1'], mumble: ['m1'], 'picture-giggle': ['pg'], hint: ['hi'] };"
+            "const all = () => true;"
+            "const plan = (m, how = {}) => a.sayPlan(m, { word: 'W', gags: ['g'], hebrew: ['he'], pools, letter: 'L' }, all, () => 0, how);"
+            "out([plan('wrong').line, plan('wrongPeek').line, plan('picture', { variant: 'giggle' }).line, plan('hintGiven').line,"
+            " a.pickLine(['gag', 'wrong'], { gags: ['g'], pools }, all)]);")
+        # (pickLine itself is unchanged: the rule is sayPlan's)
+        self.assertEqual(res, ['w1', 'm1', 'he', 'hi', 'g'])
+
+    def test_a_correct_check_with_the_word_held_back_never_says_a_gag(self):
+        # through renderSound, the word's clip held back (its decode not
+        # done at the check): correct, streak and tutorialDone each say the
+        # first of their other lines with a clip, else the prototype clip,
+        # and nothing more when the word's decode ends later; with the word
+        # ready, the word and then the gag, as B-223
+        manifests = [['gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'robot/correct-01.mp3'],
+                     ['gags/animals/cat.mp3', 'robot/correct-01.mp3', 'robot/streak-01.mp3', 'robot/tutorial-done-01.mp3'],
+                     ['gags/animals/cat.mp3']]
+        res = [self.run_node(
+            f"MAN = man(...{json.dumps(files)}); await ready(); S.subscribe(a.renderSound); Math.random = () => 0; let n = 0;"
+            "const say = async (kind, held) => {"
+            " S.setState({ screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } }); await settle();"
+            " hold.clear(); if (held) hold.add(CAT);"
+            " const o = { roundsStarted: ++n, ...(kind === 'tutorialDone' ? { tutorial: true } : {}) };"
+            " if (kind === 'streak') await checkStreak(o); else await check(o);"
+            " const atCheck = played();"
+            " if (held) await release(CAT); else await end('words/animals/cat.mp3');"
+            " return [atCheck, played(), kinds()]; };"
+            "const row = {};"
+            f"for (const m of {json.dumps(self.MOMENTS)}) row[m] = [await say(m, true), await say(m, false)];"
+            "out(row);") for files in manifests]
+        word, gag = 'words/animals/cat.mp3', 'gags/animals/cat.mp3'
+        said = lambda line: [[line], [line], ['v']]
+        after = lambda line: [[word], [word, line], ['v', 'v']]
+        # gags and a correct line: held, the correct line alone; ready, the
+        # word then the gag (streak and tutorialDone have no line of their
+        # own here)
+        self.assertEqual(res[0], {m: [said('robot/correct-01.mp3'), after(gag)] for m in self.MOMENTS})
+        # every pool: held, each moment's first other line; ready, the gag
+        # on correct, its own line first on streak and tutorialDone
+        self.assertEqual(res[1], {
+            'correct': [said('robot/correct-01.mp3'), after(gag)],
+            'streak': [said('robot/streak-01.mp3'), after('robot/streak-01.mp3')],
+            'tutorialDone': [said('robot/tutorial-done-01.mp3'), after('robot/tutorial-done-01.mp3')]})
+        # only a gag: held, the prototype correct clip alone; ready, the
+        # word then the gag
+        self.assertEqual(res[2], {m: [said('correct/bingo.mp3'), after(gag)] for m in self.MOMENTS})
 
 
 class MomentLinesTests(TestCase):

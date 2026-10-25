@@ -16,7 +16,9 @@
 //     pool), else the moment's prototype clip; after his letter lands, its
 //     name (`letters/`). On a correct check (the moments with
 //     MOMENTS[moment].word, B-223) he says the word himself first, from
-//     the word's `audio` decoded when the word started (sayPlan, speak).
+//     the word's `audio` decoded when the word started (sayPlan, speak);
+//     the word's gag only after it (B-225: with the word not ready, a
+//     shared line or the prototype clip plays alone).
 //     His idle peeks whisper too (peekLine, told by character.js);
 //   - the TV's tune-in hiss and channel click (BACKLOG B-214): made in
 //     code, no sound file (hiss), played when tv.js starts a tune-in.
@@ -247,6 +249,10 @@ export function pickLine(lines, clips = {}, ready = () => true, rand = Math.rand
 //   - word: on a moment that says the word (MOMENTS[moment].word, B-223),
 //     the word's clip when it is ready;
 //   - line: a ready clip of the first of its lines with one (pickLine);
+//     the word's gag only when the plan says the word: with the word's
+//     clip not ready (or none), the gag is skipped too and the next of
+//     its lines plays alone (B-225, CHARACTER "Rules": a gag never plays
+//     without the word);
 //   - sound: with no line, the moment's sound when it is his voice (the
 //     prototype clip), else null;
 //   - letter: on a moment with MOMENTS[moment].letter, the letter's name
@@ -258,7 +264,8 @@ export function sayPlan(moment, clips = {}, ready = () => true, rand = Math.rand
     const sound = spec.sound || null;
     const fx = sound && CHANNEL[sound] === 'fx' ? sound : null;
     const word = spec.word && clips.word && ready(clips.word) ? clips.word : null;
-    const line = pickLine(linesOf(moment, how), clips, ready, rand);
+    const lines = linesOf(moment, how).filter((name) => word || name !== 'gag');
+    const line = pickLine(lines, clips, ready, rand);
     const letter = spec.letter && clips.letter && ready(clips.letter) ? clips.letter : null;
     return { fx, word, line, sound: (line || fx) ? null : sound, letter };
 }

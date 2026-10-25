@@ -127,5 +127,12 @@ it is dropped, never cutting him. Pools not wired yet: `murmur`,
   follow it, never replace it.
 - One voice clip at a time; a new clip cuts the previous one, except the
   target word.
+  Never cut means by another clip: a speaker tap starts the word again
+  from the speaker, and leaving the word (next, round end, back) stops
+  the word he is saying and drops his line, as it stops the speaker's
+  word (B-223).
+- When the word's clip is not ready at a correct check, the word's gag
+  is skipped too; a shared line or the correct clip plays alone (a gag
+  never plays without the word).
 - He never covers the rail, the blocks or the console controls.
 - No English text from him on screen, ever.
