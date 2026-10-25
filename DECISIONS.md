@@ -1608,3 +1608,10 @@ Append-only. One entry per choice an agent made without asking (per ask-rule).
 - docs: CLAUDE.md (keys.js, locks.js bullets; players.js; celebrate.js; the product rule on themes; the DOM ids `theme-keys`, `round-key`), PROGRESSION.md (principles; "Build decisions": theme keys replace "all themes stay open"), DESIGN.md (theme keys; the exception; cards two to a row), CHARACTER.md (Key earned, Theme opened; `key` and `theme-open` leave "not wired yet"), BACKLOG "Later / not now" (their two lines removed).
 - tests: new `KeysTests` (7); the moment-table, sound, hand-pose and pool lists name `keyEarned` and `themeOpen`; the round literals carry `keyEarned`; the theme cards' bulbs and the onNext progress read.
 - reversible: yes; adding a theme to `START_OPEN` opens it for everyone.
+
+## 2026-10-25 — Missed words come back only on their stage or a later one (chat, no backlog id)
+- chose: round.js `pickRound` brings back up to `MISSED_BACK` (2) missed words only when the word's stage is the round's stage or an earlier one. A miss of a later stage stays on the missed list (missed.js keeps words a round did not play) and comes back once the kid plays its stage. A missed word whose data entry has no stage still comes back on every stage, as before.
+- because: playtest, 2026-10-25: the human's kid started Transportation on stage 1 and got helicopter and scooter (long) in the round, missed in an earlier round of that theme (likely from before stages); the human chose this fix over also dropping such words from the list.
+- docs: PROGRESSION.md ("Rounds", "Missed words return"), CLAUDE.md (round.js bullet), comments in round.js, main.js `startRound`, missed.js.
+- tests: `MissedWordsTests` and `StageRoundTests` updated to the new rule; new `test_a_missed_long_word_waits_for_the_long_stage`.
+- reversible: yes; nothing stored changes.

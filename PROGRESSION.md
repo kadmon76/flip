@@ -44,7 +44,9 @@ robot revealed does not count). The next stage then opens. A cleared
 stage stays cleared, even if more words are added to it later.
 
 **Rounds.** Rounds stay 5 words. A round of a stage takes, in this order:
-up to 2 of the theme's missed words (as today, `MISSED_BACK`); then the
+up to 2 of the theme's missed words (`MISSED_BACK`), only words of this
+stage or an earlier one (a miss of a later stage waits for its stage;
+human, 2026-10-25); then the
 stage's words not yet solved; then its solved words; then review words
 from the theme's earlier stages. Only while a theme's data is still
 partial (the voice batch has not landed), words from its next stages
@@ -54,7 +56,8 @@ fill the rest. The 5 are played in random order.
 one. A replay earns gears and stickers like any round.
 
 ## Repetition and stickers
-- **Missed words return** in the next rounds (unchanged, `missed.js`).
+- **Missed words return** in the next rounds of their stage or a later
+  one (`missed.js`; see "Rounds").
 - **Sticker on a clean spelling.** A word's sticker is earned the first
   time it is checked correct on the first check with no boost. A word
   solved after mistakes, the free hint or a boost still counts toward

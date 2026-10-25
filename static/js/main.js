@@ -272,7 +272,8 @@ async function startRound({ name, dataUrl }, chosen = null) {
     // stage 1 the first letter is given, on stages 3-5 extra letters lie
     // on the bench. The words (round.js pickRound, PROGRESSION.md
     // "Rounds"): up to two of the words this theme's earlier rounds
-    // missed come back, in random places (missed.js; BACKLOG B-208), then
+    // missed come back, in random places, if their stage is this one or
+    // an earlier one (missed.js; BACKLOG B-208; human 2026-10-25), then
     // the stage's words not yet solved (progress.js), its solved words,
     // the earlier stages' words, and only while places are left the later
     // stages'.
