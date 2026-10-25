@@ -1461,7 +1461,7 @@ class CharacterTests(TestCase):
         self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
             'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
             'tutorialWave', 'tutorialDrag', 'tutorialPress', 'tutorialDone', 'greet',
-            'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'speakerLocked', 'hintGiven',
+            'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'keyEarned', 'themeOpen', 'speakerLocked', 'hintGiven',
             'boostGiven', 'domeNudge'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
         # (B-224: a whisper of pool `peek`, only while he is quiet)
@@ -1573,7 +1573,7 @@ class CharacterTests(TestCase):
             'tutorialWave': [], 'tutorialDrag': [], 'tutorialPress': ['swipe'], 'tutorialDone': ['correct'], 'greet': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
-            'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
+            'keyEarned': [], 'themeOpen': [], 'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
@@ -1844,7 +1844,7 @@ class PuppetTests(TestCase):
             'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'],
             'tutorialWave': ['wave'], 'tutorialDrag': ['point'], 'tutorialPress': ['point'], 'tutorialDone': ['pump2'], 'greet': ['wave'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
-            'roundEnd': ['rest'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
+            'roundEnd': ['rest'], 'keyEarned': ['point'], 'themeOpen': ['gasp'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
             'domeNudge': ['point']})
 
     def test_the_hands_hide_before_they_sink_and_show_after_they_rise(self):
@@ -3115,7 +3115,7 @@ class PlayBackTests(TestCase):
         leave = self.function('leaveRound')
         self.assertLess(leave.index('stopWord();'), leave.index('setState({'))
         self.assertLess(leave.index('...patch,'), leave.index('data: null,'))
-        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false },',
+        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false, keyEarned: false },',
                      'current: { word: null,', 'speaking: false,', 'pressed: null,', 'idleBeat: null,'):
             self.assertIn(decl, leave, decl)
 
@@ -3234,7 +3234,7 @@ class StageTests(TestCase):
         state = (self.JS / 'state.js').read_text()
         self.assertNotRegex(state, r'\n    level:')
         self.assertNotRegex(state, r'\n    streak:')
-        self.assertIn('\n    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false },', state)
+        self.assertIn('\n    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },', state)
         # lockedTaps stays (the robot's head-shake; B-219 adds to it)
         self.assertRegex(state, r'\n    lockedTaps: 0,')
 
@@ -3302,14 +3302,14 @@ class StageTests(TestCase):
     def test_the_stage_is_fixed_for_the_round(self):
         start = self.main_function('startRound')
         self.assertIn("import { stagesOf } from './stage.js';", (self.JS / 'main.js').read_text())
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
         # nothing else writes a round's stage; leaving a round clears it
         main = self.code('main.js')
         self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },',
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },',
                       self.main_function('leaveRound'))
         for name in ('onCheck', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
@@ -3702,7 +3702,7 @@ class StageStartTests(TestCase):
         start = self.function('startRound')
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },', start)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },', start)
         nxt = self.function('onNext')
         self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', nxt)
 
@@ -4844,7 +4844,8 @@ class MissedWordsTests(TestCase):
     the words a round missed per theme in localStorage `flip.missed.v1`
     (shape { "<theme>": ["horse", ...] }, the oldest miss first; read and
     written only there), and round.js pickRound brings up to two of them
-    back in the theme's next round, in random places; run through node
+    back in the theme's next round of their stage or a later one (human
+    2026-10-25), in random places; run through node
     with a fake localStorage and a seeded Math.random. The wiring in
     main.js (the pick at startRound, the record at the round end only) is
     checked in the source."""
@@ -4999,55 +5000,75 @@ class MissedWordsTests(TestCase):
                     f" JSON.stringify(R.pickWords(data, 5, {json.dumps(stage)}, ['cat', 'bird'], seeded(i + 1)))));")
                 self.assertEqual(same, [True] * 20, (stage, missed))
 
-    def test_the_two_oldest_missed_words_come_back_on_every_stage(self):
+    def test_the_two_oldest_missed_words_the_kid_has_reached_come_back(self):
+        # human 2026-10-25: a missed word comes back only on its own stage
+        # or a later one; a miss of a later stage waits for its stage
         data = self.content('animals')
         missed = ['tiger', 'rabbit', 'lion', 'wolf']
-        for stage in (1, 3, 5):
-            for words in self.rounds(data, stage, missed):
-                self.assertEqual(len(words), 5, stage)
-                self.assertEqual(len(set(words)), 5, stage)
-                self.assertLessEqual(set(words), set(data), stage)
-                self.assertLessEqual({'tiger', 'rabbit'}, set(words), stage)
-                # up to two come back: the newer misses of other stages
-                # (lion on 4, wolf on 5) wait for a later round
-                if stage != 5:
-                    self.assertEqual(set(words) & set(missed), {'tiger', 'rabbit'}, stage)
-        # since B-216 (PROGRESSION.md "Rounds") a newer miss of the round's
-        # own stage comes as one of the stage's words: stage 5 is tiger,
-        # rabbit (back), then its other words, mouse, bear and wolf
+        # stages 1 and 3: all four are later (lion 4, the others 5), so
+        # none comes back and the pick is the stage's own (pickWords)
+        for stage in (1, 3):
+            same = self.run_node(
+                f"const data = {json.dumps(data)};"
+                "out(Array.from({ length: 20 }, (_, i) => JSON.stringify(R.pickRound(data, 5, "
+                f"{stage}, {json.dumps(missed)}, [], seeded(i + 1))) ==="
+                f" JSON.stringify(R.pickWords(data, 5, {stage}, [], seeded(i + 1)))));")
+            self.assertEqual(same, [True] * 20, stage)
+        # stage 4: only lion is reached; it comes back, the other places
+        # are bird and horse (the stage), then fish and duck (stage 3)
+        for words in self.rounds(data, 4, missed):
+            self.assertEqual(len(set(words)), 5)
+            self.assertEqual(set(words), {'lion', 'bird', 'horse', 'fish', 'duck'})
+        # stage 5: all four are reached; up to two come back, the oldest
+        # (tiger, rabbit); since B-216 (PROGRESSION.md "Rounds") a newer
+        # miss of the round's own stage comes as one of the stage's words:
+        # tiger, rabbit (back), then its other words, mouse, bear and wolf
         for words in self.rounds(data, 5, missed):
             self.assertEqual(set(words), {'tiger', 'rabbit', 'mouse', 'bear', 'wolf'})
 
+    def test_a_missed_long_word_waits_for_the_long_stage(self):
+        # human 2026-10-25: helicopter and scooter (long) were missed, and
+        # came back in a stage 1 round of transportation. Now stage 1 is
+        # its own pick: bus, then car and truck, then two of stage 4
+        data = self.content('transportation')
+        stage4 = {'taxi', 'boat', 'plane', 'train'}
+        for words in self.rounds(data, 1, ['helicopter', 'scooter']):
+            self.assertLessEqual({'bus', 'car', 'truck'}, set(words))
+            self.assertEqual(len(set(words) & stage4), 2)
+            self.assertFalse(set(words) & {'helicopter', 'scooter'})
+        # on the long stage they come back, with three of the other long words
+        for words in self.rounds(data, 'long', ['helicopter', 'scooter']):
+            self.assertEqual(set(words), {'helicopter', 'scooter', 'bicycle', 'motorbike', 'submarine'})
+
     def test_one_missed_word_comes_back_and_the_others_follow_the_stage(self):
-        # animals stage 1 with horse (stage 4) missed: horse, then the
-        # stage's cat and dog, frog (stage 2) and one of fish and duck
+        # animals stage 4 with frog (stage 2) missed: frog, then the
+        # stage's bird, lion and horse, and one of fish and duck (stage 3)
         data = self.content('animals')
         seen = set()
-        for words in self.rounds(data, 1, ['horse']):
-            self.assertIn('horse', words)
-            self.assertLessEqual({'cat', 'dog', 'frog'}, set(words))
+        for words in self.rounds(data, 4, ['frog']):
+            self.assertIn('frog', words)
+            self.assertLessEqual({'bird', 'lion', 'horse'}, set(words))
             seen |= set(words)
-        self.assertEqual(seen, {'horse', 'cat', 'dog', 'frog', 'fish', 'duck'})
-        # transportation stage 1: two long words missed come back, and the
-        # other places are bus, then car and truck (stage 2 has none)
+        self.assertEqual(seen, {'frog', 'bird', 'lion', 'horse', 'fish', 'duck'})
+        # transportation stage 4 with bus (stage 1) missed: bus, then its
+        # four words
         data = self.content('transportation')
-        for words in self.rounds(data, 1, ['helicopter', 'submarine']):
-            self.assertEqual(set(words), {'helicopter', 'submarine', 'bus', 'car', 'truck'})
-        # stage 4: the other four places are its four words
-        for words in self.rounds(data, 4, ['helicopter']):
-            self.assertEqual(set(words), {'helicopter', 'taxi', 'boat', 'plane', 'train'})
+        for words in self.rounds(data, 4, ['bus']):
+            self.assertEqual(set(words), {'bus', 'taxi', 'boat', 'plane', 'train'})
 
     def test_missed_words_come_back_in_random_places(self):
         data = self.content('animals')
         for stage in (1, 4):
-            rounds = self.rounds(data, stage, ['tiger', 'rabbit'])
-            for word in ('tiger', 'rabbit'):
+            rounds = self.rounds(data, stage, ['cat', 'dog'])
+            for word in ('cat', 'dog'):
                 self.assertEqual({words.index(word) for words in rounds}, {0, 1, 2, 3, 4}, (stage, word))
 
     def test_words_the_theme_no_longer_has_are_skipped(self):
+        # unicorn and dragon are gone and cat comes once: the two back are
+        # cat and frog, so dog (stage 1) is not in a stage 5 round
         data = self.content('animals')
-        for words in self.rounds(data, 1, ['unicorn', 'tiger', 'tiger', 'dragon', 'lion', 'bear']):
-            self.assertEqual(set(words) & {'tiger', 'lion', 'bear'}, {'tiger', 'lion'})
+        for words in self.rounds(data, 5, ['unicorn', 'cat', 'cat', 'dragon', 'frog', 'dog']):
+            self.assertEqual(set(words) & {'cat', 'frog', 'dog'}, {'cat', 'frog'})
 
     def test_a_theme_with_every_word_missed_still_gets_a_full_round(self):
         data = {w: {'image': f'/{w}.svg'} for w in ('ant', 'bee', 'cow', 'pig', 'yak', 'emu')}
@@ -7001,7 +7022,7 @@ class ProgressTests(TestCase):
         self.assertLess(nxt.index('recordMissed(state.theme, results);'), rec)
         self.assertLess(rec, nxt.index("screen: 'round-end'"))
         self.assertLess(rec, nxt.index('} else {', end))
-        self.assertIn('round: { ...round, results, cleared: progress.cleared, justCleared },', nxt)
+        self.assertIn('round: { ...round, results, cleared: progress.cleared, justCleared, keyEarned: keys.earned },', nxt)
         # a round left with the back button records nothing
         for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound', 'onPlayAgain'):
             self.assertNotIn('recordProgress', self.function(name), name)
@@ -7014,7 +7035,8 @@ class ProgressTests(TestCase):
 class StageRoundTests(TestCase):
     """A round of a stage (BACKLOG B-216, PROGRESSION.md "Rounds"):
     round.js pickRound(data, size, stage, missed, solved) takes up to
-    MISSED_BACK missed words, then the stage's unsolved words, then its
+    MISSED_BACK missed words of the stage or an earlier one (human
+    2026-10-25), then the stage's unsolved words, then its
     solved words, then the earlier stages' words (the nearest first),
     then, only if still short, the later stages' (the nearest first); five
     words in random order. Run through node with a seeded Math.random, on
@@ -7108,16 +7130,21 @@ class StageRoundTests(TestCase):
         solved = ['elephant', 'kangaroo', 'giraffe']
         for words in self.rounds(data, 'long', solved=solved):
             self.assertEqual(set(words), set(self.FULL['long']) - set(solved))
-        # two missed words back: three places for stage 3, its three
-        # unsolved words first
-        for words in self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck']):
-            self.assertEqual(set(words), {'cat', 'mole', 'sheep', 'shark', 'moose'})
+        # two missed words back (cat, stage 1; frog, stage 2): three places
+        # for stage 3, its three unsolved words first
+        for words in self.rounds(data, 3, missed=['cat', 'frog'], solved=['fish', 'duck']):
+            self.assertEqual(set(words), {'cat', 'frog', 'sheep', 'shark', 'moose'})
         # four of five solved: the one unsolved, then two of the solved
-        rounds = self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck', 'sheep', 'shark'])
+        rounds = self.rounds(data, 3, missed=['cat', 'frog'], solved=['fish', 'duck', 'sheep', 'shark'])
         for words in rounds:
-            self.assertLessEqual({'cat', 'mole', 'moose'}, set(words))
+            self.assertLessEqual({'cat', 'frog', 'moose'}, set(words))
             self.assertEqual(len(set(words) & {'fish', 'duck', 'sheep', 'shark'}), 2)
-        self.assertEqual({w for words in rounds for w in words}, {'cat', 'mole', 'moose', 'fish', 'duck', 'sheep', 'shark'})
+        self.assertEqual({w for words in rounds for w in words}, {'cat', 'frog', 'moose', 'fish', 'duck', 'sheep', 'shark'})
+        # a miss of a later stage (mole, stage 4) waits for its stage: a
+        # stage 3 round brings back only cat
+        for words in self.rounds(data, 3, missed=['cat', 'mole'], solved=['fish', 'duck']):
+            self.assertIn('cat', words)
+            self.assertNotIn('mole', words)
 
     def test_the_earlier_stages_review_before_the_later_stages_fill(self):
         # a stage of two words: the nearest earlier stage fills the rest,
@@ -7482,7 +7509,7 @@ class StruggleSwapTests(TestCase):
             "  const swapForStruggle = (...args) => R.swapForStruggle(...args);"
             "  const progressFor = (theme) => { asked.push(theme); return { solved, cleared: [1, 2] }; };"
             "  const stopWord = () => {}; const armIdle = () => {}; const recordMissed = () => {};"
-            "  const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const loadProgress = () => ({});"
+            "  const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const recordKeys = () => ({ ring: {}, earned: false }); const loadProgress = () => ({});"
             "  const addGears = () => 0; const GEARS = { round: 2 }; const LIVES = 3; const newTileId = () => 't';"
             "  const makeWord = (e, st) => ({ word: e.word, stage: st, status: 'playing' });"
             f"  {nxt}"
@@ -8023,8 +8050,11 @@ class StageMapTests(TestCase):
         self.assertIn('setState({ progress: loadProgress() });', main)
         self.assertLess(main.index('setState({ progress: loadProgress() });'), main.index('loadThemes();\n'))
         nxt = self.function('onNext')
-        self.assertLess(nxt.index('recordProgress('), nxt.index('progress: loadProgress(),'))
-        self.assertLess(nxt.index('progress: loadProgress(),'), nxt.index("screen: 'round-end',"))
+        # read again after the record (theme keys compare it with the
+        # progress before the round, human 2026-10-24) and kept in state
+        self.assertLess(nxt.index('recordProgress('), nxt.index('const all = loadProgress();'))
+        self.assertLess(nxt.index('const all = loadProgress();'), nxt.index('progress: all,'))
+        self.assertLess(nxt.index('progress: all,'), nxt.index("screen: 'round-end',"))
         # and when a player starts (startAs, the start screen, 2026-10-24)
         self.assertIn('progress: loadProgress(), gears: loadGears(),', self.function('startAs'))
         self.assertEqual(len(re.findall(r'\bprogress: ', main)), 3)
@@ -8100,7 +8130,7 @@ class StageMapTests(TestCase):
             " get lastElementChild() { return this.children[this.children.length - 1]; }, set innerHTML(v) { this.children = []; } }; return el; };"
             "const container = make('div');"
             "globalThis.document = { createElement: make }; const $ = () => container;"
-            "let builtThemes = null; const opened = []; const onTheme = (t) => opened.push(t.name);"
+            "let builtThemes = null; const opened = []; const onTheme = (t) => opened.push(t.name); const padlock = () => make('span');"
             + src +
             "const themes = [{ name: 'animals', image: '/cat.webp', stages: [1, 2, 3, 4, 5] }, { name: 'transportation', image: '/bus.webp', stages: [1, 3, 4, 'long'] }];"
             "const bulbs = () => container.children.map((c) => [c.children.map((k) => k.tag), c.lastElementChild.className,"
@@ -8111,7 +8141,8 @@ class StageMapTests(TestCase):
             "container.children[1].listeners.forEach((f) => f());"
             "out([fresh, later, kept, opened]);")
         fresh, later, kept, opened = res
-        self.assertEqual(fresh, [[['img', 'span'], 'stage-bulbs', 'true', '00000'], [['img', 'span'], 'stage-bulbs', 'true', '0000']])
+        # the picture, the padlock (shown while locked, theme keys) and the bulbs
+        self.assertEqual(fresh, [[['img', 'span', 'span'], 'stage-bulbs', 'true', '00000'], [['img', 'span', 'span'], 'stage-bulbs', 'true', '0000']])
         self.assertEqual([c[3] for c in later], ['11000', '1000'])
         self.assertTrue(kept)                                    # the cards are not rebuilt, the bulbs follow progress
         self.assertEqual(opened, ['transportation'])
@@ -8125,9 +8156,12 @@ class StageMapTests(TestCase):
         self.assertIn('flex: 1 1 0;', img)
         self.assertIn('min-height: 0;', img)
         self.assertIn('margin-top: 8px;', self.rule('.theme-btn .stage-bulbs'))
+        # 11px, 6px apart since the cards are two to a row (theme keys,
+        # human 2026-10-24): six bulbs (86px) fit a 155px card at 360 wide
         bulb = self.rule('.theme-btn .stage-bulbs .bulb')
-        self.assertIn('width: 14px;', bulb)
-        self.assertIn('height: 14px;', bulb)
+        self.assertIn('width: 11px;', bulb)
+        self.assertIn('height: 11px;', bulb)
+        self.assertIn('gap: 6px;', self.rule('.theme-btn .stage-bulbs'))
 
 
 class GearsTests(TestCase):
@@ -8322,7 +8356,7 @@ class GearsTests(TestCase):
             "const setState = (p) => Object.assign(state, p);"
             "const calls = []; let stored = 7;"
             "const addGears = (n) => { calls.push(n); stored += n; return stored; }; const { GEARS } = G;"
-            "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false });"
+            "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const recordKeys = () => ({ ring: {}, earned: false });"
             "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
             "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't'; const LIVES = 3;"
             "const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });"
@@ -9387,7 +9421,7 @@ class CorrectWordVoiceTests(TestCase):
             # the pools the moment table's lines name (B-223: correct,
             # streak; B-224: every moment's, PEEK's), not the word's own
             # clips (gag, hebrew)
-            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'tutorial-drag', 'tutorial-press', 'tutorial-done', 'correct', 'greet', 'wrong', 'mumble', 'reveal-open', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
+            ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'tutorial-drag', 'tutorial-press', 'tutorial-done', 'correct', 'greet', 'wrong', 'mumble', 'reveal-open', 'streak', 'end-mid', 'end-high', 'end-low', 'key', 'theme-open', 'no-gears', 'hint', 'boost-slot', 'boost-first', 'boost-clean', 'peek'], ['p', 'q']])
 
     def test_the_moment_table_says_the_word_on_a_correct_check(self):
         # character.js MOMENTS: correct and streak say the word, then the
@@ -9485,7 +9519,7 @@ class CorrectWordVoiceTests(TestCase):
             "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
             " a.gagClips(listed, 'animals', 'cat'), listed.includes('words/animals/cat.mp3'), atCheck, played()]);")
-        self.assertEqual(res[:5], [156, 130, [0] * 25, [], True])
+        self.assertEqual(res[:5], [156, 130, [0] * 27, [], True])
         self.assertEqual(res[5:], [['words/animals/cat.mp3'], ['words/animals/cat.mp3', 'correct/you have a spelling superpower.mp3']])
 
     # --- a new word ---
@@ -9847,10 +9881,10 @@ class MomentLinesTests(TestCase):
 
     # the pools the table names (B-223's correct and streak among them)
     POOLS = ['start', 'picture-surprise', 'picture-giggle', 'picture-shock', 'press', 'idle', 'wake', 'tutorial-drag',
-             'tutorial-press', 'tutorial-done', 'correct', 'greet', 'wrong', 'mumble', 'reveal-open', 'streak', 'end-mid', 'end-high', 'end-low', 'no-gears', 'hint', 'boost-slot',
+             'tutorial-press', 'tutorial-done', 'correct', 'greet', 'wrong', 'mumble', 'reveal-open', 'streak', 'end-mid', 'end-high', 'end-low', 'key', 'theme-open', 'no-gears', 'hint', 'boost-slot',
              'boost-first', 'boost-clean', 'peek']
     # BACKLOG B-224: the pools not wired here (each a "Later / not now" line)
-    UNWIRED = ['murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow', 'key', 'theme-open']
+    UNWIRED = ['murmur', 'reveal-close', 'sticker', 'stage', 'gear', 'boost-slow']
 
     def setUp(self):
         if shutil.which('node') is None:
@@ -9952,7 +9986,7 @@ class MomentLinesTests(TestCase):
             'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
             'filled': 'swipe', 'kidIdle': None, 'wake': None, 'tutorialWave': None, 'tutorialDrag': None,
             'tutorialPress': 'swipe', 'tutorialDone': 'correct', 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
-            'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'speakerLocked': 'locked',
+            'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'keyEarned': None, 'themeOpen': None, 'speakerLocked': 'locked',
             'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
 
     def test_the_pools_are_the_contents_and_the_unwired_ones_are_listed_later(self):
@@ -11434,3 +11468,141 @@ class TutorialTests(TestCase):
             "out([P.markTutored('p1'), P.markTutored('p9'), P.load().list.map((p) => !!p.tutored)]);")
         self.assertEqual(res[0]['list'][0], {'id': 'p1', 'pic': 'fox', 'name': 'Noa', 'tutored': True})
         self.assertEqual(res[1:], [None, [True, False]])
+
+
+class KeysTests(TestCase):
+    """Theme keys (human, 2026-10-24): keys.js's rules (pure) and store
+    (`flip.keys.v1`, per player), the robot's key moments (character.js),
+    and main.js's onTheme (a locked card opens with a key). Through node."""
+
+    JS = Path(__file__).resolve().parent.parent / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const store = new Map(); globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null),"
+            " setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };"
+            f"const K = await import('{(self.JS / 'keys.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'players.js').as_uri()}');"
+            "const NAMES = ['animals', 'transportation', 'food', 'home'];"
+            "const ring = (opened = [], bonus = 0, dry = 0) => ({ opened, bonus, dry });"
+            "const cleared = (...themes) => Object.fromEntries(themes.map((t) => [t, { solved: ['x'], cleared: [1] }]));"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def code(self, name):
+        return (self.JS / name).read_text()
+
+    def test_which_themes_are_open_and_the_keys_held(self):
+        res = self.run_node(
+            "out([K.START_OPEN, K.SAFETY_ROUNDS,"
+            " K.keysView(NAMES, ring(), {}),"
+            # animals' first stage cleared: one key, both other themes glow
+            " K.keysView(NAMES, ring(), cleared('animals')),"
+            # the key used on home
+            " K.keysView(NAMES, ring(['home']), cleared('animals')),"
+            # a theme played before keys (solved words) stays open, free
+            " K.keysView(NAMES, ring(), { transportation: { solved: ['bus'], cleared: [] } }),"
+            # a safety key; a replay's cleared stages earn no more
+            " K.held(ring([], 1), {}), K.earnedOf({ animals: { solved: [], cleared: [1, 2, 3] } }),"
+            " K.held(ring(['home', 'transportation']), cleared('animals'))]);")
+        self.assertEqual(res, [
+            ['animals', 'food'], 6,
+            {'locked': ['transportation', 'home'], 'held': 0, 'canOpen': False},
+            {'locked': ['transportation', 'home'], 'held': 1, 'canOpen': True},
+            {'locked': ['transportation'], 'held': 0, 'canOpen': False},
+            {'locked': ['home'], 'held': 0, 'canOpen': False},
+            1, 1, 0])
+
+    def test_a_key_opens_one_locked_theme(self):
+        res = self.run_node(
+            "const p = cleared('animals');"
+            "const a = K.opened(ring(), 'home', p);"
+            "out([a, K.opened(a, 'transportation', p), K.opened(ring(), 'animals', p), K.opened(ring(), 'home', {})]);")
+        self.assertEqual(res, [
+            {'opened': ['home'], 'bonus': 0, 'dry': 0},
+            {'opened': ['home'], 'bonus': 0, 'dry': 0},     # no key left
+            {'opened': [], 'bonus': 0, 'dry': 0},           # open already
+            {'opened': [], 'bonus': 0, 'dry': 0}])          # no key
+
+    def test_the_round_end_earns_a_key_or_the_safety_key(self):
+        res = self.run_node(
+            "const none = {}; const one = cleared('animals');"
+            "const steps = []; let r = ring();"
+            "for (let i = 0; i < 6; i++) { const o = K.afterRound(r, none, none, NAMES); r = o.ring; steps.push([o.earned, r.dry, r.bonus]); }"
+            "out([K.afterRound(ring([], 0, 3), none, one, NAMES),"
+            # every theme open: the key is kept quietly
+            " K.afterRound(ring(['home', 'transportation']), cleared('animals', 'food'), cleared('animals', 'food', 'home'), NAMES),"
+            # a key held and unused: no counting toward a safety key
+            " K.afterRound(ring([], 0, 4), one, one, NAMES),"
+            " steps]);")
+        self.assertEqual(res, [
+            {'ring': {'opened': [], 'bonus': 0, 'dry': 0}, 'earned': True},
+            {'ring': {'opened': ['home', 'transportation'], 'bonus': 0, 'dry': 0}, 'earned': False},
+            {'ring': {'opened': [], 'bonus': 0, 'dry': 0}, 'earned': False},
+            [[False, 1, 0], [False, 2, 0], [False, 3, 0], [False, 4, 0], [False, 5, 0], [True, 0, 1]]])
+
+    def test_kept_per_player_and_clean_on_read(self):
+        res = self.run_node(
+            "P.add('fox', [], 'Noa');"
+            "const opened = K.open('home', cleared('food'));"
+            "const keys = [...store.keys()].filter((k) => k.startsWith('flip.keys'));"
+            "const other = (P.add('cat'), K.load());"
+            "store.set('flip.keys.v1@p2', '{bad'); const bad = K.load();"
+            "store.set('flip.keys.v1@p2', JSON.stringify({ opened: ['home', 'home', 'food', 3, ''], bonus: -2, dry: 1.5 }));"
+            "out([opened, keys, other, bad, K.load()]);")
+        self.assertEqual(res, [
+            {'opened': ['home'], 'bonus': 0, 'dry': 0}, ['flip.keys.v1@p1'],
+            {'opened': [], 'bonus': 0, 'dry': 0}, {'opened': [], 'bonus': 0, 'dry': 0},
+            {'opened': ['home'], 'bonus': 0, 'dry': 0}])
+
+    def test_only_keys_js_names_the_key_and_it_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            text = path.read_text()
+            if path.name == 'keys.js':
+                self.assertIn("export const KEY = 'flip.keys.v1';", text)
+            else:
+                self.assertNotIn('flip.keys', text, path.name)
+        code = re.sub(r'//[^\n]*', '', self.code('keys.js'))   # comments aside
+        for word in ('document', 'window', 'state.', 'setState'):
+            self.assertNotIn(word, code, word)
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M), ["import { keyOf } from './players.js';"])
+
+    def test_the_robot_says_the_key_and_the_theme_opening(self):
+        res = self.run_node(
+            "const base = { roundsStarted: 1, current: { word: null }, round: { index: 4, size: 5, results: Array(5).fill({ correct: true }) },"
+            " lives: 3, idleBeat: null, lockedTaps: 0, nudges: 0, keys: ring() };"
+            "const snap = (s) => C.snapshot({ ...base, ...s });"
+            "const play = snap({ screen: 'play' });"
+            "const end = snap({ screen: 'round-end', round: { ...base.round, keyEarned: true } });"
+            "const plain = snap({ screen: 'round-end' });"
+            "const theme = snap({ screen: 'theme' }); const opened = snap({ screen: 'theme', keys: ring(['home']) });"
+            "const start = snap({ screen: 'start' });"
+            "out([C.momentsFor(play, end), C.momentsFor(play, plain), C.momentsFor(theme, opened), C.momentsFor(start, opened),"
+            " C.momentsFor(opened, opened), C.MOMENTS.keyEarned.lines, C.MOMENTS.themeOpen.lines]);")
+        self.assertEqual(res, [['roundEndGood', 'keyEarned'], ['roundEndGood'], ['themeOpen'], ['greet'], [],
+                               ['key'], ['theme-open']])
+
+    def test_main_opens_a_locked_theme_with_a_key(self):
+        main = self.code('main.js')
+        start = main.index('\nfunction onTheme(')
+        fn = main[start:main.index('\n}\n', start) + 2]
+        res = self.run_node(
+            "const state = { screen: 'theme', keys: ring(), progress: {} };"
+            "const setState = (p) => Object.assign(state, p);"
+            "const isOpen = K.isOpen; const keysHeld = K.held; const openTheme = K.open;"
+            + fn +
+            "onTheme({ name: 'home' }); const a = [state.screen, state.keys.opened];"
+            "state.progress = cleared('animals'); onTheme({ name: 'home' }); const b = [state.screen, state.keys.opened];"
+            "onTheme({ name: 'transportation' }); const c = [state.screen, state.keys.opened];"
+            "onTheme({ name: 'home' }); out([a, b, c, [state.screen, state.theme]]);")
+        self.assertEqual(res, [['theme', []], ['theme', ['home']], ['theme', ['home']], ['stages', 'home']])
+        nxt = main[main.index('\nfunction onNext('):]
+        self.assertLess(nxt.index('recordProgress('), nxt.index('recordKeys('))
+        self.assertIn('keys: keys.ring,', nxt)

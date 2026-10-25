@@ -40,6 +40,8 @@ import { wordsFor as missedWords, record as recordMissed } from './missed.js';
 import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
 import { load as loadPlayers, add as addPlayer, select as selectPlayer, markTutored } from './players.js';
 import { renderCoach, resetCoach } from './coach.js';
+import { load as loadKeys, open as openTheme, record as recordKeys, isOpen, held as keysHeld } from './keys.js';
+import { renderLocks, padlock } from './locks.js';
 // The save modules' keys, for the first player to take over the saves
 // made before players existed (players.js add); each key stays named only
 // in its own module.
@@ -104,6 +106,7 @@ function renderThemeButtons(state) {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'theme-btn panel';
+            btn.dataset.theme = theme.name;
             btn.setAttribute('aria-label', theme.name);
             if (theme.image) {
                 const img = document.createElement('img');
@@ -111,6 +114,8 @@ function renderThemeButtons(state) {
                 img.alt = '';
                 btn.appendChild(img);
             }
+            // shown while the theme is locked (locks.js, keys.js)
+            btn.appendChild(padlock());
             const row = document.createElement('span');
             row.className = 'stage-bulbs';
             row.setAttribute('aria-hidden', 'true');
@@ -133,7 +138,7 @@ function renderThemeButtons(state) {
 function startAs(players) {
     setState({
         screen: 'theme', players: players.list, player: players.current, picking: false, naming: null, theme: null,
-        progress: loadProgress(), gears: loadGears(),
+        progress: loadProgress(), gears: loadGears(), keys: loadKeys(),
     });
 }
 
@@ -204,9 +209,17 @@ const START = { onPlayer, onNew: onNewPlayer, onPick: onPickPic, onPickBack };
 
 // --- Stage screen (BACKLOG B-217, stagemap.js) ---
 
-// A theme card opens the theme's stage map; no round starts yet.
+// A theme card opens the theme's stage map; no round starts yet. A
+// locked theme's card (keys.js; human, 2026-10-24) opens the theme
+// instead while the kid holds a key: the key is used, the padlock pops
+// off (celebrate.js) and the robot says his theme-open line; the kid taps
+// again to play it. With no key, a locked card does nothing.
 function onTheme(theme) {
     if (state.screen !== 'theme') return;
+    if (!isOpen(theme.name, state.keys, state.progress)) {
+        if (keysHeld(state.keys, state.progress) > 0) setState({ keys: openTheme(theme.name, state.progress) });
+        return;
+    }
     setState({ screen: 'stages', theme: theme.name });
 }
 
@@ -259,7 +272,8 @@ async function startRound({ name, dataUrl }, chosen = null) {
     // stage 1 the first letter is given, on stages 3-5 extra letters lie
     // on the bench. The words (round.js pickRound, PROGRESSION.md
     // "Rounds"): up to two of the words this theme's earlier rounds
-    // missed come back, in random places (missed.js; BACKLOG B-208), then
+    // missed come back, in random places, if their stage is this one or
+    // an earlier one (missed.js; BACKLOG B-208; human 2026-10-25), then
     // the stage's words not yet solved (progress.js), its solved words,
     // the earlier stages' words, and only while places are left the later
     // stages'.
@@ -275,7 +289,7 @@ async function startRound({ name, dataUrl }, chosen = null) {
         data,
         words,
         screen: 'play',
-        round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false },
+        round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },
         current: makeWord(words[0], stage, newTileId),
         tutorial: needsTutorial(),
         lives: LIVES,
@@ -432,9 +446,14 @@ function onNext(extra = {}) {
     if (nextIndex >= round.size) {
         recordMissed(state.theme, results);
         const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);
+        // theme keys (keys.js; human, 2026-10-24): a first stage cleared,
+        // or the safety key after rounds with none
+        const all = loadProgress();
+        const keys = recordKeys(state.progress, all, (state.themes || []).map((t) => t.name));
         setState({
-            round: { ...round, results, cleared: progress.cleared, justCleared },
-            progress: loadProgress(),
+            round: { ...round, results, cleared: progress.cleared, justCleared, keyEarned: keys.earned },
+            progress: all,
+            keys: keys.ring,
             gears: addGears(GEARS.round),
             screen: 'round-end',
             tutorial: false,
@@ -709,7 +728,7 @@ function leaveRound(patch) {
         ...patch,
         data: null,
         words: [],
-        round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false },
+        round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,
@@ -792,6 +811,7 @@ subscribe(renderControls);
 subscribe(renderCoach);       // after the card and the controls: the ghost mitten finds the tiles, slots and dome
 subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
 subscribe(renderRoundEnd);
+subscribe(renderLocks);       // after the theme cards and the round-end render, before celebrate.js (it pops the round's key)
 subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter
 subscribe(renderGallery);
 subscribe((s) => renderStageMap(s, onStation));
@@ -837,6 +857,9 @@ setState({ players: loadPlayers().list });
 // The kid's progress per theme (progress.js, BACKLOG B-217), for the
 // theme cards' bulbs and the stage map.
 setState({ progress: loadProgress() });
+// The player's theme keys (keys.js; human, 2026-10-24), for the locked
+// theme cards and the key holder.
+setState({ keys: loadKeys() });
 // The kid's gears (gears.js, BACKLOG B-218), for the gear counters.
 setState({ gears: loadGears() });
 loadThemes();

@@ -431,6 +431,26 @@ export const MOMENTS = {
         lines: { by: 'stars', 2: ['end-mid'], 3: ['end-high'] },
     },
     roundEnd: { steps: [{ at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest' }], sound: 'tada', lines: ['end-low'] },
+    // Theme keys (human, 2026-10-24; keys.js): after his round-end line,
+    // the round brought a key; on the theme screen, a key opened a theme.
+    // He is not drawn on those screens yet, so only his voice shows them;
+    // the steps are for when he is.
+    keyEarned: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'wide', brows: 'up', hands: 'point', pop: 1 },
+            { at: 2, hands: 'rest', eyes: 'happy', brows: 'calm' },
+        ],
+        sound: null,
+        lines: ['key'],
+    },
+    themeOpen: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'wide', brows: 'up', hands: 'gasp', pop: 1 },
+            { at: 1.6, hands: 'rest', eyes: 'happy', brows: 'calm' },
+        ],
+        sound: null,
+        lines: ['theme-open'],
+    },
     speakerLocked: {
         steps: [
             { at: 0, sink: 0, eyes: 'idle', brows: 'frown', hands: 'shrug', shake: true },
@@ -790,6 +810,10 @@ export function snapshot(state) {
         tutorial: onWord && !!state.tutorial,
         tutor: onWord ? coachStep(state) : null,
         stars: screen === 'round-end' ? starsFor(results.filter((r) => r && r.correct).length, round.size) : null,
+        // theme keys (keys.js): the round brought a key (round end), and
+        // the themes opened with a key so far (one more: themeOpen)
+        keyEarned: screen === 'round-end' && !!round.keyEarned,
+        opened: state.keys && Array.isArray(state.keys.opened) ? state.keys.opened.length : 0,
     };
 }
 
@@ -802,9 +826,12 @@ export function snapshot(state) {
 export function momentsFor(prev, now) {
     // The start screen's player tap (main.js onPlayer): he greets the kid.
     if (now.screen === 'theme' && prev.screen === 'start') return ['greet'];
+    // a key opened a theme (main.js onTheme)
+    if (now.screen === 'theme' && prev.screen === 'theme' && now.opened > prev.opened) return ['themeOpen'];
     if (now.screen === 'round-end') {
         if (prev.screen === 'round-end') return [];
-        return [now.stars >= 2 ? 'roundEndGood' : 'roundEnd'];
+        const end = now.stars >= 2 ? 'roundEndGood' : 'roundEnd';
+        return now.keyEarned ? [end, 'keyEarned'] : [end];
     }
     if (!now.key) return [];
     // the tutorial's first word: his drag line in place of the round's
@@ -975,7 +1002,7 @@ export function nudgeWait(state) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
 
 // --- Render ---
 
