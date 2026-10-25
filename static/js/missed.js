@@ -1,5 +1,6 @@
 // missed.js — the words the kid missed, per theme (BACKLOG B-208), so the
-// next round of that theme brings them back (round.js pickRound).
+// next round of that theme brings them back (round.js pickRound), once the
+// round's stage is the word's stage or a later one (human 2026-10-25).
 // Persisted in localStorage `flip.missed.v1`, read and written only here,
 // as stickers.js owns the sticker book. No DOM and no module state: every
 // call reads the store, so a Django test runs this through node with a
