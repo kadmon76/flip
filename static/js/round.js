@@ -60,16 +60,21 @@ export const MISSED_BACK = 2;
 // The words of a round (BACKLOG B-208, B-216; PROGRESSION.md "Rounds"):
 // `missed` is the theme's missed words (missed.js wordsFor, the oldest
 // miss first), `solved` its solved words (progress.js). The round takes
-// the first MISSED_BACK missed words that are still in `data`, on every
-// stage, and fills the other places with pickWords (the stage's unsolved
-// words, its solved words, the earlier stages, then the later ones) from
-// the theme's other words; a missed word after the first MISSED_BACK
-// takes its place there like any word of its stage. All in random order.
-// With no missed word in `data` it is pickWords exactly.
+// the first MISSED_BACK missed words that are still in `data` and whose
+// stage is the round's stage or an earlier one (a missed word of a later
+// stage waits for its own stage, human 2026-10-25: helicopter came back
+// on stage 1), and fills the other places with pickWords (the stage's
+// unsolved words, its solved words, the earlier stages, then the later
+// ones) from the theme's other words; a missed word after the first
+// MISSED_BACK takes its place there like any word of its stage. All in
+// random order. With no such missed word it is pickWords exactly. A `stage`
+// that is not a stage reads as stage 1, as in pickWords.
 export function pickRound(data, size, stage, missed = [], solved = [], rand = Math.random) {
     const names = Object.keys(data);
     const list = Array.isArray(missed) ? missed : [];
-    const remembered = list.filter((w, i) => names.includes(w) && list.indexOf(w) === i);
+    const at = isStage(stage) ? STAGES.indexOf(stage) : 0;
+    const reached = (w) => !!data[w] && isStage(data[w].stage) && STAGES.indexOf(data[w].stage) <= at;
+    const remembered = list.filter((w, i) => names.includes(w) && list.indexOf(w) === i && reached(w));
     const back = remembered.slice(0, Math.min(MISSED_BACK, size));
     if (!back.length) return pickWords(data, size, stage, solved, rand);
     const rest = Object.fromEntries(names.filter((w) => !back.includes(w)).map((w) => [w, data[w]]));
