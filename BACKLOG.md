@@ -567,7 +567,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - The chances, the 4–7 s wait and the gap are pure (no DOM), passed a random function, and tested through `node`: each tier at fixed draws, the gap, the press line cancelled by a move, at most one press line per word.
   - Docs: CHARACTER.md's moment map (a column or a note per moment: always / sometimes / rare); CLAUDE.md's character.js and audio.js bullets where they say which moments speak.
   - Screenshots: `filled-quiet.png` (all slots filled, him pointing, the scope mouth off). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/106
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
