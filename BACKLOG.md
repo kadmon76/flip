@@ -550,6 +550,25 @@ Build order: life → win.
   - Screenshots, each mid-move: `win-cat-cheer.png`, `win-taxi-drive.png`, `win-dog-hop-spin.png`, `win-helicopter-zoom.png`, plus `win-reduced.png`. Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/90
 
+## M6 — A quieter robot, then the opening screen and login
+Decided by the human on 2026-10-26: the prototype is ready as a game; next come a quieter robot, an opening screen (the lab "power-on", tap to start) and login (a parent's Google sign-in, progress kept on the server). Only the first is itemised here; the opening screen and login get their items once their details are settled in chat.
+
+### B-226 A quieter robot: fewer lines, the "press it" line later and not every time
+- why: the robot talks too much; the "press the button" line plays every time the kid fills the last slot, and it should come only after a few seconds, with some randomness, and not every time (human, 2026-10-26).
+- acceptance:
+  - All slots filled, word not checked yet (`filledEarly`): his point at the dome and the dome's blink stay as today, with no line at that moment. His `press` line comes only if the kid has neither pressed the dome nor moved a block for a random 4–7 s, and then only with chance 1/3; at most once per word. A move or a press cancels it. Nothing of this in the tutorial word (`tutorialPress` stays as it is).
+  - The dome nudge after a correct word (`domeNudge`, B-212): his point keeps repeating as today, but only the first nudge of a word may say a `press` line, with chance 1/3; later nudges are silent.
+  - Three tiers of moments, each moment's tier and chance in one table in character.js, as starting values recorded in DECISIONS (the human will tune them):
+    - always: `correct`, `streak` (the word, then his line), `thirdMiss`, `hintGiven`, `boostGiven`, `speakerLocked`, the round end, `greet`, `keyEarned`, `themeOpen` and the tutorial moments.
+    - sometimes (chance 1/2): `roundStart`, `wrong`, `wrongPeek`, `wake`, and `picture`'s `picture-<variant>` line. A word's Hebrew guess, when it has one, always plays (those exist only where funny).
+    - rare: `kidIdle` (chance 1/3), his peeks' whisper (chance 1/4), the `press` lines above (1/3).
+  - A quiet gap: after any line of his ends, a "sometimes" or "rare" line is dropped for 8 s (`TALK_GAP`, in the same table). The "always" moments and the word itself are never dropped by it.
+  - A dropped line drops only the voice: the pose, the moves and the effect sounds (swipe, error, tada) play as today. A moment whose line is dropped plays no prototype clip in its place.
+  - The chances, the 4–7 s wait and the gap are pure (no DOM), passed a random function, and tested through `node`: each tier at fixed draws, the gap, the press line cancelled by a move, at most one press line per word.
+  - Docs: CHARACTER.md's moment map (a column or a note per moment: always / sometimes / rare); CLAUDE.md's character.js and audio.js bullets where they say which moments speak.
+  - Screenshots: `filled-quiet.png` (all slots filled, him pointing, the scope mouth off). Checklist passes.
+- status:
+
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
 - Picture peek and win frames: once the data carries `face` or `win_image` (the win-frame batch), the face peeks every 3–7s and the win swaps in the second frame, as the prototype's bat (B-221, B-222 leave them out).
