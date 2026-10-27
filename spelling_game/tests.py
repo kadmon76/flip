@@ -1458,8 +1458,10 @@ class CharacterTests(TestCase):
         self.assertEqual(steps('domeNudge'), [
             {**point, 'pop': 1}, {'at': 0.3, 'fx': 'wag'},
             {'at': 2, 'hands': 'rest', 'eyes': 'idle', 'brows': 'calm', 'head': 0, 'look': [0, 0]}])
+        # his press nudge (B-226): his point at the dome, as filledEarly's
+        self.assertEqual(steps('filledNudge'), [point])
         self.assertEqual(self.run_node("out(Object.keys(c.MOMENTS));"), [
-            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'kidIdle', 'wake',
+            'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'filledNudge', 'kidIdle', 'wake',
             'tutorialWave', 'tutorialDrag', 'tutorialPress', 'tutorialDone', 'greet',
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'keyEarned', 'themeOpen', 'speakerLocked', 'hintGiven',
             'boostGiven', 'domeNudge'])
@@ -1569,7 +1571,7 @@ class CharacterTests(TestCase):
         sounds = self.run_node("out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.soundsFor([m])])));")
         self.assertEqual(sounds, {
             'roundStart': [], 'picture': [], 'blockPlaced': ['swipe'], 'blockReturned': [],
-            'filledEarly': ['swipe'], 'filled': ['swipe'], 'kidIdle': [], 'wake': [],
+            'filledEarly': ['swipe'], 'filled': ['swipe'], 'filledNudge': [], 'kidIdle': [], 'wake': [],
             'tutorialWave': [], 'tutorialDrag': [], 'tutorialPress': ['swipe'], 'tutorialDone': ['correct'], 'greet': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
@@ -1841,7 +1843,7 @@ class PuppetTests(TestCase):
         self.assertEqual(self.run_node(
             "out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.variantsOf(m).map((v) => v.steps[0].hands || null)])));"), {
             'roundStart': ['wave'], 'picture': ['gasp', 'giggle', 'shock'], 'blockPlaced': ['rest'], 'blockReturned': ['rest'],
-            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'kidIdle': ['chin'], 'wake': ['rest'],
+            'filledEarly': ['point', 'point'], 'filled': ['rest'], 'filledNudge': ['point'], 'kidIdle': ['chin'], 'wake': ['rest'],
             'tutorialWave': ['wave'], 'tutorialDrag': ['point'], 'tutorialPress': ['point'], 'tutorialDone': ['pump2'], 'greet': ['wave'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
             'roundEnd': ['rest'], 'keyEarned': ['point'], 'themeOpen': ['gasp'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
@@ -2301,9 +2303,12 @@ class AudioTests(TestCase):
         # downloads and decodes finish, `ready()` is init + one gesture +
         # settle. `st(...)` builds a play-screen state on "cat" (round 1,
         # three lives) with overrides; `put(ids)` its placed slots.
+        # performance.now() stands still unless `clockOn(s)` moves it on (his
+        # quiet gap, B-226, counts on it).
         script = (
             "const log = []; const listeners = {}; const made = []; const fetched = []; const missing = new Set();"
             "const ctxs = []; const sources = [];"
+            "let NOW = 1000; performance.now = () => NOW; const clockOn = (sec = 60) => { NOW += sec * 1000; };"
             "globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.on = {}; made.push(this); }"
             " addEventListener(t, fn) { this.on[t] = fn; }"
             " play() { this.paused = false; log.push({ op: 'play', src: this.src }); return Promise.resolve(); }"
@@ -2461,11 +2466,12 @@ class AudioTests(TestCase):
         # renderSound (a state subscriber) plays MOMENTS[moment].sound for
         # each state change: swipe for a block into a slot (the last one
         # too), nothing for a block back to the bench or the lever, error
-        # on a wrong check and the reveal, correct on a correct check,
+        # on a wrong check (B-226: a "sometimes" moment, here at a draw
+        # under its chance) and the reveal, correct on a correct check,
         # tada once when the round-end screen shows; and nothing at all
         # while muted.
         steps = self.run_node(
-            "await ready(); S.subscribe(a.renderSound);"
+            "await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
             "const go = (o) => { clear(); S.setState(st(o)); return kinds(); };"
             "const cur = (ids, status = 'playing') => ({ current: { word: 'cat', status, placed: put(ids) } });"
             "const res = (n) => ({ round: { index: 4, size: 5, results: [0, 1, 2, 3, 4].map((i) => ({ correct: i < n })) } });"
@@ -2530,8 +2536,9 @@ class AudioTests(TestCase):
             "const go = (o) => { clear(); S.setState(st(o)); return played(); };"
             "out([go({ lockedTaps: 0 }), go({ lockedTaps: 1 }), go({ lockedTaps: 2 }), sounding(),"
             " go({ lockedTaps: 2 }), go({ lockedTaps: 3, muted: true }), go({ lockedTaps: 3, muted: false }),"
-            # after a wrong check (its error clip), a tap still says hmm no
-            " (go({ lockedTaps: 3, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 }), kinds()),"
+            # after a wrong check (its error clip: a draw under its chance,
+            # past the quiet gap, B-226), a tap still says hmm no
+            " (clockOn(), Math.random = () => 0, go({ lockedTaps: 3, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 }), kinds()),"
             " go({ lockedTaps: 4, current: { word: 'cat', status: 'wrong', placed: put(['t3', 't2', 't1']) }, lives: 2 })]);"),
             [[], ['error/hmm no.mp3'], ['error/hmm no.mp3'], ['error'], [], [], [], ['error'], ['error/hmm no.mp3']])
 
@@ -5716,7 +5723,7 @@ class NextDomeTests(TestCase):
     def test_main_counts_the_nudges_and_nothing_else_does(self):
         self.assertRegex((self.JS / 'state.js').read_text(), r'\n    nudges: 0,')
         main = self.code('main.js')
-        self.assertIn("import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';", main)
+        self.assertIn("import { renderRobot, renderTalk, idleWait, nudgeWait, pressWait, pressDue, wordKey, IDLE_MS } from './character.js';", main)
         arm = self.function('armNudge')
         self.assertIn('const word = wordKey(state);', arm)
         self.assertIn('if (wordKey(state) !== word || nudgeWait(state) === null) return;', arm)
@@ -9317,9 +9324,12 @@ class CorrectWordVoiceTests(TestCase):
         # animals' "cat" (its clip /static/voice/words/animals/cat.mp3),
         # `correct(o)` the same word checked correct (first of the round),
         # `streak(o)` the third correct word in a row ("cat" again).
+        # performance.now() stands still unless `clockOn(s)` moves it on (his
+        # quiet gap, B-226, counts on it).
         script = (
             "const log = []; const listeners = {}; const made = []; const fetched = []; const missing = new Set();"
             "const ctxs = []; const sources = []; const decodes = []; const hold = new Set(); const held = {};"
+            "let NOW = 1000; performance.now = () => NOW; const clockOn = (sec = 60) => { NOW += sec * 1000; };"
             "let MAN; const NOJSON = {}; const errors = []; console.error = (...x) => errors.push(x.join(' '));"
             "globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.on = {}; made.push(this); }"
             " addEventListener(t, fn) { this.on[t] = fn; }"
@@ -9895,9 +9905,11 @@ class MomentLinesTests(TestCase):
     # 100); `P('ca-')` placed slots (tile t<i>), `W(cur, o)` a play-screen
     # state on "cat" (`cur` merged into its word), `ends(n)` a finished
     # round with n words right; `hush()` silences everything (a mute and
-    # unmute); `go(from, to)` the files started by the change from `from`
-    # to `to`, with nothing playing before it; `lineMan(...)` a manifest
-    # listing one clip of every pool the table names, plus `extra`.
+    # unmute) and lets a minute pass (past his quiet gap, B-226);
+    # `go(from, to)` the files started by the change from `from` to `to`,
+    # with nothing playing before it and a minute since he last spoke;
+    # `lineMan(...)` a manifest listing one clip of every pool the table
+    # names, plus `extra`.
     def run_node(self, body):
         prelude = (
             f"const POOLS = {json.dumps(self.POOLS)};"
@@ -9913,7 +9925,7 @@ class MomentLinesTests(TestCase):
             "const END = (n) => ({ ...W(), screen: 'round-end', round: ends(n) });"
             "const STAGES = { screen: 'stages', current: { word: null, placed: [] } };"
             "const lineMan = (...extra) => man(...POOLS.map((p) => `robot/${p}-01.mp3`), ...extra);"
-            "const hush = async () => { S.setState({ muted: true }); await settle(); S.setState({ muted: false }); await settle(); };"
+            "const hush = async () => { S.setState({ muted: true }); await settle(); S.setState({ muted: false }); await settle(); clockOn(); };"
             "const go = async (from, to) => { await hush(); S.setState(from); await settle(); await hush(); clear();"
             " S.setState(to); await settle(); return played(); };"
             # the second miss on "cat": his letter "a" in slot 1
@@ -9933,6 +9945,7 @@ class MomentLinesTests(TestCase):
             " roundStart: [STAGES, W({}, { tuned: false })],"
             " picture: [W({}, { tuned: false }), W({}, { tuned: true })],"
             " filledEarly: [W({ placed: P('ca-') }), W({ placed: P('cat') })],"
+            " filledNudge: [W({ placed: P('cat') }, { filledNudged: false }), W({ placed: P('cat') }, { filledNudged: true })],"
             " domeNudge: [W({ status: 'correct', placed: P('cat') }, { round: DONE }), W({ status: 'correct', placed: P('cat') }, { round: DONE, nudges: 1 })],"
             " kidIdle: [W(), W({}, { idleBeat: 'sunk' })],"
             " wake: [W({}, { idleBeat: 'sunk' }), W({}, { idleBeat: 'over' })],"
@@ -9954,7 +9967,7 @@ class MomentLinesTests(TestCase):
             "const L = C.linesOf;"
             "out({ roundStart: L('roundStart'), surprise: L('picture', { variant: 'surprise' }),"
             " giggle: L('picture', { variant: 'giggle' }), shock: L('picture', { variant: 'shock' }), firstLook: L('picture'),"
-            " filledEarly: L('filledEarly'), domeNudge: L('domeNudge'), kidIdle: L('kidIdle'), peek: C.PEEK.lines, wake: L('wake'),"
+            " filledEarly: L('filledEarly'), filledNudge: L('filledNudge'), domeNudge: L('domeNudge'), kidIdle: L('kidIdle'), peek: C.PEEK.lines, wake: L('wake'),"
             " wrong: L('wrong'), wrongPeek: L('wrongPeek'), hintGiven: L('hintGiven'), thirdMiss: L('thirdMiss'),"
             " stars: [0, 1, 2, 3].map((n) => L(n >= 2 ? 'roundEndGood' : 'roundEnd', { stars: n })),"
             " speakerLocked: L('speakerLocked'),"
@@ -9968,7 +9981,9 @@ class MomentLinesTests(TestCase):
         for v in ('surprise', 'giggle', 'shock'):
             self.assertEqual(res[v], ['hebrew', f'picture-{v}'])
         self.assertEqual(res['firstLook'], ['hebrew', 'picture-surprise'])
-        self.assertEqual([res['filledEarly'], res['domeNudge']], [['press'], ['press']])
+        # B-226: no line as the last slot fills; his press line comes with
+        # the press nudge (and the dome nudge), if at all (CHATTER)
+        self.assertEqual([res['filledEarly'], res['filledNudge'], res['domeNudge']], [[], ['press'], ['press']])
         self.assertEqual([res['kidIdle'], res['peek'], res['wake']], [['idle'], ['peek'], ['wake']])
         self.assertEqual([res['wrong'], res['wrongPeek']], [['wrong', 'mumble'], ['mumble']])
         self.assertEqual([res['hintGiven'], res['thirdMiss']], [['hint'], ['reveal-open']])
@@ -9978,13 +9993,13 @@ class MomentLinesTests(TestCase):
         self.assertEqual([res['correct'], res['streak']], [['gag', 'correct'], ['streak', 'gag', 'correct']])
         self.assertEqual(res['none'], [[], [], [], []])
         # the moments that come on their own; the letter's slot field
-        self.assertEqual(res['ifQuiet'], ['picture', 'kidIdle', 'domeNudge'])
+        self.assertEqual(res['ifQuiet'], ['picture', 'filledNudge', 'kidIdle', 'domeNudge'])
         self.assertTrue(res['peekQuiet'])
         self.assertEqual(res['letter'], [['hintGiven', 'hint'], ['boostGiven', 'boost']])
         # the prototype column is as it was (the tada is now an effect)
         self.assertEqual(res['sounds'], {
             'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
-            'filled': 'swipe', 'kidIdle': None, 'wake': None, 'tutorialWave': None, 'tutorialDrag': None,
+            'filled': 'swipe', 'filledNudge': None, 'kidIdle': None, 'wake': None, 'tutorialWave': None, 'tutorialDrag': None,
             'tutorialPress': 'swipe', 'tutorialDone': 'correct', 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
             'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'keyEarned': None, 'themeOpen': None, 'speakerLocked': 'locked',
             'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
@@ -10035,7 +10050,7 @@ class MomentLinesTests(TestCase):
             "out({"
             " pictureHe: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }), picture: plan('picture', {}, { variant: 'giggle' }),"
             " pictureNone: plan('picture', {}, { variant: 'shock' }), pictureNotReady: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }, not('he')),"
-            " filledEarly: plan('filledEarly', {}), filledNone: plan('filledEarly', { pools: {} }),"
+            " filledEarly: plan('filledEarly', {}), filledNone: plan('filledEarly', { pools: {} }), filledNudge: plan('filledNudge', {}),"
             " wrong: plan('wrong', {}), wrongMumble: plan('wrong', {}, {}, not('w')), wrongNone: plan('wrong', { pools: {} }),"
             " hint: plan('hintGiven', { letter: 'L' }), hintAlone: plan('hintGiven', { letter: 'L', pools: {} }),"
             " hintNoLetter: plan('hintGiven', { letter: 'L' }, {}, not('L')),"
@@ -10056,9 +10071,11 @@ class MomentLinesTests(TestCase):
         self.assertEqual(res['picture'], p(line='pg'))
         self.assertEqual(res['pictureNone'], p())
         self.assertEqual(res['pictureNotReady'], p(line='pg'))
-        # the swipe is an effect: it plays with his line, or alone
-        self.assertEqual(res['filledEarly'], p(fx='swipe', line='pr'))
+        # the swipe is an effect: it plays alone (B-226: no line as the
+        # last slot fills; his press line is the press nudge's)
+        self.assertEqual(res['filledEarly'], p(fx='swipe'))
         self.assertEqual(res['filledNone'], p(fx='swipe'))
+        self.assertEqual(res['filledNudge'], p(line='pr'))
         # wrong, else mumble, else the prototype clip
         self.assertEqual([res['wrong'], res['wrongMumble'], res['wrongNone']], [p(line='w'), p(line='m'), p(sound='error')])
         # his letter: its name after his line, or alone; not ready: none
@@ -10121,7 +10138,9 @@ class MomentLinesTests(TestCase):
         line = lambda pool: [[f'robot/{pool}-01.mp3'], ['v']]
         expect = {
             'roundStart': line('start'), 'picture': line(f'picture-{look}'),
-            'filledEarly': [['swipe/swipe1.mp3', 'robot/press-01.mp3'], ['o', 'v']],
+            # B-226: the swipe alone as the last slot fills; his press
+            # line with the press nudge
+            'filledEarly': [['swipe/swipe1.mp3'], ['o']], 'filledNudge': line('press'),
             'domeNudge': line('press'), 'kidIdle': line('idle'), 'wake': line('wake'), 'wrong': line('wrong'),
             'secondMiss': line('mumble'), 'thirdMiss': line('reveal-open'),
             'end3': [['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v']],
@@ -10152,7 +10171,7 @@ class MomentLinesTests(TestCase):
         res, miss, boost = res
         err = [['error/actually that is cleverly wrong.mp3'], ['v']]
         self.assertEqual(res, {
-            'roundStart': [[], []], 'picture': [[], []], 'filledEarly': [['swipe/swipe1.mp3'], ['o']],
+            'roundStart': [[], []], 'picture': [[], []], 'filledEarly': [['swipe/swipe1.mp3'], ['o']], 'filledNudge': [[], []],
             'domeNudge': [[], []], 'kidIdle': [[], []], 'wake': [[], []], 'wrong': err, 'secondMiss': err, 'thirdMiss': err,
             'end3': [['celebration/tada.mp3'], ['o']], 'end2': [['celebration/tada.mp3'], ['o']],
             'end1': [['celebration/tada.mp3'], ['o']], 'end0': [['celebration/tada.mp3'], ['o']],
@@ -10171,7 +10190,7 @@ class MomentLinesTests(TestCase):
     def test_the_picture_says_the_hebrew_guess_else_the_line_of_his_look(self):
         res = self.run_node(
             "MAN = lineMan('hebrew/animals/cat.mp3', 'hebrew/animals/dog.mp3'); await ready(); S.subscribe(a.renderSound);"
-            "const he = await go(...T.picture);"
+            "Math.random = () => 0; const he = await go(...T.picture);"
             "const dog = (o = {}) => st({ current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing',"
             " placed: P('---') }, round: { index: 1, size: 5, results: [{ correct: true }] }, ...o });"
             "const dogHe = await go(dog({ tuned: false }), dog());"
@@ -10192,7 +10211,7 @@ class MomentLinesTests(TestCase):
         # a word without a guess: the line of his look, which is the look
         # the robot shows (character.js renderRobot picks it the same way)
         res = self.run_node(
-            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); const out1 = await go(...T.picture);"
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0; const out1 = await go(...T.picture);"
             "out([out1, look()]);")
         self.assertEqual(res[0], [f'robot/picture-{res[1]}-01.mp3'])
         robot = re.sub(r'/\*.*?\*/|//[^\n]*', '', self.CHARACTER.read_text(), flags=re.S)
@@ -10201,8 +10220,9 @@ class MomentLinesTests(TestCase):
     def test_his_letter_s_name_after_his_line_or_alone(self):
         res = self.run_node(
             "MAN = lineMan('letters/a.mp3', 'letters/c.mp3', 'letters/t.mp3'); await ready(); S.subscribe(a.renderSound);"
-            # the second miss: mumble, then his hint line, then the letter
-            "await go(...MISS2); const s1 = played(); await end('robot/mumble-01.mp3'); const s2 = [...played(), when('robot/hint-01.mp3')];"
+            # the second miss: mumble (a draw under its chance, B-226), then
+            # his hint line, then the letter
+            "Math.random = () => 0; await go(...MISS2); const s1 = played(); await end('robot/mumble-01.mp3'); const s2 = [...played(), when('robot/hint-01.mp3')];"
             "await end('robot/hint-01.mp3'); const s3 = [played(), kinds(), on()]; await end('letters/a.mp3'); const s4 = on();"
             "const boost = {}; for (const k of ['remember', 'first', 'cleanup']) {"
             " const first = await go(...BOOST[k]); const at = when(first[0]);"
@@ -10249,19 +10269,24 @@ class MomentLinesTests(TestCase):
 
     def test_a_moment_that_comes_on_its_own_never_cuts_him(self):
         # the dome nudge while he says the word and his gag: dropped (the
-        # gag plays on, whole); when he is quiet, it plays. The picture
-        # while his round-start line plays, kid idle while his wrong line
-        # plays: dropped. A moment from the kid's action (his head-shake)
-        # cuts the line playing, as any voice clip does.
+        # gag plays on, whole); a later nudge is silent anyway (B-226: only
+        # a word's first nudge may speak). On the next word, with him quiet
+        # (past the quiet gap, a draw under its chance), its first nudge
+        # plays; a re-render does not start it again. The picture while his
+        # round-start line plays, kid idle while his wrong line plays:
+        # dropped. A moment from the kid's action that always speaks (his
+        # head-shake) cuts the line playing, as any voice clip did.
         res = self.run_node(
             "MAN = lineMan('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
             "const done = (n) => correct({ nudges: n });"
             "await check(); S.setState(done(1)); await settle(); const overWord = [played(), on()];"
             "await end('words/animals/cat.mp3'); S.setState(done(2)); await settle();"
             "const overGag = [played(), on(), log.filter((e) => e.op === 'stop' && short(e.src).startsWith('gags/')).length];"
-            "await end('gags/animals/cat.mp3'); S.setState(done(3)); await settle(); const quiet = on();"
-            "S.setState(done(4)); await settle(); const overPress = on();"
-            "S.setState({ ...done(4), lockedTaps: 1 }); await settle(); const cut = on();"
+            "await end('gags/animals/cat.mp3');"
+            "const next = (n, o = {}) => correct({ nudges: n, round: { index: 1, size: 5, results: [{ correct: true }, { correct: true }] }, ...o });"
+            "const quiet = (await go(next(0), next(1)), on());"
+            "S.setState(next(1)); await settle(); const overPress = on();"
+            "S.setState(next(1, { lockedTaps: 1 })); await settle(); const cut = on();"
             "await hush(); S.setState(STAGES); await settle(); clear(); S.setState(W({}, { roundsStarted: 2, tuned: false })); await settle();"
             "S.setState(W({}, { roundsStarted: 2 })); await settle(); const picture = [played(), on()];"
             "await go(...T.wrong); S.setState(W({ status: 'wrong', placed: P('tac') }, { lives: 2, idleBeat: 'sunk' })); await settle();"
@@ -10279,8 +10304,11 @@ class MomentLinesTests(TestCase):
     def test_one_clip_at_a_time_never_over_the_word_and_nothing_muted(self):
         res = self.run_node(
             "MAN = lineMan('letters/a.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
-            # one at a time: the wrong line cuts the press line
-            "await go(...T.filledEarly); S.setState(W({ status: 'wrong', placed: P('cat') }, { lives: 2 })); await settle();"
+            # one at a time: his head-shake's line (always, B-226) cuts the
+            # press line; a wrong line (sometimes) over it was dropped
+            "await go(...T.filledNudge); const wrongly = W({ status: 'wrong', placed: P('cat') }, { lives: 2, filledNudged: true });"
+            "S.setState(wrongly); await settle(); const over = [on(), log.filter((e) => e.op === 'stop').length];"
+            "S.setState({ ...wrongly, lockedTaps: 1 }); await settle();"
             "const one = [on(), log.filter((e) => e.op === 'stop').map((e) => short(e.src))];"
             # the speaker's word playing: no line of his starts, of any moment
             "const res = [];"
@@ -10291,10 +10319,10 @@ class MomentLinesTests(TestCase):
             "const muted = [];"
             "for (const [k, [from, to]] of Object.entries(T)) { await hush(); S.setState({ ...from, muted: true }); await settle(); clear();"
             " S.setState({ ...to, muted: true }); await settle(); muted.push(played().length); }"
-            "out([one, res, muted]);")
-        one, speaking, muted = res
-        # (the swipe, an effect, plays on)
-        self.assertEqual(one, [['swipe/swipe1.mp3', 'robot/wrong-01.mp3'], ['robot/press-01.mp3']])
+            "out([over, one, res, muted]);")
+        over, one, speaking, muted = res
+        self.assertEqual(over, [['robot/press-01.mp3'], 0])
+        self.assertEqual(one, [['robot/no-gears-01.mp3'], ['robot/press-01.mp3']])
         self.assertEqual(speaking, [[], [], [], []])
         self.assertEqual(set(muted), {0})
 
@@ -10338,7 +10366,7 @@ class MomentLinesTests(TestCase):
     def test_his_peeks_whisper_only_while_he_is_quiet(self):
         res = self.run_node(
             "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
-            "await go(...T.kidIdle); await end('robot/idle-01.mp3'); clear();"
+            "await go(...T.kidIdle); await end('robot/idle-01.mp3'); clockOn(); clear();"
             "a.peekLine(); const first = [played(), kinds()]; a.peekLine(); const again = [played(), on()];"
             "await end('robot/peek-01.mp3'); await go(...T.wrong); clear(); a.peekLine(); const overWrong = [played(), on()];"
             "await hush(); S.setState({ muted: true }); clear(); a.peekLine(); const muted = played(); S.setState({ muted: false });"
@@ -10349,8 +10377,8 @@ class MomentLinesTests(TestCase):
                                [[], ['robot/wrong-01.mp3']], [], [], []])
         # no peek clip listed: nothing
         self.assertEqual(self.run_node(
-            "MAN = man('robot/idle-01.mp3'); await ready(); S.subscribe(a.renderSound); await go(...T.kidIdle);"
-            "await end('robot/idle-01.mp3'); clear(); a.peekLine(); out(played());"), [])
+            "MAN = man('robot/idle-01.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0; await go(...T.kidIdle);"
+            "await end('robot/idle-01.mp3'); clockOn(); clear(); a.peekLine(); out(played());"), [])
 
     def test_the_wiring(self):
         strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
@@ -10360,7 +10388,7 @@ class MomentLinesTests(TestCase):
         self.assertIn('subscribe((s) => renderRobot(s, peekLine));', main)
         self.assertNotIn('subscribe(renderRobot);', main)
         audio = strip(self.MODULE.read_text())
-        self.assertIn("import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf } from './character.js';", audio)
+        self.assertIn("import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf, chatterOf, saysLine } from './character.js';", audio)
         # leaving the word stops his voice (no say flag any more)
         render = audio[audio.index('export function renderSound('):]
         self.assertIn('stopVoice();\n        loadWord(state);', render)
@@ -10369,6 +10397,412 @@ class MomentLinesTests(TestCase):
         character = strip(self.CHARACTER.read_text())
         for word in ('setState', 'AudioContext', 'new Audio', "from './audio.js'"):
             self.assertNotIn(word, character)
+
+
+class QuietRobotTests(TestCase):
+    """BACKLOG B-226: a quieter robot. character.js's CHATTER table gives
+    each moment with a line its tier (always, sometimes, rare) and the
+    chance its line is said, and the quiet gap (TALK_GAP, 8s: after a clip
+    of his voice went quiet, ended or cut, a sometimes or rare line is
+    dropped; so is one due while he talks); saysLine decides, at a draw of
+    a random function. All slots filled on a filledEarly word: his point
+    at the dome, no line; his press line comes only with his press nudge
+    (filledNudge), when the kid has neither pressed the dome nor moved a
+    block for a random 4-7s (pressWait, pressDue, main.js's press timer),
+    at chance 1/3, at most once per word, never on the tutorial word. The
+    dome nudge: only a word's first may speak, at 1/3. A dropped line drops
+    only his voice: no prototype clip in its place; the effects and his
+    pose as ever. Through node: character.js and drag.js alone, audio.js
+    with MomentLinesTests' stand-ins, and the render with
+    PuppetRenderTests' stand-ins."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CHARACTER = JS / 'character.js'
+    DRAG = JS / 'drag.js'
+    MODULE = JS / 'audio.js'
+    STATE = JS / 'state.js'
+    MANIFEST = ROOT / 'static' / 'voice' / 'manifest.json'
+    POOLS = MomentLinesTests.POOLS
+
+    # the acceptance's tiers (starting values, DECISIONS 2026-10-27)
+    ALWAYS = ['correct', 'streak', 'thirdMiss', 'hintGiven', 'boostGiven', 'speakerLocked', 'roundEndGood', 'roundEnd',
+              'greet', 'keyEarned', 'themeOpen', 'tutorialWave', 'tutorialDrag', 'tutorialPress', 'tutorialDone']
+    SOMETIMES = ['roundStart', 'picture', 'wrong', 'wrongPeek', 'wake']
+    RARE = {'kidIdle': 1 / 3, 'peek': 1 / 4, 'filledNudge': 1 / 3, 'domeNudge': 1 / 3}
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def run_character(self, body):
+        # `c` character.js, `d` drag.js. `cur(placed, o)` the word "cat"
+        # with blocks t0 c, t1 a, t2 t on the bench and `placed` ('ca-')
+        # in its slots; `st(o)` a play-screen state on it (round 1, the
+        # picture tuned in, every slot filled by default); `moments(a, b)`.
+        script = (
+            f"const c = await import('{self.CHARACTER.as_uri()}');"
+            f"const d = await import('{self.DRAG.as_uri()}');"
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const cur = (placed = 'cat', o = {}) => ({ word: 'cat', audio: 'x.mp3', status: 'playing',"
+            " placed: placed.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + 'cat'.indexOf(ch) })),"
+            " tray: ['c', 'a', 't'].map((l, i) => ({ id: 't' + i, letter: l, used: placed.includes(l) })),"
+            " filledOnce: [true, true, true], boosts: 0, ...o });"
+            "const st = (o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, lockedTaps: 0,"
+            " pressed: null, nudges: 0, filledNudged: false, tutorial: false, tuned: true,"
+            " round: { index: 0, size: 5, results: [] }, current: cur(), ...o });"
+            "const moments = (a, b) => c.momentsFor(c.snapshot(a), c.snapshot(b));"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def run_sound(self, body):
+        # MomentLinesTests' harness (CorrectWordVoiceTests' stand-ins, its
+        # prelude: W, P, T, go, hush, ...), plus `step(s)`: the files
+        # started by one more change to `s`; `quietly(sec)`: one line of his
+        # (the head-shake's no-gears, an always line) plays and ends on
+        # "cat", then `sec` seconds pass; `nudge(n)` the answered "cat"
+        # with `n` dome nudges; `DOG(o)` a word with no Hebrew guess.
+        prelude = (
+            "const step = async (s) => { clear(); S.setState(s); await settle(); return played(); };"
+            "let taps = 0;"
+            "const quietly = async (sec, base = W()) => { await hush(); S.setState(base); await settle(); await hush();"
+            " taps++; S.setState({ ...base, lockedTaps: taps }); await settle(); await end('robot/no-gears-01.mp3'); clockOn(sec); };"
+            "const nudge = (n) => W({ status: 'correct', placed: P('cat') }, { round: DONE, nudges: n });"
+            "const DOG = (o = {}) => st({ current: { word: 'dog', audio: '/static/voice/words/animals/dog.mp3', status: 'playing',"
+            " placed: P('---') }, round: { index: 1, size: 5, results: [{ correct: true }] }, ...o });"
+        )
+        return MomentLinesTests.run_node(self, prelude + body)
+
+    # --- the table and the rules (character.js) ---
+
+    def test_the_table_gives_every_moment_with_a_line_its_tier_and_chance(self):
+        res = self.run_character(
+            "out([c.CHATTER, Object.fromEntries(Object.entries(c.MOMENTS).map(([m, s]) => [m, {"
+            " lines: c.linesOf(m).length > 0 || Object.values(s.variants || {}).some((v) => (v.lines || []).length > 0)"
+            "  || (!!s.lines && !Array.isArray(s.lines)), word: !!s.word, sound: s.sound }]))]);")
+        chatter, moments = res
+        self.assertEqual(chatter['TALK_GAP'], 8)
+        self.assertEqual(chatter['PRESS_WAIT'], [4, 7])
+        rows = chatter['moments']
+        self.assertEqual(set(rows), set(self.ALWAYS) | set(self.SOMETIMES) | set(self.RARE))
+        for m in self.ALWAYS:
+            self.assertEqual(rows[m], {'tier': 'always', 'chance': 1}, m)
+        for m in self.SOMETIMES:
+            self.assertEqual({k: v for k, v in rows[m].items() if k in ('tier', 'chance')}, {'tier': 'sometimes', 'chance': 1 / 2}, m)
+        for m, chance in self.RARE.items():
+            self.assertEqual({k: v for k, v in rows[m].items() if k in ('tier', 'chance')}, {'tier': 'rare', 'chance': chance}, m)
+        # the picture's Hebrew guess always plays; only a word's first
+        # dome nudge may speak
+        self.assertEqual(rows['picture'].get('always'), ['hebrew'])
+        self.assertEqual(rows['domeNudge'].get('first'), 'nudges')
+        self.assertEqual([k for k, r in rows.items() if 'always' in r or 'first' in r], ['picture', 'domeNudge'])
+        # every moment that says anything of his voice is in the table, and
+        # the table names only moments (and `peek`, his whisper)
+        voiced = {m for m, s in moments.items() if s['lines'] or s['word'] or s['sound'] in ('correct', 'error', 'locked')}
+        self.assertLessEqual(voiced, set(rows))
+        self.assertLessEqual(set(rows), set(moments) | {'peek'})
+        # the moments with no voice of his: the swipe's, the tutorial wave
+        self.assertEqual(sorted(set(moments) - set(rows)), ['blockPlaced', 'blockReturned', 'filled', 'filledEarly'])
+
+    def test_says_line_at_fixed_draws(self):
+        res = self.run_character(
+            "const says = (m, quiet, r, now = {}) => c.saysLine(m, now, quiet, () => r);"
+            f"const ALWAYS = {json.dumps(self.ALWAYS)}; const SOMETIMES = {json.dumps(self.SOMETIMES)};"
+            "out({"
+            # always: whatever the draw, also while he talks and in the gap
+            " always: ALWAYS.map((m) => [says(m, Infinity, 0.99), says(m, 0, 0.99), says(m, 3, 0.99)]),"
+            # sometimes: under 1/2
+            " sometimes: SOMETIMES.map((m) => [says(m, Infinity, 0), says(m, Infinity, 0.49), says(m, Infinity, 0.5), says(m, 9, 0.99)]),"
+            # rare: kid idle 1/3, his whisper 1/4, the press lines 1/3
+            " kidIdle: [0.33, 0.34].map((r) => says('kidIdle', Infinity, r)),"
+            " peek: [0.24, 0.25].map((r) => says('peek', Infinity, r)),"
+            " filledNudge: [0.33, 0.34].map((r) => says('filledNudge', Infinity, r)),"
+            " domeNudge: [0.33, 0.34].map((r) => says('domeNudge', Infinity, r, { nudges: 1 })),"
+            # only a word's first dome nudge: later ones never, even at 0
+            " laterNudges: [2, 3, 9].map((n) => says('domeNudge', Infinity, 0, { nudges: n })),"
+            # the quiet gap: 8s after his voice went quiet, and while he talks
+            " gap: ['wrong', 'kidIdle', 'peek', 'domeNudge', 'filledNudge', 'picture'].map((m) =>"
+            "  [0, 7.99, 8, 30].map((q) => says(m, q, 0, { nudges: 1 }))),"
+            # a moment not in the table: always
+            " unlisted: ['blockPlaced', 'filledEarly', 'nope'].map((m) => says(m, 0, 0.99)),"
+            " rows: [c.chatterOf('picture'), c.chatterOf('domeNudge', { nudges: 1 }), c.chatterOf('domeNudge', { nudges: 2 }),"
+            "  c.chatterOf('correct'), c.chatterOf('blockPlaced')] });")
+        self.assertEqual(res['always'], [[True, True, True]] * len(self.ALWAYS))
+        self.assertEqual(res['sometimes'], [[True, True, False, False]] * len(self.SOMETIMES))
+        self.assertEqual(res['kidIdle'], [True, False])
+        self.assertEqual(res['peek'], [True, False])
+        self.assertEqual(res['filledNudge'], [True, False])
+        self.assertEqual(res['domeNudge'], [True, False])
+        self.assertEqual(res['laterNudges'], [False, False, False])
+        self.assertEqual(res['gap'], [[False, False, True, True]] * 6)
+        self.assertEqual(res['unlisted'], [True, True, True])
+        self.assertEqual(res['rows'], [
+            {'tier': 'sometimes', 'chance': 0.5, 'always': ['hebrew']},
+            {'tier': 'rare', 'chance': 1 / 3, 'always': []}, {'tier': 'rare', 'chance': 0, 'always': []},
+            {'tier': 'always', 'chance': 1, 'always': []}, {'tier': 'always', 'chance': 1, 'always': []}])
+
+    def test_all_slots_filled_points_with_no_line_and_the_press_nudge_comes_once(self):
+        res = self.run_character(
+            "const filled = st(); const part = st({ current: cur('ca-') });"
+            "out({"
+            " filled: moments(part, filled), lines: c.linesOf('filledEarly'), stepsKept: c.stepsOf('filledEarly', 'excited').length,"
+            " nudge: moments(filled, { ...filled, filledNudged: true }),"
+            " again: moments({ ...filled, filledNudged: true }, { ...filled, filledNudged: true, lastInput: 5 }),"
+            " row: [c.MOMENTS.filledNudge.lines, c.MOMENTS.filledNudge.sound, c.MOMENTS.filledNudge.ifQuiet, c.stepsOf('filledNudge')],"
+            " point: c.stepsOf('filledEarly', 'point'),"
+            # the tutorial word: tutorialPress as it is; round 3: filled
+            " tutorial: moments(st({ tutorial: true, current: cur('ca-') }), st({ tutorial: true })),"
+            " round3: moments(st({ roundsStarted: 3, current: cur('ca-') }), st({ roundsStarted: 3 })),"
+            " snap: [c.snapshot({ ...filled, filledNudged: true }).filledNudged, c.snapshot(filled).filledNudged,"
+            "  c.snapshot({ ...filled, screen: 'round-end', filledNudged: true }).filledNudged, c.NONE.filledNudged] });")
+        self.assertEqual(res['filled'], ['filledEarly'])
+        self.assertEqual(res['lines'], [])
+        self.assertEqual(res['stepsKept'], 3)          # his point and the excited variant as before
+        self.assertEqual(res['nudge'], ['filledNudge'])
+        self.assertEqual(res['again'], [])
+        self.assertEqual(res['row'][:3], [['press'], None, True])
+        self.assertEqual(res['row'][3], res['point'])   # the point he already shows
+        self.assertEqual(res['tutorial'], ['tutorialPress'])
+        self.assertEqual(res['round3'], ['filled'])
+        self.assertEqual(res['snap'], [True, False, False, False])
+
+    def test_the_press_wait_and_a_move_or_a_press_cancels_it(self):
+        res = self.run_character(
+            "const filled = st(); const armed = filled.current;"
+            "const moved = d.takeOut(armed, 't2'); const back = d.placeIn(moved, 't2', 2);"
+            "const swapped = d.placeIn(armed, 't0', 1);"
+            "const W = (s) => c.pressWait(s, () => 0);"
+            "out({"
+            # a random 4-7s
+            " waits: [0, 0.5, 0.999, 1].map((r) => c.pressWait(filled, () => r)), round2: W(st({ roundsStarted: 2 })),"
+            # none: the tutorial word, round 3 on, not every slot filled, a
+            # wrong check waiting for a move, answered, a control held, off
+            # the play screen, or already come on this word
+            " none: [st({ tutorial: true }), st({ roundsStarted: 3 }), st({ current: cur('ca-') }),"
+            "  st({ current: cur('cat', { status: 'wrong' }) }), st({ current: cur('cat', { status: 'correct' }) }),"
+            "  st({ pressed: 'dome' }), st({ pressed: 'lever' }), st({ screen: 'round-end' }), st({ filledNudged: true })].map(W),"
+            # due: still that very word state, nothing pressed, not come yet
+            " due: c.pressDue(filled, armed),"
+            # a move cancels it: a block out, out and back in, two swapped
+            " moves: [c.pressDue({ ...filled, current: moved }, armed), c.pressDue({ ...filled, current: back }, armed),"
+            "  c.pressDue({ ...filled, current: swapped }, armed)],"
+            " backFilled: [back.placed.every(Boolean), W({ ...filled, current: back })],"
+            # a press cancels it: the dome held, then the check
+            " press: [c.pressDue({ ...filled, pressed: 'dome' }, armed), c.pressDue({ ...filled, current: { ...armed, status: 'wrong' } }, armed)],"
+            # at most once per word
+            " once: [c.pressDue({ ...filled, filledNudged: true }, armed), W({ ...filled, filledNudged: true, current: back })],"
+            " noArm: c.pressDue(filled, null) });")
+        self.assertEqual(res['waits'], [4000, 5500, 6997, 7000])
+        self.assertEqual(res['round2'], 4000)
+        self.assertEqual(res['none'], [None] * 9)
+        self.assertTrue(res['due'])
+        self.assertEqual(res['moves'], [False, False, False])
+        self.assertEqual(res['backFilled'], [True, 4000])   # filled again: a new wait from then
+        self.assertEqual(res['press'], [False, False])
+        self.assertEqual(res['once'], [False, None])
+        self.assertFalse(res['noArm'])
+
+    # --- what he says (audio.js) ---
+
+    def test_say_plan_when_a_line_is_dropped(self):
+        res = self.run_sound(
+            "const pools = { 'picture-giggle': ['pg'], press: ['pr'], wrong: ['w'], mumble: ['m'], hint: ['hi'], 'end-high': ['eh'] };"
+            "const all = () => true; const not = (...x) => (u) => !x.includes(u); const r0 = () => 0;"
+            "const plan = (m, c, how = {}, say = true, ready = all) => a.sayPlan(m, { word: 'W', gags: ['g'], hebrew: [], pools, ...c }, ready, r0, how, say);"
+            "out({"
+            " pictureHe: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }, false),"
+            " pictureHeNotReady: plan('picture', { hebrew: ['he'] }, { variant: 'giggle' }, false, not('he')),"
+            " picture: plan('picture', {}, { variant: 'giggle' }, false), pictureSaid: plan('picture', {}, { variant: 'giggle' }),"
+            " wrong: plan('wrong', {}, {}, false), wrongNone: plan('wrong', { pools: {} }, {}, false), wrongNoneSaid: plan('wrong', { pools: {} }),"
+            " filledNudge: plan('filledNudge', {}, {}, false), filledNudgeSaid: plan('filledNudge', {}),"
+            " placed: plan('blockPlaced', {}, {}, false), end: plan('roundEndGood', {}, { stars: 3 }, false),"
+            " correct: plan('correct', {}, {}, false), hint: plan('hintGiven', { letter: 'L' }, {}, false), default: a.sayPlan.length });")
+        p = lambda fx=None, word=None, line=None, sound=None, letter=None: {
+            'fx': fx, 'word': word, 'line': line, 'sound': sound, 'letter': letter}
+        # the picture's Hebrew guess plays whatever the draw; his look's line not
+        self.assertEqual(res['pictureHe'], p(line='he'))
+        self.assertEqual(res['pictureHeNotReady'], p())
+        self.assertEqual([res['picture'], res['pictureSaid']], [p(), p(line='pg')])
+        # no prototype clip in a dropped line's place (the error clip is his
+        # voice); said, the prototype as before
+        self.assertEqual([res['wrong'], res['wrongNone'], res['wrongNoneSaid']], [p(), p(), p(sound='error')])
+        self.assertEqual([res['filledNudge'], res['filledNudgeSaid']], [p(), p(line='pr')])
+        # the effects, the word and his letter's name are as ever
+        self.assertEqual([res['placed'], res['end']], [p(fx='swipe'), p(fx='tada')])
+        self.assertEqual([res['correct'], res['hint']], [p(word='W'), p(letter='L')])
+
+    def test_the_last_slot_filled_says_nothing_and_his_press_line_is_rare(self):
+        res = self.run_sound(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound);"
+            "const filled = []; for (const r of [0, 0.99]) { Math.random = () => r; filled.push([await go(...T.filledEarly), kinds()]); }"
+            "const press = {}; for (const r of [0, 0.33, 0.34, 0.99]) { Math.random = () => r; press[r] = [await go(...T.filledNudge), kinds()]; }"
+            # at most once per word: a re-render plays nothing more
+            "Math.random = () => 0; await go(...T.filledNudge); await end('robot/press-01.mp3'); clockOn();"
+            "const again = await step(W({ placed: P('cat') }, { filledNudged: true, lastInput: 9 }));"
+            # the dome nudge: the word's first at 1/3; later ones silent
+            "const dome = {}; for (const r of [0, 0.33, 0.34]) { Math.random = () => r; dome[r] = await go(nudge(0), nudge(1)); }"
+            "Math.random = () => 0; const later = [await go(nudge(1), nudge(2)), await go(nudge(2), nudge(3)), await go(nudge(5), nudge(6))];"
+            "out([filled, press, again, dome, later]);")
+        filled, press, again, dome, later = res
+        # the swipe alone, never his press line, whatever the draw
+        self.assertEqual(filled, [[['swipe/swipe1.mp3'], ['o']], [['swipe/swipe4.mp3'], ['o']]])
+        self.assertEqual(press, {'0': [['robot/press-01.mp3'], ['v']], '0.33': [['robot/press-01.mp3'], ['v']],
+                                 '0.34': [[], []], '0.99': [[], []]})
+        self.assertEqual(again, [])
+        self.assertEqual(dome, {'0': ['robot/press-01.mp3'], '0.33': ['robot/press-01.mp3'], '0.34': []})
+        self.assertEqual(later, [[], [], []])
+
+    def test_each_tier_at_fixed_draws(self):
+        res = self.run_sound(
+            "MAN = lineMan('hebrew/animals/cat.mp3', 'letters/a.mp3'); await ready(); S.subscribe(a.renderSound);"
+            "const at = async (r, from, to) => { Math.random = () => r; return go(from, to); };"
+            "const dogLook = C.picksFor(['picture'], C.snapshot(DOG())).picture;"
+            "out({"
+            " sometimes: { wrong: [await at(0.49, ...T.wrong), await at(0.5, ...T.wrong)],"
+            "  roundStart: [await at(0.49, ...T.roundStart), await at(0.5, ...T.roundStart)],"
+            "  wake: [await at(0.49, ...T.wake), await at(0.5, ...T.wake)],"
+            "  secondMiss: [await at(0.49, ...MISS2), await at(0.5, ...MISS2)],"
+            "  pictureLook: [await at(0.49, DOG({ tuned: false }), DOG()), await at(0.5, DOG({ tuned: false }), DOG())],"
+            "  pictureHebrew: [await at(0.99, ...T.picture)] },"
+            " rare: { kidIdle: [await at(0.33, ...T.kidIdle), await at(0.34, ...T.kidIdle)] },"
+            " always: { speakerLocked: await at(0.99, ...T.speakerLocked), thirdMiss: await at(0.99, ...T.thirdMiss),"
+            "  end3: await at(0.99, ...T.end3), boostFirst: await at(0.99, ...BOOST.first) },"
+            " dogLook });")
+        s = res['sometimes']
+        self.assertEqual(s['wrong'], [['robot/wrong-01.mp3'], []])
+        self.assertEqual(s['roundStart'], [['robot/start-01.mp3'], []])
+        self.assertEqual(s['wake'], [['robot/wake-01.mp3'], []])
+        # the second miss: his mumble at 1/2; his hint line (always) either way
+        # (the hint line after the mumble has ended, or alone when his peek is over)
+        self.assertEqual(s['secondMiss'], [['robot/mumble-01.mp3'], ['robot/hint-01.mp3']])
+        self.assertEqual(s['pictureLook'], [[f'robot/picture-{res["dogLook"]}-01.mp3'], []])
+        self.assertEqual(s['pictureHebrew'], [['hebrew/animals/cat.mp3']])
+        self.assertEqual(res['rare']['kidIdle'], [['robot/idle-01.mp3'], []])
+        a = res['always']
+        self.assertEqual(a['speakerLocked'], ['robot/no-gears-01.mp3'])
+        self.assertEqual(a['thirdMiss'], ['robot/reveal-open-01.mp3'])
+        self.assertEqual(a['end3'], ['celebration/tada.mp3', 'robot/end-high-01.mp3'])
+        self.assertEqual(a['boostFirst'], ['robot/boost-first-01.mp3'])
+
+    def test_a_dropped_line_plays_no_prototype_clip_in_its_place(self):
+        # a manifest with no shared line (the prototype clips fill in): a
+        # wrong check under its chance says the error clip as before; over
+        # it, nothing (the error clip is his voice, not an effect); the
+        # reveal and the head-shake always; the swipe and the tada as ever
+        real = json.loads(self.MANIFEST.read_text())
+        manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
+        res = self.run_sound(
+            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound);"
+            "const at = async (r, from, to) => { Math.random = () => r; return [await go(from, to), kinds()]; };"
+            "out([await at(0, ...T.wrong), await at(0.5, ...T.wrong), await at(0.99, ...T.thirdMiss),"
+            " await at(0.99, ...T.speakerLocked), await at(0.99, ...T.filledEarly), await at(0.99, ...T.end0)]);")
+        self.assertEqual(res, [
+            [['error/actually that is cleverly wrong.mp3'], ['v']], [[], []],
+            [['error/you can do better.mp3'], ['v']], [['error/hmm no.mp3'], ['v']],
+            [['swipe/swipe4.mp3'], ['o']], [['celebration/tada.mp3'], ['o']]])
+
+    def test_the_quiet_gap(self):
+        res = self.run_sound(
+            "MAN = lineMan('hebrew/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const res = {};"
+            # 7.9s after his line ended, a sometimes or rare line is dropped;
+            # at 8s it plays
+            "for (const [k, sec] of [['wrong', 7.9], ['wrong', 8], ['kidIdle', 7.9], ['kidIdle', 8]]) {"
+            " await quietly(sec, T[k][0]); res[`${k}@${sec}`] = await step({ ...T[k][1], lockedTaps: taps }); }"
+            # the press lines too
+            "await quietly(7.9, W({ placed: P('cat') }, { filledNudged: false })); res['filledNudge@7.9'] = await step(W({ placed: P('cat') }, { lockedTaps: taps, filledNudged: true }));"
+            "await quietly(7.9, nudge(0)); res['domeNudge@7.9'] = await step({ ...nudge(1), lockedTaps: taps });"
+            # the picture: its look's line dropped, the Hebrew guess plays
+            "await quietly(1, DOG({ tuned: false })); res['look@1'] = await step(DOG({ lockedTaps: taps }));"
+            "await quietly(1, W({}, { tuned: false })); res['hebrew@1'] = await step(W({}, { lockedTaps: taps }));"
+            # always: the word and his line, the round end
+            "await quietly(1, W({ placed: P('cat') })); res['correct@1'] = await step(W({ status: 'correct', placed: P('cat') }, { round: DONE, lockedTaps: taps }));"
+            "await end('words/animals/cat.mp3'); res['correctLine'] = played();"
+            "await quietly(1); res['end@1'] = await step({ ...END(5), lockedTaps: taps });"
+            # his whisper: dropped in the gap, says at 8s
+            "await quietly(7.9, W({}, { idleBeat: 'sunk' })); clear(); a.peekLine(); res['peek@7.9'] = played();"
+            "clockOn(0.1); a.peekLine(); res['peek@8'] = played();"
+            # while he talks: a sometimes line is dropped, his line plays on
+            "await hush(); S.setState(T.wrong[0]); await settle(); await hush(); S.setState({ ...T.wrong[0], lockedTaps: ++taps }); await settle();"
+            "res['wrongOverHim'] = [await step({ ...T.wrong[1], lockedTaps: taps }), on()];"
+            # a line cut (leaving the word) counts too: the next round's start line is dropped
+            "await hush(); S.setState(W({}, { roundsStarted: 3 })); await settle(); await hush(); S.setState(W({}, { roundsStarted: 3, lockedTaps: ++taps })); await settle();"
+            "S.setState(STAGES); await settle(); clockOn(2); res['startAfterCut'] = await step(W({}, { roundsStarted: 4, tuned: false, lockedTaps: taps }));"
+            "out(res);")
+        self.assertEqual(res['wrong@7.9'], [])
+        self.assertEqual(res['wrong@8'], ['robot/wrong-01.mp3'])
+        self.assertEqual(res['kidIdle@7.9'], [])
+        self.assertEqual(res['kidIdle@8'], ['robot/idle-01.mp3'])
+        self.assertEqual([res['filledNudge@7.9'], res['domeNudge@7.9']], [[], []])
+        self.assertEqual(res['look@1'], [])
+        self.assertEqual(res['hebrew@1'], ['hebrew/animals/cat.mp3'])
+        self.assertEqual(res['correct@1'], ['words/animals/cat.mp3'])
+        self.assertEqual(res['correctLine'], ['words/animals/cat.mp3', 'robot/correct-01.mp3'])
+        self.assertEqual(res['end@1'], ['celebration/tada.mp3', 'robot/end-high-01.mp3'])
+        self.assertEqual([res['peek@7.9'], res['peek@8']], [[], ['robot/peek-01.mp3']])
+        self.assertEqual(res['wrongOverHim'], [[], ['robot/no-gears-01.mp3']])
+        self.assertEqual(res['startAfterCut'], [])
+
+    def test_his_whisper_is_rare(self):
+        res = self.run_sound(
+            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound);"
+            # kid idle's own line dropped (a draw over 1/3), so he is quiet
+            "Math.random = () => 0.99; await go(...T.kidIdle); const idle = played(); const res = [];"
+            "for (const r of [0, 0.24, 0.25, 0.99]) { Math.random = () => r; clear(); a.peekLine(); const p = played(); res.push(p);"
+            " if (p.length) { await end(p[0]); clockOn(); } }"
+            "out([idle, res]);")
+        self.assertEqual(res, [[], [['robot/peek-01.mp3'], ['robot/peek-01.mp3'], [], []]])
+
+    # --- his pose, and the wiring ---
+
+    def test_his_pose_plays_whatever_his_voice_does(self):
+        # the robot's render never asks the table: the press nudge's point
+        # is scheduled at any draw
+        res = PuppetRenderTests('run_node').run_node(
+            "Math.random = () => 0.99;"
+            "const full = st({ current: { word: 'cat', status: 'playing', placed: put('cat') } });"
+            "c.renderRobot(theme); c.renderRobot(st()); c.renderRobot(full); take();"
+            "c.renderRobot({ ...full, filledNudged: true });"
+            "const steps = take().filter((e) => (e[0] === 'delayedCall' && e[2] === 'applyStep')).map((e) => e[3][0]);"
+            "out(steps);")
+        self.assertEqual(res, [{'at': 0, 'sink': 0, 'head': 6, 'eyes': 'wide', 'brows': 'up', 'hands': 'point', 'look': [26, 22]}])
+        strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
+        render = strip(self.CHARACTER.read_text())
+        render = render[render.index('let last = { snap: NONE'):]
+        for word in ('CHATTER', 'saysLine', 'chatterOf'):
+            self.assertNotIn(word, render)
+
+    def test_main_arms_the_press_timer(self):
+        strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
+        main = strip((self.JS / 'main.js').read_text())
+
+        def function(name):
+            start = main.index(f'function {name}(')
+            return main[start:main.index('\n}\n', start)]
+        self.assertIn('subscribe(armPress);', main)
+        arm = function('armPress')
+        self.assertIn('pressHeard = s.current;', arm)
+        self.assertIn('if (s.current === before) return;', arm)
+        self.assertIn('const wait = pressWait(s);', arm)
+        self.assertIn('if (pressDue(state, armed)) setState({ filledNudged: true });', arm)
+        self.assertIn('}, wait);', arm)
+        # false on every new word, the round end and leaving the round
+        for name, n in (('startRound', 1), ('onNext', 2), ('leaveRound', 1)):
+            self.assertEqual(function(name).count('filledNudged: false,'), n, name)
+        self.assertRegex((self.JS / 'state.js').read_text(), r'\n    filledNudged: false,')
+        # only main.js writes it; character.js and audio.js never set state
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'main.js':
+                self.assertNotIn('filledNudged: true', strip(f.read_text()), f.name)
+        for f in ('character.js', 'audio.js'):
+            self.assertNotIn('setState', strip((self.JS / f).read_text()), f)
+        # audio.js asks the table per moment and for his whisper
+        audio = strip(self.MODULE.read_text())
+        self.assertIn('saysLine(m, now, quiet, Math.random)', audio)
+        self.assertIn("if (!saysLine('peek', snapshot(state), quietFor(), Math.random)) return;", audio)
 
 
 class PictureLifeTests(TestCase):

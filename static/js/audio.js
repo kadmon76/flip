@@ -19,7 +19,12 @@
 //     the word's `audio` decoded when the word started (sayPlan, speak);
 //     the word's gag only after it (B-225: with the word not ready, a
 //     shared line or the prototype clip plays alone).
-//     His idle peeks whisper too (peekLine, told by character.js);
+//     His idle peeks whisper too (peekLine, told by character.js).
+//     How often (BACKLOG B-226): per moment character.js saysLine, from
+//     its CHATTER table: always, or sometimes / rare at a chance and never
+//     within its TALK_GAP after his voice went quiet (`hushedAt`); a line
+//     dropped drops only his voice (no prototype clip in its place), the
+//     effects play;
 //   - the TV's tune-in hiss and channel click (BACKLOG B-214): made in
 //     code, no sound file (hiss), played when tv.js starts a tune-in.
 // `state.muted` (localStorage `flip.muted`, read and written only here
@@ -30,7 +35,7 @@
 // first gesture and Audio elements only inside speakWord().
 
 import { state } from './state.js';
-import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf } from './character.js';
+import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf, chatterOf, saysLine } from './character.js';
 
 export const SOUND_BASE = '/static/sounds/';
 export const MUTED_KEY = 'flip.muted';
@@ -91,7 +96,9 @@ export const FILES = {
 // the word he says, `word`; and his new voice's lines, `line`, B-223,
 // B-224: his shared lines, the gags, the Hebrew guess, the letter names):
 // one clip at a time, a new one cuts the one playing (but a moment that
-// comes on its own never cuts it, MOMENTS[moment].ifQuiet), and none
+// comes on its own never cuts it, MOMENTS[moment].ifQuiet, and since
+// B-226 a sometimes or rare line is dropped while he talks and for the
+// quiet gap after, so only an always moment cuts him), and none
 // starts over the target word, the speaker's or the one he says (DESIGN
 // "Sound", CHARACTER "Rules"). The swipe is an effect, not his voice: it
 // plays whenever a block goes into a slot and may overlap anything. So
@@ -259,15 +266,21 @@ export function pickLine(lines, clips = {}, ready = () => true, rand = Math.rand
 //     when it is ready.
 // He says them in that order: the word, his line (or the prototype clip),
 // the letter's name.
-export function sayPlan(moment, clips = {}, ready = () => true, rand = Math.random, how = {}) {
+// `say` false (BACKLOG B-226: character.js saysLine dropped the moment's
+// line, by its chance or the quiet gap): only the lines the moment says
+// every time (CHATTER's `always`: the picture's Hebrew guess) may play,
+// and no prototype clip plays in its place; its effect, the word and the
+// letter's name are as ever (the moments that have them always speak).
+export function sayPlan(moment, clips = {}, ready = () => true, rand = Math.random, how = {}, say = true) {
     const spec = MOMENTS[moment] || {};
     const sound = spec.sound || null;
     const fx = sound && CHANNEL[sound] === 'fx' ? sound : null;
     const word = spec.word && clips.word && ready(clips.word) ? clips.word : null;
-    const lines = linesOf(moment, how).filter((name) => word || name !== 'gag');
+    const always = chatterOf(moment).always;
+    const lines = linesOf(moment, how).filter((name) => (word || name !== 'gag') && (say || always.includes(name)));
     const line = pickLine(lines, clips, ready, rand);
     const letter = spec.letter && clips.letter && ready(clips.letter) ? clips.letter : null;
-    return { fx, word, line, sound: (line || fx) ? null : sound, letter };
+    return { fx, word, line, sound: (line || fx || !say) ? null : sound, letter };
 }
 
 // The clips of his voice the plans of one state change say, one after the
@@ -334,6 +347,10 @@ let ctx = null;             // the AudioContext, made on the first gesture
 const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
 const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
 const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224) and the TV's hiss (B-214), { src, kind }
+// When his voice last went quiet (BACKLOG B-226): the performance.now() ms
+// at which a clip of his voice last ended or was cut (-Infinity before he
+// ever spoke), for the quiet gap (character.js CHATTER.TALK_GAP, saysLine).
+let hushedAt = -Infinity;
 // His new voice (BACKLOG B-223, B-224): the files static/voice/manifest.json
 // lists (none until it is in, and none for a missing or broken one), and
 // per clip URL { bytes: Promise of its bytes or null, buffer: its decoded
@@ -534,8 +551,16 @@ function decodeAll() {
     for (const clip of [...lineClips.values(), ...wordClips.values()]) decodeClip(clip);
 }
 
+// A source leaves `live`: one of his voice notes when he went quiet
+// (`hushedAt`, B-226), whether it ended or was cut.
+function gone(entry) {
+    if (!live.delete(entry)) return false;
+    if (CHANNEL[entry.kind] === 'voice') hushedAt = performance.now();
+    return true;
+}
+
 function stopSource(entry) {
-    live.delete(entry);
+    gone(entry);
     try {
         entry.src.stop();
     } catch (e) {
@@ -560,6 +585,12 @@ function talking() {
     return [...live].some((entry) => CHANNEL[entry.kind] === 'voice');
 }
 
+// Seconds his voice has been quiet (BACKLOG B-226, character.js saysLine):
+// 0 while a clip of his plays or is due; Infinity before he ever spoke.
+function quietFor() {
+    return talking() ? 0 : (performance.now() - hushedAt) / 1000;
+}
+
 // Start `buffer` as a clip of `kind`, `wait` s from now (0: now): his
 // voice (CHANNEL) through the analyser, an effect straight out. `then`
 // runs when the clip has played to its end, never when it was stopped
@@ -577,7 +608,7 @@ function start(buffer, kind, then = null, wait = 0) {
         const entry = { src, kind };
         live.add(entry);
         src.onended = () => {
-            if (live.delete(entry) && then) then();
+            if (gone(entry) && then) then();
         };
         src.start(wait > 0 ? ctx.currentTime + wait : 0);
     } catch (e) {
@@ -677,13 +708,17 @@ function reducedMotion() {
 // script (waitFor: a boost's when its letter lands; startsOf: the second
 // miss's letter when his peek is over). The picture's line is the one of
 // his look (picksFor), the round end's by its stars, a boost's by its
-// kind.
+// kind. Whether each moment says its line (BACKLOG B-226): character.js
+// saysLine, its tier and chance, and the quiet gap, from how long his
+// voice has been quiet as the change comes (quietFor); one it drops plays
+// only its effect (and the lines it always says).
 function speak(moments, s, prev, now) {
     const picks = picksFor(moments, now);
     const ready = (url) => !!bufferOf(url);
     const word = s.current && s.current.word;
+    const quiet = quietFor();
     const plans = moments.map((m) => sayPlan(m, clipsFor(s, letterGiven(m, prev, now, word)), ready, Math.random,
-        { variant: picks[m], stars: now.stars, boostKind: now.boostKind }));
+        { variant: picks[m], stars: now.stars, boostKind: now.boostKind }, saysLine(m, now, quiet, Math.random)));
     for (const p of plans) if (p.fx) play(p.fx);
     const wait = waitFor(moments, prev, now, reducedMotion());
     const starts = startsOf(moments, picks).map((t) => wait + t);
@@ -692,9 +727,12 @@ function speak(moments, s, prev, now) {
 
 // His whisper as he peeks over the edge while sunk (BACKLOG B-224):
 // character.js tells main.js, which calls this. A random ready clip of
-// PEEK.lines, only while he is quiet (PEEK.ifQuiet); none: nothing.
+// PEEK.lines, only while he is quiet (PEEK.ifQuiet), and rarely (B-226:
+// saysLine for CHATTER's `peek`, its chance and the quiet gap); none:
+// nothing.
 export function peekLine() {
     if (state.screen !== 'play') return;
+    if (!saysLine('peek', snapshot(state), quietFor(), Math.random)) return;
     const line = pickLine(PEEK.lines, clipsFor(state), (url) => !!bufferOf(url));
     if (line) voice([{ url: line, kind: 'line' }], !!PEEK.ifQuiet);
 }

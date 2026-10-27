@@ -5,7 +5,8 @@
 // were not clean the next two are easier ones), the console controls
 // (check dome, reset lever, speaker), the header's mute toggle and the
 // play screen's back button, the kid-idle
-// timer and the dome-nudge timer for the robot and his voice's frames,
+// timer, the dome-nudge timer and the press timer (BACKLOG B-226) for the
+// robot and his voice's frames,
 // the TV's lock (tv.js) and the picture's life after it (picture.js,
 // BACKLOG B-221) with its win on a correct check (BACKLOG B-222), screen
 // renders. The kid's gears (gears.js,
@@ -33,7 +34,7 @@ import { renderBoost } from './boosttray.js';
 import { renderGallery } from './gallery.js';
 import { renderStageMap } from './stagemap.js';
 import { renderFlaps } from './flaps.js';
-import { renderRobot, renderTalk, idleWait, nudgeWait, wordKey, IDLE_MS } from './character.js';
+import { renderRobot, renderTalk, idleWait, nudgeWait, pressWait, pressDue, wordKey, IDLE_MS } from './character.js';
 import { stagesOf } from './stage.js';
 import { pickRound, makeWord, swapForStruggle } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
@@ -299,6 +300,7 @@ async function startRound({ name, dataUrl }, chosen = null) {
         lastInput: performance.now(),
         idleBeat: null,
         nudges: 0,
+        filledNudged: false,
         tuned: false,
         boostMenu: null,
         startingRound: false,
@@ -460,6 +462,7 @@ function onNext(extra = {}) {
             speaking: false,
             idleBeat: null,
             nudges: 0,
+            filledNudged: false,
             boostMenu: null,
             ...extra,
         });
@@ -475,6 +478,7 @@ function onNext(extra = {}) {
             lastInput: performance.now(),
             idleBeat: null,
             nudges: 0,
+            filledNudged: false,
             tuned: false,
             boostMenu: null,
             ...extra,
@@ -531,6 +535,34 @@ function armNudge() {
     };
     const wait = nudgeWait(state);
     if (wait !== null) setTimeout(tick, wait);
+}
+
+// --- The robot's press nudge (BACKLOG B-226, character.js) ---
+
+// Memo (CLAUDE.md "Subscribers may keep a memo"): the word state
+// (`current`) this subscriber last heard, so only a new one arms the press
+// timer. Overwritten on every setState; never read by another module.
+let pressHeard = null;
+
+// The press timer: when a new word state has every slot filled on a word
+// the robot points at the dome on (character.js pressWait: the first
+// rounds, not the tutorial word, not checked yet, his press nudge not come
+// yet on this word), a random 4-7s later `filledNudged` is set (his
+// filledNudge moment: a rare press line), if the word is still in that
+// very state and the dome not pressed (pressDue): a block moved, a check,
+// a lever pull or a boost since makes a new `current` and cancels it.
+// Nothing else is kept outside state: the word state it was armed on
+// lives in the timer's own closure.
+function armPress(s) {
+    const before = pressHeard;
+    pressHeard = s.current;
+    if (s.current === before) return;
+    const wait = pressWait(s);
+    if (wait === null) return;
+    const armed = s.current;
+    setTimeout(() => {
+        if (pressDue(state, armed)) setState({ filledNudged: true });
+    }, wait);
 }
 
 // --- Boosts (BACKLOG B-219, PROGRESSION.md "Boosts", "Guardrails") ---
@@ -734,6 +766,7 @@ function leaveRound(patch) {
         speaking: false,
         idleBeat: null,
         nudges: 0,
+        filledNudged: false,
         tuned: false,
         boostMenu: null,
     });
@@ -810,6 +843,7 @@ subscribe(renderPicture);     // after the TV: the picture's life once it has lo
 subscribe(renderControls);
 subscribe(renderCoach);       // after the card and the controls: the ghost mitten finds the tiles, slots and dome
 subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
+subscribe(armPress);          // his press nudge, a while after every slot is filled (B-226)
 subscribe(renderRoundEnd);
 subscribe(renderLocks);       // after the theme cards and the round-end render, before celebrate.js (it pops the round's key)
 subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter

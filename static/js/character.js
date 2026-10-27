@@ -19,7 +19,10 @@
 // column, B-223), else the prototype clip of its `sound` column, then the
 // name of the letter he placed (the `letter` column); nothing else
 // triggers a clip, except his idle peeks, which renderRobot tells main.js
-// about (`onPeek`). While one of his clips plays (the word he says on a
+// about (`onPeek`). How often a moment's line is said is the CHATTER
+// table's (BACKLOG B-226: always, sometimes or rare, and a quiet gap
+// after he talks); a line it drops drops only his voice, never the pose.
+// While one of his clips plays (the word he says on a
 // correct check too, not the speaker's), audio.js's AnalyserNode hears it
 // and main.js hands its samples to renderTalk() every frame (B-210, the
 // talking effects below).
@@ -187,9 +190,10 @@ export const FX = {
 //     just put in a slot (letterGiven: the snapshot field holding its
 //     slot), or the name alone with no line.
 //   - `ifQuiet: true` (B-224): a moment that comes on its own (the
-//     picture at the TV's lock, kid idle and his peeks, the dome nudge),
-//     not from the kid's action: its line never cuts his voice; due while
-//     a clip of his plays, it is dropped.
+//     picture at the TV's lock, kid idle and his peeks, the press nudge
+//     and the dome nudge), not from the kid's action: its line never cuts
+//     his voice; due while a clip of his plays, it is dropped.
+//   - whether the line is said at all: the CHATTER table below (B-226).
 // A step comes `at` seconds into the moment and sets any of: `sink`
 // (puppet px down, 0 = up), `head` (turn), `eyes`, `brows`, `hands` (the
 // tables above), `look` (where the eyes look, visor units), `pop` (1, 2,
@@ -207,9 +211,9 @@ export const FX = {
 // sparks; only the third correct in a row, so the words after it say
 // their gag again), round end (clap), speaker locked (head-shake, shrug).
 // Where the map gives a choice, momentsFor() picks the moment:
-//   - "All slots filled": filledEarly (pointing at the dome) in the first
-//     EARLY_ROUNDS rounds of the session; filled after that, which is
-//     "Letter placed";
+//   - "All slots filled": filledEarly (pointing at the dome, no line:
+//     BACKLOG B-226) in the first EARLY_ROUNDS rounds of the session;
+//     filled after that, which is "Letter placed";
 //   - "Wrong check ... peek": he peeks when the miss leaves one lives
 //     bulb lit, on the first miss it is "Wrong";
 //   - "Round end": clapping for 2-3 stars, his rest pose for 0-1 (never
@@ -223,7 +227,12 @@ export const FX = {
 // pressed for a while) is the reference's "All slots filled" pointing at
 // the dome, with a pop and the pointing finger wagging, then his rest
 // pose; no prototype clip (none of the existing ones says "go on"), a
-// `press` line of his new voice (B-224). boostGiven (BACKLOG B-219: a
+// `press` line of his new voice (B-224), only on the word's first nudge
+// and rarely (B-226, CHATTER). filledNudge (BACKLOG B-226: every slot
+// filled on a filledEarly word, and the kid has neither pressed the dome
+// nor moved a block for a while, main.js's press timer, pressWait) is his
+// point at the dome, as he already shows it, with a rare `press` line;
+// at most once per word. boostGiven (BACKLOG B-219: a
 // boost the kid paid for, his letter landing in its slot, or the extra
 // blocks gone) takes hintGiven's steps, as his letter lands (boostLands);
 // his line and the letter's name start then too (waitFor).
@@ -297,10 +306,19 @@ export const MOMENTS = {
                 ],
             },
         },
+        // no line as the last slot fills (BACKLOG B-226): his press line
+        // comes later, if at all (filledNudge)
         sound: 'swipe',
-        lines: ['press'],
     },
     filled: { steps: LETTER_PLACED, sound: 'swipe' },
+    // A while after every slot filled, nothing pressed or moved (B-226):
+    // his point at the dome (filledEarly's), and a rare press line.
+    filledNudge: {
+        steps: [{ at: 0, sink: 0, head: 6, eyes: 'wide', brows: 'up', hands: 'point', look: [26, 22] }],
+        sound: null,
+        lines: ['press'],
+        ifQuiet: true,
+    },
     kidIdle: {
         steps: [
             { at: 0, sink: 0, head: -6, eyes: 'squint', brows: 'frown', hands: 'chin' },
@@ -484,7 +502,7 @@ export const MOMENTS = {
 // and sinks again. His hands stay hidden (the sink hides them). As he
 // comes up he whispers a line of his `lines` (BACKLOG B-224; audio.js
 // peekLine, through renderRobot's `onPeek`), only while he is quiet
-// (`ifQuiet`, as the moments above).
+// (`ifQuiet`, as the moments above), and rarely (CHATTER's `peek`, B-226).
 export const PEEK = {
     wait: 1.6,
     every: 4.8,
@@ -508,6 +526,53 @@ export const EARLY_ROUNDS = 2;    // he points at the dome in the first 2 rounds
 // The 3rd correct in a row -> double pop and a streak line; the 4th and
 // 5th are plain correct again, so they say their gag (human, 2026-10-24).
 export const STREAK = 3;
+
+// How often he talks (BACKLOG B-226: a quieter robot; starting values the
+// human tunes, DECISIONS 2026-10-27). Per moment that has a line (and
+// `peek`, his peeks' whisper), its tier and the chance its line is said:
+//   - always: every time;
+//   - sometimes, rare: a draw under `chance`, and never within TALK_GAP s
+//     after a clip of his voice went quiet, nor while one plays (saysLine).
+// A moment not in the table says its line always. `always` in a moment:
+// lines of it said every time, whatever its tier (the picture's Hebrew
+// guess: they exist only where funny). `first`: the snapshot field that
+// counts the moment on the word; only its first (the field at 1) may
+// speak (the dome nudge's `nudges`). A line dropped drops only his voice:
+// the moment's pose, moves and effect sound (the swipe, the tada) play as
+// ever, and no prototype clip plays in its place (audio.js sayPlan).
+// PRESS_WAIT: seconds [least, most] the kid neither presses the dome nor
+// moves a block, with every slot filled on a filledEarly word, before his
+// press line may come (filledNudge; a random wait, pressWait).
+export const CHATTER = {
+    TALK_GAP: 8,
+    PRESS_WAIT: [4, 7],
+    moments: {
+        correct: { tier: 'always', chance: 1 },
+        streak: { tier: 'always', chance: 1 },
+        thirdMiss: { tier: 'always', chance: 1 },
+        hintGiven: { tier: 'always', chance: 1 },
+        boostGiven: { tier: 'always', chance: 1 },
+        speakerLocked: { tier: 'always', chance: 1 },
+        roundEndGood: { tier: 'always', chance: 1 },
+        roundEnd: { tier: 'always', chance: 1 },
+        greet: { tier: 'always', chance: 1 },
+        keyEarned: { tier: 'always', chance: 1 },
+        themeOpen: { tier: 'always', chance: 1 },
+        tutorialWave: { tier: 'always', chance: 1 },
+        tutorialDrag: { tier: 'always', chance: 1 },
+        tutorialPress: { tier: 'always', chance: 1 },
+        tutorialDone: { tier: 'always', chance: 1 },
+        roundStart: { tier: 'sometimes', chance: 1 / 2 },
+        picture: { tier: 'sometimes', chance: 1 / 2, always: ['hebrew'] },
+        wrong: { tier: 'sometimes', chance: 1 / 2 },
+        wrongPeek: { tier: 'sometimes', chance: 1 / 2 },
+        wake: { tier: 'sometimes', chance: 1 / 2 },
+        kidIdle: { tier: 'rare', chance: 1 / 3 },
+        peek: { tier: 'rare', chance: 1 / 4 },
+        filledNudge: { tier: 'rare', chance: 1 / 3 },
+        domeNudge: { tier: 'rare', chance: 1 / 3, first: 'nudges' },
+    },
+};
 
 // The variants of moment `name` as [{ name, chance, steps }] (one, named
 // 'only', for a moment without variants).
@@ -802,6 +867,8 @@ export function snapshot(state) {
         boostKind: onWord ? current.boostKind || null : null,
         // his nudges toward the dome on this word (BACKLOG B-212)
         nudges: onWord ? state.nudges || 0 : 0,
+        // his press nudge has come on this word (BACKLOG B-226, filledNudge)
+        filledNudged: onWord && !!state.filledNudged,
         // the TV has tuned in to this word's picture (BACKLOG B-214)
         tuned: onWord && !!state.tuned,
         streak: onWord ? streakOf(results, round.index) : 0,
@@ -862,6 +929,9 @@ export function momentsFor(prev, now) {
     if (now.lockedTaps !== prev.lockedTaps) return ['speakerLocked'];
     // One more nudge toward the dome on the answered word (B-212).
     if (now.nudges > prev.nudges) return ['domeNudge'];
+    // Every slot filled and nothing pressed or moved for a while (B-226:
+    // main.js's press timer, pressWait): his press nudge, once per word.
+    if (now.filledNudged && !prev.filledNudged) return ['filledNudge'];
     if (now.idleBeat !== prev.idleBeat) {
         if (now.idleBeat === 'sunk') return ['kidIdle'];
         if (prev.idleBeat === 'sunk') return ['wake'];
@@ -931,6 +1001,31 @@ export function linesOf(moment, how = {}) {
     return Array.isArray(lines) ? [...lines] : [];
 }
 
+// --- How often he talks (BACKLOG B-226) ---
+
+// Moment `moment`'s row of CHATTER on snapshot `now`: { tier, chance,
+// always: its lines said every time }. A moment not in the table:
+// always. One with `first` past its first on the word: chance 0.
+export function chatterOf(moment, now = {}) {
+    const row = CHATTER.moments[moment] || { tier: 'always', chance: 1 };
+    const later = row.first && (now[row.first] || 0) > 1;
+    return { tier: row.tier, chance: later ? 0 : row.chance, always: [...(row.always || [])] };
+}
+
+// Whether moment `moment` (on snapshot `now`) says its line: an always
+// moment, yes; a sometimes or rare one, not within CHATTER.TALK_GAP s of
+// his voice going quiet (`quietFor`: seconds since a clip of his voice
+// last ended or was cut, 0 while one plays or is due, Infinity before
+// any), and then only when a draw of `rand` comes under its chance.
+// audio.js asks it per moment (and for `peek`, his whisper); a line it
+// drops drops only his voice.
+export function saysLine(moment, now, quietFor, rand = Math.random) {
+    const row = chatterOf(moment, now);
+    if (row.tier === 'always') return true;
+    if (!(quietFor >= CHATTER.TALK_GAP)) return false;
+    return rand() < row.chance;
+}
+
 // The letter he has just put in a slot on moment `moment` (between
 // snapshots `prev` and `now`; `word` the word): with MOMENTS[moment].letter
 // the snapshot field holding its slot ('hint': his second-miss letter;
@@ -993,16 +1088,42 @@ export function idleWait(state, now) {
 // NUDGE_MS.every (`state.nudges` counts the ones already made); null when
 // none can come (off the play screen, not on an answered word, or the
 // dome just pressed: the next word is coming). main.js's nudge timer
-// waits this long and then adds one to `state.nudges`.
+// waits this long and then adds one to `state.nudges` (his point comes
+// each time; only the first may say his press line, CHATTER, B-226).
 export function nudgeWait(state) {
     if (state.screen !== 'play' || state.pressed === 'dome') return null;
     if (domeAction(state.current) !== 'next') return null;
     return state.nudges > 0 ? NUDGE_MS.every : NUDGE_MS.first;
 }
 
+// Ms until his press nudge (BACKLOG B-226, filledNudge): a random
+// CHATTER.PRESS_WAIT seconds (`rand`), from when every slot is filled on
+// a word he points at the dome on (filledEarly: the first EARLY_ROUNDS
+// rounds; never the tutorial word, whose tutorialPress stays as it is),
+// the word not checked yet (the dome would check) and not being pressed;
+// null when it cannot come (that, or it already came on this word: at
+// most once per word, `state.filledNudged`). main.js's press timer waits
+// this long from the fill and then sets `filledNudged` if pressDue.
+export function pressWait(state, rand = Math.random) {
+    if (state.screen !== 'play' || state.tutorial || state.filledNudged || state.pressed) return null;
+    if (state.roundsStarted > EARLY_ROUNDS || domeAction(state.current) !== 'check') return null;
+    const [least, most] = CHATTER.PRESS_WAIT;
+    return Math.round((least + rand() * (most - least)) * 1000);
+}
+
+// Whether his press nudge comes now, for a press timer armed on the word
+// state `armed` (the `current` that filled the last slot): the word is
+// still in that very state (no block moved, taken out or swapped, no
+// check, no lever pull, no boost since: each makes a new `current`), and
+// pressWait still holds (not pressed, not come yet on this word). A move
+// or a press cancels it.
+export function pressDue(state, armed) {
+    return !!armed && state.current === armed && pressWait(state, () => 0) !== null;
+}
+
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
 
 // --- Render ---
 
