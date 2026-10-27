@@ -569,6 +569,20 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Screenshots: `filled-quiet.png` (all slots filled, him pointing, the scope mouth off). Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/106
 
+### B-227 Correct word: the picture's 1-second win first, then the robot speaks
+- why: the win should be easy to see and fun, and not compete with the robot (human, 2026-10-27, after the "Win Length Test" prototype: 1 second chosen; the robot says the word after the win; his gag line stays as it is, after the word). Each word gets its own win story later (Word Win Review page, M5); this item sets the timing, the sound and the room to move that those stories will use.
+- acceptance:
+  - On a correct check the TV picture's win (picture.js, B-222) plays at once and lasts 1 s (`WIN_MS`, one constant, the human may tune it): every move of `WIN` and the reduced-motion pulse are retimed to fit it, keeping their shapes. Easing goes on each keyframe, not on the whole animation, so the beats land where the keyframes say.
+  - During the win the subject may leave the TV screen: it is drawn above the TV's frame and the scene (not clipped by the screen's rounded corners), while the plate, the flash and the scanlines stay inside the screen. When the move ends the subject is back in its place inside the screen. A word with no `motion` keeps today's `pop` of the whole picture, clipped as today.
+  - A shared win chime, made in code in audio.js like the TV's hiss (no file): two bright notes (about C6 then G6, triangle wave), the second starting about 0.09 s after the first, started with the win. It is an effect: it may overlap anything, the mute stops it. It plays on every correct check (`correct`, `streak`, `tutorialDone`), alongside the moment's existing effect sound.
+  - The robot stays quiet during the win: on `correct`, `streak` and `tutorialDone` he looks up at the TV with happy eyes (no pump, no talk) for `WIN_MS`, then does today's pump. His voice (the word, then his gag or streak line, as today) starts when the win ends (`waitFor`), not at the check. Nothing else of his voice starts during the win.
+  - The cogs still fly from the TV into the gear counter (B-218); they start when the win ends.
+  - iPhone silent switch: code-made sound (Web Audio: his voice, the effects, the hiss, the chime) also plays with the phone's silent switch on. At the first gesture that unlocks sound, audio.js sets `navigator.audioSession.type = 'playback'` where the browser has it, and starts a looping silent clip made in code (a short WAV of zeros as a blob URL, in an `<audio>` element) so the page counts as playing media; the mute pauses it, unmute resumes it. Recorded in DECISIONS.
+  - Pure helpers (the retimed move table, `WIN_MS`, the robot's wait for the win, the chime's notes) tested through `node`.
+  - Docs: CHARACTER.md moment map (Correct, 3 in a row, Tutorial done: he watches the win, then speaks); CLAUDE.md's picture.js, audio.js and character.js bullets where they describe the win and the correct check; DESIGN.md "Sound" (the chime).
+  - Screenshots: `win-out.png` (mid-win, the subject partly outside the TV screen), `win-then-word.png` (just after the win, the scope mouth showing the word). Checklist passes.
+- status:
+
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
 - Picture peek and win frames: once the data carries `face` or `win_image` (the win-frame batch), the face peeks every 3–7s and the win swaps in the second frame, as the prototype's bat (B-221, B-222 leave them out).
