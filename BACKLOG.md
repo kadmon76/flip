@@ -583,6 +583,21 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Screenshots: `win-out.png` (mid-win, the subject partly outside the TV screen), `win-then-word.png` (just after the win, the scope mouth showing the word). Checklist passes.
 - status:
 
+### B-228 Each animal's own win on a correct word
+- why: every word picture should act out its own funny win, with its own sound (human, 2026-10-18 and 2026-10-27); the human approved all 32 Animals wins one by one on the Word Win Preview page (2026-10-27/28). The data and the drawings are in the repo; this item plays them in the game.
+- needs: B-227 (the 1-second win first, the subject free to leave the screen, the chime, the robot waiting).
+- content (read-only, written by Claude in chat): `static/data/wins/animals.json` (`ms` 1000; per word: `pivot`, `peak`, optional `clip`, `frame`, `parts`, `shake`, and `subject`, `fx`, `sfx`; the `story` is for people, never shown) and the part drawings in `static/images/words/animals/` (`<word>-body.webp` plus one file per part, `bat-win.webp`; the bat's plate and subject were replaced to line up with its win drawing). The reference player is `design/reference/word-wins.html` (serve the repo root and open `/design/reference/word-wins.html`): its engine (the `FX` particle kinds and their drawn `SHAPES`, the `SFX` sounds made in code, and `play()`) is the spec. The game must play each win exactly as the reference does.
+- acceptance:
+  - A word whose theme has a wins file and whose word has an entry plays that win on a correct check, instead of B-227's shared move: the subject's track (all keyframes, easing per keyframe, `extra` props such as `filter` and `opacity`), its `parts` (a word with parts shows `<word>-body.webp` plus each part at its pivot, all inside the moving subject, except a `fixed` part, which stays put beside it; a part's third value is its opacity, stepped), the `frame` swaps (rest/win drawing, stepped), the `shake` (the TV picture jolts), the `fx` (drawn in code like the reference: puff, dust, feathers, sparks, stars, drops, clang, swoosh, bubble, rings, ping, ink, moon, tangle) and the `sfx` (audio.js, made in code, effects: they may overlap anything, the mute stops them). The chime and the warm flash and sparks of B-227 fire at the word's `peak`, not at a fixed time.
+  - `clip: true` (crab, mouse) keeps the subject inside the screen; every other win may leave it, drawn above the TV frame as B-227 set up.
+  - While the life layers are not showing (not decoded or not locked yet), or for a word with no entry (duck, any other theme), B-227's win plays as today. Under reduced motion: the flash and a pulse only, no move, no particles; the sounds still play.
+  - The parts' drawings load with the word's life layers (B-221) and only the current and next word's are fetched.
+  - The robot's voice still waits for the win to end (B-227); the win stays 1 s (`ms`).
+  - The particle kinds, the sound recipes and the data reader are pure where they can be (no DOM: e.g. the keyframe lists built from a win, the sound schedule, which drawings a word needs) and tested through `node` with the real `animals.json`: every word's tracks start at 0 and end at 1, every part named has its file, every fx kind and sfx name used exists.
+  - Docs: CLAUDE.md's picture.js and audio.js bullets (the wins file, parts, the effect sounds); DESIGN.md "Motion" (per-word wins) and "Sound" (their effects).
+  - Screenshots: mid-win frames for `giraffe` (neck tangled), `dolphin` (in the air, splash still in place), `crab` (half off the right edge, clipped) and `bat` (wings open); a side-by-side with the reference player at the same moment for one of them. Checklist passes.
+- status:
+
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
 - Picture peek and win frames: once the data carries `face` or `win_image` (the win-frame batch), the face peeks every 3–7s and the win swaps in the second frame, as the prototype's bat (B-221, B-222 leave them out).

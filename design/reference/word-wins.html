@@ -1,0 +1,553 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"></head><body>
+<title>Word Win Reference</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Courier+Prime:wght@700&display=swap">
+<style>
+/* Layout: the lab's TV (top of the real play screen) as the stage, the
+   batch's words as buttons under it, then the verdict for the word on
+   screen. Every win is data (WINS below) played by one small engine, the
+   same shape the game will use. */
+:root {
+  --bg: #efe0be;
+  --surface: #f7ecd2;
+  --surface-2: #e6d3a9;
+  --fg: #2a1c10;
+  --muted: #6b4a1c;
+  --line: #d2bb88;
+  --accent: #b46e12;
+  --on-accent: #2a1c10;
+  --keep: #27665e;
+  --change: #b46e12;
+  --drop: #c24a2e;
+  --focus: #27665e;
+  --font-word: "Courier Prime", "Courier New", ui-monospace, monospace;
+  --font-body: "Andika", "Trebuchet MS", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1e160e; --surface: #2c241c; --surface-2: #3a2e22; --fg: #efe0be; --muted: #c9ae7c; --line: #4a3a28;
+  --accent: #ffd87a; --on-accent: #2a1c10; --keep: #3fe0d0; --change: #ffd87a; --drop: #f07a5c; --focus: #3fe0d0; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #1e160e; --surface: #2c241c; --surface-2: #3a2e22; --fg: #efe0be; --muted: #c9ae7c; --line: #4a3a28;
+  --accent: #ffd87a; --on-accent: #2a1c10; --keep: #3fe0d0; --change: #ffd87a; --drop: #f07a5c; --focus: #3fe0d0; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.4; }
+.wrap {
+  max-width: 420px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 32px;
+  display: grid; gap: 10px;
+}
+h1 { font-family: var(--font-word); font-size: 1.25rem; margin: 0; }
+.hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+.stage {
+  position: relative; width: 100%; aspect-ratio: 360 / 350;
+  border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  background: #2b2016 url(word-wins-room.webp) center / 100% 100% no-repeat;
+  user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+.tv, .pop, .glow, .fx { position: absolute; left: 28%; top: 36.543%; width: 42%; height: 31.428%; }
+.tv { border-radius: 9.26% / 14.55%; overflow: hidden; background: #3f8f86; }
+.tv img, .actor img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.tv::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.07) 0 1px, transparent 1px 3px); }
+.flash { position: absolute; inset: 0; opacity: 0; z-index: 2; background: radial-gradient(circle at 50% 55%, rgba(255,226,150,.85), rgba(255,200,90,.25) 55%, transparent 75%); mix-blend-mode: screen; }
+.pop, .fx, .glow { pointer-events: none; }
+.actor { position: absolute; inset: 0; }
+.actor .win { opacity: 0; }
+.tv .actor { z-index: 1; }
+.glow { border-radius: 9.26% / 14.55%; opacity: 0; box-shadow: 0 0 0 2px rgba(255,214,120,.9), 0 0 22px 8px rgba(255,190,80,.75); }
+.fx svg { position: absolute; overflow: visible; }
+.badge { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); font-family: var(--font-word); font-weight: 700; font-size: 0.85rem;
+  color: #ffe2a0; background: rgba(30,20,10,.72); border-radius: 6px; padding: 1px 8px; white-space: nowrap; pointer-events: none; }
+
+.words { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.words button {
+  font: inherit; font-family: var(--font-word); font-weight: 700; font-size: 1rem; cursor: pointer; min-height: 40px; min-width: 0;
+  border-radius: 8px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); position: relative;
+}
+.words button[aria-pressed="true"] { border-color: var(--fg); background: var(--surface-2); }
+.words button .dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.words button[data-state="keep"] .dot { background: var(--keep); }
+.words button[data-state="change"] .dot { background: var(--change); }
+.words button[data-state="drop"] .dot { background: var(--drop); }
+.opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.opt { font: inherit; font-size: 0.88rem; cursor: pointer; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; background: transparent; color: var(--fg); }
+.opt[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
+.card h2 { margin: 0; font-family: var(--font-word); font-size: 1.15rem; }
+.story { margin: 0; font-size: 0.95rem; }
+.verdicts { display: flex; gap: 6px; }
+.v { flex: 1 1 0; font: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer; min-height: 40px; border-radius: 8px; border: 2px solid var(--line); background: transparent; color: var(--fg); }
+.v[data-v="keep"][aria-pressed="true"] { background: var(--keep); border-color: var(--keep); color: var(--bg); }
+.v[data-v="change"][aria-pressed="true"] { background: var(--change); border-color: var(--change); color: #2a1c10; }
+.v[data-v="drop"][aria-pressed="true"] { background: var(--drop); border-color: var(--drop); color: #fff8ec; }
+textarea { font: inherit; font-size: 0.95rem; width: 100%; min-height: 2.6em; resize: vertical; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.save { font-size: 0.78rem; color: var(--muted); min-height: 1.1em; }
+button:focus-visible, textarea:focus-visible, .stage:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+footer { color: var(--muted); font-size: 0.88rem; }
+</style>
+
+<div class="wrap">
+  <h1>Word Win Reference</h1>
+  <p class="hint">All the animals. Tap a word, then tap the TV to replay. Each win is 1 second; the robot says the word right after. Volume up (iPhone: silent switch off).</p>
+
+  <div class="stage" id="stage" role="button" tabindex="0" aria-label="Play the win">
+    <div class="glow" id="glow"></div>
+    <div class="tv" id="tv">
+      <img id="plate" alt="">
+      <div class="actor" id="actor-in"><img class="rest" alt=""><img class="win" alt=""></div>
+      <div class="flash" id="flash"></div>
+    </div>
+    <div class="pop" id="pop"><div class="actor" id="actor-out"><img class="rest" alt=""><img class="win" alt=""></div></div>
+    <div class="fx" id="fx"></div>
+    <div class="badge" id="badge" hidden></div>
+  </div>
+
+  <div class="words" id="words" role="group" aria-label="Words"></div>
+  <div class="opts">
+    <button type="button" class="opt" id="opt-word" aria-pressed="true">Robot says the word</button>
+    <button type="button" class="opt" id="opt-slow" aria-pressed="false">Slow motion</button>
+  </div>
+
+  <section class="card" aria-live="polite" hidden>
+    <h2 id="w-name"></h2>
+    <p class="story" id="w-story"></p>
+    <div class="verdicts" id="verdicts" role="group" aria-label="Your call">
+      <button type="button" class="v" data-v="keep">Keep</button>
+      <button type="button" class="v" data-v="change">Change</button>
+      <button type="button" class="v" data-v="drop">Drop</button>
+    </div>
+    <textarea id="note" rows="2" placeholder="What to change…" aria-label="Notes"></textarea>
+    <div class="save" id="save"></div>
+  </section>
+  <footer>Approved by the human on 2026-10-27/28. The data is static/data/wins/animals.json; this page is the reference player (BACKLOG B-228). Serve the repo root and open /design/reference/word-wins.html.</footer>
+</div>
+
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), fx = $('fx');
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+  // ======================= sound, made in code =======================
+  let ctx = null, master = null, keepAlive = null;
+  const clips = {};
+  function silentWav() {
+    const n = 8000, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+  }
+  function audio() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    if (!keepAlive) { try { keepAlive = new Audio(silentWav()); keepAlive.loop = true; } catch (e) {} }
+    if (keepAlive && keepAlive.paused) { const p = keepAlive.play(); if (p && p.catch) p.catch(() => {}); }
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination);
+    }
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    return ctx;
+  }
+  function noiseBuf() {
+    if (noiseBuf.b) return noiseBuf.b;
+    const b = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return (noiseBuf.b = b);
+  }
+  function env(g, t, a, peak, dur) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+  function tone(t, { type = 'sine', f0, f1 = f0, dur, peak = 0.5, a = 0.008 }) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    env(g, t, a, peak, dur); o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise(t, { dur, peak = 0.4, type = 'bandpass', f = 1200, q = 1, f1 = f }) {
+    const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseBuf(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+    if (f1 !== f) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    env(g, t, 0.005, peak, dur); s.connect(fl); fl.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.05);
+  }
+  // Every sound a win can call: name -> (t, ...args)
+  const SFX = {
+    chime(t) { tone(t, { type: 'triangle', f0: 1046, dur: 0.35, peak: 0.28 }); tone(t + 0.09, { type: 'triangle', f0: 1568, dur: 0.5, peak: 0.26 }); },
+    motor(t, dur) {
+      const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), fl = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(55, t); o.frequency.exponentialRampToValueAtTime(120, t + dur);
+      lfo.frequency.setValueAtTime(18, t); lfo.frequency.linearRampToValueAtTime(34, t + dur); lg.gain.value = 0.5; am.gain.value = 0.5;
+      fl.type = 'lowpass'; fl.frequency.value = 700;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.04); g.gain.setValueAtTime(0.35, t + dur - 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      lfo.connect(lg); lg.connect(am.gain); o.connect(fl); fl.connect(am); am.connect(g); g.connect(master);
+      o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    },
+    sputter(t, n = 2, gap = 0.08) { for (let i = 0; i < n; i++) { noise(t + i * gap, { dur: 0.07, peak: 0.5, type: 'lowpass', f: 900 }); tone(t + i * gap, { type: 'square', f0: 90, f1: 60, dur: 0.06, peak: 0.12 }); } },
+    puff(t) { noise(t, { dur: 0.25, peak: 0.25, type: 'bandpass', f: 500, f1: 1800, q: 0.7 }); },
+    boing(t, dur = 0.25) { tone(t, { type: 'sine', f0: 180, f1: 720, dur, peak: 0.4 }); },
+    bawk(t) { tone(t, { type: 'square', f0: 520, f1: 760, dur: 0.06, peak: 0.16 }); tone(t + 0.07, { type: 'sawtooth', f0: 980, f1: 560, dur: 0.17, peak: 0.18 }); },
+    flutter(t, dur) { for (let i = 0; i < Math.round(dur / 0.05); i++) noise(t + i * 0.05, { dur: 0.04, peak: 0.12, type: 'highpass', f: 2500 }); },
+    thump(t) { tone(t, { type: 'sine', f0: 140, f1: 50, dur: 0.16, peak: 0.6 }); noise(t, { dur: 0.06, peak: 0.2, type: 'lowpass', f: 400 }); },
+    softthud(t) { tone(t, { type: 'sine', f0: 110, f1: 55, dur: 0.14, peak: 0.45 }); },
+    whirr(t, dur) { tone(t, { type: 'sawtooth', f0: 120, f1: 520, dur, peak: 0.12 }); tone(t, { type: 'sine', f0: 240, f1: 1040, dur, peak: 0.1 }); },
+    twinkle(t, dur) { const n = [1568, 1760, 2093, 2349, 2637, 3136]; for (let i = 0; i < 6; i++) tone(t + i * dur / 6, { type: 'triangle', f0: n[i], dur: 0.18, peak: 0.13 }); },
+    plink(t, f = 1300) { tone(t, { type: 'sine', f0: f, dur: 0.09, peak: 0.22 }); },
+    clang(t) { for (const [f, p] of [[523, 0.3], [1187, 0.2], [1820, 0.14], [2640, 0.1]]) tone(t, { type: 'sine', f0: f, f1: f * 0.98, dur: 0.6, peak: p, a: 0.002 }); noise(t, { dur: 0.05, peak: 0.3, type: 'highpass', f: 3000 }); },
+    taps(t, dur, gap = 0.045) { for (let i = 0; i * gap < dur; i++) noise(t + i * gap, { dur: 0.02, peak: 0.18, type: 'bandpass', f: 3500, q: 4 }); },
+    skid(t) { tone(t, { type: 'sawtooth', f0: 1800, f1: 700, dur: 0.16, peak: 0.08 }); noise(t, { dur: 0.16, peak: 0.12, type: 'bandpass', f: 2500, f1: 900, q: 2 }); },
+    buzz(t, dur) {
+      const o = ctx.createOscillator(), g = ctx.createGain(), fl = ctx.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(190, t);
+      for (let i = 1; i <= 6; i++) o.frequency.linearRampToValueAtTime(i % 2 ? 260 : 170, t + dur * i / 6);
+      fl.type = 'bandpass'; fl.frequency.value = 900; fl.Q.value = 0.8;
+      env(g, t, 0.03, 0.22, dur); o.connect(fl); fl.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+    },
+    bonk(t) { tone(t, { type: 'sine', f0: 420, f1: 300, dur: 0.12, peak: 0.5, a: 0.002 }); noise(t, { dur: 0.03, peak: 0.25, type: 'lowpass', f: 1500 }); },
+    inflate(t, dur) { tone(t, { type: 'square', f0: 260, f1: 900, dur, peak: 0.07 }); },
+    ribbit(t) { for (const d of [0, 0.11]) { tone(t + d, { type: 'square', f0: 170, f1: 140, dur: 0.08, peak: 0.16 }); noise(t + d, { dur: 0.08, peak: 0.12, type: 'bandpass', f: 600, q: 3 }); } },
+    splat(t) { noise(t, { dur: 0.14, peak: 0.45, type: 'lowpass', f: 1200, f1: 300 }); tone(t, { type: 'sine', f0: 160, f1: 60, dur: 0.12, peak: 0.4 }); },
+    clicks(t, dur, gap = 0.05) { for (let i = 0; i * gap < dur; i++) noise(t + i * gap, { dur: 0.015, peak: 0.22, type: 'highpass', f: 4000 }); },
+    snap(t) { noise(t, { dur: 0.03, peak: 0.45, type: 'highpass', f: 2500 }); tone(t, { type: 'square', f0: 900, f1: 500, dur: 0.03, peak: 0.08 }); },
+    pop(t) { tone(t, { type: 'sine', f0: 900, f1: 1600, dur: 0.05, peak: 0.3, a: 0.002 }); noise(t, { dur: 0.03, peak: 0.15, type: 'highpass', f: 3000 }); },
+    pfff(t, dur) { noise(t, { dur, peak: 0.3, type: 'bandpass', f: 2500, f1: 700, q: 1.5 }); tone(t, { type: 'sawtooth', f0: 600, f1: 180, dur, peak: 0.06 }); },
+    tweet(t) {
+      const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(2200, t); o.frequency.linearRampToValueAtTime(3200, t + 0.25);
+      lfo.frequency.value = 28; lg.gain.value = 220; lfo.connect(lg); lg.connect(o.frequency);
+      env(g, t, 0.01, 0.45, 0.3); o.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + 0.35); lfo.stop(t + 0.35);
+    },
+    roar(t, dur) { noise(t, { dur, peak: 0.35, type: 'lowpass', f: 300, f1: 900 }); tone(t, { type: 'sawtooth', f0: 55, f1: 95, dur, peak: 0.16 }); },
+    squeak(t) { tone(t, { type: 'sine', f0: 1500, f1: 2400, dur: 0.09, peak: 0.3 }); },
+    hiss(t, dur) { noise(t, { dur, peak: 0.28, type: 'highpass', f: 4500 }); },
+    clipclop(t, dur, gap = 0.1) { for (let i = 0; i * gap < dur; i++) tone(t + i * gap, { type: 'sine', f0: i % 2 ? 620 : 820, f1: i % 2 ? 500 : 650, dur: 0.05, peak: 0.3, a: 0.002 }); },
+    ping(t) { tone(t, { type: 'sine', f0: 2637, dur: 0.3, peak: 0.25, a: 0.002 }); tone(t + 0.04, { type: 'sine', f0: 3520, dur: 0.25, peak: 0.15, a: 0.002 }); },
+    splash(t) { noise(t, { dur: 0.3, peak: 0.35, type: 'bandpass', f: 1800, f1: 600, q: 0.8 }); },
+    dizzy(t, dur) {
+      const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(400, t + dur);
+      lfo.frequency.value = 9; lg.gain.value = 80; lfo.connect(lg); lg.connect(o.frequency);
+      env(g, t, 0.02, 0.18, dur); o.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    },
+    yawn(t, dur) { tone(t, { type: 'sawtooth', f0: 260, f1: 130, dur, peak: 0.1, a: 0.06 }); noise(t, { dur, peak: 0.12, type: 'lowpass', f: 700, f1: 300 }); },
+    howl(t, dur) {
+      const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(420, t); o.frequency.linearRampToValueAtTime(760, t + dur * 0.4); o.frequency.linearRampToValueAtTime(560, t + dur);
+      lfo.frequency.value = 6; lg.gain.value = 18; lfo.connect(lg); lg.connect(o.frequency);
+      env(g, t, 0.08, 0.3, dur); o.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    },
+    slide(t, dur, f0 = 400, f1 = 1400) { tone(t, { type: 'sine', f0, f1, dur, peak: 0.22, a: 0.02 }); },
+    trumpet(t, dur) {
+      const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(330, t); o.frequency.linearRampToValueAtTime(520, t + 0.08); o.frequency.linearRampToValueAtTime(480, t + dur);
+      lfo.frequency.value = 7; lg.gain.value = 14; lfo.connect(lg); lg.connect(o.frequency);
+      fl.type = 'bandpass'; fl.frequency.value = 1100; fl.Q.value = 1.2;
+      env(g, t, 0.03, 0.4, dur); o.connect(fl); fl.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    },
+    sprinkle(t, dur) { for (let i = 0; i * 0.035 < dur; i++) noise(t + i * 0.035 + Math.random() * 0.02, { dur: 0.03, peak: 0.12, type: 'highpass', f: 5000 }); },
+    neigh(t, dur) {
+      const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(700, t); o.frequency.linearRampToValueAtTime(1100, t + dur * 0.25); o.frequency.linearRampToValueAtTime(450, t + dur);
+      lfo.frequency.value = 14; lg.gain.value = 90; lfo.connect(lg); lg.connect(o.frequency);
+      fl.type = 'bandpass'; fl.frequency.value = 1400; fl.Q.value = 1.5;
+      env(g, t, 0.02, 0.3, dur); o.connect(fl); fl.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    },
+    chomp(t) { tone(t, { type: 'sine', f0: 220, f1: 90, dur: 0.1, peak: 0.6, a: 0.002 }); noise(t, { dur: 0.05, peak: 0.4, type: 'bandpass', f: 2200, q: 2 }); },
+    zip(t) { noise(t, { dur: 0.14, peak: 0.3, type: 'bandpass', f: 1200, f1: 5000, q: 3 }); tone(t, { type: 'sine', f0: 700, f1: 2200, dur: 0.12, peak: 0.12 }); },
+    whoosh(t, dur = 0.2) { noise(t, { dur, peak: 0.2, type: 'bandpass', f: 600, f1: 2400, q: 1.2 }); },
+  };
+  function loadClip(w) {
+    if (clips[w] || !ctx) return;
+    clips[w] = fetch('/static/voice/words/animals/' + w + '.mp3').then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)).catch(() => null);
+  }
+  let voice = null;
+  async function sayWord(w, t) {
+    const buf = await clips[w];
+    if (!buf || !ctx) return;
+    const s = ctx.createBufferSource(), g = ctx.createGain(); g.gain.value = 1.6;
+    s.buffer = buf; s.connect(g); g.connect(ctx.destination); s.start(Math.max(t, ctx.currentTime)); voice = s;
+  }
+
+  // ======================= drawn bits =======================
+  const INK = '#2a1c10';
+  const SHAPES = {
+    puff: [40, 32, `<g fill="#e9e2d2" stroke="${INK}" stroke-width="1.6"><circle cx="14" cy="18" r="8"/><circle cx="24" cy="12" r="9"/><circle cx="31" cy="20" r="7"/><circle cx="20" cy="22" r="7"/></g>`],
+    dust: [30, 20, `<g fill="#c8a978" stroke="${INK}" stroke-width="1.3"><circle cx="9" cy="12" r="6"/><circle cx="17" cy="9" r="7"/><circle cx="23" cy="13" r="5"/></g>`],
+    feather: [20, 15, `<path d="M3 13 C7 4 15 1 19 3 C17 8 11 13 3 13 Z" fill="#f4ecdc" stroke="${INK}" stroke-width="1.3"/><path d="M4 12 L16 4" stroke="${INK}" stroke-width="1"/>`],
+    spark: [16, 16, `<path d="M8 0 L10 6 L16 8 L10 10 L8 16 L6 10 L0 8 L6 6 Z" fill="#ffd36a" stroke="${INK}" stroke-width="1"/>`],
+    star: [14, 14, `<path d="M7 0 L8.8 4.6 L14 5 L10 8.2 L11.3 13.4 L7 10.6 L2.7 13.4 L4 8.2 L0 5 L5.2 4.6 Z" fill="#ffe27a" stroke="${INK}" stroke-width="1"/>`],
+    drop: [10, 14, `<path d="M5 1 C8 6 9 8 9 10 A4 4 0 0 1 1 10 C1 8 2 6 5 1 Z" fill="#8fd3e0" stroke="${INK}" stroke-width="1.1"/>`],
+    greendrop: [10, 14, `<path d="M5 1 C8 6 9 8 9 10 A4 4 0 0 1 1 10 C1 8 2 6 5 1 Z" fill="#9cc46a" stroke="${INK}" stroke-width="1.1"/>`],
+    clang: [40, 24, `<g stroke="${INK}" stroke-width="2.2" stroke-linecap="round"><path d="M20 2 L20 9"/><path d="M8 6 L12 11"/><path d="M32 6 L28 11"/><path d="M2 15 L9 15"/><path d="M38 15 L31 15"/></g>`],
+    ink: [40, 32, `<g fill="#3a2440" stroke="${INK}" stroke-width="1.6"><circle cx="14" cy="18" r="8"/><circle cx="24" cy="12" r="9"/><circle cx="31" cy="20" r="7"/><circle cx="20" cy="22" r="7"/></g>`],
+    moon: [36, 36, `<circle cx="18" cy="18" r="15" fill="#f3e6b8" stroke="${INK}" stroke-width="1.6"/><circle cx="12" cy="14" r="3" fill="#e2cf92"/><circle cx="22" cy="23" r="4" fill="#e2cf92"/><circle cx="23" cy="11" r="2" fill="#e2cf92"/>`],
+    tangle: [40, 30, `<path d="M3 20 C 9 3, 25 3, 21 16 C 17 28, 5 22, 13 12 C 21 2, 33 8, 37 22" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`],
+    bubble: [14, 14, `<circle cx="7" cy="7" r="5.6" fill="rgba(220,245,250,.35)" stroke="${INK}" stroke-width="1.1"/><path d="M4.5 5 A3 3 0 0 1 7 3.2" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>`],
+    rings: [40, 40, `<g fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"><path d="M14 12 A10 10 0 0 1 14 28"/><path d="M21 7 A16 16 0 0 1 21 33"/><path d="M28 2 A22 22 0 0 1 28 38"/></g>`],
+    swoosh: [36, 18, `<path d="M2 14 C12 2 26 2 34 10" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 4"/>`],
+  };
+  function shape(name, x, y, scale = 1) {
+    const [w, h, html] = SHAPES[name];
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    const ww = w * scale / 151.2 * 100;
+    s.style.width = ww + '%';
+    s.style.left = `calc(${x}% - ${ww / 2}%)`;
+    s.style.top = `calc(${y}% - ${h * scale / 110 * 50}%)`;
+    s.innerHTML = html; fx.appendChild(s); return s;
+  }
+  const u = () => stage.clientWidth / 360;   // one game px in page px
+
+  // particle kinds: (spec, at) -> animations
+  const FX = {
+    puff({ at, x, y, s = 1, grow = 1.6, dur = 0.55 }) {
+      shape('puff', x, y, s).animate([
+        { transform: 'scale(.2)', opacity: 0, easing: 'ease-out' },
+        { transform: 'scale(1)', opacity: 1, offset: 0.2, easing: 'ease-out' },
+        { transform: `translateY(${-38 * u()}px) scale(${grow})`, opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    dust({ at, x, y, dir = 1, dur = 0.45 }) {
+      for (const k of [0, 1]) shape('dust', x + k * dir * 8, y, 0.9 - k * 0.2).animate([
+        { transform: 'scale(.3)', opacity: 0, easing: 'ease-out' },
+        { transform: 'scale(1)', opacity: 1, offset: 0.25, easing: 'ease-out' },
+        { transform: `translate(${-dir * (24 + k * 14) * u()}px, ${-8 * u()}px) scale(1.4)`, opacity: 0 },
+      ], { duration: dur * 1000, delay: (at + k * 0.05) * 1000, fill: 'both' });
+    },
+    feathers({ at, n = 6, x = 50, y = 28, dur = 0.7 }) {
+      for (let i = 0; i < n; i++) {
+        const r = (k) => ((Math.sin((i + 1) * k * 12.9898) * 43758.5453) % 1 + 1) % 1;
+        const dx = ((i / (n - 1)) - 0.5) * 170 * u() * (0.7 + 0.6 * r(3)), up = -70 * u() * (0.5 + 0.9 * r(1)), down = 40 * u() * (0.4 + 1.2 * r(2));
+        const rot = (i % 2 ? 1 : -1) * (30 + 140 * r(4)), sz = 0.9 + 0.7 * r(5);
+        shape('feather', x - 4 + (i % 3) * 4, y + (i % 2) * 10).animate([
+          { transform: 'translate(0,0) scale(.4)', opacity: 0, easing: 'ease-out' },
+          { transform: `translate(${dx * 0.6}px, ${up}px) rotate(${rot}deg) scale(${sz})`, opacity: 1, offset: 0.25 },
+          { transform: `translate(${dx * 0.85}px, ${up * 0.4}px) rotate(${-rot / 2}deg) scale(${sz})`, opacity: 1, offset: 0.6 },
+          { transform: `translate(${dx}px, ${down}px) rotate(${rot / 3}deg) scale(${sz * 0.9})`, opacity: 0 },
+        ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+      }
+    },
+    sparks({ at, n = 8, big = true }) {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + 0.3, r = (big ? 120 : 85) * u();
+        shape('spark', 50, 50).animate([
+          { transform: 'translate(0,0) scale(.3)', opacity: 0 },
+          { transform: 'translate(0,0) scale(.6)', opacity: 1, offset: 0.1, easing: 'cubic-bezier(.2,.7,.3,1)' },
+          { transform: `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r * 0.8}px) scale(1) rotate(90deg)`, opacity: 1, offset: 0.7 },
+          { transform: `translate(${Math.cos(a) * r * 1.1}px, ${Math.sin(a) * r * 0.9 + 10}px) scale(.4) rotate(140deg)`, opacity: 0 },
+        ], { duration: 650, delay: at * 1000, fill: 'both' });
+      }
+    },
+    stars({ at, x, y, n = 4, dur = 0.5, r = 22 }) {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        shape('star', x, y).animate([
+          { transform: 'scale(0)', opacity: 0 },
+          { transform: `translate(${Math.cos(a) * r * u()}px, ${Math.sin(a) * r * 0.5 * u()}px) scale(1)`, opacity: 1, offset: 0.2 },
+          { transform: `translate(${Math.cos(a + 2) * r * u()}px, ${Math.sin(a + 2) * r * 0.5 * u()}px) scale(1)`, opacity: 1, offset: 0.7 },
+          { transform: `translate(${Math.cos(a + 3) * r * u()}px, ${Math.sin(a + 3) * r * 0.5 * u()}px) scale(.6)`, opacity: 0 },
+        ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+      }
+    },
+    drops({ at, x, y, n = 6, green = false, dur = 0.5, spread = 60 }) {
+      for (let i = 0; i < n; i++) {
+        const dx = ((i / (n - 1)) - 0.5) * spread * 2 * u(), up = -(30 + (i % 3) * 14) * u();
+        shape(green ? 'greendrop' : 'drop', x, y).animate([
+          { transform: 'translate(0,0) scale(.4)', opacity: 0, easing: 'ease-out' },
+          { transform: `translate(${dx * 0.6}px, ${up}px) scale(1)`, opacity: 1, offset: 0.4, easing: 'ease-in' },
+          { transform: `translate(${dx}px, ${-up * 0.4}px) scale(.8)`, opacity: 0 },
+        ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+      }
+    },
+    clang({ at, x, y, dur = 0.35 }) {
+      shape('clang', x, y, 1.2).animate([
+        { transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.25 }, { transform: 'scale(1.2)', opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    tangle({ at, x, y, dur = 0.34 }) {
+      shape('tangle', x, y, 1.3).animate([
+        { transform: 'scale(.3) rotate(-40deg)', opacity: 0 }, { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 0.3 }, { transform: 'scale(1.05) rotate(20deg)', opacity: 1, offset: 0.7 }, { transform: 'scale(.4) rotate(90deg)', opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    ink({ at, x, y, s = 1.6, dur = 0.55 }) {
+      shape('ink', x, y, s).animate([
+        { transform: 'scale(.2)', opacity: 0, easing: 'ease-out' }, { transform: 'scale(1.1)', opacity: 1, offset: 0.25 }, { transform: 'scale(1.2)', opacity: 0.9, offset: 0.6 }, { transform: 'translateY(-10px) scale(1.5)', opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    moon({ at, x, y, dur = 0.65 }) {
+      shape('moon', x, y, 1.4).animate([
+        { transform: 'translateY(30px)', opacity: 0, easing: 'ease-out' }, { transform: `translateY(${-10 * u()}px)`, opacity: 1, offset: 0.4 }, { transform: `translateY(${-14 * u()}px)`, opacity: 1, offset: 0.8 }, { transform: `translateY(${-16 * u()}px)`, opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    bubble({ at, x, y, rise = 40, dur = 0.32, s = 1 }) {
+      const b = shape('bubble', x, y, s);
+      b.animate([
+        { transform: 'translateY(0) scale(.3)', opacity: 0, easing: 'ease-out' },
+        { transform: `translateY(${-rise * 0.4 * u()}px) scale(1)`, opacity: 1, offset: 0.3 },
+        { transform: `translateY(${-rise * u()}px) scale(1.15)`, opacity: 1, offset: 0.85 },
+        { transform: `translateY(${-rise * u()}px) scale(1.8)`, opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    rings({ at, x, y, s = 1, dur = 0.4, flip = false }) {
+      shape('rings', x, y, s).animate([
+        { transform: `scaleX(${flip ? -1 : 1}) scale(.4)`, opacity: 0 }, { transform: `scaleX(${flip ? -1 : 1}) scale(1)`, opacity: 1, offset: 0.3 }, { transform: `scaleX(${flip ? -1 : 1}) scale(1.6)`, opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    ping({ at, x, y, s = 1.4, dur = 0.35 }) {
+      shape('spark', x, y, s).animate([
+        { transform: 'scale(0) rotate(0)', opacity: 0 }, { transform: 'scale(1.2) rotate(45deg)', opacity: 1, offset: 0.35 }, { transform: 'scale(0) rotate(90deg)', opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+    swoosh({ at, x, y, flip = false, dur = 0.3 }) {
+      shape('swoosh', x, y, 1.1).animate([
+        { transform: `scaleX(${flip ? -1 : 1}) scale(.6)`, opacity: 0 }, { transform: `scaleX(${flip ? -1 : 1}) scale(1)`, opacity: 1, offset: 0.3 }, { transform: `scaleX(${flip ? -1 : 1}) scale(1.1)`, opacity: 0 },
+      ], { duration: dur * 1000, delay: at * 1000, fill: 'both' });
+    },
+  };
+
+  // ======================= the wins (data) =======================
+  // t in seconds (0..1). subject: transforms of the cutout around `pivot`.
+  // clip: the subject stays inside the TV screen (for exits off an edge).
+  // frame: [[t, 'win'|'rest']] swaps to the word's second drawing.
+  // shake: [[t, px]] jolts the picture. peak: when the chime and sparks go.
+  const WINS = (await (await fetch('/static/data/wins/animals.json')).json()).words;
+  const ORDER = Object.keys(WINS);
+
+  // ======================= the engine =======================
+  let word = store.get('flip-winprev-word');
+  if (!WINS[word]) word = ORDER[0];
+  let slow = false, sayIt = true, idle = null;
+  const actors = () => [$('actor-in'), $('actor-out')];
+  function setWord(w) {
+    word = w; store.set('flip-winprev-word', w);
+    const W = WINS[w];
+    $('plate').src = '/static/images/words/animals/' + w + '-plate.webp';
+    for (const a of actors()) {
+      a.querySelectorAll('.part').forEach((n) => n.remove());
+      a.parentNode.querySelectorAll(':scope > .part').forEach((n) => n.remove());
+      a.querySelector('.rest').src = '/static/images/words/animals/' + w + (W.parts ? '-body' : '-subject') + '.webp';
+      for (const part of W.parts || []) {
+        const img = document.createElement('img'); img.className = 'part'; img.dataset.part = part.name; img.alt = '';
+        img.src = '/static/images/words/animals/' + w + '-' + part.name + '.webp'; img.style.transformOrigin = part.pivot;
+        const first = part.kf[0]; if (first[2] !== undefined) img.style.opacity = first[2];
+        if (part.fixed) { img.style.position = 'absolute'; img.style.inset = '0'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; img.style.zIndex = 1; a.parentNode.appendChild(img); }
+        else a.appendChild(img);
+      }
+      const win = a.querySelector('.win');
+      if (W.frame) win.src = '/static/images/words/animals/' + w + '-win.webp'; else win.removeAttribute('src');
+      a.style.transformOrigin = W.pivot;
+    }
+    reset();
+    renderCard();
+  }
+  function current() { return WINS[word].clip ? $('actor-in') : $('actor-out'); }
+  function reset() {
+    fx.textContent = '';
+    for (const el of [...actors(), ...actors().flatMap((a) => [...a.querySelectorAll('img')]), $('glow'), $('flash'), $('tv')]) el.getAnimations().forEach((a) => a.cancel());
+    if (voice) { try { voice.stop(); } catch (e) {} voice = null; }
+    $('actor-in').hidden = !WINS[word].clip; $('actor-out').hidden = !!WINS[word].clip;
+    idle = current().animate([{ transform: 'none' }, { transform: 'scale(1.015,1.025)' }, { transform: 'none' }], { duration: 2200, iterations: Infinity, easing: 'ease-in-out' });
+  }
+  function play() {
+    const W = WINS[word], rate = slow ? 0.25 : 1;
+    const ac = slow ? null : audio();
+    if (ac) loadClip(word);
+    reset(); idle.cancel();
+    const anims = [];
+    const A = (el, kf, o) => { const a = el.animate(kf, { fill: 'both', ...o }); anims.push(a); return a; };
+    A(current(), W.subject.map(([t, tf, extra]) => ({ offset: t, transform: tf, easing: 'ease-out', ...(extra || {}) })), { duration: 1000 });
+    for (const part of W.parts || []) {
+      const el = current().querySelector(`[data-part="${part.name}"]`) || current().parentNode.querySelector(`:scope > [data-part="${part.name}"]`);
+      A(el, part.kf.map(([t, tf, op]) => ({ offset: t, transform: tf, ...(op === undefined ? {} : { opacity: op }), easing: op === undefined ? 'ease-in-out' : 'step-end' })), { duration: 1000 });
+    }
+    if (W.frame) {
+      const kf = (on) => [{ offset: 0, opacity: on ? 0 : 1, easing: 'step-end' },
+        ...W.frame.map(([t, f]) => ({ offset: t, opacity: (f === 'win') === on ? 1 : 0, easing: 'step-end' })),
+        { offset: 1, opacity: on ? 0 : 1 }];
+      A(current().querySelector('.win'), kf(true), { duration: 1000 });
+      A(current().querySelector('.rest'), kf(false), { duration: 1000 });
+    }
+    A($('glow'), [{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 550, delay: W.peak * 1000 });
+    A($('flash'), [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 550, delay: W.peak * 1000 });
+    for (const [t, px] of W.shake || []) {
+      A($('tv'), [{ transform: 'none' }, { transform: `translate(${px * u()}px, ${-px * u() * 0.5}px)` }, { transform: `translate(${-px * u()}px, ${px * u() * 0.5}px)` }, { transform: `translate(${px * 0.5 * u()}px,0)` }, { transform: 'none' }], { duration: 220, delay: t * 1000 });
+    }
+    FX.sparks({ at: W.peak, n: 8, big: true });
+    for (const [k, spec] of W.fx || []) FX[k](spec);
+    for (const el of fx.querySelectorAll('svg')) el.getAnimations().forEach((a) => anims.push(a));
+    for (const a of anims) a.playbackRate = rate;
+    if (ac) {
+      const t0 = ac.currentTime + 0.03;
+      for (const [name, at, ...args] of W.sfx || []) SFX[name](t0 + at, ...args);
+      SFX.chime(t0 + W.peak);
+      if (sayIt) sayWord(word, t0 + 1.05);
+    }
+    const b = $('badge'); b.hidden = !slow; b.textContent = 'slow motion ×4';
+  }
+
+  // ======================= verdicts (saved for Claude) =======================
+  let db = null, reviews = {}, saveTimer = null;
+  function renderWords() {
+    const box = $('words');
+    if (!box.children.length) {
+      for (const w of ORDER) {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.w = w;
+        b.append(document.createTextNode(w)); const d = document.createElement('span'); d.className = 'dot'; b.appendChild(d);
+        b.addEventListener('click', () => { setWord(w); play(); });
+        box.appendChild(b);
+      }
+    }
+    for (const b of box.children) { b.setAttribute('aria-pressed', String(b.dataset.w === word)); b.dataset.state = (reviews[b.dataset.w] || {}).verdict || ''; }
+  }
+  function renderCard() {
+    $('w-name').textContent = word;
+    $('w-story').textContent = WINS[word].story;
+    const r = reviews[word] || {};
+    for (const b of $('verdicts').children) b.setAttribute('aria-pressed', String(b.dataset.v === r.verdict));
+    if (document.activeElement !== $('note')) $('note').value = r.note || '';
+    renderWords();
+  }
+  async function save(w) {
+    if (!db) { $('save').textContent = 'Open this page signed in to claude.ai to save your marks.'; return; }
+    const r = reviews[w] || {};
+    $('save').textContent = 'Saving…';
+    try { await db.collection('reviews').doc(w).set({ verdict: r.verdict || '', note: r.note || '', updatedAt: Date.now() }); $('save').textContent = 'Saved'; }
+    catch (e) { $('save').textContent = 'Not saved. Check your connection and try again.'; }
+  }
+  $('verdicts').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const r = reviews[word] = { ...(reviews[word] || {}) };
+    r.verdict = r.verdict === b.dataset.v ? '' : b.dataset.v; r.note = $('note').value;
+    renderCard(); save(word);
+  });
+  $('note').addEventListener('input', () => {
+    const w = word; reviews[w] = { ...(reviews[w] || {}), note: $('note').value };
+    $('save').textContent = 'Typing…'; clearTimeout(saveTimer); saveTimer = setTimeout(() => save(w), 900);
+  });
+
+  stage.addEventListener('click', play);
+  stage.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); } });
+  $('opt-word').addEventListener('click', (e) => { sayIt = !sayIt; e.currentTarget.setAttribute('aria-pressed', String(sayIt)); });
+  $('opt-slow').addEventListener('click', (e) => { slow = !slow; e.currentTarget.setAttribute('aria-pressed', String(slow)); });
+
+  setWord(word);
+  if (window.claude && window.claude.use) {
+    window.claude.use('db').then((d) => {
+      if (!d) return;
+      db = d;
+      db.collection('reviews').onSnapshot((snap) => {
+        const next = {}; for (const s of snap.docs) next[s.id] = s.data();
+        if (document.activeElement === $('note')) next[word] = { ...(next[word] || {}), note: $('note').value };
+        reviews = next; renderCard();
+      }, () => {});
+    });
+  }
+})();
+</script>
+
+</body></html>
