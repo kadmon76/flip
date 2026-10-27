@@ -608,3 +608,4 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 - His `gear` lines (the first gear of a session): not wired by B-224; no moment for it yet.
 - His `boost-slow` line (the slow say boost, before the slow word): not wired by B-224; waits for the slow say boost (above).
 - Renaming or removing a player on the start screen (players and names, chat 2026-10-24): today a player can only be added.
+- Tune B-226's starting values: with `TALK_GAP` 8 s and the dome nudge's first at 4 s (B-212), the dome nudge's `press` line is never heard after an answer (the answer's own line is still playing or ended under 8 s before; DECISIONS 2026-10-27).

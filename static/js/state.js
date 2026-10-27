@@ -164,9 +164,16 @@ export const state = {
     // (BACKLOG B-212): once the word is answered (correct or revealed, the
     // dome means "next") and the dome is not pressed, main.js's nudge
     // timer adds one after character.js NUDGE_MS.first and then every
-    // NUDGE_MS.every; each one more is his domeNudge moment. 0 on a new
-    // word.
+    // NUDGE_MS.every; each one more is his domeNudge moment (only the
+    // first may say his press line, BACKLOG B-226). 0 on a new word.
     nudges: 0,
+    // His press nudge has come on the current word (BACKLOG B-226): every
+    // slot filled on a word he points at the dome on (character.js
+    // filledEarly) and the kid has neither pressed the dome nor moved a
+    // block for a random 4-7s (character.js pressWait, pressDue); main.js's
+    // press timer sets it, and the change is his filledNudge moment (a rare
+    // press line). At most once per word: false on a new word.
+    filledNudged: false,
     // The TV has tuned in to the current word's picture (BACKLOG B-214):
     // false on a new word, while tv.js's tune-in runs; true once its
     // picture has locked (main.js onTuned, told by tv.js). The robot's

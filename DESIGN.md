@@ -214,7 +214,7 @@ Block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays no swipe, only his `reveal-open` line or the error clip). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. The swipe, the round end's tada and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
+dropped. How often he speaks is CHARACTER.md's Says column (B-226): a sometimes or rare line is dropped while he talks and for 8 s after his voice went quiet, and a dropped line plays no clip in its place. The swipe, the round end's tada and the TV's tune-in hiss (B-214, made in code) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
