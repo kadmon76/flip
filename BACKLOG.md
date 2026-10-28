@@ -620,6 +620,18 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Pure parts (the fanfare's notes and envelope, the end line's start after it) tested through `node`; a test with a stand-in context that at the round end at most one voice source is live at any time (including a round ended right after the last word's correct check).
   - Docs: CHARACTER.md (round end), DESIGN.md "Sound", CLAUDE.md's audio.js bullet (the tada is gone, the fanfare).
   - Screenshot: the round end just after it shows. Checklist passes.
+### B-231 Bulbs for the whole round, and a spare bulb for a perfect round
+- why: the game should be a little harder; the kid's idea: lives for the whole round instead of per word (human and kid, 2026-10-28). Decided by the human: from stage 1; when the bulbs run out the round ends (option A); a perfect round earns a spare bulb for the next round.
+- acceptance:
+  - A round starts with 3 bulbs plus the player's spare bulbs; the TV's bulbs (today 3 per word) show the round's bulbs, up to 5. They no longer refill on a new word.
+  - Each wrong check turns one bulb off, on any word. Per word the rest stays: the free letter after the word's second miss (B-206), the reveal after the word's third miss, the lever rule.
+  - When the last bulb goes off: the word on screen is revealed as on a third miss (it counts as missed and comes back later, missed.js) and the round ends after it: the dome goes to the round end, which shows the stars for the words solved out of the round's size (score.js unchanged), records progress, missed words, gears and keys as a finished round does. Words of the round not reached are not played and not counted as missed.
+  - Spare bulbs: a perfect round (every word of the round correct on the first check, with no boost: all `clean`) earns one spare bulb, kept per player (a new save module, `bulbs.js`, localStorage `flip.bulbs.v1` through players.js `keyOf`, every read and write in try/catch), at most 2. The next round starts with them and uses them up (spares used are gone; a perfect round can earn one again). The round end shows the new bulb popping in (celebrate.js, like the key), and the TV shows 4 or 5 bulbs when a round starts with spares.
+  - The first word's tutorial (coach.js) costs no bulb.
+  - The struggle help (B-220) and boosts are unchanged.
+  - Pure parts (bulbs at round start, after a check, round over, spare earned) tested through `node`.
+  - Docs: CLAUDE.md "Product rules" (Mistakes: 3 bulbs per round, not per word), its main.js/score/save-module bullets; PROGRESSION.md "Guardrails"; CHARACTER.md if a moment changes.
+  - Screenshots: a round with 2 bulbs left on its third word; the round end after the bulbs ran out on word 3; a round end with the spare bulb popping in; the next round starting with 4 bulbs. Checklist passes.
 - status:
 
 ## Later / not now
