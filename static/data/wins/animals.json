@@ -1,0 +1,4213 @@
+{
+ "version": 1,
+ "date": "2026-10-28",
+ "ms": 1000,
+ "note": "Per-word correct-word wins for the Animals theme, approved by the human on the Word Win Preview page (2026-10-27/28). Times are seconds from the check (0..1). See design/reference/word-wins.html for the player.",
+ "words": {
+  "cat": {
+   "story": "Puffs up proud past the TV edge, a purr-motor rumble shakes it, a puff of smoke, back to smug.",
+   "pivot": "50% 95%",
+   "peak": 0.42,
+   "subject": [
+    [
+     0,
+     "translateX(-2.2%) scale(1)"
+    ],
+    [
+     0.045,
+     "translateX(2.2%) scale(1.0225)"
+    ],
+    [
+     0.09,
+     "translateX(-2.2%) scale(1.045)"
+    ],
+    [
+     0.135,
+     "translateX(2.2%) scale(1.0675)"
+    ],
+    [
+     0.18,
+     "translateX(-2.2%) scale(1.0899999999999999)"
+    ],
+    [
+     0.22499999999999998,
+     "translateX(2.2%) scale(1.1125)"
+    ],
+    [
+     0.27,
+     "translateX(-2.2%) scale(1.135)"
+    ],
+    [
+     0.315,
+     "translateX(2.2%) scale(1.1575)"
+    ],
+    [
+     0.36,
+     "translateX(-2.2%) scale(1.18)"
+    ],
+    [
+     0.42,
+     "translateY(-6%) scale(1.3)"
+    ],
+    [
+     0.52,
+     "scale(.93,1.06)"
+    ],
+    [
+     0.62,
+     "rotate(-6deg)"
+    ],
+    [
+     0.78,
+     "rotate(6deg)"
+    ],
+    [
+     0.92,
+     "rotate(-2deg)"
+    ],
+    [
+     1,
+     "none"
+    ]
+   ],
+   "fx": [
+    [
+     "puff",
+     {
+      "at": 0.4,
+      "x": 74,
+      "y": 72,
+      "s": 1,
+      "grow": 1.7,
+      "dur": 0.6
+     }
+    ],
+    [
+     "puff",
+     {
+      "at": 0.48,
+      "x": 26,
+      "y": 66,
+      "s": 0.9,
+      "grow": 1.4,
+      "dur": 0.55
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "motor",
+     0,
+     0.38
+    ],
+    [
+     "sputter",
+     0.38,
+     2,
+     0.08
+    ],
+    [
+     "puff",
+     0.4
+    ]
+   ]
+  },
+  "dog": {
+   "story": "The tail wags faster and faster until it spins the whole dog around once; it lands with a happy bounce, tail still going.",
+   "pivot": "50% 95%",
+   "peak": 0.5,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "65% 57%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.09,
+       "rotate(24deg)"
+      ],
+      [
+       0.17,
+       "rotate(-24deg)"
+      ],
+      [
+       0.24,
+       "rotate(24deg)"
+      ],
+      [
+       0.3,
+       "rotate(-24deg)"
+      ],
+      [
+       0.35,
+       "rotate(24deg)"
+      ],
+      [
+       0.39,
+       "rotate(-24deg)"
+      ],
+      [
+       0.43,
+       "rotate(24deg)"
+      ],
+      [
+       0.47,
+       "rotate(-24deg)"
+      ],
+      [
+       0.51,
+       "rotate(24deg)"
+      ],
+      [
+       0.55,
+       "rotate(-24deg)"
+      ],
+      [
+       0.59,
+       "rotate(24deg)"
+      ],
+      [
+       0.63,
+       "rotate(-24deg)"
+      ],
+      [
+       0.67,
+       "rotate(24deg)"
+      ],
+      [
+       0.71,
+       "rotate(-24deg)"
+      ],
+      [
+       0.75,
+       "rotate(24deg)"
+      ],
+      [
+       0.79,
+       "rotate(-24deg)"
+      ],
+      [
+       0.83,
+       "rotate(24deg)"
+      ],
+      [
+       0.87,
+       "rotate(-24deg)"
+      ],
+      [
+       0.91,
+       "rotate(24deg)"
+      ],
+      [
+       0.95,
+       "rotate(-24deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.12,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-2deg) scale(1, 1)"
+    ],
+    [
+     0.22,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(2deg) scale(1, 1)"
+    ],
+    [
+     0.3,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.08, 0.9)"
+    ],
+    [
+     0.38,
+     "perspective(600px) translate(0%, -18%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.62,
+     "perspective(600px) translate(0%, -36%) rotateY(360deg) rotate(0deg) scale(1.12, 1.12)"
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(0%, 0%) rotateY(360deg) rotate(0deg) scale(1.12, 0.86)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(0%, -8%) rotateY(360deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.92,
+     "perspective(600px) translate(0%, 0%) rotateY(360deg) rotate(0deg) scale(1.03, 0.97)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(360deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "swoosh",
+     {
+      "at": 0.08,
+      "x": 84,
+      "y": 18
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.2,
+      "x": 86,
+      "y": 30,
+      "flip": true
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.42,
+      "x": 22,
+      "y": 10
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.52,
+      "x": 78,
+      "y": 0,
+      "flip": true
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.74,
+      "x": 38,
+      "y": 92,
+      "dir": 1
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.74,
+      "x": 62,
+      "y": 92,
+      "dir": -1
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "whirr",
+     0,
+     0.36
+    ],
+    [
+     "boing",
+     0.36,
+     0.26
+    ],
+    [
+     "whoosh",
+     0.44,
+     0.2
+    ],
+    [
+     "thump",
+     0.74
+    ]
+   ]
+  },
+  "pig": {
+   "story": "Leaps up out of the TV twirling like a ballerina, three spins in the air and a cartwheel on the way down, then lands on its bottom with a soft bounce.",
+   "pivot": "50% 70%",
+   "peak": 0.56,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.1, 0.88)"
+    ],
+    [
+     0.2,
+     "perspective(600px) translate(0%, -24%) rotateY(300deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.34,
+     "perspective(600px) translate(0%, -38%) rotateY(680deg) rotate(0deg) scale(1.12, 1.12)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, -42%) rotateY(1080deg) rotate(0deg) scale(1.15, 1.15)"
+    ],
+    [
+     0.68,
+     "perspective(600px) translate(0%, -26%) rotateY(1080deg) rotate(360deg) scale(1.12, 1.12)"
+    ],
+    [
+     0.8,
+     "perspective(600px) translate(0%, 6%) rotateY(1080deg) rotate(360deg) scale(1.16, 0.82)"
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(0%, -4%) rotateY(1080deg) rotate(360deg) scale(0.97, 1.04)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(1080deg) rotate(360deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "swoosh",
+     {
+      "at": 0.14,
+      "x": 18,
+      "y": 30
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.22,
+      "x": 82,
+      "y": 10,
+      "flip": true
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.3,
+      "x": 22,
+      "y": -10
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.38,
+      "x": 78,
+      "y": -18,
+      "flip": true
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.2,
+      "x": 50,
+      "y": 10,
+      "n": 6,
+      "dur": 0.6,
+      "r": 46
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.8,
+      "x": 40,
+      "y": 92,
+      "dir": 1
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.8,
+      "x": 60,
+      "y": 92,
+      "dir": -1
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "twinkle",
+     0.1,
+     0.5
+    ],
+    [
+     "whoosh",
+     0.14,
+     0.14
+    ],
+    [
+     "whoosh",
+     0.28,
+     0.14
+    ],
+    [
+     "whoosh",
+     0.42,
+     0.14
+    ],
+    [
+     "boing",
+     0.56,
+     0.12
+    ],
+    [
+     "softthud",
+     0.8
+    ]
+   ]
+  },
+  "hen": {
+   "story": "Startled, she leaps up out of the TV, feathers burst off her, she lands ruffled.",
+   "pivot": "50% 95%",
+   "peak": 0.34,
+   "subject": [
+    [
+     0,
+     "none"
+    ],
+    [
+     0.08,
+     "scale(1.12,.82)"
+    ],
+    [
+     0.34,
+     "translateY(-52%) rotate(-8deg) scale(1.06)"
+    ],
+    [
+     0.42,
+     "translateY(-48%) rotate(4deg) scale(1.06)"
+    ],
+    [
+     0.56,
+     "none"
+    ],
+    [
+     0.62,
+     "scale(1.12,.84)"
+    ],
+    [
+     0.7,
+     "scale(.97,1.04)"
+    ],
+    [
+     0.78,
+     "rotate(-5deg)"
+    ],
+    [
+     0.86,
+     "rotate(5deg)"
+    ],
+    [
+     0.93,
+     "rotate(-2deg)"
+    ],
+    [
+     1,
+     "none"
+    ]
+   ],
+   "fx": [
+    [
+     "feathers",
+     {
+      "at": 0.3,
+      "n": 6,
+      "dur": 0.7
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "boing",
+     0.06,
+     0.26
+    ],
+    [
+     "bawk",
+     0.2
+    ],
+    [
+     "flutter",
+     0.32,
+     0.3
+    ],
+    [
+     "thump",
+     0.56
+    ]
+   ]
+  },
+  "fox": {
+   "story": "Sneaks across the screen on tiptoe, glances back over its shoulder, sneaks the other way. Clang! It jumps stiff with its tail puffed up.",
+   "pivot": "50% 95%",
+   "peak": 0.58,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "69% 71%",
+     "kf": [
+      [
+       0,
+       "none"
+      ],
+      [
+       0.12,
+       "rotate(-8deg)"
+      ],
+      [
+       0.24,
+       "rotate(6deg)"
+      ],
+      [
+       0.36,
+       "rotate(-8deg)"
+      ],
+      [
+       0.48,
+       "rotate(6deg)"
+      ],
+      [
+       0.56,
+       "rotate(-14deg) scale(1.3)"
+      ],
+      [
+       0.82,
+       "rotate(-12deg) scale(1.3)"
+      ],
+      [
+       1,
+       "none"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.06,
+     "perspective(600px) translate(0%, 3%) rotateY(0deg) rotate(0deg) scale(1.04, 0.92)"
+    ],
+    [
+     0.1,
+     "perspective(600px) translate(4%, -5%) rotateY(0deg) rotate(4deg) scale(1, 1)"
+    ],
+    [
+     0.14,
+     "perspective(600px) translate(8%, 2%) rotateY(0deg) rotate(0deg) scale(1, 0.94)"
+    ],
+    [
+     0.18,
+     "perspective(600px) translate(12%, -5%) rotateY(0deg) rotate(4deg) scale(1, 1)"
+    ],
+    [
+     0.22,
+     "perspective(600px) translate(16%, 2%) rotateY(0deg) rotate(0deg) scale(1, 0.94)"
+    ],
+    [
+     0.26,
+     "perspective(600px) translate(20%, -5%) rotateY(0deg) rotate(4deg) scale(1, 1)"
+    ],
+    [
+     0.3,
+     "perspective(600px) translate(24%, 2%) rotateY(0deg) rotate(0deg) scale(1, 0.94)"
+    ],
+    [
+     0.34,
+     "perspective(600px) translate(24%, 2%) rotateY(0deg) rotate(0deg) scale(1, 0.94)"
+    ],
+    [
+     0.38,
+     "perspective(600px) translate(24%, 0%) rotateY(0deg) rotate(0deg) scale(-1, 1)"
+    ],
+    [
+     0.42,
+     "perspective(600px) translate(18%, -5%) rotateY(0deg) rotate(-4deg) scale(-1, 1)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(12%, 2%) rotateY(0deg) rotate(0deg) scale(-1, 0.94)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(6%, -5%) rotateY(0deg) rotate(-4deg) scale(-1, 1)"
+    ],
+    [
+     0.54,
+     "perspective(600px) translate(2%, 2%) rotateY(0deg) rotate(0deg) scale(-1, 0.94)"
+    ],
+    [
+     0.58,
+     "perspective(600px) translate(2%, -18%) rotateY(0deg) rotate(0deg) scale(-1.14, 1.2)"
+    ],
+    [
+     0.62,
+     "perspective(600px) translate(3%, -16%) rotateY(0deg) rotate(0deg) scale(-1.14, 1.18)"
+    ],
+    [
+     0.66,
+     "perspective(600px) translate(1%, -16%) rotateY(0deg) rotate(0deg) scale(-1.14, 1.18)"
+    ],
+    [
+     0.7,
+     "perspective(600px) translate(3%, -16%) rotateY(0deg) rotate(0deg) scale(-1.14, 1.18)"
+    ],
+    [
+     0.82,
+     "perspective(600px) translate(2%, -16%) rotateY(0deg) rotate(0deg) scale(-1.14, 1.18)"
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(1%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "clang",
+     {
+      "at": 0.56,
+      "x": 50,
+      "y": -6
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.58,
+      "x": 50,
+      "y": 6,
+      "n": 3,
+      "dur": 0.45,
+      "r": 18
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.56,
+     3
+    ]
+   ],
+   "sfx": [
+    [
+     "plink",
+     0.1,
+     1500
+    ],
+    [
+     "plink",
+     0.18,
+     1300
+    ],
+    [
+     "plink",
+     0.26,
+     1500
+    ],
+    [
+     "whoosh",
+     0.38,
+     0.12
+    ],
+    [
+     "plink",
+     0.42,
+     1300
+    ],
+    [
+     "plink",
+     0.5,
+     1500
+    ],
+    [
+     "clang",
+     0.56
+    ]
+   ]
+  },
+  "bat": {
+   "story": "Jolts awake, throws its wings open and swings on its branch, cheering (the wings-open drawing we have).",
+   "pivot": "51% 14%",
+   "peak": 0.16,
+   "frame": [
+    [
+     0.1,
+     "win"
+    ],
+    [
+     0.95,
+     "rest"
+    ]
+   ],
+   "subject": [
+    [
+     0,
+     "none"
+    ],
+    [
+     0.08,
+     "scale(.96,1.04)"
+    ],
+    [
+     0.16,
+     "scale(1.16) rotate(-4deg)"
+    ],
+    [
+     0.32,
+     "scale(1.08) rotate(-14deg)"
+    ],
+    [
+     0.5,
+     "scale(1.08) rotate(12deg)"
+    ],
+    [
+     0.66,
+     "scale(1.06) rotate(-8deg)"
+    ],
+    [
+     0.8,
+     "scale(1.04) rotate(4deg)"
+    ],
+    [
+     0.92,
+     "scale(1.02) rotate(-1deg)"
+    ],
+    [
+     1,
+     "none"
+    ]
+   ],
+   "fx": [
+    [
+     "swoosh",
+     {
+      "at": 0.3,
+      "x": 22,
+      "y": 50,
+      "flip": true
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.48,
+      "x": 78,
+      "y": 50
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "boing",
+     0.06,
+     0.12
+    ],
+    [
+     "whoosh",
+     0.14,
+     0.18
+    ],
+    [
+     "whoosh",
+     0.32,
+     0.2
+    ],
+    [
+     "whoosh",
+     0.52,
+     0.2
+    ]
+   ]
+  },
+  "ant": {
+   "story": "Marches so fast its legs blur into a whirl, skids to a stop, and stands up proud on its back legs.",
+   "pivot": "60% 92%",
+   "peak": 0.56,
+   "parts": [
+    {
+     "name": "legs",
+     "pivot": "50% 80%",
+     "kf": [
+      [
+       0,
+       "none",
+       1
+      ],
+      [
+       0.02,
+       "none",
+       0
+      ],
+      [
+       0.4,
+       "none",
+       0
+      ],
+      [
+       0.42,
+       "none",
+       1
+      ],
+      [
+       1,
+       "none",
+       1
+      ]
+     ]
+    },
+    {
+     "name": "legsblur",
+     "pivot": "50% 80%",
+     "kf": [
+      [
+       0,
+       "none",
+       0
+      ],
+      [
+       0.02,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.05,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.08,
+       "translateX(2%) skewX(6deg)",
+       1
+      ],
+      [
+       0.11,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.14,
+       "translateX(2%) skewX(6deg)",
+       1
+      ],
+      [
+       0.16999999999999998,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.2,
+       "translateX(2%) skewX(6deg)",
+       1
+      ],
+      [
+       0.22999999999999998,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.26,
+       "translateX(2%) skewX(6deg)",
+       1
+      ],
+      [
+       0.29,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.32,
+       "translateX(2%) skewX(6deg)",
+       1
+      ],
+      [
+       0.35,
+       "translateX(-2%) skewX(-6deg)",
+       1
+      ],
+      [
+       0.37999999999999995,
+       "translateX(2%) skewX(6deg)",
+       1
+      ],
+      [
+       0.4,
+       "none",
+       1
+      ],
+      [
+       0.42,
+       "none",
+       0
+      ],
+      [
+       1,
+       "none",
+       0
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(1deg) scale(1, 1)"
+    ],
+    [
+     0.045,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(-2deg) scale(1, 1)"
+    ],
+    [
+     0.09,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(1deg) scale(1, 1)"
+    ],
+    [
+     0.135,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(-2deg) scale(1, 1)"
+    ],
+    [
+     0.18,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(1deg) scale(1, 1)"
+    ],
+    [
+     0.22499999999999998,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(-2deg) scale(1, 1)"
+    ],
+    [
+     0.27,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(1deg) scale(1, 1)"
+    ],
+    [
+     0.315,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(-2deg) scale(1, 1)"
+    ],
+    [
+     0.36,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(1deg) scale(1, 1)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(4%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.48,
+     "perspective(600px) translate(9%, 0%) rotateY(0deg) rotate(-7deg) scale(1, 1)"
+    ],
+    [
+     0.56,
+     "perspective(600px) translate(9%, -12%) rotateY(0deg) rotate(-24deg) scale(1.16, 1.16)"
+    ],
+    [
+     0.64,
+     "perspective(600px) translate(9%, -10%) rotateY(0deg) rotate(-20deg) scale(1.2, 1.2)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(9%, -10%) rotateY(0deg) rotate(-20deg) scale(1.2, 1.2)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "dust",
+     {
+      "at": 0.06,
+      "x": 30,
+      "y": 90,
+      "dir": -1,
+      "dur": 0.3
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.2,
+      "x": 30,
+      "y": 90,
+      "dir": -1,
+      "dur": 0.3
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.42,
+      "x": 72,
+      "y": 90,
+      "dir": -1
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.1,
+      "x": 10,
+      "y": 40,
+      "flip": true
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.26,
+      "x": 8,
+      "y": 60,
+      "flip": true
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "taps",
+     0,
+     0.4,
+     0.03
+    ],
+    [
+     "skid",
+     0.42
+    ]
+   ]
+  },
+  "bug": {
+   "story": "Zooms in a loop out of the TV and back, bonks into the screen glass and wobbles.",
+   "pivot": "50% 50%",
+   "peak": 0.66,
+   "subject": [
+    [
+     0,
+     "none"
+    ],
+    [
+     0.14,
+     "translate(26%,-30%) scale(.85) rotate(20deg)"
+    ],
+    [
+     0.3,
+     "translate(-6%,-62%) scale(.8) rotate(-10deg)"
+    ],
+    [
+     0.44,
+     "translate(-34%,-24%) scale(.95) rotate(-30deg)"
+    ],
+    [
+     0.58,
+     "translate(-10%,6%) scale(1.25) rotate(-8deg)"
+    ],
+    [
+     0.66,
+     "translate(0,0) scale(1.45)"
+    ],
+    [
+     0.71,
+     "scale(1.6,1.3)"
+    ],
+    [
+     0.78,
+     "scale(1.2) rotate(-9deg)"
+    ],
+    [
+     0.86,
+     "scale(1.1) rotate(7deg)"
+    ],
+    [
+     0.93,
+     "rotate(-3deg)"
+    ],
+    [
+     1,
+     "none"
+    ]
+   ],
+   "fx": [
+    [
+     "stars",
+     {
+      "at": 0.68,
+      "x": 50,
+      "y": 30,
+      "n": 4,
+      "dur": 0.4,
+      "r": 26
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.66,
+     3
+    ]
+   ],
+   "sfx": [
+    [
+     "buzz",
+     0,
+     0.64
+    ],
+    [
+     "bonk",
+     0.66
+    ]
+   ]
+  },
+  "frog": {
+   "story": "Swells up big and round, then leaps up out of the TV with a ribbit and lands with a splat.",
+   "pivot": "50% 95%",
+   "peak": 0.42,
+   "subject": [
+    [
+     0,
+     "none"
+    ],
+    [
+     0.12,
+     "scale(1.06,1.03)"
+    ],
+    [
+     0.22,
+     "scale(1.12,1.06)"
+    ],
+    [
+     0.3,
+     "scale(1.2,1.1)"
+    ],
+    [
+     0.36,
+     "scale(1.26,.84)"
+    ],
+    [
+     0.56,
+     "translateY(-56%) scale(.94,1.1) rotate(-6deg)"
+    ],
+    [
+     0.72,
+     "translateY(0) scale(1)"
+    ],
+    [
+     0.78,
+     "scale(1.3,.72)"
+    ],
+    [
+     0.88,
+     "scale(.96,1.05)"
+    ],
+    [
+     1,
+     "none"
+    ]
+   ],
+   "fx": [
+    [
+     "drops",
+     {
+      "at": 0.76,
+      "x": 50,
+      "y": 90,
+      "n": 6,
+      "green": true,
+      "dur": 0.5,
+      "spread": 70
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "inflate",
+     0,
+     0.34
+    ],
+    [
+     "ribbit",
+     0.38
+    ],
+    [
+     "splat",
+     0.76
+    ]
+   ]
+  },
+  "crab": {
+   "story": "Scuttles sideways off the right edge and pops back in from the left, still sideways, snapping its claws.",
+   "pivot": "50% 92%",
+   "peak": 0.7,
+   "clip": true,
+   "subject": [
+    [
+     0,
+     "none"
+    ],
+    [
+     0.06,
+     "translate(8%,-3%)"
+    ],
+    [
+     0.12,
+     "translate(18%,0)"
+    ],
+    [
+     0.18,
+     "translate(30%,-3%)"
+    ],
+    [
+     0.24,
+     "translate(45%,0)"
+    ],
+    [
+     0.3,
+     "translate(62%,-3%)"
+    ],
+    [
+     0.34,
+     "translate(80%,0)"
+    ],
+    [
+     0.341,
+     "translate(-80%,0)"
+    ],
+    [
+     0.42,
+     "translate(-56%,-3%)"
+    ],
+    [
+     0.5,
+     "translate(-36%,0)"
+    ],
+    [
+     0.58,
+     "translate(-18%,-3%)"
+    ],
+    [
+     0.66,
+     "translate(0,0)"
+    ],
+    [
+     0.72,
+     "scale(1.06,.95)"
+    ],
+    [
+     0.78,
+     "scale(.98,1.04)"
+    ],
+    [
+     0.84,
+     "scale(1.06,.95)"
+    ],
+    [
+     0.9,
+     "scale(.98,1.04)"
+    ],
+    [
+     1,
+     "none"
+    ]
+   ],
+   "fx": [
+    [
+     "stars",
+     {
+      "at": 0.74,
+      "x": 22,
+      "y": 30,
+      "n": 2,
+      "dur": 0.3,
+      "r": 10
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.86,
+      "x": 78,
+      "y": 30,
+      "n": 2,
+      "dur": 0.3,
+      "r": 10
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "clicks",
+     0,
+     0.66
+    ],
+    [
+     "snap",
+     0.74
+    ],
+    [
+     "snap",
+     0.86
+    ]
+   ]
+  },
+  "panda": {
+   "story": "Pulls its bamboo back like a spring; it boings, bonks the panda on the head, and the panda rocks on its round back.",
+   "pivot": "50% 92%",
+   "peak": 0.34,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.15,
+     "perspective(600px) translate(-3%, 0%) rotateY(0deg) rotate(-14deg) scale(1, 1)"
+    ],
+    [
+     0.22,
+     "perspective(600px) translate(-4%, 0%) rotateY(0deg) rotate(-16deg) scale(1.04, 0.96)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(4%, -4%) rotateY(0deg) rotate(12deg) scale(1, 1)"
+    ],
+    [
+     0.42,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-6deg) scale(1, 1)"
+    ],
+    [
+     0.55,
+     "perspective(600px) translate(-6%, 2%) rotateY(0deg) rotate(-38deg) scale(1, 1)"
+    ],
+    [
+     0.68,
+     "perspective(600px) translate(-3%, 0%) rotateY(0deg) rotate(-20deg) scale(1, 1)"
+    ],
+    [
+     0.78,
+     "perspective(600px) translate(-5%, 0%) rotateY(0deg) rotate(-32deg) scale(1, 1)"
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-6deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "swoosh",
+     {
+      "at": 0.24,
+      "x": 66,
+      "y": 4,
+      "flip": true
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.33,
+      "x": 46,
+      "y": 20,
+      "n": 4,
+      "dur": 0.55,
+      "r": 22
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.32,
+     2
+    ]
+   ],
+   "sfx": [
+    [
+     "inflate",
+     0,
+     0.22
+    ],
+    [
+     "boing",
+     0.22,
+     0.12
+    ],
+    [
+     "bonk",
+     0.32
+    ],
+    [
+     "softthud",
+     0.55
+    ]
+   ]
+  },
+  "fish": {
+   "story": "Puffs up round like a balloon, blows three bubbles that pop, then lets the air out and zooms around like a balloon.",
+   "pivot": "50% 55%",
+   "peak": 0.3,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "30% 57%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.06,
+       "rotate(18deg)"
+      ],
+      [
+       0.12,
+       "rotate(-18deg)"
+      ],
+      [
+       0.18,
+       "rotate(18deg)"
+      ],
+      [
+       0.24,
+       "rotate(-18deg)"
+      ],
+      [
+       0.3,
+       "rotate(18deg)"
+      ],
+      [
+       0.36,
+       "rotate(-18deg)"
+      ],
+      [
+       0.42,
+       "rotate(18deg)"
+      ],
+      [
+       0.48,
+       "rotate(-18deg)"
+      ],
+      [
+       0.54,
+       "rotate(18deg)"
+      ],
+      [
+       0.58,
+       "rotate(-18deg)"
+      ],
+      [
+       0.62,
+       "rotate(18deg)"
+      ],
+      [
+       0.66,
+       "rotate(-18deg)"
+      ],
+      [
+       0.7,
+       "rotate(18deg)"
+      ],
+      [
+       0.74,
+       "rotate(-18deg)"
+      ],
+      [
+       0.78,
+       "rotate(18deg)"
+      ],
+      [
+       0.82,
+       "rotate(-18deg)"
+      ],
+      [
+       0.86,
+       "rotate(18deg)"
+      ],
+      [
+       0.9,
+       "rotate(-18deg)"
+      ],
+      [
+       0.95,
+       "rotate(18deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.1, 1.15)"
+    ],
+    [
+     0.16,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.2, 1.32)"
+    ],
+    [
+     0.26,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.28, 1.48)"
+    ],
+    [
+     0.36,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-3deg) scale(1.28, 1.46)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(3deg) scale(1.28, 1.46)"
+    ],
+    [
+     0.54,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.26, 1.44)"
+    ],
+    [
+     0.62,
+     "perspective(600px) translate(-30%, -50%) rotateY(0deg) rotate(-30deg) scale(1.05, 1.05)"
+    ],
+    [
+     0.7,
+     "perspective(600px) translate(20%, -70%) rotateY(0deg) rotate(40deg) scale(1, 1)"
+    ],
+    [
+     0.78,
+     "perspective(600px) translate(35%, -20%) rotateY(0deg) rotate(120deg) scale(1, 1)"
+    ],
+    [
+     0.88,
+     "perspective(600px) translate(-10%, -5%) rotateY(0deg) rotate(330deg) scale(1, 1)"
+    ],
+    [
+     0.95,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(360deg) scale(1.05, 0.95)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(360deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "bubble",
+     {
+      "at": 0.3,
+      "x": 82,
+      "y": 40,
+      "rise": 45
+     }
+    ],
+    [
+     "bubble",
+     {
+      "at": 0.38,
+      "x": 84,
+      "y": 44,
+      "rise": 55,
+      "s": 1.3
+     }
+    ],
+    [
+     "bubble",
+     {
+      "at": 0.46,
+      "x": 82,
+      "y": 42,
+      "rise": 40,
+      "s": 0.8
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.64,
+      "x": 30,
+      "y": -10
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.76,
+      "x": 80,
+      "y": 20,
+      "flip": true
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "inflate",
+     0,
+     0.26
+    ],
+    [
+     "pop",
+     0.6
+    ],
+    [
+     "pop",
+     0.68
+    ],
+    [
+     "pop",
+     0.76
+    ],
+    [
+     "pfff",
+     0.56,
+     0.36
+    ]
+   ]
+  },
+  "sheep": {
+   "story": "Floats up out of the top of the TV like a cloud, legs kicking, bobs, and drops back down with a soft boing.",
+   "pivot": "50% 90%",
+   "peak": 0.48,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.06, 0.9)"
+    ],
+    [
+     0.22,
+     "perspective(600px) translate(0%, -30%) rotateY(0deg) rotate(0deg) scale(1.05, 1.05)"
+    ],
+    [
+     0.36,
+     "perspective(600px) translate(0%, -48%) rotateY(0deg) rotate(-4deg) scale(1.1, 1.1)"
+    ],
+    [
+     0.42,
+     "perspective(600px) translate(0%, -50%) rotateY(0deg) rotate(-2deg) scale(1.16, 1.06)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(0%, -52%) rotateY(0deg) rotate(2deg) scale(1.06, 1.14)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, -56%) rotateY(0deg) rotate(4deg) scale(1.16, 1.06)"
+    ],
+    [
+     0.56,
+     "perspective(600px) translate(0%, -54%) rotateY(0deg) rotate(2deg) scale(1.1, 1.1)"
+    ],
+    [
+     0.64,
+     "perspective(600px) translate(0%, -48%) rotateY(0deg) rotate(-3deg) scale(1.1, 1.1)"
+    ],
+    [
+     0.76,
+     "perspective(600px) translate(0%, -26%) rotateY(0deg) rotate(0deg) scale(1.04, 1.04)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(0%, 4%) rotateY(0deg) rotate(0deg) scale(1.12, 0.86)"
+    ],
+    [
+     0.92,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(0.97, 1.04)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "puff",
+     {
+      "at": 0.26,
+      "x": 12,
+      "y": 30,
+      "s": 0.8,
+      "grow": 1.3,
+      "dur": 0.5
+     }
+    ],
+    [
+     "puff",
+     {
+      "at": 0.4,
+      "x": 88,
+      "y": 10,
+      "s": 0.8,
+      "grow": 1.3,
+      "dur": 0.5
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.84,
+      "x": 38,
+      "y": 92,
+      "dir": 1
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.84,
+      "x": 62,
+      "y": 92,
+      "dir": -1
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "whoosh",
+     0.08,
+     0.45
+    ],
+    [
+     "flutter",
+     0.4,
+     0.16
+    ],
+    [
+     "boing",
+     0.84,
+     0.14
+    ]
+   ]
+  },
+  "shark": {
+   "story": "Rises up out of the water with its big toothy grin, a sparkle pings on its teeth, and it rocks side to side, waving.",
+   "pivot": "50% 95%",
+   "peak": 0.36,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 6%) rotateY(0deg) rotate(0deg) scale(1, 0.94)"
+    ],
+    [
+     0.3,
+     "perspective(600px) translate(0%, -28%) rotateY(0deg) rotate(0deg) scale(1.12, 1.12)"
+    ],
+    [
+     0.38,
+     "perspective(600px) translate(0%, -26%) rotateY(0deg) rotate(0deg) scale(1.14, 1.14)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, -26%) rotateY(0deg) rotate(-8deg) scale(1.12, 1.12)"
+    ],
+    [
+     0.62,
+     "perspective(600px) translate(0%, -26%) rotateY(0deg) rotate(8deg) scale(1.12, 1.12)"
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(0%, -20%) rotateY(0deg) rotate(-6deg) scale(1.08, 1.08)"
+    ],
+    [
+     0.86,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(2deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "drops",
+     {
+      "at": 0.08,
+      "x": 50,
+      "y": 92,
+      "n": 7,
+      "dur": 0.5,
+      "spread": 70
+     }
+    ],
+    [
+     "ping",
+     {
+      "at": 0.34,
+      "x": 38,
+      "y": 4,
+      "s": 1.6
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.5,
+      "x": 18,
+      "y": 10
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.62,
+      "x": 82,
+      "y": 10,
+      "flip": true
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "splash",
+     0.06
+    ],
+    [
+     "whoosh",
+     0.1,
+     0.2
+    ],
+    [
+     "ping",
+     0.34
+    ],
+    [
+     "whoosh",
+     0.5,
+     0.12
+    ],
+    [
+     "whoosh",
+     0.62,
+     0.12
+    ]
+   ]
+  },
+  "zebra": {
+   "story": "Spins so fast its stripes blur to grey, stops, and wobbles dizzily with stars circling its head, tail flapping.",
+   "pivot": "50% 92%",
+   "peak": 0.5,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "28.7% 64.7%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.5,
+       "rotate(0deg)"
+      ],
+      [
+       0.56,
+       "rotate(20deg)"
+      ],
+      [
+       0.62,
+       "rotate(-20deg)"
+      ],
+      [
+       0.68,
+       "rotate(20deg)"
+      ],
+      [
+       0.74,
+       "rotate(-20deg)"
+      ],
+      [
+       0.8,
+       "rotate(20deg)"
+      ],
+      [
+       0.86,
+       "rotate(-20deg)"
+      ],
+      [
+       0.92,
+       "rotate(20deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.05,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.04, 0.96)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.15,
+     "perspective(600px) translate(0%, 0%) rotateY(360deg) rotate(0deg) scale(1, 1)",
+     {
+      "filter": "blur(2.5px)"
+     }
+    ],
+    [
+     0.45,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(0deg) scale(1, 1)",
+     {
+      "filter": "blur(2.5px)"
+     }
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(0deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.58,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(-10deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.66,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(9deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(-7deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.82,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(5deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(-2deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(1440deg) rotate(0deg) scale(1, 1)",
+     {
+      "filter": "blur(0px)"
+     }
+    ]
+   ],
+   "fx": [
+    [
+     "stars",
+     {
+      "at": 0.5,
+      "x": 46,
+      "y": 14,
+      "n": 4,
+      "dur": 0.5,
+      "r": 24
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "whirr",
+     0.05,
+     0.42
+    ],
+    [
+     "dizzy",
+     0.52,
+     0.42
+    ]
+   ]
+  },
+  "bird": {
+   "story": "Puffs up to twice its size for a huge tweet that shakes the TV and blows off a few feathers, then shrinks back small.",
+   "pivot": "65% 74%",
+   "peak": 0.32,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.15, 1.15)"
+    ],
+    [
+     0.2,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.35, 1.35)"
+    ],
+    [
+     0.28,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.6, 1.6)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(0%, -8%) rotateY(0deg) rotate(-6deg) scale(1.7, 1.7)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.6, 1.6)"
+    ],
+    [
+     0.62,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.8, 0.8)"
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(4deg) scale(0.84, 0.84)"
+    ],
+    [
+     0.86,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-3deg) scale(0.9, 0.9)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "rings",
+     {
+      "at": 0.3,
+      "x": 96,
+      "y": 0,
+      "s": 1.3
+     }
+    ],
+    [
+     "rings",
+     {
+      "at": 0.38,
+      "x": 104,
+      "y": -6,
+      "s": 1.6
+     }
+    ],
+    [
+     "feathers",
+     {
+      "at": 0.32,
+      "n": 5,
+      "x": 55,
+      "y": 40,
+      "dur": 0.6
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.3,
+     3
+    ],
+    [
+     0.4,
+     2
+    ]
+   ],
+   "sfx": [
+    [
+     "inflate",
+     0,
+     0.28
+    ],
+    [
+     "tweet",
+     0.3
+    ],
+    [
+     "flutter",
+     0.34,
+     0.2
+    ],
+    [
+     "plink",
+     0.62,
+     1800
+    ]
+   ]
+  },
+  "lion": {
+   "story": "Swells up huge for a giant roar... out comes a tiny squeak. It shrinks a little and looks away, embarrassed.",
+   "pivot": "50% 95%",
+   "peak": 0.44,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "68.3% 78.6%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.38,
+       "rotate(-30deg)"
+      ],
+      [
+       0.44,
+       "rotate(-30deg)"
+      ],
+      [
+       0.52,
+       "rotate(24deg)"
+      ],
+      [
+       0.9,
+       "rotate(20deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.06, 1.06)"
+    ],
+    [
+     0.18,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(0deg) scale(1.18, 1.18)"
+    ],
+    [
+     0.28,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.3, 1.3)"
+    ],
+    [
+     0.31,
+     "perspective(600px) translate(1%, -6%) rotateY(0deg) rotate(0deg) scale(1.31, 1.31)"
+    ],
+    [
+     0.34,
+     "perspective(600px) translate(-1%, -7%) rotateY(0deg) rotate(0deg) scale(1.32, 1.32)"
+    ],
+    [
+     0.37,
+     "perspective(600px) translate(1%, -7%) rotateY(0deg) rotate(0deg) scale(1.33, 1.33)"
+    ],
+    [
+     0.42,
+     "perspective(600px) translate(0%, -8%) rotateY(0deg) rotate(0deg) scale(1.34, 1.34)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(0%, 2%) rotateY(0deg) rotate(0deg) scale(0.82, 0.82)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(0%, 2%) rotateY(0deg) rotate(-4deg) scale(0.82, 0.82)"
+    ],
+    [
+     0.75,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(3deg) scale(0.86, 0.86)"
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.94, 0.94)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "rings",
+     {
+      "at": 0.43,
+      "x": 62,
+      "y": 30,
+      "s": 0.5,
+      "dur": 0.3
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "roar",
+     0,
+     0.42
+    ],
+    [
+     "squeak",
+     0.43
+    ]
+   ]
+  },
+  "snake": {
+   "story": "Coils down and springs up out of the top of the TV like a jack-in-the-box, then sways back down with a hiss.",
+   "pivot": "50% 95%",
+   "peak": 0.32,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.12, 0.72)"
+    ],
+    [
+     0.18,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.16, 0.62)"
+    ],
+    [
+     0.3,
+     "perspective(600px) translate(0%, -40%) rotateY(0deg) rotate(0deg) scale(0.9, 1.3)"
+    ],
+    [
+     0.38,
+     "perspective(600px) translate(0%, -46%) rotateY(0deg) rotate(-6deg) scale(0.92, 1.25)"
+    ],
+    [
+     0.48,
+     "perspective(600px) translate(0%, -34%) rotateY(0deg) rotate(8deg) scale(1, 1.15)"
+    ],
+    [
+     0.58,
+     "perspective(600px) translate(0%, -20%) rotateY(0deg) rotate(-8deg) scale(1, 1)"
+    ],
+    [
+     0.68,
+     "perspective(600px) translate(0%, -8%) rotateY(0deg) rotate(6deg) scale(1, 1)"
+    ],
+    [
+     0.78,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-4deg) scale(1, 1)"
+    ],
+    [
+     0.88,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(2deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "puff",
+     {
+      "at": 0.48,
+      "x": 72,
+      "y": -18,
+      "s": 0.6,
+      "grow": 1.4,
+      "dur": 0.4
+     }
+    ],
+    [
+     "puff",
+     {
+      "at": 0.56,
+      "x": 80,
+      "y": -12,
+      "s": 0.5,
+      "grow": 1.4,
+      "dur": 0.4
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "inflate",
+     0,
+     0.18
+    ],
+    [
+     "boing",
+     0.2,
+     0.3
+    ],
+    [
+     "hiss",
+     0.48,
+     0.3
+    ]
+   ]
+  },
+  "horse": {
+   "story": "Gallops on the spot, rears up on its hind legs with a big neigh, front hooves kicking, slams down in a cloud of dust and prances proudly. Tail swishing all the way.",
+   "pivot": "75% 92%",
+   "peak": 0.48,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "65.8% 42.4%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.08,
+       "rotate(16deg)"
+      ],
+      [
+       0.16,
+       "rotate(-16deg)"
+      ],
+      [
+       0.24,
+       "rotate(16deg)"
+      ],
+      [
+       0.32,
+       "rotate(-16deg)"
+      ],
+      [
+       0.4,
+       "rotate(16deg)"
+      ],
+      [
+       0.48,
+       "rotate(-16deg)"
+      ],
+      [
+       0.56,
+       "rotate(16deg)"
+      ],
+      [
+       0.64,
+       "rotate(-16deg)"
+      ],
+      [
+       0.72,
+       "rotate(16deg)"
+      ],
+      [
+       0.8,
+       "rotate(-16deg)"
+      ],
+      [
+       0.88,
+       "rotate(16deg)"
+      ],
+      [
+       0.94,
+       "rotate(-16deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.04,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(-3deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(3deg) scale(1, 1)"
+    ],
+    [
+     0.12,
+     "perspective(600px) translate(0%, -3%) rotateY(0deg) rotate(-3deg) scale(1, 1)"
+    ],
+    [
+     0.16,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.04, 0.94)"
+    ],
+    [
+     0.28,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(24deg) scale(1.08, 1.08)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(20deg) scale(1.08, 1.08)"
+    ],
+    [
+     0.36,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(26deg) scale(1.08, 1.08)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(21deg) scale(1.08, 1.08)"
+    ],
+    [
+     0.48,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-3deg) scale(1.08, 0.9)"
+    ],
+    [
+     0.56,
+     "perspective(600px) translate(0%, -2%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.64,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(2deg) scale(1, 1)"
+    ],
+    [
+     0.72,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.8,
+     "perspective(600px) translate(0%, -5%) rotateY(0deg) rotate(-2deg) scale(1, 1)"
+    ],
+    [
+     0.88,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "dust",
+     {
+      "at": 0.02,
+      "x": 30,
+      "y": 90,
+      "dir": 1,
+      "dur": 0.35
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.48,
+      "x": 20,
+      "y": 90,
+      "dir": 1
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.48,
+      "x": 80,
+      "y": 90,
+      "dir": -1
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.48,
+     3
+    ]
+   ],
+   "sfx": [
+    [
+     "clipclop",
+     0,
+     0.14,
+     0.05
+    ],
+    [
+     "neigh",
+     0.16,
+     0.42
+    ],
+    [
+     "thump",
+     0.48
+    ],
+    [
+     "clipclop",
+     0.56,
+     0.34,
+     0.08
+    ]
+   ]
+  },
+  "tiger": {
+   "story": "The yawn turns into a mighty stretch: the tiger lunges forward out of the TV, then flops back down sleepily.",
+   "pivot": "50% 90%",
+   "peak": 0.4,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "25% 38%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.2,
+       "rotate(-8deg)"
+      ],
+      [
+       0.4,
+       "rotate(-18deg)"
+      ],
+      [
+       0.5,
+       "rotate(12deg)"
+      ],
+      [
+       0.62,
+       "rotate(18deg)"
+      ],
+      [
+       0.8,
+       "rotate(14deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.12,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-2deg) scale(1.03, 1.06)"
+    ],
+    [
+     0.22,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-3deg) scale(1.04, 1.08)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(16%, -4%) rotateY(0deg) rotate(-3deg) scale(1.32, 1.12)"
+    ],
+    [
+     0.48,
+     "perspective(600px) translate(18%, -3%) rotateY(0deg) rotate(0deg) scale(1.34, 1.1)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(6%, 6%) rotateY(0deg) rotate(3deg) scale(1.16, 0.82)"
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(4%, 6%) rotateY(0deg) rotate(2deg) scale(1.14, 0.84)"
+    ],
+    [
+     0.88,
+     "perspective(600px) translate(2%, 3%) rotateY(0deg) rotate(0deg) scale(1.06, 0.92)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "bubble",
+     {
+      "at": 0.62,
+      "x": 80,
+      "y": 40,
+      "rise": 30,
+      "dur": 0.38,
+      "s": 1.3
+     }
+    ],
+    [
+     "bubble",
+     {
+      "at": 0.72,
+      "x": 86,
+      "y": 34,
+      "rise": 34,
+      "dur": 0.28
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.3,
+      "x": 10,
+      "y": 40,
+      "flip": true
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "yawn",
+     0,
+     0.3
+    ],
+    [
+     "whoosh",
+     0.24,
+     0.2
+    ],
+    [
+     "softthud",
+     0.58
+    ]
+   ]
+  },
+  "rabbit": {
+   "story": "Hops high out of the TV, then a little hop more; its tall ear flips like a flag in the air.",
+   "pivot": "50% 92%",
+   "peak": 0.3,
+   "parts": [
+    {
+     "name": "ear",
+     "pivot": "50% 30.1%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.18,
+       "rotate(-55deg)"
+      ],
+      [
+       0.34,
+       "rotate(45deg)"
+      ],
+      [
+       0.48,
+       "rotate(-35deg)"
+      ],
+      [
+       0.62,
+       "rotate(28deg)"
+      ],
+      [
+       0.76,
+       "rotate(-18deg)"
+      ],
+      [
+       0.88,
+       "rotate(8deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.12, 0.84)"
+    ],
+    [
+     0.3,
+     "perspective(600px) translate(0%, -48%) rotateY(0deg) rotate(0deg) scale(0.94, 1.08)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.52,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.12, 0.86)"
+    ],
+    [
+     0.68,
+     "perspective(600px) translate(0%, -18%) rotateY(0deg) rotate(0deg) scale(1, 1.04)"
+    ],
+    [
+     0.82,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.08, 0.92)"
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1.02)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "dust",
+     {
+      "at": 0.47,
+      "x": 40,
+      "y": 92,
+      "dir": 1,
+      "dur": 0.35
+     }
+    ],
+    [
+     "dust",
+     {
+      "at": 0.47,
+      "x": 60,
+      "y": 92,
+      "dir": -1,
+      "dur": 0.35
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "boing",
+     0.08,
+     0.2
+    ],
+    [
+     "softthud",
+     0.47
+    ],
+    [
+     "boing",
+     0.54,
+     0.12
+    ],
+    [
+     "softthud",
+     0.82
+    ]
+   ]
+  },
+  "mouse": {
+   "story": "Zips off the screen in a puff of dust, then peeks back in from the edge with just its nose and whiskers, twitching, before scurrying back.",
+   "pivot": "50% 92%",
+   "peak": 0.62,
+   "clip": true,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "70% 67%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.1,
+       "rotate(18deg)"
+      ],
+      [
+       0.2,
+       "rotate(-14deg)"
+      ],
+      [
+       0.5,
+       "rotate(0deg)"
+      ],
+      [
+       0.66,
+       "rotate(10deg)"
+      ],
+      [
+       0.78,
+       "rotate(-8deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.06,
+     "perspective(600px) translate(3%, 0%) rotateY(0deg) rotate(0deg) scale(1.08, 0.9)"
+    ],
+    [
+     0.2,
+     "perspective(600px) translate(-110%, 0%) rotateY(0deg) rotate(0deg) scale(1.2, 0.9)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(-110%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.58,
+     "perspective(600px) translate(-50%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.64,
+     "perspective(600px) translate(-47%, 0%) rotateY(0deg) rotate(-4deg) scale(1, 1)"
+    ],
+    [
+     0.7,
+     "perspective(600px) translate(-49%, 0%) rotateY(0deg) rotate(3deg) scale(1, 1)"
+    ],
+    [
+     0.76,
+     "perspective(600px) translate(-47%, 0%) rotateY(0deg) rotate(-3deg) scale(1, 1)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(-50%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.94,
+     "perspective(600px) translate(-6%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "dust",
+     {
+      "at": 0.08,
+      "x": 48,
+      "y": 86,
+      "dir": -1
+     }
+    ],
+    [
+     "puff",
+     {
+      "at": 0.1,
+      "x": 60,
+      "y": 70,
+      "s": 0.8,
+      "grow": 1.5,
+      "dur": 0.45
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "zip",
+     0.07
+    ],
+    [
+     "squeak",
+     0.6
+    ],
+    [
+     "squeak",
+     0.72
+    ],
+    [
+     "zip",
+     0.86
+    ]
+   ]
+  },
+  "bear": {
+   "story": "Opens its arms and leans in for a big hug, squishes flat against the TV glass, then pops back.",
+   "pivot": "50% 90%",
+   "peak": 0.42,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-3deg) scale(1.04, 0.97)"
+    ],
+    [
+     0.34,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.38, 1.38)"
+    ],
+    [
+     0.42,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.62, 1.26)"
+    ],
+    [
+     0.56,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.6, 1.25)"
+    ],
+    [
+     0.64,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.9, 0.9)"
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.06, 1.06)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.97, 0.97)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "ping",
+     {
+      "at": 0.42,
+      "x": 22,
+      "y": 20,
+      "s": 1.4
+     }
+    ],
+    [
+     "ping",
+     {
+      "at": 0.46,
+      "x": 80,
+      "y": 30,
+      "s": 1.1
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.42,
+     2
+    ]
+   ],
+   "sfx": [
+    [
+     "whoosh",
+     0.08,
+     0.26
+    ],
+    [
+     "splat",
+     0.42
+    ],
+    [
+     "pop",
+     0.62
+    ]
+   ]
+  },
+  "wolf": {
+   "story": "Stretches up tall and howls. A round moon rises behind it and sound rings ripple out; the tail sways with the song.",
+   "pivot": "50% 95%",
+   "peak": 0.4,
+   "parts": [
+    {
+     "name": "tail",
+     "pivot": "38% 87%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.15,
+       "rotate(12deg)"
+      ],
+      [
+       0.3,
+       "rotate(-12deg)"
+      ],
+      [
+       0.45,
+       "rotate(12deg)"
+      ],
+      [
+       0.6,
+       "rotate(-12deg)"
+      ],
+      [
+       0.75,
+       "rotate(12deg)"
+      ],
+      [
+       0.9,
+       "rotate(-12deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.03, 0.94)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(0.96, 1.18)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(-2deg) scale(0.96, 1.18)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(2deg) scale(0.96, 1.18)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(-2deg) scale(0.96, 1.17)"
+    ],
+    [
+     0.72,
+     "perspective(600px) translate(0%, -5%) rotateY(0deg) rotate(0deg) scale(0.97, 1.15)"
+    ],
+    [
+     0.88,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1.02)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "moon",
+     {
+      "at": 0.1,
+      "x": 22,
+      "y": -14,
+      "dur": 0.85
+     }
+    ],
+    [
+     "rings",
+     {
+      "at": 0.38,
+      "x": 66,
+      "y": -12,
+      "s": 1
+     }
+    ],
+    [
+     "rings",
+     {
+      "at": 0.54,
+      "x": 72,
+      "y": -18,
+      "s": 1.3
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "howl",
+     0.3,
+     0.6
+    ]
+   ]
+  },
+  "giraffe": {
+   "story": "The long neck stretches up out of the TV, gets all twisted and tangled, wobbles itself loose, and boings back.",
+   "pivot": "50% 96%",
+   "peak": 0.36,
+   "parts": [
+    {
+     "name": "neck",
+     "pivot": "48.3% 62.5%",
+     "kf": [
+      [
+       0,
+       "none"
+      ],
+      [
+       0.24,
+       "scaleY(1.4)"
+      ],
+      [
+       0.32,
+       "scaleY(1.4) rotate(-18deg) skewX(18deg)"
+      ],
+      [
+       0.4,
+       "scaleY(1.32) rotate(16deg) skewX(-22deg)"
+      ],
+      [
+       0.48,
+       "scaleY(1.26) rotate(-14deg) skewX(20deg)"
+      ],
+      [
+       0.56,
+       "scaleY(1.2) rotate(12deg) skewX(-16deg)"
+      ],
+      [
+       0.64,
+       "scaleY(1.1) rotate(-8deg)"
+      ],
+      [
+       0.72,
+       "scaleY(.92) rotate(6deg)"
+      ],
+      [
+       0.8,
+       "scaleY(1.05) rotate(-4deg)"
+      ],
+      [
+       0.9,
+       "rotate(2deg)"
+      ],
+      [
+       1,
+       "none"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 0.94)"
+    ],
+    [
+     0.24,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1.04)"
+    ],
+    [
+     0.36,
+     "perspective(600px) translate(-2%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.44,
+     "perspective(600px) translate(2%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.52,
+     "perspective(600px) translate(-2%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.72,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.05, 0.93)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1.03)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "tangle",
+     {
+      "at": 0.3,
+      "x": 52,
+      "y": -6
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.46,
+      "x": 36,
+      "y": -14,
+      "n": 3,
+      "dur": 0.45,
+      "r": 16
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "slide",
+     0.02,
+     0.24,
+     380,
+     1300
+    ],
+    [
+     "boing",
+     0.32,
+     0.08
+    ],
+    [
+     "boing",
+     0.4,
+     0.08
+    ],
+    [
+     "boing",
+     0.48,
+     0.08
+    ],
+    [
+     "dizzy",
+     0.5,
+     0.2
+    ],
+    [
+     "boing",
+     0.68,
+     0.3
+    ]
+   ]
+  },
+  "dolphin": {
+   "story": "Leaps out of the TV in an arc, spins once in the air and splashes back down in a spray of drops.",
+   "pivot": "55% 60%",
+   "peak": 0.45,
+   "parts": [
+    {
+     "name": "water",
+     "fixed": true,
+     "pivot": "50% 90%",
+     "kf": [
+      [
+       0,
+       "none"
+      ],
+      [
+       1,
+       "none"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(0%, 4%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.28,
+     "perspective(600px) translate(-14%, -58%) rotateY(0deg) rotate(-40deg) scale(1, 1)"
+    ],
+    [
+     0.45,
+     "perspective(600px) translate(0%, -80%) rotateY(0deg) rotate(-190deg) scale(1, 1)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(10%, -58%) rotateY(0deg) rotate(-320deg) scale(1, 1)"
+    ],
+    [
+     0.74,
+     "perspective(600px) translate(3%, 4%) rotateY(0deg) rotate(-360deg) scale(1, 1)"
+    ],
+    [
+     0.84,
+     "perspective(600px) translate(0%, 2%) rotateY(0deg) rotate(-360deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-360deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "drops",
+     {
+      "at": 0.06,
+      "x": 55,
+      "y": 84,
+      "n": 6,
+      "dur": 0.45,
+      "spread": 50
+     }
+    ],
+    [
+     "drops",
+     {
+      "at": 0.74,
+      "x": 55,
+      "y": 84,
+      "n": 9,
+      "dur": 0.55,
+      "spread": 90
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "splash",
+     0.05
+    ],
+    [
+     "whoosh",
+     0.1,
+     0.25
+    ],
+    [
+     "whoosh",
+     0.36,
+     0.2
+    ],
+    [
+     "splash",
+     0.74
+    ]
+   ]
+  },
+  "penguin": {
+   "story": "Waddles left, right, slips, and slides forward on its belly, flippers flapping, then pops back up on its feet.",
+   "pivot": "50% 95%",
+   "peak": 0.5,
+   "parts": [
+    {
+     "name": "flipl",
+     "pivot": "34% 37%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.36,
+       "rotate(0deg)"
+      ],
+      [
+       0.42,
+       "rotate(24deg)"
+      ],
+      [
+       0.48,
+       "rotate(-24deg)"
+      ],
+      [
+       0.54,
+       "rotate(24deg)"
+      ],
+      [
+       0.6,
+       "rotate(-24deg)"
+      ],
+      [
+       0.66,
+       "rotate(24deg)"
+      ],
+      [
+       0.72,
+       "rotate(-24deg)"
+      ],
+      [
+       0.78,
+       "rotate(0deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    },
+    {
+     "name": "flipr",
+     "pivot": "55% 37%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.36,
+       "rotate(0deg)"
+      ],
+      [
+       0.42,
+       "rotate(-24deg)"
+      ],
+      [
+       0.48,
+       "rotate(24deg)"
+      ],
+      [
+       0.54,
+       "rotate(-24deg)"
+      ],
+      [
+       0.6,
+       "rotate(24deg)"
+      ],
+      [
+       0.66,
+       "rotate(-24deg)"
+      ],
+      [
+       0.72,
+       "rotate(24deg)"
+      ],
+      [
+       0.78,
+       "rotate(0deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.08,
+     "perspective(600px) translate(-4%, 0%) rotateY(0deg) rotate(-8deg) scale(1, 1)"
+    ],
+    [
+     0.16,
+     "perspective(600px) translate(4%, 0%) rotateY(0deg) rotate(8deg) scale(1, 1)"
+    ],
+    [
+     0.24,
+     "perspective(600px) translate(-4%, 0%) rotateY(0deg) rotate(-8deg) scale(1, 1)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(4%, 0%) rotateY(0deg) rotate(8deg) scale(1, 1)"
+    ],
+    [
+     0.38,
+     "perspective(600px) translate(6%, -6%) rotateY(0deg) rotate(30deg) scale(1, 1)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(8%, 10%) rotateY(0deg) rotate(78deg) scale(1, 1)"
+    ],
+    [
+     0.7,
+     "perspective(600px) translate(26%, 10%) rotateY(0deg) rotate(80deg) scale(1, 1)"
+    ],
+    [
+     0.82,
+     "perspective(600px) translate(14%, -22%) rotateY(0deg) rotate(-12deg) scale(1, 1)"
+    ],
+    [
+     0.92,
+     "perspective(600px) translate(4%, 0%) rotateY(0deg) rotate(5deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "swoosh",
+     {
+      "at": 0.5,
+      "x": 10,
+      "y": 80,
+      "flip": true
+     }
+    ],
+    [
+     "swoosh",
+     {
+      "at": 0.62,
+      "x": 20,
+      "y": 86,
+      "flip": true
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.42,
+      "x": 50,
+      "y": 40,
+      "n": 3,
+      "dur": 0.35,
+      "r": 16
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "taps",
+     0,
+     0.34,
+     0.08
+    ],
+    [
+     "slide",
+     0.44,
+     0.3,
+     500,
+     1300
+    ],
+    [
+     "boing",
+     0.74,
+     0.14
+    ],
+    [
+     "softthud",
+     0.92
+    ]
+   ]
+  },
+  "kangaroo": {
+   "story": "Bounces high twice; at the top of the second bounce the baby pops up out of the pocket.",
+   "pivot": "50% 95%",
+   "peak": 0.62,
+   "parts": [
+    {
+     "name": "baby",
+     "pivot": "63% 50%",
+     "kf": [
+      [
+       0,
+       "none"
+      ],
+      [
+       0.54,
+       "none"
+      ],
+      [
+       0.62,
+       "translateY(-5%) scale(1.12)"
+      ],
+      [
+       0.68,
+       "translateY(-4%) scale(1.1) rotate(-6deg)"
+      ],
+      [
+       0.76,
+       "translateY(-4%) scale(1.1) rotate(6deg)"
+      ],
+      [
+       0.86,
+       "translateY(-1%) scale(1.02)"
+      ],
+      [
+       1,
+       "none"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.05,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.08, 0.88)"
+    ],
+    [
+     0.24,
+     "perspective(600px) translate(0%, -34%) rotateY(0deg) rotate(0deg) scale(1, 1.06)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.45,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.1, 0.86)"
+    ],
+    [
+     0.62,
+     "perspective(600px) translate(0%, -48%) rotateY(0deg) rotate(0deg) scale(1, 1.08)"
+    ],
+    [
+     0.8,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.86,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.08, 0.9)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "stars",
+     {
+      "at": 0.62,
+      "x": 66,
+      "y": -10,
+      "n": 3,
+      "dur": 0.4,
+      "r": 14
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "boing",
+     0.05,
+     0.2
+    ],
+    [
+     "softthud",
+     0.4
+    ],
+    [
+     "boing",
+     0.45,
+     0.22
+    ],
+    [
+     "pop",
+     0.62
+    ],
+    [
+     "squeak",
+     0.66
+    ],
+    [
+     "softthud",
+     0.8
+    ]
+   ]
+  },
+  "elephant": {
+   "story": "Lifts its trunk and sprays a fountain of water drops that rain down over the TV.",
+   "pivot": "50% 95%",
+   "peak": 0.3,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.14,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-4deg) scale(1, 1.04)"
+    ],
+    [
+     0.26,
+     "perspective(600px) translate(0%, -2%) rotateY(0deg) rotate(-5deg) scale(1, 1.06)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(3deg) scale(1, 0.96)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(2deg) scale(1, 1)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(3deg) scale(1, 0.97)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(1deg) scale(1, 1)"
+    ],
+    [
+     0.8,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-1deg) scale(1, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "drops",
+     {
+      "at": 0.3,
+      "x": 67,
+      "y": 6,
+      "n": 8,
+      "dur": 0.6,
+      "spread": 80
+     }
+    ],
+    [
+     "drops",
+     {
+      "at": 0.42,
+      "x": 67,
+      "y": 6,
+      "n": 8,
+      "dur": 0.6,
+      "spread": 110
+     }
+    ],
+    [
+     "drops",
+     {
+      "at": 0.54,
+      "x": 67,
+      "y": 6,
+      "n": 6,
+      "dur": 0.45,
+      "spread": 60
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.3,
+     2
+    ]
+   ],
+   "sfx": [
+    [
+     "trumpet",
+     0.24,
+     0.34
+    ],
+    [
+     "sprinkle",
+     0.36,
+     0.5
+    ]
+   ]
+  },
+  "octopus": {
+   "story": "Wiggles all eight arms at once, puffs a little ink cloud, and peeks out of it.",
+   "pivot": "50% 60%",
+   "peak": 0.45,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.05,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-5deg) scale(0.94, 1.07)"
+    ],
+    [
+     0.095,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(5deg) scale(1.08, 0.94)"
+    ],
+    [
+     0.14,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-5deg) scale(0.94, 1.07)"
+    ],
+    [
+     0.185,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(5deg) scale(1.08, 0.94)"
+    ],
+    [
+     0.22999999999999998,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-5deg) scale(0.94, 1.07)"
+    ],
+    [
+     0.27499999999999997,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(5deg) scale(1.08, 0.94)"
+    ],
+    [
+     0.32,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(-5deg) scale(0.94, 1.07)"
+    ],
+    [
+     0.365,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(5deg) scale(1.08, 0.94)"
+    ],
+    [
+     0.44,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.9, 0.9)",
+     {
+      "opacity": 1
+     }
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.6, 0.6)",
+     {
+      "opacity": 0
+     }
+    ],
+    [
+     0.7,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.6, 0.6)",
+     {
+      "opacity": 0
+     }
+    ],
+    [
+     0.76,
+     "perspective(600px) translate(0%, -12%) rotateY(0deg) rotate(0deg) scale(0.95, 0.95)",
+     {
+      "opacity": 1
+     }
+    ],
+    [
+     0.86,
+     "perspective(600px) translate(0%, -10%) rotateY(0deg) rotate(-4deg) scale(1, 1)",
+     {
+      "opacity": 1
+     }
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)",
+     {
+      "opacity": 1
+     }
+    ]
+   ],
+   "fx": [
+    [
+     "ink",
+     {
+      "at": 0.44,
+      "x": 50,
+      "y": 52,
+      "s": 2.2,
+      "dur": 0.5
+     }
+    ],
+    [
+     "ink",
+     {
+      "at": 0.48,
+      "x": 40,
+      "y": 60,
+      "s": 1.6,
+      "dur": 0.45
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "boing",
+     0.05,
+     0.08
+    ],
+    [
+     "boing",
+     0.14,
+     0.08
+    ],
+    [
+     "boing",
+     0.23,
+     0.08
+    ],
+    [
+     "boing",
+     0.32,
+     0.08
+    ],
+    [
+     "splat",
+     0.45
+    ],
+    [
+     "pop",
+     0.76
+    ]
+   ]
+  },
+  "butterfly": {
+   "story": "Flutters out of the TV in a zigzag loop, wings beating fast, and lands back on its spot.",
+   "pivot": "50% 50%",
+   "peak": 0.42,
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.05,
+     "perspective(600px) translate(9.166666666666668%, -12.5%) rotateY(0deg) rotate(-8deg) scale(0.4, 1)"
+    ],
+    [
+     0.1,
+     "perspective(600px) translate(18.333333333333336%, -25%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.15,
+     "perspective(600px) translate(11.714285714285715%, -36.857142857142854%) rotateY(0deg) rotate(8deg) scale(0.4, 1)"
+    ],
+    [
+     0.2,
+     "perspective(600px) translate(-5.428571428571431%, -48.28571428571429%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.25,
+     "perspective(600px) translate(-22.57142857142857%, -59.71428571428571%) rotateY(0deg) rotate(-8deg) scale(0.4, 1)"
+    ],
+    [
+     0.3,
+     "perspective(600px) translate(-13.500000000000004%, -68.5%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.35,
+     "perspective(600px) translate(2.124999999999993%, -76.625%) rotateY(0deg) rotate(8deg) scale(0.4, 1)"
+    ],
+    [
+     0.4,
+     "perspective(600px) translate(17.750000000000014%, -84.75%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.45,
+     "perspective(600px) translate(12.428571428571425%, -81.57142857142857%) rotateY(0deg) rotate(-8deg) scale(0.4, 1)"
+    ],
+    [
+     0.5,
+     "perspective(600px) translate(-6.8571428571428505%, -70.85714285714286%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.55,
+     "perspective(600px) translate(-26.14285714285714%, -60.142857142857146%) rotateY(0deg) rotate(8deg) scale(0.4, 1)"
+    ],
+    [
+     0.6,
+     "perspective(600px) translate(-18.000000000000014%, -48.85714285714287%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.65,
+     "perspective(600px) translate(-2.9999999999999893%, -37.428571428571416%) rotateY(0deg) rotate(-8deg) scale(0.4, 1)"
+    ],
+    [
+     0.7,
+     "perspective(600px) translate(12%, -26%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.75,
+     "perspective(600px) translate(7.714285714285711%, -18.85714285714285%) rotateY(0deg) rotate(8deg) scale(0.4, 1)"
+    ],
+    [
+     0.8,
+     "perspective(600px) translate(3.4285714285714217%, -11.714285714285703%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.85,
+     "perspective(600px) translate(0%, -5.625%) rotateY(0deg) rotate(-8deg) scale(0.4, 1)"
+    ],
+    [
+     0.9,
+     "perspective(600px) translate(0%, -3.7499999999999982%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.95,
+     "perspective(600px) translate(0%, -1.8750000000000018%) rotateY(0deg) rotate(8deg) scale(0.4, 1)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "stars",
+     {
+      "at": 0.3,
+      "x": 40,
+      "y": -20,
+      "n": 3,
+      "dur": 0.5,
+      "r": 18
+     }
+    ],
+    [
+     "stars",
+     {
+      "at": 0.6,
+      "x": 60,
+      "y": -10,
+      "n": 3,
+      "dur": 0.4,
+      "r": 14
+     }
+    ]
+   ],
+   "sfx": [
+    [
+     "flutter",
+     0,
+     0.84
+    ],
+    [
+     "twinkle",
+     0.8,
+     0.2
+    ]
+   ]
+  },
+  "crocodile": {
+   "story": "Lunges at the screen with two big chomps that shake the TV, then backs off grinning.",
+   "pivot": "50% 95%",
+   "peak": 0.38,
+   "parts": [
+    {
+     "name": "jaw",
+     "pivot": "55% 35.7%",
+     "kf": [
+      [
+       0,
+       "rotate(0deg)"
+      ],
+      [
+       0.2,
+       "rotate(-4deg)"
+      ],
+      [
+       0.32,
+       "rotate(-6deg)"
+      ],
+      [
+       0.38,
+       "rotate(12deg)"
+      ],
+      [
+       0.48,
+       "rotate(-4deg)"
+      ],
+      [
+       0.56,
+       "rotate(12deg)"
+      ],
+      [
+       0.68,
+       "rotate(0deg)"
+      ],
+      [
+       1,
+       "rotate(0deg)"
+      ]
+     ]
+    }
+   ],
+   "subject": [
+    [
+     0,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ],
+    [
+     0.18,
+     "perspective(600px) translate(-3%, 0%) rotateY(0deg) rotate(-5deg) scale(1, 1)"
+    ],
+    [
+     0.36,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.4, 1.4)"
+    ],
+    [
+     0.46,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.42, 1.42)"
+    ],
+    [
+     0.56,
+     "perspective(600px) translate(0%, -6%) rotateY(0deg) rotate(0deg) scale(1.44, 1.44)"
+    ],
+    [
+     0.72,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(0.95, 0.95)"
+    ],
+    [
+     0.86,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1.03, 1.03)"
+    ],
+    [
+     1,
+     "perspective(600px) translate(0%, 0%) rotateY(0deg) rotate(0deg) scale(1, 1)"
+    ]
+   ],
+   "fx": [
+    [
+     "clang",
+     {
+      "at": 0.36,
+      "x": 30,
+      "y": 20
+     }
+    ],
+    [
+     "clang",
+     {
+      "at": 0.54,
+      "x": 26,
+      "y": 30
+     }
+    ]
+   ],
+   "shake": [
+    [
+     0.38,
+     3
+    ],
+    [
+     0.56,
+     3
+    ]
+   ],
+   "sfx": [
+    [
+     "whoosh",
+     0.14,
+     0.22
+    ],
+    [
+     "chomp",
+     0.38
+    ],
+    [
+     "chomp",
+     0.56
+    ]
+   ]
+  }
+ }
+}
