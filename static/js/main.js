@@ -8,8 +8,9 @@
 // timer, the dome-nudge timer and the press timer (BACKLOG B-226) for the
 // robot and his voice's frames,
 // the TV's lock (tv.js) and the picture's life after it (picture.js,
-// BACKLOG B-221) with its win on a correct check (BACKLOG B-222), screen
-// renders. The kid's gears (gears.js,
+// BACKLOG B-221) with its win on a correct check (BACKLOG B-222; each
+// word's own, from the theme's wins file, B-228, its sounds audio.js's),
+// screen renders. The kid's gears (gears.js,
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
 // kept in state.gears for the gear counters (cogs.js); and spent on boosts
 // (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
@@ -22,8 +23,9 @@ import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.j
 import { renderFeedback } from './feedback.js';
 import { renderTv } from './tv.js';
 import { renderPicture } from './picture.js';
+import { winsUrl } from './wins.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
-import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine, winSound } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
@@ -235,6 +237,19 @@ function onStation(stage) {
     if (open) startRound(theme, stage);
 }
 
+// The theme's wins file (BACKLOG B-228: each word's own win, wins.js), at
+// wins.js winsUrl beside its data file, or null when it has none (a
+// missing or broken file is none: those words play the shared win).
+function loadWins(dataUrl) {
+    const url = winsUrl(dataUrl);
+    if (!url) return Promise.resolve(null);
+    try {
+        return fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    } catch (e) {
+        return Promise.resolve(null);
+    }
+}
+
 // `chosen`: the stage picked on the stage map (BACKLOG B-217); none for
 // play again, which plays the theme's current stage.
 async function startRound({ name, dataUrl }, chosen = null) {
@@ -246,7 +261,9 @@ async function startRound({ name, dataUrl }, chosen = null) {
     // its round end (play again).
     const from = state.screen;
     setState({ startingRound: true });
-    // data shape: { "duck": { image, audio, stage, break }, ... }
+    // data shape: { "duck": { image, audio, stage, break }, ... }; the
+    // theme's wins file (BACKLOG B-228) comes with it, or none
+    const winsFile = loadWins(dataUrl);
     let data;
     try {
         data = await fetch(dataUrl).then((r) => r.json());
@@ -254,6 +271,7 @@ async function startRound({ name, dataUrl }, chosen = null) {
         setState({ startingRound: false });
         throw e;
     }
+    const wins = await winsFile;
     // The kid left while the data file was on its way (the stage screen's
     // back arrow, the round end's themes, then maybe another theme's
     // card): no round starts (BACKLOG B-217, review fix).
@@ -288,6 +306,7 @@ async function startRound({ name, dataUrl }, chosen = null) {
     setState({
         theme: name,
         data,
+        wins,
         words,
         screen: 'play',
         round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },
@@ -759,6 +778,7 @@ function leaveRound(patch) {
     setState({
         ...patch,
         data: null,
+        wins: null,
         words: [],
         round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
@@ -839,7 +859,7 @@ subscribe(renderCard);
 subscribe((s) => renderBoost(s, BOOST_TAPS));   // after the card render: places the boost tray and the glowing slots on it
 subscribe(renderFeedback);    // after the card render: keys off its DOM (and the boost tray's)
 subscribe((s) => renderTv(s, onTuned));   // after the card render: tunes in to its picture
-subscribe(renderPicture);     // after the TV: the picture's life once it has locked (BACKLOG B-221), its win (B-222)
+subscribe((s) => renderPicture(s, winSound));   // after the TV: the picture's life once it has locked (BACKLOG B-221), its win (B-222; a word's own, B-228) and the win's sounds
 subscribe(renderControls);
 subscribe(renderCoach);       // after the card and the controls: the ghost mitten finds the tiles, slots and dome
 subscribe((s) => renderRobot(s, peekLine));   // his idle peeks whisper (audio.js, B-224)
@@ -907,9 +927,10 @@ window.addEventListener('resize', () => {
     renderBoost(state, BOOST_TAPS);
 });
 
-// The picture's life (picture.js, BACKLOG B-221) and its win (B-222) stop
-// while the page is hidden; the life starts again when it shows.
-document.addEventListener('visibilitychange', () => renderPicture(state));
+// The picture's life (picture.js, BACKLOG B-221) and its win (B-222,
+// B-228) stop while the page is hidden; the life starts again when it
+// shows.
+document.addEventListener('visibilitychange', () => renderPicture(state, winSound));
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.

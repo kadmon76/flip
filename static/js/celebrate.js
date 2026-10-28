@@ -1,9 +1,10 @@
 // celebrate.js — one-shot motion for the two reward beats (DESIGN
 // "Feedback", "Motion"): a correct check pulses the slots once and small
 // cogs, one per gear the word earns, fly from the TV into the console's
-// gear counter, whose count flips up as they land (BACKLOG B-218); the
-// TV's own win, its warm flash and its sparks start in picture.js
-// (BACKLOG B-222); the round-end screen pops the
+// gear counter, whose count flips up as they land (BACKLOG B-218), setting
+// off as the TV's win ends (B-227: picture.js WIN_MS); the TV's own win,
+// its warm flash and its sparks start in picture.js (BACKLOG B-222); the
+// round-end screen pops the
 // earned stars in one after another and, when the round cleared its
 // stage, then lights that stage's bulb with a pop (BACKLOG B-216), and
 // then pops in the theme key the round earned (human, 2026-10-24); on the
@@ -21,6 +22,7 @@
 import { motionFor } from './motion.js';
 import { wordGears } from './gears.js';
 import { cog, countText, showCount } from './cogs.js';
+import { WIN_MS } from './picture.js';
 
 // Render cache (like the `tiles` Map in card.js): what the last render
 // showed, so a transition can be told from a re-render; `gears` is the
@@ -182,9 +184,10 @@ export function changedFlaps(before, after) {
     return out;
 }
 
-// Seconds from the check until the counter's last flip ends, for `n`
-// cogs (pure): the last cog sets off (n - 1) staggers after the first,
-// lands `gearFly.duration` later, then its flip.
+// Seconds from when the cogs set off (as the TV's win ends, WIN_MS after
+// the check, B-227) until the counter's last flip ends, for `n` cogs
+// (pure): the last cog sets off (n - 1) staggers after the first, lands
+// `gearFly.duration` later, then its flip.
 export function gearsDone(n) {
     const fly = motionFor('gearFly', false);
     const flip = motionFor('gearFlip', false);
@@ -192,14 +195,15 @@ export function gearsDone(n) {
 }
 
 // `n` small cogs (the word's gears, gears.js wordGears) pop out of the TV
-// picture's centre, rise a little apart and drop into the console's gear
-// counter (#console-gears), one after the other; as each lands its
-// counter's count goes one step up (gearTicks) with its changed digits
-// flipping up and its cog turning a tooth. Until then the counter holds
-// the count from before the word (`from`), which cogs.js has already
-// replaced with `to`. The cogs live in a fixed, click-through layer that
-// is removed when the last one lands; every flip clears what it set.
-// Reduced motion: nothing here, the count just changes (cogs.js).
+// picture's centre once its win has played (WIN_MS after the check,
+// B-227: hidden until then), rise a little apart and drop into the
+// console's gear counter (#console-gears), one after the other; as each
+// lands its counter's count goes one step up (gearTicks) with its changed
+// digits flipping up and its cog turning a tooth. Until then the counter
+// holds the count from before the word (`from`), which cogs.js has
+// already replaced with `to`. The cogs live in a fixed, click-through
+// layer that is removed when the last one lands; every flip clears what
+// it set. Reduced motion: nothing here, the count just changes (cogs.js).
 function flyGears(from, to, n) {
     const m = motionFor('gearFly', reducedMotion());
     if (n <= 0 || m.duration === 0) return;
@@ -219,9 +223,12 @@ function flyGears(from, to, n) {
     const tx = t.left + t.width / 2;
     const ty = t.top + t.height / 2;
 
+    const wait = WIN_MS / 1000;
     const layer = document.createElement('div');
     layer.className = 'gear-fly';
     layer.setAttribute('aria-hidden', 'true');
+    gsap.set(layer, { visibility: 'hidden' });
+    gsap.set(layer, { visibility: 'visible', delay: wait });
     let shown = countText(hold);
     for (let i = 0; i < n; i++) {
         const piece = document.createElement('span');
@@ -229,7 +236,7 @@ function flyGears(from, to, n) {
         piece.appendChild(cog());
         layer.appendChild(piece);
         const side = n === 1 ? 0 : ((2 * i) / (n - 1) - 1) * m.spread / 2;
-        const at = i * m.stagger;
+        const at = wait + i * m.stagger;
         gsap.set(piece, { x: cx + side / 2 - half, y: cy - half, scale: 0.5, rotation: 0 });
         gsap.to(piece, { x: cx + side - half, y: cy - m.height - half, scale: 1, rotation: 90,
             duration: m.rise, delay: at, ease: 'power1.out' });
@@ -271,11 +278,12 @@ function flipUp(host, before, text) {
 }
 
 // Leaving the correct word (the next word, the round end, the back
-// arrow): cogs still flying are dropped, a flip still running stops, and
-// the console's counter shows `gears` (state.gears), as cogs.js renders it.
+// arrow): cogs still waiting for the win to end or flying are dropped, a
+// flip still running stops, and the console's counter shows `gears`
+// (state.gears), as cogs.js renders it.
 function settleGears(gears) {
     document.querySelectorAll('.gear-fly').forEach((layer) => {
-        gsap.killTweensOf(Array.from(layer.children));
+        gsap.killTweensOf([layer, ...Array.from(layer.children)]);
         layer.remove();
     });
     const host = document.querySelector('#console-gears');

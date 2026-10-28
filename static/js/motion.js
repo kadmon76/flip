@@ -35,9 +35,10 @@
 //   while it swells to `scale` and settles back, within `duration`, ease-out
 //   (no overshoot: DESIGN "Motion" keeps that for snaps and star pops).
 //   Reduced motion: no pop and no fade, the bulb is simply lit.
-// - `gearFly`: on a correct word (BACKLOG B-218, celebrate.js) one small
-//   cog (`size` px) per gear the word earns pops out of the TV, the
-//   cogs `spread` px apart, rising `height` px in `rise`, then drops
+// - `gearFly`: on a correct word (BACKLOG B-218, celebrate.js), once the
+//   TV's win has played (B-227), one small cog (`size` px) per gear the
+//   word earns pops out of the TV, the cogs `spread` px apart, rising
+//   `height` px in `rise`, then drops
 //   into the console's gear counter, landing `duration` after it set off,
 //   one `stagger` after the other. `gearFlip`: as each cog lands, the
 //   counter's changed digits flip up (scaleY 0 -> 1) and its cog turns a

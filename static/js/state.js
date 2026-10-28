@@ -53,6 +53,12 @@ export const state = {
     // the theme's stages, stage.js stagesOf); null with no round in play
     // (the theme and stage screens).
     data: null,
+    // The round's theme's wins file (BACKLOG B-228: each word's own win on
+    // a correct word, static/data/wins/<theme>.json, read by wins.js
+    // wordWin; picture.js plays it, audio.js its sounds), fetched with the
+    // data file by startRound and kept with it; null for a theme with none
+    // and with no round in play.
+    wins: null,
     // [{ word, image, audio, break }] for the current round (main.js
     // startRound); onNext may swap the next two for solved words of the
     // theme's earlier stages after three not clean in a row (BACKLOG

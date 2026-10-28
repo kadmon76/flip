@@ -809,13 +809,14 @@ body[data-screen="play"] .play-back-btn {
 }
 
 /* TV screen (x 28-70%, y 16.4-30.5% of the picture): the word picture
-   inside, masked to the screen's rounded corners, on the teal tube with a
-   soft teal glow. The old content pictures are square with their own
-   backdrop, so they are shown whole (contained) rather than cropped. The
-   new word pictures (static/images/words/, 4:3 on teal, subject in the
-   middle 70%) fill the whole tube, trimmed a little top and bottom
-   (claude/flip-picture-style.md "Where the picture lives"). The [src]
-   rule goes once every word has a new picture. */
+   inside, masked to the screen's rounded corners (while a win's move runs
+   its subject may leave them, BACKLOG B-227, .card.win-out below), on the
+   teal tube with a soft teal glow. The old content pictures are square
+   with their own backdrop, so they are shown whole (contained) rather
+   than cropped. The new word pictures (static/images/words/, 4:3 on
+   teal, subject in the middle 70%) fill the whole tube, trimmed a little
+   top and bottom (claude/flip-picture-style.md "Where the picture
+   lives"). The [src] rule goes once every word has a new picture. */
 #screen-play .card {
     position: absolute;
     left: 28%;
@@ -938,6 +939,47 @@ body[data-screen="play"] .play-back-btn {
     will-change: transform;
 }
 
+/* A word with its own win (BACKLOG B-228, picture.js): its drawings (the
+   rest drawing, its parts, its win drawing) lie in .tv-body, the whole
+   picture's box, which that win's track moves from its pivot; its images
+   are framed as the layers' above. */
+#screen-play .tv-body {
+    position: absolute;
+    inset: 0;
+}
+
+/* The win (BACKLOG B-227, picture.js): while the subject plays its move
+   (class win-out on the card) it may leave the TV screen. The card stops
+   clipping, so the subject is drawn over the TV's frame and the lab around
+   it; the plate (rounded like the screen), the specks and the puffs or
+   drops (each clipped to the screen), the flash and the scanlines (the
+   screen's own shape) stay inside, and the quiet bar, which rolls past the
+   screen's edges, hides meanwhile. The play screen clips it at its sides,
+   so a move off one side never widens the page. When the move ends the
+   class goes and the screen clips again. */
+#screen-play:has(.card.win-out) {
+    overflow-x: clip;
+}
+
+#screen-play .card.win-out {
+    overflow: visible;
+}
+
+#screen-play .card.win-out .tv-life,
+#screen-play .card.win-out .tv-plate {
+    border-radius: inherit;
+}
+
+#screen-play .card.win-out .tv-motes,
+#screen-play .card.win-out .tv-fx {
+    overflow: hidden;
+    border-radius: inherit;
+}
+
+#screen-play .card.win-out .tv-roll {
+    visibility: hidden;
+}
+
 #screen-play .tv-mote {
     position: absolute;
     width: calc(3 * var(--u));
@@ -947,10 +989,11 @@ body[data-screen="play"] .play-back-btn {
     opacity: 0;
 }
 
-/* The win's puffs and drops (BACKLOG B-222, picture.js): .tv-fx lies over
-   the subject, inside the TV's mask; picture.js places each piece (left,
-   top and size inline, from the picture's width) and removes it when its
-   flight ends. Puffs: the drive's exhaust, as the prototype's (cream, an
+/* The win's puffs and drops (BACKLOG B-222, picture.js; the shared moves'
+   drive and splash): .tv-fx lies over the subject, inside the TV's mask
+   (a word's own win's particles are .win-fx's, BACKLOG B-228, below);
+   picture.js places each piece (left, top and size inline, from the
+   picture's width) and removes it when its flight ends. Puffs: the drive's exhaust, as the prototype's (cream, an
    ink outline, the lower right shaded). Drops: the splash's, teal and
    cream, outlined in ink. Invisible at rest. */
 #screen-play .tv-fx {
@@ -981,6 +1024,30 @@ body[data-screen="play"] .play-back-btn {
 
 #screen-play .tv-drop.cream {
     background: var(--cream);
+}
+
+/* A word's own win's particles (BACKLOG B-228, picture.js; the reference
+   word-wins.html's .fx): a layer the TV picture's box (the card's), after
+   it, so over the picture and the subject, and not clipped by the screen;
+   each particle an <svg> drawn in code, placed in % of the picture and
+   removed when its flight ends. While it holds any the play screen clips
+   at its sides, so one never widens the page. Empty at rest, no taps. */
+#screen-play .win-fx {
+    position: absolute;
+    left: 28%;
+    width: 42%;
+    top: calc(var(--bg-h) * 0.164);
+    height: calc(var(--bg-h) * 0.141);
+    pointer-events: none;
+}
+
+#screen-play .win-fx svg {
+    position: absolute;
+    overflow: visible;
+}
+
+#screen-play:has(.win-fx > *) {
+    overflow-x: clip;
 }
 
 /* Wrong check: static over the picture, fine light and dark noise lines

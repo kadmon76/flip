@@ -16,8 +16,9 @@
 // only place sounds play, asks momentsFor() which moments a state change
 // is and plays, per moment, a line of the pool its `lines` column names
 // (his new voice, B-224; on a correct check the word first, the `word`
-// column, B-223), else the prototype clip of its `sound` column, then the
-// name of the letter he placed (the `letter` column); nothing else
+// column, B-223, once the TV's win has played, `win`, B-227), else the
+// prototype clip of its `sound` column, then the name of the letter he
+// placed (the `letter` column); nothing else
 // triggers a clip, except his idle peeks, which renderRobot tells main.js
 // about (`onPeek`). How often a moment's line is said is the CHATTER
 // table's (BACKLOG B-226: always, sometimes or rare, and a quiet gap
@@ -31,6 +32,7 @@ import { starsFor } from './score.js';
 import { domeAction } from './controls.js';
 import { motionFor } from './motion.js';
 import { coachStep } from './coach.js';
+import { WIN_MS } from './picture.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -186,6 +188,12 @@ export const FX = {
 //     when it ends, his line. 'gag' plays only after the word: with the
 //     word's clip not ready at the check, the gag is skipped too and the
 //     next of the lines plays alone (B-225; audio.js sayPlan).
+//   - `win: true` (a correct check: correct, streak, tutorialDone;
+//     B-227): the TV's win comes first (picture.js, WIN_MS). He watches it
+//     (WATCH, leadOf: no pump, no talk), audio.js plays its chime with it
+//     (at once, or at a word's own win's peak, B-228: picture.js tells
+//     audio.js winSound), and the moment's steps and his voice start when
+//     it ends (waitFor).
 //   - `letter` (B-224): after his line he says the name of the letter he
 //     just put in a slot (letterGiven: the snapshot field holding its
 //     slot), or the name alone with no line.
@@ -210,6 +218,8 @@ export const FX = {
 // relief), correct (fist pump), 3 in a row (two fists, double pop, cap
 // sparks; only the third correct in a row, so the words after it say
 // their gag again), round end (clap), speaker locked (head-shake, shrug).
+// Since B-227 correct, 3 in a row and the tutorial's done first watch the
+// TV's win (`win`, WATCH), then pump.
 // Where the map gives a choice, momentsFor() picks the moment:
 //   - "All slots filled": filledEarly (pointing at the dome, no line:
 //     BACKLOG B-226) in the first EARLY_ROUNDS rounds of the session;
@@ -239,6 +249,13 @@ export const FX = {
 const LETTER_PLACED = [
     { at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest', look: [-26, 22] },
     { at: 0.6, look: [0, 0] },
+];
+
+// He watches the TV's win on a correct check (BACKLOG B-227; the moments
+// with `win`): he looks up at the TV with happy eyes, his hands at rest,
+// until his moment starts as the win ends (waitFor, leadOf).
+export const WATCH = [
+    { at: 0, sink: 0, head: -8, look: [0, -22], eyes: 'happy', brows: 'happy', hands: 'rest' },
 ];
 
 // His letter in the slot (hintGiven, and boostGiven): happy, a small pop,
@@ -376,6 +393,7 @@ export const MOMENTS = {
         ],
         sound: 'correct',
         word: true,
+        win: true,
         lines: ['tutorial-done', 'gag', 'correct'],
     },
     // A player picked on the start screen (human, 2026-10-24): the theme
@@ -427,6 +445,7 @@ export const MOMENTS = {
         ],
         sound: 'correct',
         word: true,
+        win: true,
         lines: ['gag', 'correct'],
     },
     streak: {
@@ -437,6 +456,7 @@ export const MOMENTS = {
         ],
         sound: 'correct',
         word: true,
+        win: true,
         lines: ['streak', 'gag', 'correct'],
     },
     roundEndGood: {
@@ -1064,11 +1084,24 @@ export function picksFor(moments, now) {
     return moments.includes('picture') && now && now.key ? { picture: pickVariant('picture', rollOf(now.key)) } : {};
 }
 
+// Whether moment `m` comes with the TV's win (MOMENTS' `win`, B-227).
+const withWin = (m) => !!(MOMENTS[m] && MOMENTS[m].win);
+
 // Seconds from the state change until `moments` start (his steps and his
-// line): a boost's moment waits for what it did to land (boostLands); the
-// others start at once.
+// line): a boost's moment waits for what it did to land (boostLands); a
+// correct check's for the TV's win to end (BACKLOG B-227: WIN_MS, under
+// reduced motion too, whose pulse lasts as long); the others start at
+// once.
 export function waitFor(moments, prev, now, reduced = false) {
-    return moments.includes('boostGiven') ? boostLands(prev, now, reduced) : 0;
+    if (moments.includes('boostGiven')) return boostLands(prev, now, reduced);
+    return moments.some(withWin) ? WIN_MS / 1000 : 0;
+}
+
+// The steps he takes while `moments` wait to start (waitFor), `at`
+// seconds from the change: on a correct check he watches the TV's win
+// (BACKLOG B-227, WATCH); none otherwise. No voice of his goes with them.
+export function leadOf(moments) {
+    return moments.some(withWin) ? WATCH.map((s) => ({ ...s })) : [];
 }
 
 // Ms until the kid has been idle IDLE_MS on this word (0 = now), counted
@@ -1362,19 +1395,24 @@ function dropWaiting() {
 // Play `moments` from now: one script (scriptFor), each moment's variant
 // picked at random unless `picks` names it, its first step no sooner than
 // CHANGE_MS after his last change, nor than `delay` seconds from now (a
-// boost's letter landing, boostLands). A newer moment replaces the steps
-// an older one still had waiting. `onPeek` is told of each idle peek
-// (applyStep). renderRobot calls it on a transition; exported so a
-// screenshot script can show a moment the play screen never does (the
-// round end).
+// boost's letter landing, boostLands; a correct check's win ending,
+// B-227). Until then he takes their lead (leadOf: on a correct check he
+// watches the win), no sooner than CHANGE_MS after his last change, and
+// the script comes CHANGE_MS after it at the earliest. A newer moment
+// replaces the steps an older one still had waiting. `onPeek` is told of
+// each idle peek (applyStep). renderRobot calls it on a transition;
+// exported so a screenshot script can show a moment the play screen never
+// does (the round end).
 export function playMoments(moments, picks = {}, delay = 0, onPeek = null) {
     const chosen = {};
     for (const m of moments) chosen[m] = picks[m] || pickVariant(m, Math.random());
     const script = scriptFor(moments, chosen);
-    const wait = Math.max(startDelay(performance.now() - last.changedAt) / 1000, delay);
+    const lead = leadOf(moments);
+    const first = startDelay(performance.now() - last.changedAt) / 1000;
+    const wait = Math.max(first + (lead.length ? CHANGE_MS / 1000 : 0), delay);
     dropWaiting();
-    for (const step of script) {
-        const t = wait + step.at;
+    const timed = [...lead.map((step) => [first + step.at, step]), ...script.map((step) => [wait + step.at, step])];
+    for (const [t, step] of timed) {
         if (t === 0) applyStep(step, onPeek);
         else gsap.delayedCall(t, applyStep, [step, onPeek]);
     }
