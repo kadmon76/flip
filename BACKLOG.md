@@ -612,6 +612,16 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Screenshots: the start screen and the first word, both taken under the throttled network. Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/113
 
+### B-230 Round end: one voice at a time
+- why: at the end of a round two voices play at once (human, 2026-10-28). The round end's `tada` (`static/sounds/celebration/tada.mp3`, 6 s) is a clip of the prototype character's voice, not a sound effect, and it plays as an effect under the robot's end line (B-224), so two characters talk over each other.
+- acceptance:
+  - The round end no longer plays `tada.mp3` (the file stays in the repo, unused). Instead a short fanfare made in code in audio.js, like the chime (B-227): three bright notes rising (about C5, E5, G5, triangle, about 0.12 s apart, the last held about 0.4 s), an effect the mute stops. It plays as the round-end screen shows; the robot's end line (and the key line after it, B-224/keys) starts when the fanfare ends, never under it.
+  - Check every way into the round end for a voice still sounding: the last word's line (the word and its gag, B-223) and anything due with `start(when)` stop as the round end shows, as on any word change; at the round end only one clip of his voice plays at any moment, and nothing of the prototype voice (`static/sounds/correct`, `error`, `celebration`) plays over it.
+  - Pure parts (the fanfare's notes and envelope, the end line's start after it) tested through `node`; a test with a stand-in context that at the round end at most one voice source is live at any time (including a round ended right after the last word's correct check).
+  - Docs: CHARACTER.md (round end), DESIGN.md "Sound", CLAUDE.md's audio.js bullet (the tada is gone, the fanfare).
+  - Screenshot: the round end just after it shows. Checklist passes.
+- status:
+
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
 - Picture peek: once the data carries `face`, the face peeks every 3–7s (B-221, B-222 leave it out; a win's second frame is B-228's, from the wins file's `frame`, e.g. the bat).
