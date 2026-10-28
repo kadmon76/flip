@@ -36,27 +36,29 @@ Exception (theme keys, human 2026-10-24): the brass key and the padlock (the key
 ## Assets (`static/images/ui/`)
 | File | What | Shown at (CSS px, 360 wide) |
 |---|---|---|
-| bg-lab.jpg | lab + TV machine + bench, 1264x2739 | width 100%, anchored top |
-| frame.png | cream bakelite bezel, transparent window | border-image overlay |
-| console.png | control console (cream + brass plate) | safe width less 4px each side (324px), ~58px tall |
-| dome-off / -ready / -pressed.png | check button (also "next") | ~80px wide |
-| lever-up / -down.png | reset lever (same canvas, plate aligned) | ~40px wide |
-| speaker-off / -on / -cap.png | hear-the-word button; cap = blanked | ~38px wide |
-| mute-switch-on / -off.png | header mute switch (same canvas), knob right = sound on, knob left = muted, 180x59 | 60px wide (60x19.7) |
+| bg-lab.webp | lab + TV machine + bench, 1264x2739 | width 100%, anchored top |
+| frame.webp | cream bakelite bezel, transparent window | border-image overlay |
+| console.webp | control console (cream + brass plate) | safe width less 4px each side (324px), ~58px tall |
+| dome-off / -ready / -pressed.webp | check button (also "next") | ~80px wide |
+| lever-up / -down.webp | reset lever (same canvas, plate aligned) | ~40px wide |
+| speaker-off / -on / -cap.webp | hear-the-word button; cap = blanked | ~38px wide |
+| mute-switch-on / -off.webp | header mute switch (same canvas), knob right = sound on, knob left = muted, 180x59 | 60px wide (60x19.7) |
 | robot/ body, head, browL, browR, hand-restL / -restR / -wave / -point / -ball / -palm | the robot puppet (505x505 canvas, aligned; hands 2x, placed by centre); the old robot-*.png poses stay on disk, not drawn | see CHARACTER.md |
+
+The UI uses the `.webp` copies (same names and pixel sizes; BACKLOG B-229); the PNG/JPG originals stay in the repo, unused. `robot/` has no WebP copies: the puppet's parts and the tutorial's mitten stay PNG.
 
 All scene sprites are lit from the upper left. Every sprite gets a soft
 contact shadow (dark, blurred, offset down-right, ~40% opacity).
 
 ## Layout (play screen, 360x740 reference; scale with width)
-- **Background:** `bg-lab.jpg`, `width:100%`, anchored top. At 360 wide it
+- **Background:** `bg-lab.webp`, `width:100%`, anchored top. At 360 wide it
   is 780px tall. On taller screens fill below with `--bench-deep`; the
   console hides the join.
 - **Frame:** fixed overlay, `pointer-events:none`, above everything:
   ```css
   border-style: solid;
   border-width: 29px 26px 38px 28px;          /* top right bottom left */
-  border-image: url(../images/ui/frame.png) 180 165 235 175;   /* no fill */
+  border-image: url(../images/ui/frame.webp) 180 165 235 175;   /* no fill */
   ```
   Content safe area inside it: padding `16px 14px 22px 14px`.
 - **TV screen** (in % of the background image): x 28%–70%, y 16.4%–30.5%.
@@ -236,7 +238,7 @@ dropped. How often he speaks is CHARACTER.md's Says column (B-226): a sometimes 
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
-Start (who's playing; 2026-10-24), theme, stage map, round-end and sticker book use: `bg-lab.jpg` blurred 6px and
+Start (who's playing; 2026-10-24), theme, stage map, round-end and sticker book use: `bg-lab.webp` blurred 6px and
 darkened 40% as backdrop, the same frame, cream panels with a brass
 border in CSS, the palette and fonts above, and icons instead of English
 labels (play ▶, themes ▦, stickers ★, back ←). Theme cards show the

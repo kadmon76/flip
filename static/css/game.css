@@ -86,7 +86,7 @@
        brass plate) is placed in % of the column width and of the image
        height (--bg-h), and sized in --u (1px at 360 wide). */
     --scene-w: min(100vw, var(--column-max));
-    --bg-h: calc(var(--scene-w) * 2739 / 1264);   /* bg-lab.jpg is 1264x2739 */
+    --bg-h: calc(var(--scene-w) * 2739 / 1264);   /* bg-lab.webp is 1264x2739 */
     --u: calc(var(--scene-w) / 360);
 }
 
@@ -121,7 +121,7 @@ body {
 }
 
 /* Backdrop of the interim screens (DESIGN "Other screens (interim)"):
-   bg-lab.jpg blurred 6px and darkened 40%, laid out like the play
+   bg-lab.webp blurred 6px and darkened 40%, laid out like the play
    screen's picture (column width, anchored top, the bench colour below)
    and fixed, so the sticker book scrolls over it. Its soft blurred edges
    lie under the frame. screens.js mirrors state.screen onto
@@ -136,7 +136,7 @@ body::before {
     z-index: -1;
     width: var(--scene-w);
     margin: 0 auto;
-    background: var(--bench-deep) url(../images/ui/bg-lab.jpg) center top / 100% auto no-repeat;
+    background: var(--bench-deep) url(../images/ui/bg-lab.webp) center top / 100% auto no-repeat;
     filter: blur(6px) brightness(60%);
     pointer-events: none;
 }
@@ -805,7 +805,7 @@ body[data-screen="play"] .play-back-btn {
     align-items: stretch;
     gap: 4px;
     padding: calc(var(--bg-h) * 0.445) 14px 22px;
-    background: var(--bench-deep) url(../images/ui/bg-lab.jpg) center top / 100% auto no-repeat;
+    background: var(--bench-deep) url(../images/ui/bg-lab.webp) center top / 100% auto no-repeat;
 }
 
 /* TV screen (x 28-70%, y 16.4-30.5% of the picture): the word picture
@@ -1382,7 +1382,7 @@ body.dragging-active {
 
 /* --- Console (DESIGN "Controls and states") --- */
 
-/* console.png pinned to the bottom of the safe area as the last item of
+/* console.webp pinned to the bottom of the safe area as the last item of
    the play column, inset 4px from each side of the safe area (324px at
    360 wide, so ~58px tall) and centred, so its lower corners clear the
    frame's rounded inner corners (DESIGN "Layout", issue #30). No
@@ -2792,7 +2792,7 @@ body[data-screen="theme"] .header-gears {
     pointer-events: none;
     border-style: solid;
     border-width: 29px 26px 38px 28px;          /* top right bottom left */
-    border-image: url(../images/ui/frame.png) 180 165 235 175;   /* no fill */
+    border-image: url(../images/ui/frame.webp) 180 165 235 175;   /* no fill */
 }
 
 /* --- The first word's tutorial (coach.js; human, 2026-10-24) --- */

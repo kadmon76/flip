@@ -7,7 +7,8 @@
 //     #play-image, framed exactly like it (they line up pixel for pixel
 //     with the full picture): motion.plate (the background with the
 //     subject painted out) and over it motion.subject (the cutout). Both
-//     start loading as the word starts (the next word's with them) and
+//     start loading as the word starts (the next word's as this one's
+//     picture locks, BACKLOG B-229) and
 //     show once both have decoded; until then, and for a word without
 //     `motion` (duck), the still picture shows as before. The tune-in
 //     still draws from `image`.
@@ -39,9 +40,12 @@
 //     state.wins, design/reference/word-wins.html its spec): a word with an
 //     entry there shows its drawings in the subject's place (`.tv-body` in
 //     the actor: its body and its parts, each at its pivot, a `fixed` part
-//     beside it in the actor; its win drawing), loaded with its layers;
+//     beside it in the actor; its win drawing), loaded with its layers
+//     (its rest drawing is the subject's layer; its parts and win drawing
+//     join as each decodes, BACKLOG B-229);
 //     on a correct check, while the layers show, it plays that win instead
-//     of the shared move: the subject's track on `.tv-body`, each part's,
+//     of the shared move (a part or win drawing not decoded yet sits it
+//     out, the body still moves): the subject's track on `.tv-body`, each part's,
 //     the frame swaps, the jolts of the TV picture and the particles drawn
 //     in code (in `.win-fx`, over the TV, unclipped), the subject leaving
 //     the screen unless the win says `clip`; the warm flash and the sparks
@@ -607,10 +611,13 @@ export function sparkOf(spec) {
 // keys it; null off the play screen), its life (lifeOf), its own win
 // (BACKLOG B-228: { win (wins.js wordWin), look (its drawings, wins.js
 // drawingsOf) }, or null), whether its picture has locked (state.tuned, as
-// last heard), whether its layers have decoded, whether its life is
-// running, and whether its win has played (once a word, BACKLOG B-222).
-// Not game state; nothing else reads it.
-let shown = { key: null, life: null, own: null, tuned: false, ready: false, running: false, won: false };
+// last heard), whether its layers (the plate and the subject's rest
+// drawing) have decoded, which of its own win's other drawings have
+// decoded (`drawn`, the images; BACKLOG B-229), whether its life is
+// running, whether its win has played (once a word, BACKLOG B-222) and
+// whether its own win's move is playing now (`playing`). Not game state;
+// nothing else reads it.
+let shown = { key: null, life: null, own: null, tuned: false, ready: false, running: false, won: false, drawn: new Set(), playing: false };
 
 // DOM cache: the TV picture's parts in the template, looked up once (again
 // if the page replaced them). Never read to decide game logic.
@@ -658,7 +665,7 @@ export function renderPicture(state, onWin = () => {}) {
     if (key !== shown.key) {
         const life = key ? lifeOf(entryOf(state.data, current.word)) : null;
         const own = key ? ownOf(state.wins, current.word, life) : null;
-        shown = { key, life, own, tuned: false, ready: false, running: false, won: false };
+        shown = { key, life, own, tuned: false, ready: false, running: false, won: false, drawn: new Set(), playing: false };
         const d = parts();
         if (d) {
             halt(d);
@@ -667,8 +674,11 @@ export function renderPicture(state, onWin = () => {}) {
             undress(d);
             if (life) load(d, life, own, key);
         }
-        if (key) prefetch(state.data, state.wins, state.words[round.index + 1]);
     }
+    // the picture has locked: the next word's layers start loading
+    // (BACKLOG B-229: until then this word's picture and layers have the
+    // network)
+    if (key && state.tuned && !shown.tuned) prefetch(state.data, state.wins, state.words[round.index + 1]);
     shown.tuned = !!state.tuned;
     sync();
     // the word just checked correct: its win, once (BACKLOG B-222)
@@ -703,24 +713,34 @@ function sync() {
 // The word's two layers start loading (its pivot set on the subject's
 // box); once both have decoded, they can show (sync). A picture that fails
 // leaves the still picture. A word with its own win (BACKLOG B-228) shows
-// its drawings in the subject's place (dress), and they load with the
-// layers: the layers show once every one has decoded.
+// its drawings in the subject's place (dress): its rest drawing is the
+// subject's layer; its parts and its win drawing load after the layers
+// and each joins as it decodes (BACKLOG B-229: `drawn`; a part shows then,
+// or when its win's move ends), so the layers never wait for them.
 function load(d, life, own, key) {
     if (d.plate.getAttribute('src') !== life.plate) d.plate.src = life.plate;
     const rest = own ? own.look.rest : life.subject;
     if (d.subject.getAttribute('src') !== rest) d.subject.src = rest;
     d.actor.style.transformOrigin = life.origin;
     const drawn = own ? dress(d, own) : [];
-    Promise.all([d.plate.decode(), d.subject.decode(), ...drawn.map((el) => el.decode())]).then(() => {
+    Promise.all([d.plate.decode(), d.subject.decode()]).then(() => {
         if (shown.key !== key) return;
         shown.ready = true;
         sync();
     }, () => {});
+    for (const el of drawn) {
+        el.decode().then(() => {
+            if (shown.key !== key) return;
+            shown.drawn.add(el);
+            if (!shown.playing) el.style.visibility = '';
+        }, () => {});
+    }
 }
 
 // A word's own win's drawings (BACKLOG B-228, the reference's setWord):
 // its win drawing (`.tv-frame`, hidden at rest) and its parts (`.tv-part`,
-// each at its pivot and its first step's opacity) over the rest drawing in
+// each at its pivot and its first step's opacity, hidden until it has
+// decoded, BACKLOG B-229) over the rest drawing in
 // `.tv-body`, which its track moves from the win's pivot; a `fixed` part
 // in the actor beside it, which the track does not move. Returns the
 // images made, to decode.
@@ -743,6 +763,7 @@ function dress(d, own) {
     for (const part of own.look.parts) {
         const el = img('tv-part', part.src);
         el.dataset.part = part.name;
+        el.style.visibility = 'hidden';
         el.style.transformOrigin = part.pivot;
         if (part.opacity !== undefined) el.style.opacity = String(part.opacity);
         (part.fixed ? d.actor : d.body).appendChild(el);
@@ -761,8 +782,9 @@ function partEl(d, name) {
     return [...d.actor.querySelectorAll('.tv-part')].find((el) => el.dataset.part === name) || null;
 }
 
-// The next word's layers start loading now, so they are there at its
-// lock (as tv.js fetches its picture ahead); for a word with its own win
+// The next word's layers start loading as this word's picture locks
+// (BACKLOG B-229), so they are there at its lock (as tv.js fetches its
+// picture ahead); for a word with its own win
 // (BACKLOG B-228), its drawings in place of its cutout. Only the current
 // and the next word's drawings are ever fetched.
 function prefetch(data, wins, next) {
@@ -876,7 +898,9 @@ const SHAKE_ID = 'tv-shake';
 // is not in its TV); its particles in `.win-fx` over the TV, unclipped;
 // and at its `peak` the warm flash and the sparks (B-227's). Reduced
 // motion: the flash at its peak and the subject's opacity pulse, no move,
-// no particles.
+// no particles. A part or the win drawing not decoded yet (BACKLOG B-229,
+// a slow network) sits the win out, hidden until the move ends; the body
+// (or the subject) still plays its track.
 function ownWin(d, w) {
     const at = (t) => t * 1000;     // the data's times are seconds
     d.flash.animate(FLASH.keyframes, { duration: FLASH.duration, easing: FLASH.easing, delay: at(w.peak) });
@@ -889,12 +913,14 @@ function ownWin(d, w) {
     idle.forEach((a) => a.pause());
     if (!w.clip) d.card.classList.add('win-out');
     const move = d.body.animate(subjectFrames(w), timing);
+    const s = shown;
+    s.playing = true;
     for (const part of w.parts) {
         const el = partEl(d, part.name);
-        if (el) el.animate(partFrames(part), timing);
+        if (el && s.drawn.has(el)) el.animate(partFrames(part), timing);
     }
     const frame = w.frame ? d.body.querySelector('.tv-frame') : null;
-    if (frame) {
+    if (frame && s.drawn.has(frame)) {
         frame.animate(frameFrames(w.frame, true), timing);
         d.subject.animate(frameFrames(w.frame, false), timing);
     }
@@ -906,10 +932,16 @@ function ownWin(d, w) {
     }
     throwShapes(d, fxPieces(w.fx, u));
     sparks(d.card, at(w.peak));
+    // the move is over (or cancelled): the parts decoded meanwhile show
+    const over = () => {
+        s.playing = false;
+        s.drawn.forEach((el) => { el.style.visibility = ''; });
+    };
     move.finished.then(() => {
+        over();
         d.card.classList.remove('win-out');
         idle.forEach((a) => a.play());
-    }, () => {});
+    }, over);
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';

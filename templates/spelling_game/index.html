@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=40">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=41">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -50,8 +50,8 @@
             <svg class="icon-sound" viewBox="2.4 4.2 19.8 15.6" aria-hidden="true"><path class="body" d="M3 9.2h3.6L12 4.8v14.4l-5.4-4.4H3z"/><path class="line" d="M15.6 8.4a5.2 5.2 0 0 1 0 7.2"/></svg>
             <svg class="icon-muted" viewBox="2.4 4.2 19.8 15.6" aria-hidden="true"><path class="body" d="M3 9.2h3.6L12 4.8v14.4l-5.4-4.4H3z"/><path class="line" d="M15.8 9.4l5.2 5.2M21 9.4l-5.2 5.2"/></svg>
             <span class="switch" aria-hidden="true">
-                <img class="switch-on" src="{% static 'images/ui/mute-switch-on.png' %}" alt="" />
-                <img class="switch-off" src="{% static 'images/ui/mute-switch-off.png' %}" alt="" />
+                <img class="switch-on" src="{% static 'images/ui/mute-switch-on.webp' %}" alt="" />
+                <img class="switch-off" src="{% static 'images/ui/mute-switch-off.webp' %}" alt="" />
             </span>
         </button>
     </header>
@@ -198,7 +198,7 @@
          that win's particles; empty at rest, no taps. -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
-            <img id="play-image" src="" alt="" />
+            <img id="play-image" src="" alt="" fetchpriority="high" />
             <div class="tv-life" aria-hidden="true">
                 <img class="tv-plate" src="" alt="" />
                 <div class="tv-motes"></div>
@@ -297,7 +297,7 @@
                     </div>
                 </div>
             </div>
-            <img class="console-body" src="{% static 'images/ui/console.png' %}" alt="" />
+            <img class="console-body" src="{% static 'images/ui/console.webp' %}" alt="" />
             <div class="robot-hands" aria-hidden="true">
                 <div class="part hands-in">
                     <div class="part hands-float">
@@ -328,23 +328,23 @@
             </div>
             <button id="reset-btn" class="ctl" type="button" aria-label="Reset">
                 <span class="sprite">
-                    <img class="lever-up" src="{% static 'images/ui/lever-up.png' %}" alt="" />
-                    <img class="lever-down" src="{% static 'images/ui/lever-down.png' %}" alt="" />
+                    <img class="lever-up" src="{% static 'images/ui/lever-up.webp' %}" alt="" />
+                    <img class="lever-down" src="{% static 'images/ui/lever-down.webp' %}" alt="" />
                 </span>
             </button>
             <button id="speak-btn" class="ctl" type="button" aria-label="Hear the word">
                 <span class="sprite">
-                    <img class="speaker-off" src="{% static 'images/ui/speaker-off.png' %}" alt="" />
-                    <img class="speaker-on" src="{% static 'images/ui/speaker-on.png' %}" alt="" />
-                    <img class="speaker-cap" src="{% static 'images/ui/speaker-cap.png' %}" alt="" />
+                    <img class="speaker-off" src="{% static 'images/ui/speaker-off.webp' %}" alt="" />
+                    <img class="speaker-on" src="{% static 'images/ui/speaker-on.webp' %}" alt="" />
+                    <img class="speaker-cap" src="{% static 'images/ui/speaker-cap.webp' %}" alt="" />
                 </span>
             </button>
             <button id="console-gears" class="gear-counter console-gears" type="button" aria-label="gears" disabled></button>
             <button id="check-btn" class="ctl" type="button" aria-label="Check" disabled>
                 <span class="sprite">
-                    <img class="dome-off" src="{% static 'images/ui/dome-off.png' %}" alt="" />
-                    <img class="dome-ready" src="{% static 'images/ui/dome-ready.png' %}" alt="" />
-                    <img class="dome-pressed" src="{% static 'images/ui/dome-pressed.png' %}" alt="" />
+                    <img class="dome-off" src="{% static 'images/ui/dome-off.webp' %}" alt="" />
+                    <img class="dome-ready" src="{% static 'images/ui/dome-ready.webp' %}" alt="" />
+                    <img class="dome-pressed" src="{% static 'images/ui/dome-pressed.webp' %}" alt="" />
                 </span>
             </button>
         </div>

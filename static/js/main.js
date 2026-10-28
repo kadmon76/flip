@@ -901,13 +901,17 @@ document.addEventListener('pointerdown', onInput, true);
 document.addEventListener('keydown', onInput, true);
 
 renderScreens(state);
-// Preload the clips (nothing plays until the first gesture), then the
+// The players on this device, for the start screen's cards (players.js),
+// first: the start screen's first render already shows them, so a
+// returning player's start does not fetch the new-player picker's
+// pictures (BACKLOG B-229).
+setState({ players: loadPlayers().list });
+// The sounds (audio.js; nothing plays until the first gesture, and since
+// BACKLOG B-229 nothing downloads until the page is idle), then the
 // remembered mute flag. No level is read any more (BACKLOG B-215): a
 // `flip.level` left in the browser by an earlier version is ignored.
 initAudio();
 setState({ muted: loadMuted() });
-// The players on this device, for the start screen's cards (players.js).
-setState({ players: loadPlayers().list });
 // The kid's progress per theme (progress.js, BACKLOG B-217), for the
 // theme cards' bulbs and the stage map.
 setState({ progress: loadProgress() });
