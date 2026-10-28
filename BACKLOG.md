@@ -598,6 +598,20 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Screenshots: mid-win frames for `giraffe` (neck tangled), `dolphin` (in the air, splash still in place), `crab` (half off the right edge, clipped) and `bat` (wings open); a side-by-side with the reference player at the same moment for one of them. Checklist passes.
 - status: done: https://github.com/kadmon76/flip/pull/110
 
+### B-229 Fast start: the game opens and plays without waiting for its sounds
+- why: on the preview the game opens very slowly and looks stuck (human, 2026-10-28). Measured on main: opening the start screen downloads about 9.4 MB in 170 requests before anything is tapped: 5.6 MB of the robot's line clips (66 files, every clip of every pool), 0.9 MB of prototype sound pools, 2.3 MB of UI images (frame.png alone 450 KB). On a phone over the Linode that crowds out what the kid needs first, and a word's own win (B-228) falls back to the shared move when its drawings are not ready at the check.
+- content (added by Claude in chat): WebP copies of every UI image beside the PNG/JPG, same names (`static/images/ui/<name>.webp`), 2.3 MB -> 0.4 MB, same pixels sizes.
+- acceptance:
+  - The UI uses the `.webp` images (CSS, template, scripts); the old PNG/JPG files stay in the repo, unused.
+  - Nothing of the robot's voice or the game sounds is fetched before the start screen is shown and idle (after `load`, in `requestIdleCallback` or a short timeout). Then, per pool his moments use, only one clip is fetched and decoded at first; a pool gets more clips over time: after one of its clips plays, one more not yet fetched (so variety builds up while playing). The prototype sound pools the same (one clip each up front). A moment whose pool has no decoded clip yet behaves as today when a clip is not ready (skipped, never waited for). The word's own clips (its clip, gags, Hebrew guess, letter names) keep loading as the word starts.
+  - Priority: on a new word its picture, its life layers and its win drawings (B-228) are requested before any voice clip of that moment; the next word's picture, layers and win drawings are prefetched before more pool clips.
+  - A word's own win plays when its life layers show, as today; if the check comes before its part drawings have decoded, it plays without the parts that are missing (the body or the subject still moves) rather than falling back to the shared move. Duck and words with no entry keep the shared win.
+  - Measured in the PR with Chromium's network throttling (DevTools protocol `Network.emulateNetworkConditions`: 1.5 Mbps down, 300 ms latency), cold cache, phone size: bytes before the start screen is idle (target under 1 MB), time until the start screen shows (target under 3 s), and time from tapping a stage until the first word's picture locks (target under 3 s). Report main's numbers next to the branch's.
+  - Pure helpers (which clips to fetch first, which next after a play) tested through `node`.
+  - Docs: CLAUDE.md's audio.js bullet (what is fetched when).
+  - Screenshots: the start screen and the first word, both taken under the throttled network. Checklist passes.
+- status:
+
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
 - Picture peek and win frames: once the data carries `face` or `win_image` (the win-frame batch), the face peeks every 3–7s and the win swaps in the second frame, as the prototype's bat (B-221, B-222 leave them out).
