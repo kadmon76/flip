@@ -174,7 +174,7 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - Second miss (the wrong check that leaves one bulb lit, every stage; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
 - Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on a stage with extra letters, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
   robot: Third miss moment (CHARACTER.md).
-- Correct: slots pulse once; the TV picture plays the word's own win
+- Correct: slots pulse once (a word with an entry in its theme's wins file plays that win instead: Motion, "Per-word wins", B-228); the TV picture plays the word's own win
   (BACKLOG B-222; `design/reference/tv-motion.html` layer 3 "Win"): its
   subject does the word's `win` move once, at once, free to leave the TV screen meanwhile (drawn over the TV's frame and the lab; the plate, the flash and the scanlines stay inside; BACKLOG B-227), then
   goes back to its idle (paused meanwhile): `cheer`, `bungee` and `drive`
@@ -200,6 +200,24 @@ Calm-tactile, 120–300ms, ease-out; small overshoot `back.out(1.4)` only for
 a block snapping into a slot and for star pops. Block pick-up: scale 1.08,
 shadow lifts, 120ms.
 
+Per-word wins (BACKLOG B-228): on a correct check, a word with an entry in
+its theme's wins file (`static/data/wins/<theme>.json`, approved by the
+human on the Word Win Preview page) plays its own 1 s win instead of the
+shared move, exactly as `design/reference/word-wins.html` plays it: the
+subject's track (each beat eased out on its keyframe, with its blur or
+fade), its parts (a body and its parts, each turning at its own pivot,
+inside the moving subject; a fixed part, the dolphin's water, stays put),
+its frame swaps (the bat's wings-open drawing), its jolts of the TV
+picture, and its particles drawn in code over the TV, not clipped by its
+screen (puff, dust, feathers, sparks, stars, drops, clang, swoosh, bubble,
+rings, ping, ink, moon, tangle; the reference's own drawings and colours,
+DECISIONS 2026-10-28). The subject may leave the screen as B-227 set up,
+unless the win says `clip` (crab, mouse: they leave by an edge and stay
+inside the screen). The TV's warm flash and the sparks come at the win's
+peak. A word with no entry (duck, every other theme), or whose layers are
+not showing yet, plays the shared win (Feedback, Correct). Reduced motion:
+the flash at the peak and the opacity pulse; no move, no particles.
+
 ## Sound
 On by default, mute toggle remembered. The robot's voice: on each moment
 a line of his new voice from the pool CHARACTER.md's moment map names
@@ -208,13 +226,13 @@ new picture the word's Hebrew guess when it has one; after his letter
 lands, the second miss or a letter boost, its name, `letters/`), and
 where the pool has no clip yet the existing clip in `static/sounds/`, or
 nothing where the moment has none:
-correct → the win's chime with the TV's win (B-227: two bright notes made in code, triangle waves, about C6 then G6, the second 0.09 s after the first; on every correct check, the tutorial word's too), then, once the 1 s win has played, the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong (also the second miss and the reveal) → `error/`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`.
+correct → the win's chime with the TV's win (B-227: two bright notes made in code, triangle waves, about C6 then G6, the second 0.09 s after the first; on every correct check, the tutorial word's too; a word with its own win, B-228, has the chime at the win's peak and its own sounds with it, made in code as the reference player makes them, each at its time: the cat's purring motor and sputter, the giraffe's slide, boings and dizzy wobble, and so on, through one gain of 0.55; under reduced motion too), then, once the 1 s win has played, the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong (also the second miss and the reveal) → `error/`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`.
 Round end → `celebration/tada.mp3`, an effect under his end line (B-224).
 Block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays no swipe, only his `reveal-open` line or the error clip). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. How often he speaks is CHARACTER.md's Says column (B-226): a sometimes or rare line is dropped while he talks and for 8 s after his voice went quiet, and a dropped line plays no clip in its place. The swipe, the round end's tada, the TV's tune-in hiss (B-214, made in code) and the win's chime (B-227, made in code) are effects and may overlap anything. Muted: nothing
+dropped. How often he speaks is CHARACTER.md's Says column (B-226): a sometimes or rare line is dropped while he talks and for 8 s after his voice went quiet, and a dropped line plays no clip in its place. The swipe, the round end's tada, the TV's tune-in hiss (B-214, made in code), the win's chime (B-227, made in code) and a word's own win's sounds (B-228, made in code) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)

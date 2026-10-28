@@ -2384,11 +2384,12 @@ class AudioTests(TestCase):
     def test_channels(self):
         # the TV's tune-in hiss (B-214) is an effect, like the swipe, and
         # so are the round end's tada (B-224: under his end line) and the
-        # win's chime (B-227); the word he says on a correct check and his
-        # lines (B-223, B-224) are his voice
+        # win's chime (B-227) and a word's own win's sounds (B-228); the
+        # word he says on a correct check and his lines (B-223, B-224) are
+        # his voice
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
                          {'correct': 'voice', 'error': 'voice', 'tada': 'fx', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
-                          'chime': 'fx', 'word': 'voice', 'line': 'voice'})
+                          'chime': 'fx', 'sfx': 'fx', 'word': 'voice', 'line': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -8083,6 +8084,7 @@ class StageMapTests(TestCase):
             "const progressFor = () => ({ solved: [], cleared: [] }); const currentStage = () => 1; const missedWords = () => [];"
             "const pickRound = () => ['cat']; const makeWord = (w, stage) => ({ word: w.word, stage }); const newTileId = () => 't1';"
             "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const LIVES = 3; const needsTutorial = () => false;"
+            "const loadWins = () => Promise.resolve(null);"
             + start +
             "const go = async (from, theme, leave, stage = 1) => {"
             " Object.assign(state, { screen: from, theme, startingRound: false, round: null });"
@@ -10394,7 +10396,7 @@ class MomentLinesTests(TestCase):
         strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
         js = self.ROOT / 'static' / 'js'
         main = strip((js / 'main.js').read_text())
-        self.assertIn("import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine } from './audio.js';", main)
+        self.assertIn("import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine, winSound } from './audio.js';", main)
         self.assertIn('subscribe((s) => renderRobot(s, peekLine));', main)
         self.assertNotIn('subscribe(renderRobot);', main)
         audio = strip(self.MODULE.read_text())
@@ -11049,7 +11051,8 @@ class PictureLifeTests(TestCase):
             // an element made by createElement is named by its class
             // (a speck is 'mote'), the template's by the test
             constructor(name, parent = null) { this.fixed = name; this.parent = parent; this.attrs = {}; this.style = {}; this.kids = [];
-                this.className = ''; this.cls = new Set(); this.isConnected = true; this.clientWidth = 151.2; this.pending = [];
+                this.className = ''; this.cls = new Set(); this.isConnected = true; this.clientWidth = 151.2; this.pending = []; this.dataset = {};
+                if (parent) parent.kids.push(this);
                 const s = this.cls; this.classList = { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c),
                     toggle: (c, on) => (on ? s.add(c) : s.delete(c)) }; }
             get name() { return this.fixed || (this.className === 'tv-mote' ? 'mote' : this.className.split(' ')[0]); }
@@ -11074,19 +11077,27 @@ class PictureLifeTests(TestCase):
             }
             appendChild(c) { c.parent = this; this.kids.push(c); }
             remove() { if (this.parent) this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; }
+            get children() { return this.kids; }
+            set innerHTML(v) { this.markup = v; }
+            // made elements by class (B-228: '.tv-part, .tv-frame'), all
+            // descendants
+            querySelectorAll(sel) { const want = sel.split(',').map((x) => x.trim().slice(1)); const out = [];
+                const walk = (e) => e.kids.forEach((k) => { if (want.some((w) => k.className.split(' ').includes(w))) out.push(k); walk(k); }); walk(this); return out; }
+            querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
             set textContent(v) { this.kids.forEach((k) => { k.parent = null; }); this.kids = []; calls.push(['clear', this.name]); }
             getAnimations(o) { return [...live].filter((a) => (o && o.subtree ? inside(a.target, this) : a.target === this)); }
             getBoundingClientRect() { return { left: 104, top: 121, width: 151.2, height: 110 }; }
         }
         const card = new El('card'); const still = new El('still', card); const life = new El('life', card); const plate = new El('plate', life);
-        const motes = new El('motes', life); const actor = new El('actor', life); const subject = new El('subject', actor);
-        const fx = new El('fx', life); const flash = new El('flash', card); const body = new El('body');
-        const parts = { '.tv-life': life, '.tv-plate': plate, '.tv-motes': motes, '.tv-actor': actor, '.tv-subject': subject,
+        const motes = new El('motes', life); const actor = new El('actor', life); const tvBody = new El('tvbody', actor); const subject = new El('subject', tvBody);
+        const fx = new El('fx', life); const flash = new El('flash', card); const body = new El('body'); const burst = new El('burst');
+        const parts = { '.tv-life': life, '.tv-plate': plate, '.tv-motes': motes, '.tv-actor': actor, '.tv-body': tvBody, '.tv-subject': subject,
             '.tv-fx': fx, '#play-image': still, '.tv-flash': flash };
         card.querySelector = (s) => parts[s] || null;
-        globalThis.document = { hidden: false, body, querySelector: (s) => (s === '#screen-play .card' ? card : null),
+        globalThis.document = { hidden: false, body,
+            querySelector: (s) => (s === '#screen-play .card' ? card : s === '#screen-play .win-fx' ? burst : null),
             querySelectorAll: (s) => (s === '.confetti' ? body.kids.filter((k) => k.className === 'confetti') : []),
-            createElement: () => new El(null) };
+            createElement: () => new El(null), createElementNS: () => new El(null) };
         globalThis.window = { matchMedia: () => ({ matches: reduced }) };
         globalThis.Image = class { set src(v) { prefetched.push(v); } };
         const decodeAll = async (ok = true) => { for (const el of [plate, subject]) { el.pending.splice(0).forEach((p) => (ok ? p.res() : p.rej(new Error('no')))); } await tick(); };
@@ -11210,9 +11221,10 @@ class PictureLifeTests(TestCase):
     def test_main_wires_it_after_the_tv_and_on_visibility_changes(self):
         main = self.code('main.js')
         self.assertIn("import { renderPicture } from './picture.js';", main)
-        self.assertIn('subscribe(renderPicture);', main)
-        self.assertLess(main.index('subscribe((s) => renderTv(s, onTuned));'), main.index('subscribe(renderPicture);'))
-        self.assertIn("document.addEventListener('visibilitychange', () => renderPicture(state));", main)
+        # the win's sounds (B-228): audio.js winSound, told each win as it starts
+        self.assertIn('subscribe((s) => renderPicture(s, winSound));', main)
+        self.assertLess(main.index('subscribe((s) => renderTv(s, onTuned));'), main.index('subscribe((s) => renderPicture(s, winSound));'))
+        self.assertIn("document.addEventListener('visibilitychange', () => renderPicture(state, winSound));", main)
         pic = self.code('picture.js')
         # it never sets state and runs no script per frame: Web Animations
         # only, cancelled through getAnimations (no animation handle kept)
@@ -11229,7 +11241,7 @@ class PictureLifeTests(TestCase):
         html = self.HTML.read_text()
         card = html[html.index('<div class="card">'):html.index('<div class="plate">')]
         order = [card.index(s) for s in ('id="play-image"', '<div class="tv-life" aria-hidden="true">', 'class="tv-plate"', 'class="tv-motes"',
-                                         '<div class="tv-actor"><img class="tv-subject" src="" alt="" /></div>', 'class="tv-tune"',
+                                         '<div class="tv-actor"><div class="tv-body"><img class="tv-subject" src="" alt="" /></div></div>', 'class="tv-tune"',
                                          'class="tv-roll"', 'class="tv-static"', 'class="tv-flash"')]
         self.assertEqual(order, sorted(order))
         self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 33)
@@ -11940,12 +11952,16 @@ class WinFirstTests(TestCase):
         self.assertAlmostEqual(0.26 * 0.55, 0.143)
 
     def test_a_correct_check_chimes_at_once_and_he_speaks_when_the_win_ends(self):
+        # since B-228 the chime is the win's sound: picture.js starts the
+        # TV's win and tells audio.js winSound (null: the shared win, its
+        # chime at once); renderSound's moments start no chime of their own
         res = self.voice(
             "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound); ctxs[0].currentTime = 10;"
-            "await check(); const c = [chimes(), voiceStarts(), kinds()];"
+            "await check(); const own = oscs.length; a.winSound(null); const c = [chimes(), voiceStarts(), kinds()];"
             "await end('words/animals/cat.mp3'); const then = voiceStarts();"
-            "out([c, then]);")
-        (chimes, starts, kinds), then = res
+            "out([own, c, then]);")
+        own, (chimes, starts, kinds), then = res
+        self.assertEqual(own, 0)
         self.assertEqual(len(chimes), 2)
         for note, (f, at, dur, peak) in zip(chimes, ((1046, 10, 0.35, 0.154), (1568, 10.09, 0.5, 0.143))):
             self.assertEqual((note['type'], note['out']), ('triangle', 'out'))     # straight out, not through his analyser
@@ -11978,24 +11994,28 @@ class WinFirstTests(TestCase):
             "const wrong = [oscs.length, voiceStarts()];"
             "out([third, quiet, tutorial, wrong]);")
         third, quiet, tutorial, wrong = res
-        self.assertEqual(third, [2, [['words/animals/cat.mp3', 11]]])
+        # renderSound starts no chime (B-228: picture.js tells winSound as
+        # the TV's win starts, on every correct check, PictureWordWinTests)
+        self.assertEqual(third, [0, [['words/animals/cat.mp3', 11]]])
         self.assertEqual(quiet, [])
-        self.assertEqual(tutorial, [2, [['words/animals/cat.mp3', 11]]])
+        self.assertEqual(tutorial, [0, [['words/animals/cat.mp3', 11]]])
         self.assertEqual(wrong, [0, [['robot/wrong-01.mp3', 0]]])
 
     def test_the_mute_stops_the_chime_and_muted_there_is_none(self):
         res = self.voice(
             "await ready(); S.subscribe(a.renderSound); ctxs[0].currentTime = 10;"
-            "await check(); const n = oscs.length; S.setState({ muted: true }); await settle(); const stopped = oscs.map((o) => o.stops.includes('now'));"
+            "await check(); a.winSound(null); const n = oscs.length; S.setState({ muted: true }); await settle(); const stopped = oscs.map((o) => o.stops.includes('now'));"
             "S.setState({ muted: false, screen: 'theme', current: { word: null, placed: [] } }); await settle();"
-            "oscs.length = 0; await check({ roundsStarted: 2, muted: true }); out([n, stopped, oscs.length]);")
+            "oscs.length = 0; await check({ roundsStarted: 2, muted: true }); a.winSound(null); out([n, stopped, oscs.length]);")
         self.assertEqual(res, [2, [True, True], 0])
 
     def test_wiring(self):
         audio = self.code('audio.js')
         speak = audio[audio.index('function speak('):audio.index('export function peekLine(')]
-        self.assertIn('if (moments.some((m) => MOMENTS[m].win)) chime();', speak)
-        self.assertLess(speak.index('chime();'), speak.index('const wait = waitFor(moments, prev, now, reducedMotion());'))
+        # since B-228 the chime is the TV's win's (winSound, which picture.js
+        # calls as the win starts), not the moment's
+        self.assertNotIn('chime(', speak)
+        self.assertIn('subscribe((s) => renderPicture(s, winSound));', self.code('main.js'))
         self.assertIn("import { WIN_MS } from './picture.js';", self.code('celebrate.js'))
 
     # --- the iPhone's silent switch (audio.js) ---
@@ -12033,6 +12053,537 @@ class WinFirstTests(TestCase):
             "S.subscribe(a.renderSound); S.setState({ muted: true }); a.init(); listeners.pointerup(); await settle();"
             "const muted = [loops(), made.filter((m) => m.loop).length]; S.setState({ muted: false }); out([muted, loops()]);")
         self.assertEqual(res, [[[], 1], ['loop']])
+
+
+class PictureWordWinTests(TestCase):
+    """BACKLOG B-228: each animal's own win on a correct word. The theme's
+    wins file (static/data/wins/animals.json, read-only content) is read by
+    wins.js (wordWin, drawingsOf, the keyframe lists, the particle kinds
+    FX and their SHAPES); picture.js plays it on a correct check while the
+    layers show (the subject's track on .tv-body, the parts, the frame
+    swaps, the jolts, the particles in .win-fx, the flash and the sparks at
+    the peak, `win-out` unless `clip`), else B-227's shared win; audio.js
+    makes its sounds in code (SFX, winSounds, winSound: the chime at the
+    peak). The reference player design/reference/word-wins.html is the
+    spec: its own play(), FX and SFX code run through node with stand-ins
+    and are compared with the game's, for every word of the real file."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+    REF = ROOT / 'design' / 'reference' / 'word-wins.html'
+    WINS = ROOT / 'static' / 'data' / 'wins' / 'animals.json'
+    DATA = ROOT / 'static' / 'data' / 'animals.json'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def node(self, body, prelude=''):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const W = await import('{(self.JS / 'wins.js').as_uri()}');"
+            f"const FILE = {self.WINS.read_text(encoding='utf-8')};"
+            f"const DATA = {self.DATA.read_text(encoding='utf-8')};"
+            f"{prelude}{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def ref_block(self, start, end):
+        ref = self.REF.read_text()
+        return ref[ref.index(start):ref.index(end)]
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def css(self):
+        return re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+
+    # --- the data (the real animals.json) ---
+
+    def test_every_word_of_the_file_reads_and_its_drawings_exist(self):
+        res = self.node(
+            "const P = await import('" + (self.JS / 'picture.js').as_uri() + "');"
+            "const A = await import('" + (self.JS / 'audio.js').as_uri() + "');"
+            "out([P.WIN_MS, FILE.ms, Object.keys(FILE.words).map((w) => { const win = W.wordWin(FILE, w);"
+            " const look = win && W.drawingsOf(w, win, DATA[w] && DATA[w].motion && DATA[w].motion.subject);"
+            " return [w, !!win, win && win.clip, W.drawingUrls(look), win && [win.fx.length, win.parts.length, win.shake.length, win.sfx.length],"
+            "  A.winSounds(win).map((s) => s[0])]; }),"
+            " Object.keys(W.FX), Object.keys(A.SFX), Object.keys(DATA).filter((w) => !W.wordWin(FILE, w))]);")
+        win_ms, ms, words, kinds, sounds, none = res
+        raw = json.loads(self.WINS.read_text(encoding='utf-8'))['words']
+        # the win stays 1 s: the file's `ms` is the game's WIN_MS (the robot waits that long)
+        self.assertEqual([ms, win_ms], [1000, 1000])
+        self.assertEqual(len(words), 32)
+        self.assertEqual(none, ['duck'])                          # the one animal without a win: B-227's
+        for word, ok, clip, urls, counts, sched in words:
+            w = raw[word]
+            self.assertTrue(ok, word)
+            # nothing of the file is left out by the reader
+            self.assertEqual(counts, [len(w.get('fx', [])), len(w.get('parts', [])), len(w.get('shake', [])), len(w.get('sfx', []))], word)
+            # every track starts at 0 and ends at 1, in order
+            for kf in [w['subject']] + [p['kf'] for p in w.get('parts', [])]:
+                ts = [k[0] for k in kf]
+                self.assertEqual([ts[0], ts[-1]], [0, 1], word)
+                self.assertEqual(ts, sorted(ts), word)
+            # every part named has its file; a word with parts shows its body, one with a frame its win drawing
+            self.assertTrue(urls, word)
+            for url in urls:
+                self.assertTrue((self.ROOT / url.lstrip('/')).exists(), (word, url))
+            self.assertEqual(urls[0].endswith(f'/{word}-body.webp'), bool(w.get('parts')), word)
+            self.assertEqual(any(u.endswith(f'/{word}-win.webp') for u in urls), bool(w.get('frame')), word)
+            # every particle kind and sound used exists; the chime last, at the peak
+            for kind, _ in w.get('fx', []):
+                self.assertIn(kind, kinds, (word, kind))
+            for name, *_ in w.get('sfx', []):
+                self.assertIn(name, sounds, (word, name))
+            self.assertEqual(sched, [s[0] for s in w.get('sfx', [])] + ['chime'], word)
+            self.assertEqual(clip, w.get('clip') is True, word)
+        self.assertEqual(sorted(x[0] for x in words if x[2]), ['crab', 'mouse'])
+        # the acceptance's kinds, and the reference's sounds but its chime (B-227's)
+        self.assertEqual(sorted(kinds), sorted(['puff', 'dust', 'feathers', 'sparks', 'stars', 'drops', 'clang', 'swoosh',
+                                                'bubble', 'rings', 'ping', 'ink', 'moon', 'tangle']))
+
+    def test_the_reader(self):
+        res = self.node(
+            "const F = (w) => ({ ms: 1000, words: { cat: { pivot: '50% 95%', peak: 0.4, subject: [[0, 'none'], [1, 'none']], ...w } } });"
+            "out([[W.winsUrl('/static/data/animals.json'), W.winsUrl('/x/home.json'), W.winsUrl(''), W.winsUrl(null)],"
+            " [null, {}, { words: null }, F({}), F({ peak: 'x' }), F({ pivot: '' }), F({ subject: [[0, 'none']] }), F({ subject: [[0.1, 'none'], [1, 'none']] }),"
+            "  F({ subject: [[0, 'none'], [0.9, 'none']] }), F({ subject: [[0, 'none'], [0.6, 'x'], [0.5, 'y'], [1, 'none']] })].map((f) => !!W.wordWin(f, 'cat')),"
+            " W.wordWin(F({}), 'dog'), W.wordWin(F({}), 'constructor'), W.wordWin(F({}), 'cat'),"
+            " W.wordWin({ ...F({ fx: [['puff', { at: 0.1 }], ['laser', { at: 0.2 }], ['dust', null], ['moon', {}], ['stars', { at: 0.3 }]],"
+            "  parts: [{ name: 'tail', pivot: '1% 2%', kf: [[0, 'none'], [1, 'none']] }, { name: '../x', pivot: '1% 2%', kf: [[0, 'none'], [1, 'none']] },"
+            "   { name: 'leg', pivot: '1% 2%', kf: [[0, 'none', 'x'], [1, 'none']] }],"
+            "  frame: [[0.1, 'win'], [0.5, 'fly'], [0.9, 'rest']], shake: [[0.3, 2], ['x', 1]], sfx: [['boing', 0.1], ['boing'], [3, 0]], clip: 'yes' }), ms: -1 }, 'cat')]);")
+        urls, valid, dog, ctor, plain, messy = res
+        self.assertEqual(urls[:2], ['/static/data/wins/animals.json', '/x/wins/home.json'])
+        self.assertEqual(urls[2:], [None, None])
+        self.assertEqual(valid, [False, False, False, True, False, False, False, False, False, False])
+        self.assertEqual([dog, ctor], [None, None])
+        self.assertEqual(plain, {'ms': 1000, 'pivot': '50% 95%', 'peak': 0.4, 'clip': False, 'subject': [[0, 'none'], [1, 'none']],
+                                 'parts': [], 'frame': None, 'shake': [], 'fx': [], 'sfx': []})
+        # what it cannot play is left out
+        self.assertEqual(messy['ms'], None)
+        self.assertFalse(messy['clip'])
+        self.assertEqual([f[0] for f in messy['fx']], ['puff', 'stars'])
+        self.assertEqual([p['name'] for p in messy['parts']], ['tail'])
+        self.assertEqual(messy['frame'], [[0.1, 'win'], [0.9, 'rest']])
+        self.assertEqual(messy['shake'], [[0.3, 2]])
+        self.assertEqual(messy['sfx'], [['boing', 0.1]])
+
+    def test_the_drawings_a_word_needs(self):
+        res = self.node(
+            "const w = (o) => ({ pivot: '1% 1%', peak: 0.1, subject: [[0, 'none'], [1, 'none']], parts: [], frame: null, ...o });"
+            "const kf = (op) => [[0, 'none', op], [1, 'none']];"
+            "out([W.drawingsOf('dog', w({ parts: [{ name: 'tail', pivot: '65% 57%', kf: kf() }, { name: 'water', pivot: '5% 5%', fixed: true, kf: kf(0) }] }), '/i/a/dog-subject.webp'),"
+            " W.drawingsOf('bat', w({ frame: [[0.1, 'win']] }), '/i/a/bat-subject.webp'), W.drawingsOf('cat', w({}), '/i/a/cat-subject.webp'),"
+            " W.drawingsOf('cat', null, '/i/a/cat-subject.webp'), W.drawingsOf('cat', w({}), ''),"
+            " W.drawingUrls(W.drawingsOf('dog', w({ parts: [{ name: 'tail', pivot: '1% 1%', kf: kf() }], frame: [] }), '/i/dog-subject.webp')), W.drawingUrls(null)]);")
+        dog, bat, cat, none, nosub, urls, nourls = res
+        self.assertEqual(dog, {'rest': '/i/a/dog-body.webp', 'frame': None, 'parts': [
+            {'name': 'tail', 'src': '/i/a/dog-tail.webp', 'pivot': '65% 57%', 'fixed': False},
+            {'name': 'water', 'src': '/i/a/dog-water.webp', 'pivot': '5% 5%', 'fixed': True, 'opacity': 0}]})
+        self.assertEqual(bat, {'rest': '/i/a/bat-subject.webp', 'parts': [], 'frame': '/i/a/bat-win.webp'})
+        self.assertEqual(cat, {'rest': '/i/a/cat-subject.webp', 'parts': [], 'frame': None})
+        self.assertEqual([none, nosub], [None, None])
+        self.assertEqual(urls, ['/i/dog-body.webp', '/i/dog-tail.webp', '/i/dog-win.webp'])
+        self.assertEqual(nourls, [])
+        # the reference's own names for them
+        ref = self.REF.read_text()
+        for line in ("a.querySelector('.rest').src = '/static/images/words/animals/' + w + (W.parts ? '-body' : '-subject') + '.webp';",
+                     "img.src = '/static/images/words/animals/' + w + '-' + part.name + '.webp'; img.style.transformOrigin = part.pivot;",
+                     "const first = part.kf[0]; if (first[2] !== undefined) img.style.opacity = first[2];",
+                     "if (W.frame) win.src = '/static/images/words/animals/' + w + '-win.webp';"):
+            self.assertIn(line, ref)
+
+    # --- the tracks: the reference's own play() through node ---
+
+    REFPLAY = """
+        const REFPLAY = (WINS, word, U) => {
+            const log = [];
+            const el = (name) => ({ name, style: {}, animate(kf, o) { log.push([name, kf, o]); return { playbackRate: 1 }; },
+                querySelector: (sel) => el(sel === '.win' ? 'win' : sel === '.rest' ? 'rest' : 'part:' + /data-part="([^"]+)"/.exec(sel)[1]),
+                get parentNode() { return { querySelector: () => null }; } });
+            const actor = el('actor');
+            const $ = (id) => (id === 'badge' ? { hidden: true } : el(id));
+            const current = () => actor;
+            const reset = () => {}; const idle = { cancel() {} }; const slow = false; const sayIt = false;
+            const audio = () => null; const loadClip = () => {}; const SFX = {}; const sayWord = () => {};
+            const FX = new Proxy({}, { get: () => () => {} }); const fx = { querySelectorAll: () => [] };
+            const u = () => U;
+            eval(REFSRC + '; play();');
+            return log;
+        };
+    """
+
+    def test_the_tracks_are_the_references(self):
+        src = self.ref_block('  function play() {', '\n  // ======================= verdicts')
+        res = self.node(
+            "const words = Object.keys(FILE.words); const U = 1.25;"
+            "out(words.map((w) => { const win = W.wordWin(FILE, w); const ref = REFPLAY(FILE.words, w, U);"
+            " const by = (n) => ref.filter((r) => r[0] === n);"
+            " const num = (t) => (t === 'none' ? [0, 0] : t.replace(/^translate\\(|\\)$/g, '').split(/[ ,]+/).map(parseFloat));"
+            " return { word: w,"
+            "  subject: [JSON.stringify(by('actor').map((r) => r[1])) === JSON.stringify([W.subjectFrames(win)]), by('actor').map((r) => r[2])],"
+            "  parts: win.parts.map((p) => JSON.stringify(by('part:' + p.name).map((r) => r[1])) === JSON.stringify([W.partFrames(p)])),"
+            "  frame: win.frame ? [JSON.stringify(by('win')[0][1]) === JSON.stringify(W.frameFrames(win.frame, true)),"
+            "   JSON.stringify(by('rest')[0][1]) === JSON.stringify(W.frameFrames(win.frame, false))] : [by('win').length, by('rest').length],"
+            "  shake: by('tv').map((r, i) => [r[2], JSON.stringify(r[1].map((k) => num(k.transform))) === JSON.stringify(W.shakeFrames(win.shake[i][1], U).map((k) => num(k.translate))),"
+            "   JSON.stringify(W.shakeFrames(win.shake[i][1], U, -1).map((k) => num(k.translate))) === JSON.stringify(r[1].map((k) => num(k.transform).map((x) => -x || 0)))]),"
+            "  peak: [by('flash')[0][2], by('glow')[0][2]] }; }));",
+            prelude=f"const REFSRC = {json.dumps(src)};" + self.REFPLAY)
+        raw = json.loads(self.WINS.read_text(encoding='utf-8'))['words']
+        self.assertEqual(len(res), 32)
+        for r in res:
+            w = raw[r['word']]
+            # the subject's track, each part's and the frame swaps as the reference plays them, over its 1 s
+            self.assertEqual(r['subject'], [True, [{'fill': 'both', 'duration': 1000}]], r['word'])
+            self.assertEqual(r['parts'], [True] * len(w.get('parts', [])), r['word'])
+            self.assertEqual(r['frame'], [True, True] if w.get('frame') else [0, 0], r['word'])
+            # each jolt: the reference's moves (as `translate`), its 220ms at its time; the opposite for a subject out of the screen
+            self.assertEqual(r['shake'], [[{'fill': 'both', 'duration': 220, 'delay': t * 1000}, True, True] for t, _ in w.get('shake', [])], r['word'])
+            # the reference's flash and glow at the peak (the game plays B-227's flash and sparks there)
+            self.assertEqual(r['peak'][0]['delay'], w['peak'] * 1000, r['word'])
+        self.assertEqual(self.node("out(W.SHAKE_MS);"), 220)
+
+    # --- the particles: the reference's own FX and shape() through node ---
+
+    REFFX = """
+        const REFFX = (U) => {
+            const made = [];
+            const document = { createElementNS: () => { const s = { attrs: {}, style: {}, setAttribute(k, v) { s.attrs[k] = v; },
+                set innerHTML(v) { s.html = v; }, animate(kf, o) { s.kf = kf; s.o = o; } }; made.push(s); return s; } };
+            const fx = { appendChild() {} }; const stage = { clientWidth: 360 * U };
+            const api = eval(REFSRC + '; ({ FX, SHAPES });');
+            return { ...api, made };
+        };
+        const game = (kind, spec, U) => W.fxPieces([[kind, spec]], U).map((p) => { const b = W.shapeBox(p.shape, p.x, p.y, p.scale);
+            return { viewBox: b.viewBox, style: { width: b.width, left: b.left, top: b.top }, html: W.SHAPES[p.shape][2], kf: p.keyframes, o: p.options }; });
+        const ref = (R, kind, spec) => { R.made.length = 0; R.FX[kind](spec);
+            return R.made.map((s) => ({ viewBox: s.attrs.viewBox, style: { width: s.style.width, left: s.style.left, top: s.style.top }, html: s.html, kf: s.kf, o: s.o })); };
+    """
+
+    def test_the_particles_are_the_references(self):
+        src = self.ref_block('  // ======================= drawn bits', '  // ======================= the wins (data)')
+        res = self.node(
+            "const out2 = [];"
+            "for (const U of [1, 1.25]) { const R = REFFX(U);"
+            " out2.push(JSON.stringify(R.SHAPES) === JSON.stringify(W.SHAPES));"
+            " for (const [w, win] of Object.entries(FILE.words)) for (const [kind, spec] of win.fx || []) {"
+            "  const a = JSON.stringify(ref(R, kind, spec)), b = JSON.stringify(game(kind, spec, U)); out2.push(a === b ? true : [w, kind, a, b]); }"
+            # every kind at its defaults too, and the peak's sparks
+            " for (const kind of Object.keys(R.FX)) { const spec = { at: 0.2, x: 40, y: 60 };"
+            "  const a = JSON.stringify(ref(R, kind, spec)), b = JSON.stringify(game(kind, spec, U)); out2.push(a === b ? true : [kind, a, b]); }"
+            " out2.push(JSON.stringify(Object.keys(R.FX).sort()) === JSON.stringify(Object.keys(W.FX).sort())); }"
+            "out([out2, W.TV]);",
+            prelude=f"const REFSRC = {json.dumps(src)};" + self.REFFX)
+        checks, tv = res
+        self.assertEqual([c for c in checks if c is not True], [])
+        self.assertGreater(len(checks), 100)
+        self.assertEqual(tv, {'width': 151.2, 'height': 110})
+
+    # --- the sounds: the reference's own SFX through node ---
+
+    FAKECTX = """
+        const fake = () => { let n = 0; const nodes = [];
+            const param = (node, name) => ({ node, name, value: null,
+                setValueAtTime(v, t) { node.log.push([name + '.set', v, t]); }, exponentialRampToValueAtTime(v, t) { node.log.push([name + '.exp', v, t]); },
+                linearRampToValueAtTime(v, t) { node.log.push([name + '.lin', v, t]); } });
+            const node = (kind, names) => { const nd = { id: kind + (n++), log: [], type: null, buffer: null,
+                connect(to) { nd.log.push(['connect', to.node ? to.node.id + '.' + to.name : to.id]); },
+                start(t) { nd.log.push(['start', t]); }, stop(t) { nd.log.push(['stop', t]); } };
+                for (const nm of names) nd[nm] = param(nd, nm); nodes.push(nd); return nd; };
+            const ctx = { sampleRate: 8000, currentTime: 10, destination: { id: 'out' },
+                createOscillator: () => node('osc', ['frequency']), createGain: () => node('gain', ['gain']),
+                createBiquadFilter: () => node('filter', ['frequency', 'Q']), createBufferSource: () => node('src', []),
+                createBuffer: (c, len) => ({ noise: true, getChannelData: () => new Float32Array(len) }) };
+            const master = node('gain', ['gain']);
+            const dump = () => nodes.map((nd) => ({ id: nd.id, type: nd.type, buffer: !!nd.buffer, log: nd.log,
+                values: ['frequency', 'gain', 'Q'].filter((k) => nd[k]).map((k) => nd[k].value) }));
+            return { ctx, master, dump, nodes };
+        };
+        const REFSFX = (f) => { let ctx = null, master = null;
+            const api = eval(REFSRC.replace('let ctx = null, master = null, keepAlive = null;', 'let keepAlive = null; ctx = f.ctx; master = f.master;') + '; SFX');
+            return api; };
+    """
+
+    def test_the_sounds_are_the_references(self):
+        src = self.ref_block('  // ======================= sound, made in code', '  function loadClip(w) {')
+        self.assertIn('let ctx = null, master = null, keepAlive = null;', src)
+        res = self.node(
+            "const A = await import('" + (self.JS / 'audio.js').as_uri() + "');"
+            "Math.random = () => 0.37; const checks = [];"
+            "const both = (calls) => { const r = fake(), g = fake(); const RS = REFSFX(r); const kit = A.sfxKit(g.ctx, g.master);"
+            " for (const [name, t, ...args] of calls) { RS[name](t, ...args); A.SFX[name](kit, t, ...args); }"
+            " const a = JSON.stringify(r.dump()), b = JSON.stringify(g.dump()); return a === b ? true : [calls, a, b]; };"
+            "for (const [w, win] of Object.entries(FILE.words)) checks.push(both((win.sfx || []).map(([n, at, ...args]) => [n, 10.03 + at, ...args])));"
+            # every recipe on its own, at its defaults (a length where it needs one)
+            "const RS0 = REFSFX(fake());"
+            "for (const name of Object.keys(A.SFX)) checks.push(both([[name, 5, 0.3]]), both([[name, 5]]));"
+            "out([checks, Object.keys(A.SFX).length, Object.keys(RS0).filter((k) => !(k in A.SFX)), Object.keys(A.SFX).filter((k) => !(k in RS0)), A.SFX_GAIN, A.SFX_LEAD,"
+            " A.winSounds(W.wordWin(FILE, 'cat')), A.winSounds(null), A.winSounds({ peak: 0.5, sfx: [['laser', 0.1], ['boing', 0.2, 0.1], ['boing'], 'x'] })]);",
+            prelude=f"const REFSRC = {json.dumps(src)};" + self.FAKECTX)
+        checks, n_sfx, only_ref, only_game, gain, lead, cat, shared, odd = res
+        self.assertEqual([c for c in checks if c is not True], [])
+        self.assertEqual(len(checks), 32 + 2 * n_sfx)
+        self.assertEqual(n_sfx, 40)
+        # the reference's sounds, all but its chime (B-227's chime() plays it)
+        self.assertEqual([only_ref, only_game], [['chime'], []])
+        # its master gain and its t0
+        self.assertEqual([gain, lead], [0.55, 0.03])
+        ref = self.REF.read_text()
+        for line in ('master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination);',
+                     'const t0 = ac.currentTime + 0.03;',
+                     'for (const [name, at, ...args] of W.sfx || []) SFX[name](t0 + at, ...args);',
+                     'SFX.chime(t0 + W.peak);'):
+            self.assertIn(line, ref)
+        # the schedule: the word's sounds in order, the chime at the peak; the shared win's chime at once
+        self.assertEqual(cat, [['motor', 0, 0.38], ['sputter', 0.38, 2, 0.08], ['puff', 0.4], ['chime', 0.42]])
+        self.assertEqual(shared, [['chime', 0]])
+        self.assertEqual(odd, [['boing', 0.2, 0.1], ['chime', 0.5]])
+
+    def test_the_win_sound_plays_them_from_the_check_and_the_mute_stops_them(self):
+        me = SimpleNamespace(MODULE=self.JS / 'audio.js', STATE=self.JS / 'state.js', CHARACTER=self.JS / 'character.js',
+                             assertEqual=self.assertEqual)
+        extra = (
+            "AudioContext.prototype.sampleRate = 8000;"
+            "AudioContext.prototype.createBiquadFilter = function () { const p = () => ({ calls: [], setValueAtTime() {}, exponentialRampToValueAtTime() {} });"
+            " const f = { type: null, frequency: p(), Q: p(), connect(t) { f.to = t; } }; return f; };"
+            "const makeBuf = AudioContext.prototype.createBuffer;"
+            "AudioContext.prototype.createBuffer = function (c, len) { const b = makeBuf.call(this); b.getChannelData = () => new Float32Array(len || 1); return b; };"
+            "const gains = []; const makeGain = AudioContext.prototype.createGain;"
+            "AudioContext.prototype.createGain = function () { const g = makeGain.call(this); g.gain.linearRampToValueAtTime = () => {}; gains.push(g); return g; };"
+            "for (const o of [AudioContext.prototype]) { const mk = o.createOscillator; o.createOscillator = function () { const x = mk.call(this);"
+            " x.frequency.linearRampToValueAtTime = () => {}; return x; }; }"
+            f"const FILE = {self.WINS.read_text(encoding='utf-8')};"
+            f"const W = await import('{(self.JS / 'wins.js').as_uri()}');"
+        )
+        res = CorrectWordVoiceTests.run_node(me, WinFirstTests.VOICE + extra + (
+            "await ready(); S.subscribe(a.renderSound); S.setState(st()); await settle(); ctxs[0].currentTime = 10;"
+            "const cat = W.wordWin(FILE, 'cat'); a.winSound(cat);"
+            "const tri = oscs.filter((o) => o.type === 'triangle').map((o) => [o.frequency.calls[0][1], Math.round(o.at * 1000) / 1000, o.to.to.name]);"
+            "const saw = oscs.filter((o) => o.type === 'sawtooth').map((o) => Math.round(o.at * 1000) / 1000);"
+            "const sq = oscs.filter((o) => o.type === 'square').map((o) => Math.round(o.at * 1000) / 1000);"
+            "const outs = gains.filter((g) => g.to && g.to.name === 'out' && g.gain.value === 0.55).length;"
+            "S.setState({ muted: true }); await settle(); const stopped = oscs.every((o) => o.stops.includes('now'));"
+            "const n = oscs.length; a.winSound(cat); const whileMuted = oscs.length - n;"
+            "S.setState({ muted: false }); await settle(); oscs.length = 0; ctxs[0].currentTime = 20; a.winSound(null);"
+            "const shared = oscs.map((o) => [o.type, Math.round(o.at * 1000) / 1000]);"
+            "out([tri, saw, sq, outs, stopped, whileMuted, shared]);"))
+        tri, saw, sq, outs, stopped, while_muted, shared = res
+        # the cat: its motor from the check (+0.03 s), its sputters, the chime at its peak (0.42 s), straight out
+        self.assertEqual(tri, [[1046, 10.45, 'out'], [1568, 10.54, 'out']])
+        self.assertEqual(saw, [10.03])                               # the motor (its LFO has no type set)
+        self.assertEqual(sq, [10.41, 10.49])                         # the sputter's two thuds
+        self.assertEqual(outs, 1)                                    # one gain of 0.55 to the speakers
+        self.assertTrue(stopped)                                     # the mute stops every one
+        self.assertEqual(while_muted, 0)
+        # the shared win (B-227): the chime at once
+        self.assertEqual(shared, [['triangle', 20], ['triangle', 20.09]])
+
+    # --- the subscriber (PictureLifeTests' stand-ins) ---
+
+    OWN = """
+        data.cat.motion.win = 'cheer';
+        const WFILE = { ms: 1000, words: {
+            cat: { pivot: '50% 95%', peak: 0.4, subject: [[0, 'none'], [0.5, 'scale(1.2)', { filter: 'blur(1px)' }], [1, 'none']],
+                parts: [{ name: 'tail', pivot: '60% 50%', kf: [[0, 'rotate(0deg)'], [0.5, 'rotate(20deg)'], [1, 'rotate(0deg)']] },
+                    { name: 'legs', pivot: '50% 80%', kf: [[0, 'none', 1], [0.5, 'none', 0], [1, 'none', 1]] },
+                    { name: 'water', fixed: true, pivot: '50% 90%', kf: [[0, 'none'], [1, 'none']] }],
+                shake: [[0.3, 3]], fx: [['puff', { at: 0.4, x: 70, y: 70 }], ['stars', { at: 0.5, x: 30, y: 20, n: 3 }]], sfx: [['boing', 0.1]] },
+            bat: { pivot: '51% 14%', peak: 0.16, frame: [[0.1, 'win'], [0.95, 'rest']], subject: [[0, 'none'], [0.5, 'scale(1.1)'], [1, 'none']] },
+            bus: { pivot: '50% 92%', peak: 0.7, clip: true, subject: [[0, 'none'], [0.3, 'translate(80%,0)'], [1, 'none']], shake: [[0.5, 2]] } } };
+        const won = []; const onWin = (w) => won.push(w ? w.peak : null);
+        const own = (i, o = {}) => at(i, { wins: WFILE, ...o });
+        const made = () => [...tvBody.kids, ...actor.kids].filter((k) => k !== tvBody && k !== subject);
+        const decodeMade = async () => { for (const el of made()) el.pending.splice(0).forEach((p) => p.res()); await tick(); };
+        const readyOwn = async (i, o = {}) => { P.renderPicture(own(i, o), onWin); await decodeAll(); await decodeMade(); P.renderPicture(own(i, { tuned: true, ...o }), onWin); };
+        const correctOwn = (i, o = {}) => ({ ...own(i, { tuned: true, ...o }), current: { word: words[i].word, status: 'correct' } });
+        const layers = () => body.kids.filter((k) => k.className === 'confetti');
+        const anim = (name) => [...live].filter((a) => a.target.name === name);
+    """
+
+    def run_own(self, body):
+        fake = PictureLifeTests.FAKE.replace(
+            "const a = { target: this, keyframes, options, finished, paused: false,",
+            "const a = { target: this, keyframes, options, finished, paused: false, id: (options && options.id) || '',")
+        return PictureWinTests.run_node(self, fake + self.OWN + body)
+
+    def test_a_word_with_its_own_win_shows_and_loads_its_drawings(self):
+        res = self.run_own(
+            "P.renderPicture(own(0), onWin); const start = take();"
+            "const where = made().map((k) => [k.className, k.parent.name, k.attrs.src, k.style.transformOrigin, k.style.opacity, k.dataset.part, k.alt]);"
+            "const origin = tvBody.style.transformOrigin;"
+            # plate and rest decoded, the parts not yet: the still picture stays
+            "await decodeAll(); P.renderPicture(own(0, { tuned: true }), onWin); const half = on();"
+            "await decodeMade(); const full = on();"
+            # the bat: its win drawing, hidden at rest; the next word's drawings fetched ahead
+            "P.renderPicture(own(1), onWin); const bat = [made().map((k) => [k.className, k.parent.name, k.attrs.src, k.style.opacity]), subject.attrs.src, tvBody.style.transformOrigin];"
+            "out([start.map((c) => c.slice(0, 3)), where, origin, half, full, bat, prefetched]);")
+        start, where, origin, half, full, bat, prefetched = res
+        self.assertEqual(start, [['clear', 'motes'], ['clear', 'fx'], ['src', 'plate', '/w/breathe-plate.webp'],
+                                 ['src', 'subject', '/w/cat-body.webp'], ['src', 'tv-part', '/w/cat-tail.webp'],
+                                 ['src', 'tv-part', '/w/cat-legs.webp'], ['src', 'tv-part', '/w/cat-water.webp'],
+                                 ['decode', 'plate'], ['decode', 'subject']] + [['decode', 'tv-part']] * 3)
+        # its parts at their pivots inside the moving box, a fixed one beside it in the actor; a stepped part at its first opacity
+        self.assertEqual(where, [['tv-part', 'tvbody', '/w/cat-tail.webp', '60% 50%', None, 'tail', ''],
+                                 ['tv-part', 'tvbody', '/w/cat-legs.webp', '50% 80%', '1', 'legs', ''],
+                                 ['tv-part', 'actor', '/w/cat-water.webp', '50% 90%', None, 'water', '']])
+        self.assertEqual(origin, '50% 95%')
+        self.assertEqual([half, full], [False, True])                # the layers show once every drawing has decoded
+        self.assertEqual(bat, [[['tv-frame', 'tvbody', '/w/bat-win.webp', '0']], '/w/sway-subject.webp', '51% 14%'])
+        # only the current and the next word's: the bat's plate, cutout and win drawing; then the duck's nothing
+        self.assertEqual(prefetched, ['/w/sway-plate.webp', '/w/sway-subject.webp', '/w/bat-win.webp'])
+
+    def test_a_correct_check_plays_the_words_own_win(self):
+        res = self.run_own(
+            "await readyOwn(0); take(); P.renderPicture(correctOwn(0), onWin); const c = take();"
+            "const winOut = card.cls.has('win-out'); const idle = anim('actor').filter((a) => !a.id).map((a) => a.paused);"
+            "const pieces = burst.kids.map((k) => [k.attrs.viewBox, k.style.width, k.markup.slice(0, 2)]);"
+            "const sparks = layers()[0].kids.map((k) => k.style.opacity); const sparkDelay = anim('confetti-piece')[0].options.delay;"
+            # again: nothing more
+            "P.renderPicture(correctOwn(0), onWin); const again = take();"
+            # the track ends: back inside the screen, the idle plays on
+            "anim('tvbody')[0].finish(); await tick(); const after = [card.cls.has('win-out'), take()];"
+            "out([won, c.filter((x) => x[1] && x[1] !== 'confetti-piece').map((x) => [x[0], x[1], x[2], x[3]]), winOut, idle, pieces, sparks.length,"
+            " [...new Set(sparks)], sparkDelay, again, after]);")
+        won, calls, win_out, idle, pieces, n_sparks, spark_opacity, spark_delay, again, after = res
+        frames = self.node(
+            "const w = { pivot: '', peak: 0, subject: [[0, 'none'], [0.5, 'scale(1.2)', { filter: 'blur(1px)' }], [1, 'none']] };"
+            "out([W.subjectFrames(w), W.partFrames({ kf: [[0, 'rotate(0deg)'], [0.5, 'rotate(20deg)'], [1, 'rotate(0deg)']] }),"
+            " W.partFrames({ kf: [[0, 'none', 1], [0.5, 'none', 0], [1, 'none', 1]] }), W.partFrames({ kf: [[0, 'none'], [1, 'none']] }),"
+            " W.shakeFrames(3, 1), W.shakeFrames(3, 1, -1), W.fxPieces([['puff', { at: 0.4, x: 70, y: 70 }], ['stars', { at: 0.5, x: 30, y: 20, n: 3 }]], 1).length]);")
+        subject_kf, tail_kf, legs_kf, water_kf, shake, counter, n_pieces = frames
+        # its sounds told as it starts: the cat's own win
+        self.assertEqual(won, [0.4])
+        timing = {'duration': 1000, 'fill': 'both'}
+        self.assertEqual([c[:2] for c in calls], [['animate', 'flash'], ['pause', 'actor'], ['animate', 'tvbody'], ['animate', 'tv-part'],
+                                                  ['animate', 'tv-part'], ['animate', 'tv-part'], ['animate', 'card'], ['animate', 'actor']])
+        flash, _, body, tail, legs, water, jolt, hold = calls
+        # the warm flash at its peak, no fill (nothing before it)
+        self.assertEqual(flash[2:], [[{'opacity': 0.9}, {'opacity': 0}], {'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)', 'delay': 400}])
+        self.assertEqual(body[2:], [subject_kf, timing])
+        self.assertEqual([tail[2:], legs[2:], water[2:]], [[tail_kf, timing], [legs_kf, timing], [water_kf, timing]])
+        # the jolt on the TV picture, the subject out of the screen held still against it
+        self.assertEqual(jolt[2:], [shake, {'id': 'tv-shake', 'duration': 220, 'delay': 300}])
+        self.assertEqual(hold[2:], [counter, {'id': 'tv-shake', 'duration': 220, 'delay': 300}])
+        self.assertEqual(shake[1], {'translate': '3px -1.5px'})
+        self.assertEqual(counter[1], {'translate': '-3px 1.5px'})
+        self.assertTrue(win_out)
+        self.assertEqual(idle, [True])
+        # its particles in .win-fx, drawn in code; the sparks at the peak, hidden until then
+        self.assertEqual(len(pieces), n_pieces)
+        self.assertEqual(pieces[0], ['0 0 40 32', f'{40 / 151.2 * 100}%', '<g'])
+        self.assertEqual([n_sparks, spark_opacity, spark_delay], [40, ['0'], 400])
+        self.assertEqual(again, [])
+        self.assertEqual(after, [False, [['play', 'actor']]])
+
+    def test_a_clipped_win_and_a_frame_swap(self):
+        res = self.run_own(
+            "await readyOwn(3); take(); P.renderPicture(correctOwn(3), onWin); const bus = [card.cls.has('win-out'), take().map((x) => x.slice(0, 2))];"
+            "await readyOwn(1); take(); P.renderPicture(correctOwn(1), onWin); const bat = take().filter((x) => x[1] === 'tv-frame' || x[1] === 'subject').map((x) => [x[1], x[2]]);"
+            "out([bus, bat, won]);")
+        bus, bat, won = res
+        frames = self.node("out([W.frameFrames([[0.1, 'win'], [0.95, 'rest']], true), W.frameFrames([[0.1, 'win'], [0.95, 'rest']], false)]);")
+        # `clip`: inside the screen, its jolt moves it with the picture
+        win_out, calls = bus
+        self.assertFalse(win_out)
+        self.assertEqual([c for c in calls if c[1] in ('card', 'actor', 'tvbody')], [['pause', 'actor'], ['animate', 'tvbody'], ['animate', 'card']])
+        # the bat's win drawing and its rest drawing swap, stepped
+        self.assertEqual(bat, [['tv-frame', frames[0]], ['subject', frames[1]]])
+        self.assertEqual(frames[0], [{'offset': 0, 'opacity': 0, 'easing': 'step-end'}, {'offset': 0.1, 'opacity': 1, 'easing': 'step-end'},
+                                     {'offset': 0.95, 'opacity': 0, 'easing': 'step-end'}, {'offset': 1, 'opacity': 0}])
+        self.assertEqual(won, [0.7, 0.16])
+
+    def test_reduced_motion_no_layers_or_no_entry_play_the_shared_win(self):
+        res = self.run_own(
+            "const ready = async (i, o = {}) => { P.renderPicture(at(i, o), onWin); await decodeAll(); P.renderPicture(at(i, { tuned: true, ...o }), onWin); };"
+            "const correct = (i, o = {}) => ({ ...at(i, { tuned: true, ...o }), current: { word: words[i].word, status: 'correct' } });"
+            "reduced = true; await readyOwn(0); take(); P.renderPicture(correctOwn(0), onWin); const calm = take(); const calmFx = burst.kids.length; const calmLayers = layers().length;"
+            "reduced = false;"
+            "P.renderPicture(own(0, { roundsStarted: 2 }), onWin); await decodeAll(); P.renderPicture(own(0, { tuned: true, roundsStarted: 2 }), onWin); take();"
+            "P.renderPicture(correctOwn(0, { roundsStarted: 2 }), onWin); const early = take().filter((x) => x[1] !== 'confetti-piece').map((x) => x.slice(0, 2));"
+            "await ready(0, { roundsStarted: 3 }); take(); P.renderPicture(correct(0, { roundsStarted: 3 }), onWin); const plain = take().filter((x) => x[1] !== 'confetti-piece').map((x) => x.slice(0, 2));"
+            "await readyOwn(2); take(); P.renderPicture(correctOwn(2), onWin); const duck = take().filter((x) => x[1] !== 'confetti-piece').map((x) => x.slice(0, 2));"
+            "out([calm.map((x) => [x[1], x[2], x[3]]), calmFx, calmLayers, early, plain, duck, won]);")
+        calm, calm_fx, calm_layers, early, plain, duck, won = res
+        self.assertEqual(calm, [['flash', [{'opacity': 0.9}, {'opacity': 0}], {'duration': 200, 'easing': 'cubic-bezier(0.33, 1, 0.68, 1)', 'delay': 400}],
+                                ['tvbody', [{'opacity': 1}, {'opacity': 0.7}, {'opacity': 1}], {'duration': 1000}]])
+        self.assertEqual([calm_fx, calm_layers], [0, 0])             # no particles, no sparks
+        self.assertEqual(early, [['animate', 'flash'], ['animate', 'still']])
+        self.assertEqual(plain, [['animate', 'flash'], ['pause', 'actor'], ['animate', 'subject']])
+        self.assertEqual(duck, [['animate', 'flash'], ['animate', 'still']])
+        # its sounds told every time: the cat's own (reduced motion too), then the shared win's three times
+        self.assertEqual(won, [0.4, None, None, None])
+
+    def test_a_new_word_or_a_hidden_page_stops_it(self):
+        res = self.run_own(
+            "await readyOwn(0); take(); P.renderPicture(correctOwn(0), onWin); take();"
+            "const mid = [anim('card').length, burst.kids.length, layers().length];"
+            # the next word mid-win: the jolts, the particles, the sparks stop; the cat's drawings go
+            "P.renderPicture(own(1), onWin); await tick(); const next = take().filter((x) => x[0] === 'cancel').map((x) => x[1]);"
+            "const left = [anim('card').length, burst.kids.length, layers().length, card.cls.has('win-out'), made().map((k) => k.className)];"
+            # a hidden page mid-win
+            "await readyOwn(0, { roundsStarted: 2 }); P.renderPicture(correctOwn(0, { roundsStarted: 2 }), onWin); take(); document.hidden = true;"
+            "P.renderPicture(correctOwn(0, { roundsStarted: 2 }), onWin); await tick(); const hidden = [anim('card').length, burst.kids.length, live.size, card.cls.has('win-out')];"
+            "document.hidden = false; P.renderPicture(correctOwn(0, { roundsStarted: 2 }), onWin);"
+            "out([mid, next, left, hidden, won]);")
+        mid, nxt, left, hidden, won = res
+        self.assertEqual(mid, [1, 4, 1])
+        for part in ('card', 'tvbody', 'tv-part', 'flash'):
+            self.assertIn(part, nxt)
+        self.assertEqual(left, [0, 0, 0, False, ['tv-frame']])       # the bat's win drawing only
+        self.assertEqual(hidden, [0, 0, 0, False])
+        self.assertEqual(won, [0.4, 0.4])                            # never replayed
+
+    # --- wiring: wins.js, main.js, state.js, the template, game.css ---
+
+    def test_wiring(self):
+        wins = self.code('wins.js')
+        for word in ('document', 'window', 'setState', 'import ', 'fetch('):
+            self.assertNotIn(word, wins, word)
+        self.assertNotRegex(wins, r'(?m)^(let|var) ')
+        pic = self.code('picture.js')
+        self.assertIn("from './wins.js';", pic)
+        self.assertEqual(re.findall(r'^let (\w+)', pic, flags=re.M), ['shown', 'dom'])
+        main = self.code('main.js')
+        start = main[main.index('\nasync function startRound('):]
+        start = start[:start.index('\n}\n')]
+        # fetched with the data file (at the same time), kept with it, dropped with it
+        self.assertLess(start.index('const winsFile = loadWins(dataUrl);'), start.index('await fetch(dataUrl)'))
+        self.assertLess(start.index('const wins = await winsFile;'), start.index('if (state.screen !== from || state.theme !== name) {'))
+        self.assertIn('        wins,\n', start)
+        self.assertIn('wins: null,', main[main.index('\nfunction leaveRound('):])
+        self.assertIn('const url = winsUrl(dataUrl);', main)
+        self.assertIn("return fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);", main)
+        self.assertIn('    wins: null,', (self.JS / 'state.js').read_text())
+        # the template: the moving box in the actor, the particles' layer after the TV picture
+        html = self.HTML.read_text()
+        play = html[html.index('<div id="screen-play"'):html.index('<div class="plate">')]
+        self.assertIn('<div class="tv-actor"><div class="tv-body"><img class="tv-subject" src="" alt="" /></div></div>', play)
+        self.assertLess(play.index('<div class="tv-flash"'), play.index('<div class="win-fx" aria-hidden="true"></div>'))
+        self.assertGreaterEqual(int(re.search(r"css/game\.css' %}\?v=(\d+)", html).group(1)), 40)
+        css = self.css()
+        rule = lambda sel: re.search(r'(?<!,)\n' + re.escape(sel) + r'\s*{(.*?)}', css, flags=re.S).group(1)
+        for decl in ('position: absolute;', 'inset: 0;'):
+            self.assertIn(decl, rule('#screen-play .tv-body'))
+        card = rule('#screen-play .card')
+        burst = rule('#screen-play .win-fx')
+        for decl in ('position: absolute;', 'left: 28%;', 'width: 42%;', 'top: calc(var(--bg-h) * 0.164);', 'height: calc(var(--bg-h) * 0.141);'):
+            self.assertIn(decl, card)
+            self.assertIn(decl, burst)
+        self.assertIn('pointer-events: none;', burst)
+        self.assertNotIn('overflow', burst)                          # not clipped by the screen
+        for decl in ('position: absolute;', 'overflow: visible;'):
+            self.assertIn(decl, rule('#screen-play .win-fx svg'))
+        self.assertIn('overflow-x: clip;', rule('#screen-play:has(.win-fx > *)'))
+        # only picture.js touches the layer
+        for f in sorted(self.JS.glob('*.js')):
+            if f.name != 'picture.js':
+                self.assertNotIn('win-fx', self.code(f.name), f.name)
 
 
 class PlayersTests(TestCase):

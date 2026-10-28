@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=39">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=40">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -191,14 +191,18 @@
          win move and .tv-fx over it holds the move's puffs or drops
          (BACKLOG B-222); while the move runs the subject may leave the
          screen (the card's win-out class, BACKLOG B-227). Hidden until
-         then, under the four above, and it takes no taps. -->
+         then, under the four above, and it takes no taps. A word with its
+         own win (BACKLOG B-228, picture.js) shows its drawings in
+         .tv-body (its body, its parts, its win drawing), which that win
+         moves; .win-fx, over the TV and not clipped by its screen, holds
+         that win's particles; empty at rest, no taps. -->
     <div id="screen-play" class="screen" style="display: none;">
         <div class="card">
             <img id="play-image" src="" alt="" />
             <div class="tv-life" aria-hidden="true">
                 <img class="tv-plate" src="" alt="" />
                 <div class="tv-motes"></div>
-                <div class="tv-actor"><img class="tv-subject" src="" alt="" /></div>
+                <div class="tv-actor"><div class="tv-body"><img class="tv-subject" src="" alt="" /></div></div>
                 <div class="tv-fx"></div>
             </div>
             <canvas class="tv-tune" aria-hidden="true"></canvas>
@@ -206,6 +210,7 @@
             <div class="tv-static" aria-hidden="true"></div>
             <div class="tv-flash" aria-hidden="true"></div>
         </div>
+        <div class="win-fx" aria-hidden="true"></div>
         <div class="plate">
             <div class="hearts" aria-label="Lives">
                 <span></span><span></span><span></span>

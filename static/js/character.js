@@ -190,8 +190,10 @@ export const FX = {
 //     next of the lines plays alone (B-225; audio.js sayPlan).
 //   - `win: true` (a correct check: correct, streak, tutorialDone;
 //     B-227): the TV's win comes first (picture.js, WIN_MS). He watches it
-//     (WATCH, leadOf: no pump, no talk), audio.js plays its chime with it,
-//     and the moment's steps and his voice start when it ends (waitFor).
+//     (WATCH, leadOf: no pump, no talk), audio.js plays its chime with it
+//     (at once, or at a word's own win's peak, B-228: picture.js tells
+//     audio.js winSound), and the moment's steps and his voice start when
+//     it ends (waitFor).
 //   - `letter` (B-224): after his line he says the name of the letter he
 //     just put in a slot (letterGiven: the snapshot field holding its
 //     slot), or the name alone with no line.

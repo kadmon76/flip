@@ -29,8 +29,13 @@
 //   - the TV's tune-in hiss and channel click (BACKLOG B-214): made in
 //     code, no sound file (hiss), played when tv.js starts a tune-in;
 //   - the win's chime (BACKLOG B-227): two bright notes made in code, no
-//     sound file (chime), played with the TV's win on a correct check
-//     (the moments with MOMENTS[moment].win).
+//     sound file (chime), played with the TV's win on a correct check;
+//   - each word's own win's sounds (BACKLOG B-228): its `sfx` (the theme's
+//     wins file, wins.js), effects made in code as the reference
+//     design/reference/word-wins.html makes them (SFX), each at its time,
+//     and the chime at the win's `peak`. picture.js tells winSound which
+//     win it starts (main.js hands it over), the shared one (null: the
+//     chime at once) or the word's own.
 // On iPhone the silent switch would mute all of the Web Audio sound: at
 // the first gesture the page asks to play like a media app
 // (navigator.audioSession, where there is one) and a silent clip made in
@@ -113,9 +118,9 @@ export const FILES = {
 // "Sound", CHARACTER "Rules"). The swipe is an effect, not his voice: it
 // plays whenever a block goes into a slot and may overlap anything. So
 // are the round end's tada (B-224: under his end line), the TV's hiss
-// (B-214; made in code, not a pool) and the win's chime (B-227; made in
-// code too).
-export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'fx', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', word: 'voice', line: 'voice' };
+// (B-214; made in code, not a pool), the win's chime (B-227; made in
+// code too) and a word's own win's sounds (B-228, `sfx`; made in code).
+export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'fx', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', sfx: 'fx', word: 'voice', line: 'voice' };
 
 // The TV's tune-in hiss (BACKLOG B-214, design/reference/tv-motion.html
 // hiss()): white noise `tail` s longer than the hiss, its first samples
@@ -162,6 +167,172 @@ export function chimeEnvelope(note) {
         ['ramp', note.peak, note.at + CHIME.attack],
         ['ramp', CHIME.floor, note.at + note.dur],
     ];
+}
+
+// --- Each word's own win's sounds (BACKLOG B-228) ---
+
+// They go out through one gain of SFX_GAIN (the reference's master gain,
+// 0.55), and start SFX_LEAD s after the check (the reference's t0), each at
+// its time in the word's `sfx`, the chime at its `peak`.
+export const SFX_GAIN = 0.55;
+export const SFX_LEAD = 0.03;
+
+const hasOwn = (o, k) => !!o && typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
+
+// A gain's envelope, the reference's env(): from silence up to `peak` in
+// `a` s, back down to silence by `dur`.
+function env(g, t, a, peak, dur) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+}
+
+// What SFX's recipes make their sounds with, on AudioContext `c`: `ctx`;
+// `out`, where every recipe's sound goes; `keep(...sources)`, told every
+// source a recipe starts (audio.js keeps them in `live`, so the mute stops
+// them); and the reference's two building blocks: `tone`, an oscillator
+// through an envelope (a pitch glide from f0 to f1), and `noise`, white
+// noise (one second, made once for the kit, as the reference's noiseBuf)
+// through a filter (its frequency gliding from f to f1) and an envelope.
+export function sfxKit(c, out, keep = () => {}) {
+    let buf = null;
+    const noiseBuf = () => {
+        if (buf) return buf;
+        const b = c.createBuffer(1, c.sampleRate, c.sampleRate), d = b.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        return (buf = b);
+    };
+    return {
+        ctx: c,
+        out,
+        keep,
+        tone(t, { type = 'sine', f0, f1 = f0, dur, peak = 0.5, a = 0.008 }) {
+            const o = c.createOscillator(), g = c.createGain();
+            o.type = type; o.frequency.setValueAtTime(f0, t);
+            if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+            env(g, t, a, peak, dur); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.05);
+            keep(o);
+        },
+        noise(t, { dur, peak = 0.4, type = 'bandpass', f = 1200, q = 1, f1 = f }) {
+            const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+            s.buffer = noiseBuf(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+            if (f1 !== f) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+            env(g, t, 0.005, peak, dur); s.connect(fl); fl.connect(g); g.connect(out); s.start(t); s.stop(t + dur + 0.05);
+            keep(s);
+        },
+    };
+}
+
+// Every sound a word's win can call, made in code: name -> (kit, t, ...the
+// data's args), started at context time `t`. The reference's SFX, its
+// recipes and numbers as they are (its chime is B-227's, chime() below).
+export const SFX = {
+    motor(k, t, dur) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), fl = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(55, t); o.frequency.exponentialRampToValueAtTime(120, t + dur);
+        lfo.frequency.setValueAtTime(18, t); lfo.frequency.linearRampToValueAtTime(34, t + dur); lg.gain.value = 0.5; am.gain.value = 0.5;
+        fl.type = 'lowpass'; fl.frequency.value = 700;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.04); g.gain.setValueAtTime(0.35, t + dur - 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        lfo.connect(lg); lg.connect(am.gain); o.connect(fl); fl.connect(am); am.connect(g); g.connect(k.out);
+        o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        k.keep(o, lfo);
+    },
+    sputter(k, t, n = 2, gap = 0.08) { for (let i = 0; i < n; i++) { k.noise(t + i * gap, { dur: 0.07, peak: 0.5, type: 'lowpass', f: 900 }); k.tone(t + i * gap, { type: 'square', f0: 90, f1: 60, dur: 0.06, peak: 0.12 }); } },
+    puff(k, t) { k.noise(t, { dur: 0.25, peak: 0.25, type: 'bandpass', f: 500, f1: 1800, q: 0.7 }); },
+    boing(k, t, dur = 0.25) { k.tone(t, { type: 'sine', f0: 180, f1: 720, dur, peak: 0.4 }); },
+    bawk(k, t) { k.tone(t, { type: 'square', f0: 520, f1: 760, dur: 0.06, peak: 0.16 }); k.tone(t + 0.07, { type: 'sawtooth', f0: 980, f1: 560, dur: 0.17, peak: 0.18 }); },
+    flutter(k, t, dur) { for (let i = 0; i < Math.round(dur / 0.05); i++) k.noise(t + i * 0.05, { dur: 0.04, peak: 0.12, type: 'highpass', f: 2500 }); },
+    thump(k, t) { k.tone(t, { type: 'sine', f0: 140, f1: 50, dur: 0.16, peak: 0.6 }); k.noise(t, { dur: 0.06, peak: 0.2, type: 'lowpass', f: 400 }); },
+    softthud(k, t) { k.tone(t, { type: 'sine', f0: 110, f1: 55, dur: 0.14, peak: 0.45 }); },
+    whirr(k, t, dur) { k.tone(t, { type: 'sawtooth', f0: 120, f1: 520, dur, peak: 0.12 }); k.tone(t, { type: 'sine', f0: 240, f1: 1040, dur, peak: 0.1 }); },
+    twinkle(k, t, dur) { const n = [1568, 1760, 2093, 2349, 2637, 3136]; for (let i = 0; i < 6; i++) k.tone(t + i * dur / 6, { type: 'triangle', f0: n[i], dur: 0.18, peak: 0.13 }); },
+    plink(k, t, f = 1300) { k.tone(t, { type: 'sine', f0: f, dur: 0.09, peak: 0.22 }); },
+    clang(k, t) { for (const [f, p] of [[523, 0.3], [1187, 0.2], [1820, 0.14], [2640, 0.1]]) k.tone(t, { type: 'sine', f0: f, f1: f * 0.98, dur: 0.6, peak: p, a: 0.002 }); k.noise(t, { dur: 0.05, peak: 0.3, type: 'highpass', f: 3000 }); },
+    taps(k, t, dur, gap = 0.045) { for (let i = 0; i * gap < dur; i++) k.noise(t + i * gap, { dur: 0.02, peak: 0.18, type: 'bandpass', f: 3500, q: 4 }); },
+    skid(k, t) { k.tone(t, { type: 'sawtooth', f0: 1800, f1: 700, dur: 0.16, peak: 0.08 }); k.noise(t, { dur: 0.16, peak: 0.12, type: 'bandpass', f: 2500, f1: 900, q: 2 }); },
+    buzz(k, t, dur) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), g = ctx.createGain(), fl = ctx.createBiquadFilter();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(190, t);
+        for (let i = 1; i <= 6; i++) o.frequency.linearRampToValueAtTime(i % 2 ? 260 : 170, t + dur * i / 6);
+        fl.type = 'bandpass'; fl.frequency.value = 900; fl.Q.value = 0.8;
+        env(g, t, 0.03, 0.22, dur); o.connect(fl); fl.connect(g); g.connect(k.out); o.start(t); o.stop(t + dur + 0.05);
+        k.keep(o);
+    },
+    bonk(k, t) { k.tone(t, { type: 'sine', f0: 420, f1: 300, dur: 0.12, peak: 0.5, a: 0.002 }); k.noise(t, { dur: 0.03, peak: 0.25, type: 'lowpass', f: 1500 }); },
+    inflate(k, t, dur) { k.tone(t, { type: 'square', f0: 260, f1: 900, dur, peak: 0.07 }); },
+    ribbit(k, t) { for (const d of [0, 0.11]) { k.tone(t + d, { type: 'square', f0: 170, f1: 140, dur: 0.08, peak: 0.16 }); k.noise(t + d, { dur: 0.08, peak: 0.12, type: 'bandpass', f: 600, q: 3 }); } },
+    splat(k, t) { k.noise(t, { dur: 0.14, peak: 0.45, type: 'lowpass', f: 1200, f1: 300 }); k.tone(t, { type: 'sine', f0: 160, f1: 60, dur: 0.12, peak: 0.4 }); },
+    clicks(k, t, dur, gap = 0.05) { for (let i = 0; i * gap < dur; i++) k.noise(t + i * gap, { dur: 0.015, peak: 0.22, type: 'highpass', f: 4000 }); },
+    snap(k, t) { k.noise(t, { dur: 0.03, peak: 0.45, type: 'highpass', f: 2500 }); k.tone(t, { type: 'square', f0: 900, f1: 500, dur: 0.03, peak: 0.08 }); },
+    pop(k, t) { k.tone(t, { type: 'sine', f0: 900, f1: 1600, dur: 0.05, peak: 0.3, a: 0.002 }); k.noise(t, { dur: 0.03, peak: 0.15, type: 'highpass', f: 3000 }); },
+    pfff(k, t, dur) { k.noise(t, { dur, peak: 0.3, type: 'bandpass', f: 2500, f1: 700, q: 1.5 }); k.tone(t, { type: 'sawtooth', f0: 600, f1: 180, dur, peak: 0.06 }); },
+    tweet(k, t) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(2200, t); o.frequency.linearRampToValueAtTime(3200, t + 0.25);
+        lfo.frequency.value = 28; lg.gain.value = 220; lfo.connect(lg); lg.connect(o.frequency);
+        env(g, t, 0.01, 0.45, 0.3); o.connect(g); g.connect(k.out); o.start(t); lfo.start(t); o.stop(t + 0.35); lfo.stop(t + 0.35);
+        k.keep(o, lfo);
+    },
+    roar(k, t, dur) { k.noise(t, { dur, peak: 0.35, type: 'lowpass', f: 300, f1: 900 }); k.tone(t, { type: 'sawtooth', f0: 55, f1: 95, dur, peak: 0.16 }); },
+    squeak(k, t) { k.tone(t, { type: 'sine', f0: 1500, f1: 2400, dur: 0.09, peak: 0.3 }); },
+    hiss(k, t, dur) { k.noise(t, { dur, peak: 0.28, type: 'highpass', f: 4500 }); },
+    clipclop(k, t, dur, gap = 0.1) { for (let i = 0; i * gap < dur; i++) k.tone(t + i * gap, { type: 'sine', f0: i % 2 ? 620 : 820, f1: i % 2 ? 500 : 650, dur: 0.05, peak: 0.3, a: 0.002 }); },
+    ping(k, t) { k.tone(t, { type: 'sine', f0: 2637, dur: 0.3, peak: 0.25, a: 0.002 }); k.tone(t + 0.04, { type: 'sine', f0: 3520, dur: 0.25, peak: 0.15, a: 0.002 }); },
+    splash(k, t) { k.noise(t, { dur: 0.3, peak: 0.35, type: 'bandpass', f: 1800, f1: 600, q: 0.8 }); },
+    dizzy(k, t, dur) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+        o.type = 'triangle'; o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(400, t + dur);
+        lfo.frequency.value = 9; lg.gain.value = 80; lfo.connect(lg); lg.connect(o.frequency);
+        env(g, t, 0.02, 0.18, dur); o.connect(g); g.connect(k.out); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        k.keep(o, lfo);
+    },
+    yawn(k, t, dur) { k.tone(t, { type: 'sawtooth', f0: 260, f1: 130, dur, peak: 0.1, a: 0.06 }); k.noise(t, { dur, peak: 0.12, type: 'lowpass', f: 700, f1: 300 }); },
+    howl(k, t, dur) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(420, t); o.frequency.linearRampToValueAtTime(760, t + dur * 0.4); o.frequency.linearRampToValueAtTime(560, t + dur);
+        lfo.frequency.value = 6; lg.gain.value = 18; lfo.connect(lg); lg.connect(o.frequency);
+        env(g, t, 0.08, 0.3, dur); o.connect(g); g.connect(k.out); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        k.keep(o, lfo);
+    },
+    slide(k, t, dur, f0 = 400, f1 = 1400) { k.tone(t, { type: 'sine', f0, f1, dur, peak: 0.22, a: 0.02 }); },
+    trumpet(k, t, dur) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(330, t); o.frequency.linearRampToValueAtTime(520, t + 0.08); o.frequency.linearRampToValueAtTime(480, t + dur);
+        lfo.frequency.value = 7; lg.gain.value = 14; lfo.connect(lg); lg.connect(o.frequency);
+        fl.type = 'bandpass'; fl.frequency.value = 1100; fl.Q.value = 1.2;
+        env(g, t, 0.03, 0.4, dur); o.connect(fl); fl.connect(g); g.connect(k.out); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        k.keep(o, lfo);
+    },
+    sprinkle(k, t, dur) { for (let i = 0; i * 0.035 < dur; i++) k.noise(t + i * 0.035 + Math.random() * 0.02, { dur: 0.03, peak: 0.12, type: 'highpass', f: 5000 }); },
+    neigh(k, t, dur) {
+        const ctx = k.ctx;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(700, t); o.frequency.linearRampToValueAtTime(1100, t + dur * 0.25); o.frequency.linearRampToValueAtTime(450, t + dur);
+        lfo.frequency.value = 14; lg.gain.value = 90; lfo.connect(lg); lg.connect(o.frequency);
+        fl.type = 'bandpass'; fl.frequency.value = 1400; fl.Q.value = 1.5;
+        env(g, t, 0.02, 0.3, dur); o.connect(fl); fl.connect(g); g.connect(k.out); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        k.keep(o, lfo);
+    },
+    chomp(k, t) { k.tone(t, { type: 'sine', f0: 220, f1: 90, dur: 0.1, peak: 0.6, a: 0.002 }); k.noise(t, { dur: 0.05, peak: 0.4, type: 'bandpass', f: 2200, q: 2 }); },
+    zip(k, t) { k.noise(t, { dur: 0.14, peak: 0.3, type: 'bandpass', f: 1200, f1: 5000, q: 3 }); k.tone(t, { type: 'sine', f0: 700, f1: 2200, dur: 0.12, peak: 0.12 }); },
+    whoosh(k, t, dur = 0.2) { k.noise(t, { dur, peak: 0.2, type: 'bandpass', f: 600, f1: 2400, q: 1.2 }); },
+};
+
+// A win's sound schedule: [[name, at (s from the win's start), ...args]]:
+// a word's own win (wins.js wordWin) its `sfx` that SFX has, in its order,
+// then the chime at its `peak`; the shared win (null) the chime at once
+// (B-227).
+export function winSounds(win) {
+    if (!win) return [['chime', 0]];
+    const sfx = (Array.isArray(win.sfx) ? win.sfx : [])
+        .filter((s) => Array.isArray(s) && hasOwn(SFX, s[0]) && typeof s[1] === 'number');
+    return [...sfx, ['chime', win.peak]];
 }
 
 // The silent clip that loops while the sound is on (BACKLOG B-227, the
@@ -411,7 +582,7 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 let ctx = null;             // the AudioContext, made on the first gesture
 const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
 const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
-const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214) and the win's chime (B-227), { src, kind }
+const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214), the win's chime (B-227) and a word's own win's sounds (B-228), { src, kind }
 // When his voice last went quiet (BACKLOG B-226): the performance.now() ms
 // at which a clip of his voice last ended or was cut (-Infinity before he
 // ever spoke), for the quiet gap (character.js CHATTER.TALK_GAP, saysLine).
@@ -802,8 +973,9 @@ function reducedMotion() {
 // What he says on the moments of one state change (`moments`, from
 // snapshot `prev` to `now`, read from state `s`): per moment its plan
 // (sayPlan, from the clips decoded now: a clip not ready is skipped, never
-// waited for): its effect at once (and on a correct check the win's chime,
-// B-227); his voice, the word (B-223), his line or the prototype clip, and
+// waited for): its effect at once (the win's chime and a word's own win's
+// sounds are not here: picture.js starts them with the TV's win, winSound,
+// B-228); his voice, the word (B-223), his line or the prototype clip, and
 // the name of the letter he placed (B-224), one after the other, each
 // moment's no sooner than the moment starts in his script (waitFor: a
 // boost's when its letter lands, a correct check's when the TV's win ends,
@@ -821,8 +993,6 @@ function speak(moments, s, prev, now) {
     const plans = moments.map((m) => sayPlan(m, clipsFor(s, letterGiven(m, prev, now, word)), ready, Math.random,
         { variant: picks[m], stars: now.stars, boostKind: now.boostKind }, saysLine(m, now, quiet, Math.random)));
     for (const p of plans) if (p.fx) play(p.fx);
-    // a correct check (B-227): the win's chime, an effect, with the TV's win
-    if (moments.some((m) => MOMENTS[m].win)) chime();
     const wait = waitFor(moments, prev, now, reducedMotion());
     const starts = startsOf(moments, picks).map((t) => wait + t);
     voice(voiceChain(plans, starts), moments.every((m) => MOMENTS[m].ifQuiet));
@@ -886,17 +1056,18 @@ export function hiss(ms) {
 }
 
 // The win's chime (BACKLOG B-227): two notes made here (CHIME,
-// chimeEnvelope), straight out; an effect, so it may overlap anything.
-// Muted or before the first gesture: nothing. Kept with the playing
-// sources, so the mute stops it.
-function chime() {
+// chimeEnvelope), straight out, from context time `when` (now unless
+// given: a word's own win's peak, B-228); an effect, so it may overlap
+// anything. Muted or before the first gesture: nothing. Kept with the
+// playing sources, so the mute stops it.
+function chime(when = null) {
     if (state.muted || !ctx) return;
     try {
         if (ctx.state !== 'running') {
             const p = ctx.resume();
             if (p && p.catch) p.catch(() => {});
         }
-        const t = ctx.currentTime;
+        const t = when === null ? ctx.currentTime : when;
         for (const note of CHIME.notes) {
             const osc = ctx.createOscillator();
             osc.type = CHIME.type;
@@ -916,6 +1087,52 @@ function chime() {
         }
     } catch (e) {
         // no chime here; the win still plays
+    }
+}
+
+// The sounds of the TV's win as it starts (BACKLOG B-228): picture.js
+// calls it (main.js hands it over) with the win it plays, a word's own
+// (wins.js wordWin) or null for the shared one. Its schedule (winSounds)
+// from SFX_LEAD s on for a word's own win (the reference's t0), at once
+// for the shared one: each of the word's `sfx` made in code (SFX, through
+// one gain of SFX_GAIN), the chime (B-227) at the win's peak. Effects:
+// they may overlap anything, each source is kept with the playing ones so
+// the mute stops them. Muted or before the first gesture: nothing. They
+// play under reduced motion too.
+export function winSound(win) {
+    if (state.muted || !ctx) return;
+    try {
+        if (ctx.state !== 'running') {
+            const p = ctx.resume();
+            if (p && p.catch) p.catch(() => {});
+        }
+        const t0 = (ctx.currentTime || 0) + (win ? SFX_LEAD : 0);
+        let kit = null;
+        for (const [name, at, ...args] of winSounds(win)) {
+            if (name === 'chime') {
+                chime(t0 + at);
+                continue;
+            }
+            if (!kit) {
+                const out = ctx.createGain();
+                out.gain.value = SFX_GAIN;
+                out.connect(ctx.destination);
+                kit = sfxKit(ctx, out, keepSfx);
+            }
+            SFX[name](kit, t0 + at, ...args);
+        }
+    } catch (e) {
+        // no sounds here; the win still plays
+    }
+}
+
+// Each source of a word's own win's sounds joins the playing ones (`live`)
+// until it ends, so the mute stops it.
+function keepSfx(...sources) {
+    for (const src of sources) {
+        const entry = { src, kind: 'sfx' };
+        live.add(entry);
+        src.onended = () => live.delete(entry);
     }
 }
 

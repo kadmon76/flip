@@ -939,6 +939,15 @@ body[data-screen="play"] .play-back-btn {
     will-change: transform;
 }
 
+/* A word with its own win (BACKLOG B-228, picture.js): its drawings (the
+   rest drawing, its parts, its win drawing) lie in .tv-body, the whole
+   picture's box, which that win's track moves from its pivot; its images
+   are framed as the layers' above. */
+#screen-play .tv-body {
+    position: absolute;
+    inset: 0;
+}
+
 /* The win (BACKLOG B-227, picture.js): while the subject plays its move
    (class win-out on the card) it may leave the TV screen. The card stops
    clipping, so the subject is drawn over the TV's frame and the lab around
@@ -980,10 +989,11 @@ body[data-screen="play"] .play-back-btn {
     opacity: 0;
 }
 
-/* The win's puffs and drops (BACKLOG B-222, picture.js): .tv-fx lies over
-   the subject, inside the TV's mask; picture.js places each piece (left,
-   top and size inline, from the picture's width) and removes it when its
-   flight ends. Puffs: the drive's exhaust, as the prototype's (cream, an
+/* The win's puffs and drops (BACKLOG B-222, picture.js; the shared moves'
+   drive and splash): .tv-fx lies over the subject, inside the TV's mask
+   (a word's own win's particles are .win-fx's, BACKLOG B-228, below);
+   picture.js places each piece (left, top and size inline, from the
+   picture's width) and removes it when its flight ends. Puffs: the drive's exhaust, as the prototype's (cream, an
    ink outline, the lower right shaded). Drops: the splash's, teal and
    cream, outlined in ink. Invisible at rest. */
 #screen-play .tv-fx {
@@ -1014,6 +1024,30 @@ body[data-screen="play"] .play-back-btn {
 
 #screen-play .tv-drop.cream {
     background: var(--cream);
+}
+
+/* A word's own win's particles (BACKLOG B-228, picture.js; the reference
+   word-wins.html's .fx): a layer the TV picture's box (the card's), after
+   it, so over the picture and the subject, and not clipped by the screen;
+   each particle an <svg> drawn in code, placed in % of the picture and
+   removed when its flight ends. While it holds any the play screen clips
+   at its sides, so one never widens the page. Empty at rest, no taps. */
+#screen-play .win-fx {
+    position: absolute;
+    left: 28%;
+    width: 42%;
+    top: calc(var(--bg-h) * 0.164);
+    height: calc(var(--bg-h) * 0.141);
+    pointer-events: none;
+}
+
+#screen-play .win-fx svg {
+    position: absolute;
+    overflow: visible;
+}
+
+#screen-play:has(.win-fx > *) {
+    overflow-x: clip;
 }
 
 /* Wrong check: static over the picture, fine light and dark noise lines
