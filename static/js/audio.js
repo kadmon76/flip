@@ -4,13 +4,14 @@
 //     played when the kid taps the speaker on the console (speakWord);
 //   - the robot's voice and the effects (the block swipe, the round end's
 //     tada): pools of the existing clips under static/sounds/, downloaded
-//     once (init), decoded into Web Audio buffers on the first gesture and
+//     a few at a time (see "Fetching" below), decoded into Web Audio
+//     buffers on the first gesture and
 //     played by renderSound, a state subscriber, for the moments
 //     character.js's table (MOMENTS[moment].sound) gives a state change.
 //     There is no second trigger list here;
 //   - his new voice (BACKLOG M4b): the clips tools/voices.py makes into
 //     static/voice/ (read-only content, never written here), listed in
-//     static/voice/manifest.json, fetched once at init. On each moment he
+//     static/voice/manifest.json, fetched once the page is idle. On each moment he
 //     says a line of the pool the table names (MOMENTS[moment].lines,
 //     B-224; the picture's: the word's Hebrew guess, else his look's
 //     pool), else the moment's prototype clip; after his letter lands, its
@@ -44,6 +45,22 @@
 // `state.muted` (localStorage `flip.muted`, read and written only here
 // through loadMuted / saveMuted) means no sound plays at all (the silent
 // loop pauses too).
+// Fetching (BACKLOG B-229: the game opens and plays without waiting for
+// its sounds): nothing of his voice or the game sounds is fetched before
+// the page has loaded and gone idle (afterIdle). Then the manifest, and
+// one clip of each pool his moments use and of each prototype pool
+// (firstFetches); a pool gets one more clip, not fetched yet, each time
+// one of its clips plays (newClip), so variety builds up while the kid
+// plays. A word's own clips (its clip, Hebrew guess, gags, letters'
+// names; wordFetches) are fetched as the word starts, before any pool
+// clip. Clips download two at a time, in that order (nextDownload), and
+// no pool clip starts while a round is starting or a new word's picture
+// is still tuning in (holdsPools; a word's own one at a time; the pools'
+// clips on their way stop as a round starts, toStop), so the round's
+// data, the word's picture, its layers, its win drawings and the next
+// word's (fetched as its picture locks, tv.js and picture.js) come first.
+// A clip not decoded yet is skipped when its moment comes, never waited
+// for.
 //
 // Everything above "Playback" is pure (no DOM, no Audio) and a Django
 // test runs it through node; the AudioContext is only created on the
@@ -103,7 +120,8 @@ export const FILES = {
     // speaker no longer holds the word back, B-215): the one "hmm no"
     // clip, a placeholder while his new voice has no `no-gears` line
     // (B-224). The file is also in the
-    // error pool; it is downloaded and decoded once (init, decodeAll).
+    // error pool; it is downloaded and decoded once (one record per URL,
+    // soundClips).
     locked: { dir: 'error', names: ['hmm no.mp3'] },
 };
 
@@ -458,7 +476,8 @@ function allLines(spec) {
 
 // The pools of his shared lines the moment table names (MOMENTS[m].lines,
 // with its variants' and every pick of a fact, and PEEK.lines; the word's
-// own clips aside), downloaded once the manifest is in.
+// own clips aside), each fetched a clip at a time once the manifest is in
+// (BACKLOG B-229: firstFetches, newClip).
 export function linePools(moments = MOMENTS, peek = PEEK) {
     const pools = new Set();
     for (const spec of [...Object.values(moments), peek]) {
@@ -538,6 +557,116 @@ export function voiceChain(plans, starts = []) {
     return out;
 }
 
+// --- Fetching (BACKLOG B-229) ---
+
+// When the clips start to download: in the first idle period after the
+// page's `load` event (requestIdleCallback, `timeout` ms at most), or
+// `wait` ms after it where the browser has no requestIdleCallback
+// (Safari).
+export const IDLE = { timeout: 1000, wait: 250 };
+
+// Run `fn` once window `win` has loaded and gone idle (IDLE); a page that
+// has loaded already only waits for the idle.
+export function afterIdle(fn, win = globalThis) {
+    const idle = () => {
+        if (typeof win.requestIdleCallback === 'function') win.requestIdleCallback(() => fn(), { timeout: IDLE.timeout });
+        else win.setTimeout(fn, IDLE.wait);
+    };
+    const doc = win.document;
+    if (doc && doc.readyState !== 'complete' && typeof win.addEventListener === 'function') {
+        win.addEventListener('load', idle, { once: true });
+    } else {
+        idle();
+    }
+}
+
+// How many clips download at once: `free`, and `held` while the pools'
+// clips wait (holdsPools: a round starting, a new word's picture tuning
+// in), so a word's own clips leave the picture most of the network.
+export const FETCH_AT_ONCE = { free: 2, held: 1 };
+
+// A download's place in the queue, the lowest first: a word's own clips,
+// then the first clip of each pool, then a pool's next clips.
+export const RANK = { word: 0, first: 1, more: 2 };
+
+// A random one of `urls` (a pool's clips) that `have` (the URLs already
+// asked for) does not hold, or null when it holds every one: a pool's
+// first clip, and its next one each time one of its clips plays. `rand`
+// is Math.random unless a test passes its own.
+export function newClip(urls, have = new Set(), rand = Math.random) {
+    const left = urls.filter((url) => !have.has(url));
+    return left.length ? left[pickIndex(left.length, rand)] : null;
+}
+
+// The clips fetched first, in order, one random clip a pool (newClip):
+// { url, pool } for a pool of his shared lines (from `files`, the
+// manifest's list), { url, kind } for a prototype pool (FILES). First the
+// pools of a moment that waits for its clip (MOMENTS[m].waitReady: the
+// greeting, which comes with the first tap), then the prototype pools
+// (the swipe on every block, the round end's tada, his fallbacks), then
+// his other pools in the moment table's order (linePools). A file two
+// pools name is fetched once; a pool with no clip has none.
+export function firstFetches(files, rand = Math.random, moments = MOMENTS, peek = PEEK) {
+    const early = linePools(Object.fromEntries(Object.entries(moments).filter(([, m]) => m && m.waitReady)), {});
+    const later = linePools(moments, peek).filter((pool) => !early.includes(pool));
+    const have = new Set();
+    const out = [];
+    const add = (item) => {
+        if (!item.url) return;
+        have.add(item.url);
+        out.push(item);
+    };
+    const line = (pool) => add({ url: newClip(poolClips(files, pool).map((file) => voiceUrl(file)), have, rand), pool });
+    early.forEach(line);
+    for (const kind of Object.keys(FILES)) add({ url: newClip(poolUrls(kind), have, rand), kind });
+    later.forEach(line);
+    return out;
+}
+
+// A word's own clips (B-223, B-224) as URLs, in the order they are fetched
+// as it starts: its Hebrew guess (said at the TV's lock), its clip
+// `audio` (said at its correct check), its gags (after the word) and the
+// names of its letters (after his letter lands), the ones `files` lists.
+export function wordFetches(files, theme, word, audio) {
+    const urls = (list) => list.map((file) => voiceUrl(file));
+    const letters = typeof word === 'string' ? [...new Set(word)].map((letter) => letterClip(files, letter)).filter(Boolean) : [];
+    return [...urls(hebrewClips(files, theme, word)), audio, ...urls(gagClips(files, theme, word)), ...urls(letters)].filter(Boolean);
+}
+
+// Whether the pools' clips wait (state `s`): while a round is starting
+// (its data on its way) and while a new word's picture tunes in (not
+// locked yet), so its picture, its life layers and win drawings and the
+// next word's are fetched first. A word's own clips never wait (they go
+// one at a time then, FETCH_AT_ONCE.held).
+export function holdsPools(s) {
+    if (!s) return false;
+    if (s.startingRound) return true;
+    return s.screen === 'play' && !!(s.current && s.current.word) && !s.tuned;
+}
+
+// The download to start next from `waiting` ([{ rank, seq }]: the queue,
+// `seq` the order they were asked for in): the lowest rank, then the
+// first asked for; while `held` (holdsPools), only a word's own. Its
+// index, or -1 for none.
+export function nextDownload(waiting, held = false) {
+    let best = -1;
+    waiting.forEach((job, i) => {
+        if (held && job.rank > RANK.word) return;
+        const top = waiting[best];
+        if (best < 0 || job.rank < top.rank || (job.rank === top.rank && job.seq < top.seq)) best = i;
+    });
+    return best;
+}
+
+// The downloads on their way (`going`, [{ rank }]) that stop when a round
+// starts (state `s`, its data on its way): the pools' clips, which go back
+// to wait their turn, so the round's data and its first word's picture
+// have the network (its picture was not fetched ahead). A word's own clips
+// go on, and nothing stops while no round is starting.
+export function toStop(going, s) {
+    return s && s.startingRound ? going.filter((job) => job.rank > RANK.word) : [];
+}
+
 // The remembered mute flag: true only when the key holds 'true'; missing,
 // anything else, or storage that cannot be read (private mode, no
 // localStorage) is sound on, the DESIGN default.
@@ -566,7 +695,9 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 // an <audio> element takes a few hundred ms from play() to sound, iOS
 // ignores `preload` so a clip's first play waits for its download, and
 // iOS refuses some of the per-element unlocks, leaving those clips silent
-// until a reload. So: init() downloads every clip once; the first user
+// until a reload. So: the clips are downloaded (BACKLOG B-229: once the
+// page is idle, a clip a pool at first, more as they play; "Fetching"
+// above); the first user
 // gesture creates one AudioContext, opens its output and decodes the
 // clips into memory; play() then starts a decoded buffer at once.
 // The target word the speaker plays stays an <audio> element (speakWord):
@@ -580,8 +711,11 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 // Audio engine handles, not game state (CLAUDE.md "audio.js"): no other
 // module reads them and nothing decides game logic from them.
 let ctx = null;             // the AudioContext, made on the first gesture
-const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
-const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
+// The prototype pools' clips (FILES), per clip URL a record as his new
+// voice's below ({ bytes, buffer, decoding }); only the ones asked for
+// (BACKLOG B-229: a clip a pool at first, one more after each play), and a
+// file two pools name ('hmm no' in error and locked) has one.
+const soundClips = new Map();
 const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214), the win's chime (B-227) and a word's own win's sounds (B-228), { src, kind }
 // When his voice last went quiet (BACKLOG B-226): the performance.now() ms
 // at which a clip of his voice last ended or was cut (-Infinity before he
@@ -590,12 +724,21 @@ let hushedAt = -Infinity;
 // His new voice (BACKLOG B-223, B-224): the files static/voice/manifest.json
 // lists (none until it is in, and none for a missing or broken one), and
 // per clip URL { bytes: Promise of its bytes or null, buffer: its decoded
-// AudioBuffer or null, decoding }: the clips of his line pools (kept), and
+// AudioBuffer or null, decoding }: the clips of his line pools asked for
+// so far (kept; each with its `pool`, B-229), and
 // the current word's own clips: its clip, its gags, its Hebrew guess and
 // the names of its letters (let go on a new word).
 let listed = [];
 const lineClips = new Map();
 const wordClips = new Map();
+// The downloads (BACKLOG B-229): `waiting`, the clips asked for that have
+// not started ({ url, rank, seq, fill, failed }: `fill` hands its bytes,
+// or null, to the clip's record; `failed` asks its pool for another),
+// `going`, the ones on their way (FETCH_AT_ONCE; each with the
+// AbortController that can stop it, `stop`), `seq`, the count asked for
+// so far, and `open`, set once the page is idle (afterIdle): nothing
+// downloads before.
+const net = { open: false, going: [], waiting: [], seq: 0 };
 // The robot's voice (the voice channel) plays through an AnalyserNode on
 // its way out, so he can show it (BACKLOG B-210: character.js
 // renderTalk, which main.js hands voiceWave() every frame). The swipe
@@ -620,9 +763,9 @@ let wordClip = null;
 // other module reads it and nothing decides game logic from it.
 let keepAlive = null;
 
-function download(url) {
+function download(url, signal = null) {
     try {
-        return fetch(url)
+        return fetch(url, signal ? { signal } : undefined)
             .then((r) => (r.ok ? r.arrayBuffer() : null))
             .catch(() => null);
     } catch (e) {
@@ -630,16 +773,82 @@ function download(url) {
     }
 }
 
-// A clip of his new voice: its download starts now, and its decode too
-// once the context exists (else on the first gesture, decodeAll).
-function fetchClip(url) {
-    const clip = { bytes: download(url), buffer: null, decoding: false };
+// Clip `url`'s bytes, asked for at `rank` (RANK): a Promise of them (null
+// when the download fails), filled when its turn in the queue comes
+// (pump). `failed` runs when the download fails.
+function ask(url, rank, failed = null) {
+    return new Promise((fill) => {
+        net.waiting.push({ url, rank, seq: ++net.seq, fill, failed });
+        pump();
+    });
+}
+
+// The next downloads start (nextDownload), FETCH_AT_ONCE at most at once:
+// none before the page is idle (`net.open`), and no pool clip (and a
+// word's own one at a time) while a round starts or a new word's picture
+// tunes in (holdsPools). As a round starts the pools' clips on their way
+// stop and wait their turn again (toStop).
+function pump() {
+    if (!net.open) return;
+    for (const job of toStop(net.going, state)) {
+        if (job.stop) job.stop.abort();
+    }
+    const held = holdsPools(state);
+    while (net.going.length < (held ? FETCH_AT_ONCE.held : FETCH_AT_ONCE.free)) {
+        const i = nextDownload(net.waiting, held);
+        if (i < 0) return;
+        const [job] = net.waiting.splice(i, 1);
+        net.going.push(job);
+        job.stop = typeof AbortController === 'function' ? new AbortController() : null;
+        download(job.url, job.stop && job.stop.signal).then((data) => {
+            net.going = net.going.filter((j) => j !== job);
+            if (job.stop && job.stop.signal.aborted) {
+                net.waiting.push(job);
+            } else {
+                job.fill(data);
+                if (!data && job.failed) job.failed();
+            }
+            pump();
+        });
+    }
+}
+
+// A clip let go before its download started (the word changed) leaves
+// the queue, with no bytes.
+function drop(url) {
+    net.waiting = net.waiting.filter((job) => {
+        if (job.url !== url) return true;
+        job.fill(null);
+        return false;
+    });
+}
+
+// A clip (a record, with `extra`): its download asked for at `rank` (ask),
+// and its decode once its bytes are in and the context exists (else on
+// the first gesture, decodeAll).
+function fetchClip(url, rank, failed = null, extra = {}) {
+    const clip = { bytes: ask(url, rank, failed), buffer: null, decoding: false, ...extra };
     decodeClip(clip);
     return clip;
 }
 
-// Decode a clip of his new voice once; one that fails to download or
-// decode stays without a buffer (never ready: skipped).
+// One clip more of his line pool `pool`, at `rank`: a random one of its
+// clips not asked for yet (newClip), if it has one; one whose download
+// fails asks for another.
+function moreLine(pool, rank = RANK.more) {
+    const url = newClip(poolClips(listed, pool).map((file) => voiceUrl(file)), new Set(lineClips.keys()));
+    if (url) lineClips.set(url, fetchClip(url, rank, () => moreLine(pool, rank), { pool }));
+}
+
+// One clip more of prototype pool `kind` (FILES), as moreLine.
+function moreSound(kind, rank = RANK.more) {
+    const url = newClip(poolUrls(kind), new Set(soundClips.keys()));
+    if (url) soundClips.set(url, fetchClip(url, rank, () => moreSound(kind, rank)));
+}
+
+// Decode a clip once (his new voice's, a prototype pool's); one that
+// fails to download or decode stays without a buffer (never ready:
+// skipped).
 function decodeClip(clip) {
     if (!ctx || clip.decoding) return;
     clip.decoding = true;
@@ -650,7 +859,8 @@ function decodeClip(clip) {
 }
 
 // Resolves true as soon as one clip of his shared-line pool `pool` is
-// decoded, false when none can be (none listed, none decodes). For a
+// decoded, false when none can be (none listed or asked for yet, none
+// decodes). For a
 // moment the table marks `waitReady` (the greeting, human 2026-10-24).
 function poolDecoded(pool) {
     const clips = poolClips(listed, pool).map((file) => lineClips.get(voiceUrl(file))).filter(Boolean);
@@ -673,9 +883,11 @@ function bufferOf(url) {
     return (clip && clip.buffer) || null;
 }
 
-// The manifest, fetched once (init): then the clips of his line pools are
-// downloaded, and the word showing, if any, gets its gags. A missing or
-// broken manifest counts as an empty one, with no console error.
+// The manifest, fetched once, as the page goes idle (open; BACKLOG B-223,
+// B-229): then the word showing, if any, gets its own clips, and one clip
+// of each pool is asked for (firstFetches: his line pools' and the
+// prototype pools'). A missing or broken manifest counts as an empty one,
+// with no console error (the prototype pools still get theirs).
 function loadManifest() {
     let got;
     try {
@@ -685,54 +897,53 @@ function loadManifest() {
     }
     return got.catch(() => null).then((manifest) => {
         listed = listedClips(manifest);
-        for (const pool of linePools()) {
-            for (const file of poolClips(listed, pool)) {
-                const url = voiceUrl(file);
-                if (!lineClips.has(url)) lineClips.set(url, fetchClip(url));
+        loadWord(state);
+        for (const item of firstFetches(listed)) {
+            if (item.pool) {
+                if (!lineClips.has(item.url)) lineClips.set(item.url, fetchClip(item.url, RANK.first, () => moreLine(item.pool, RANK.first), { pool: item.pool }));
+            } else if (!soundClips.has(item.url)) {
+                soundClips.set(item.url, fetchClip(item.url, RANK.first, () => moreSound(item.kind, RANK.first)));
             }
         }
-        loadWord(state);
     }).catch(() => {});
 }
 
 // The word now showing (BACKLOG B-223, B-224): its own clip (its `audio`),
-// its gags, its Hebrew guess and the names of its letters are fetched and
-// decoded now, as it starts, so they are ready at the TV's lock, at its
-// check and when his letter lands; the clips of the word before are let
-// go. Off the play screen, none.
+// its Hebrew guess, its gags and the names of its letters are asked for
+// now, as it starts, ahead of any pool clip (wordFetches, RANK.word), so
+// they are ready at the TV's lock, at its check and when his letter
+// lands; the clips of the word before are let go (and leave the queue if
+// they have not started). Off the play screen, none.
 function loadWord(s) {
     const { current } = s;
     const onWord = s.screen === 'play' && current && current.word;
-    const files = onWord
-        ? [...gagClips(listed, s.theme, current.word), ...hebrewClips(listed, s.theme, current.word),
-            ...[...new Set(current.word)].map((letter) => letterClip(listed, letter))].filter(Boolean)
-        : [];
-    const want = onWord ? [current.audio, ...files.map((file) => voiceUrl(file))].filter(Boolean) : [];
+    const want = onWord ? wordFetches(listed, s.theme, current.word, current.audio) : [];
     for (const url of [...wordClips.keys()]) {
-        if (!want.includes(url)) wordClips.delete(url);
+        if (want.includes(url)) continue;
+        wordClips.delete(url);
+        drop(url);
     }
     for (const url of want) {
-        if (!wordClips.has(url)) wordClips.set(url, fetchClip(url));
+        if (!wordClips.has(url)) wordClips.set(url, fetchClip(url, RANK.word));
     }
 }
 
-// Start downloading every clip and wait for the first gesture. Nothing
-// plays and no AudioContext exists yet, so loading the page raises no
-// autoplay-policy warning. A clip that fails to download is left out of
-// its pool. A file named by two pools ('hmm no' is in error and locked)
-// is downloaded once; both pools share its bytes. His new voice's
-// manifest is fetched once (BACKLOG B-223).
+// Wait for the first gesture, and for the page to go idle before any clip
+// downloads (BACKLOG B-229: afterIdle, open). Nothing plays and no
+// AudioContext exists yet, so loading the page raises no autoplay-policy
+// warning.
 export function init() {
-    const byUrl = new Map();    // url -> its download, for this call only
-    for (const kind of Object.keys(FILES)) {
-        buffers[kind] = FILES[kind].names.map(() => null);
-        bytes[kind] = poolUrls(kind).map((url) => {
-            if (!byUrl.has(url)) byUrl.set(url, download(url));
-            return byUrl.get(url);
-        });
-    }
-    loadManifest();
     for (const type of UNLOCK_EVENTS) document.addEventListener(type, unlock, true);
+    afterIdle(open);
+}
+
+// The page is idle (BACKLOG B-229): the downloads may start, his new
+// voice's manifest first (loadManifest).
+function open() {
+    if (net.open) return;
+    net.open = true;
+    loadManifest();
+    pump();
 }
 
 // The silent loop's element (keepAlive), or null where it cannot be made.
@@ -805,21 +1016,11 @@ function unlock() {
     }
 }
 
-// Decode each download once (decodeAudioData takes over the bytes it is
-// given, so shared bytes cannot be decoded twice) and give the buffer to
-// every pool slot that names the file. His new voice's clips fetched
-// before the context existed decode now too.
+// The clips asked for before the context existed decode now, each record
+// once (decodeAudioData takes over the bytes it is given; a file two
+// pools name has one record). An undecodable clip is left out of its pool.
 function decodeAll() {
-    const decoded = new Map();  // download -> its decode, for this call only
-    for (const kind of Object.keys(bytes)) {
-        bytes[kind].forEach((p, i) => {
-            if (!decoded.has(p)) decoded.set(p, p.then((data) => (data ? ctx.decodeAudioData(data) : null)));
-            decoded.get(p)
-                .then((buf) => { if (buf) buffers[kind][i] = buf; })
-                .catch(() => {});   // an undecodable clip is left out of its pool
-        });
-    }
-    for (const clip of [...lineClips.values(), ...wordClips.values()]) decodeClip(clip);
+    for (const clip of [...soundClips.values(), ...lineClips.values(), ...wordClips.values()]) decodeClip(clip);
 }
 
 // A source leaves `live`: one of his voice notes when he went quiet
@@ -888,11 +1089,13 @@ function start(buffer, kind, then = null, wait = 0) {
 }
 
 // A random decoded clip of pool `kind`, started (`then`, `wait` as for
-// start); false while none is decoded.
+// start); false while none is decoded. The pool asks for one clip more
+// (BACKLOG B-229).
 function startPool(kind, then = null, wait = 0) {
-    const ready = (buffers[kind] || []).filter(Boolean);
+    const ready = poolUrls(kind).map((url) => soundClips.get(url)).filter((clip) => clip && clip.buffer);
     if (!ready.length) return false;
-    start(ready[pickIndex(ready.length)], kind, then, wait);
+    start(ready[pickIndex(ready.length)].buffer, kind, then, wait);
+    moreSound(kind);
     return true;
 }
 
@@ -904,7 +1107,7 @@ function startPool(kind, then = null, wait = 0) {
 // correct check, B-223): the word is spoken clean and is never cut. The
 // effects (the swipe, the tada) may overlap anything.
 export function play(kind) {
-    if (state.muted || !ctx || !buffers[kind]) return;
+    if (state.muted || !ctx || !FILES[kind]) return;
     if (CHANNEL[kind] === 'voice') {
         if (state.speaking || saying()) return;
         stopVoice();
@@ -916,7 +1119,9 @@ export function play(kind) {
 // after the other, each when the one before has played to its end, and
 // one with `at` no sooner than `at` s after `t0` (the context's time at
 // the state change). A clip no longer decoded is skipped. Nothing more
-// once muted or while the speaker's word plays: the rest is dropped.
+// once muted or while the speaker's word plays: the rest is dropped. A
+// clip of his line pools that starts has its pool ask for one more
+// (BACKLOG B-229).
 function chain(items, t0) {
     if (!items.length || state.muted || state.speaking || !ctx) return;
     const [item, ...rest] = items;
@@ -928,8 +1133,13 @@ function chain(items, t0) {
         return;
     }
     const buf = bufferOf(item.url);
-    if (buf) start(buf, item.kind, then, wait);
-    else next();
+    if (!buf) {
+        next();
+        return;
+    }
+    start(buf, item.kind, then, wait);
+    const clip = lineClips.get(item.url);
+    if (clip && clip.pool) moreLine(clip.pool);
 }
 
 // His voice on a state change (BACKLOG B-223, B-224): `items` said one
@@ -1214,7 +1424,9 @@ let last = { snap: NONE, muted: false };
 // (character.js's table; speak), on every screen (the round end's tada and
 // line too). A new word (or none: the round end, the back arrow) stops his
 // voice, whatever he was saying of the last one (B-223, B-224), and loads
-// its own clips (loadWord), muted or not. On mute everything playing
+// its own clips (loadWord), muted or not. The downloads waiting go on
+// once a round has started and the new word's picture has locked
+// (BACKLOG B-229, pump: holdsPools). On mute everything playing
 // stops and the silent loop pauses; while muted nothing plays; on unmute
 // the silent loop plays again (B-227).
 export function renderSound(state) {
@@ -1225,6 +1437,7 @@ export function renderSound(state) {
         stopVoice();
         loadWord(state);
     }
+    pump();
     if (state.muted) {
         if (!prev.muted) silence();
         return;
@@ -1234,7 +1447,9 @@ export function renderSound(state) {
     if (!moments.length) return;
     // A moment the table marks `waitReady` (the greeting) comes with the
     // very tap that unlocks the sound, before his clips are decoded: it
-    // waits for a clip of its pool (a few hundred ms), then says it if
+    // waits for a clip of its pool (a few hundred ms; its pool's first clip
+    // is the first asked for, B-229, and with none asked for yet, before
+    // the page is idle, it says nothing), then says it if
     // the screen is still the same and the sound is on; never twice.
     const waiting = moments.find((m) => MOMENTS[m].waitReady && Array.isArray(MOMENTS[m].lines)
         && !MOMENTS[m].lines.some((pool) => poolClips(listed, pool).some((file) => !!bufferOf(voiceUrl(file)))));

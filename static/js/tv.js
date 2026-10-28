@@ -271,14 +271,21 @@ export function renderTv(state, onLock) {
     shown = key;
     stop();
     if (!key) return;
-    prefetch(state.words[round.index + 1]);
     const d = parts();
     if (!d) return;
-    if (reducedMotion()) fadeIn(d, onLock);
-    else tuneIn(d, onLock);
+    // at the lock the next word's picture starts loading, then main.js is
+    // told (BACKLOG B-229: until then this word's picture has the network)
+    const next = state.words[round.index + 1];
+    const lock = () => {
+        prefetch(next);
+        onLock();
+    };
+    if (reducedMotion()) fadeIn(d, lock);
+    else tuneIn(d, lock);
 }
 
-// The next word's picture starts loading now, so its tune-in rarely has
+// The next word's picture starts loading as this one locks (BACKLOG B-229;
+// it loaded as the word started until then), so its tune-in rarely has
 // to wait for it. (A word the struggle help swaps in as the next word
 // starts, BACKLOG B-220, was not fetched ahead: its snow holds while its
 // picture loads, 2s at most.)

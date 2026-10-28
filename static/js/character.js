@@ -407,7 +407,9 @@ export const MOMENTS = {
         sound: null,
         lines: ['greet'],
         // it comes with the tap that unlocks the sound: audio.js waits
-        // for a clip of the pool to decode instead of skipping it
+        // for a clip of the pool to decode instead of skipping it, once
+        // one has been asked for (BACKLOG B-229: after the page is idle
+        // and the manifest is in; before that, nothing)
         waitReady: true,
     },
     wrong: {

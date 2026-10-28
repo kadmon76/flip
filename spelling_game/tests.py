@@ -62,11 +62,12 @@ class IndexTests(TestCase):
 
     def test_console_controls_are_the_image_assets(self):
         # BACKLOG B-114, DESIGN "The layer model": the console and its
-        # controls are the scene images, left to right lever, speaker, dome.
+        # controls are the scene images, left to right lever, speaker, dome
+        # (their WebP copies since B-229).
         html = self.client.get('/').content.decode()
         for asset in ('console', 'lever-up', 'lever-down', 'speaker-off', 'speaker-on',
                       'speaker-cap', 'dome-off', 'dome-ready', 'dome-pressed'):
-            self.assertIn(f'/static/images/ui/{asset}.png', html, asset)
+            self.assertIn(f'/static/images/ui/{asset}.webp', html, asset)
         self.assertLess(html.index('id="reset-btn"'), html.index('id="speak-btn"'))
         self.assertLess(html.index('id="speak-btn"'), html.index('id="check-btn"'))
         self.assertNotIn('icon-btn', html)
@@ -192,7 +193,8 @@ class GameCssPaletteTests(TestCase):
     def test_frame_border_image_is_exactly_as_design(self):
         css = self.CSS.read_text()
         self.assertIn('border-width: 29px 26px 38px 28px;', css)
-        self.assertIn('border-image: url(../images/ui/frame.png) 180 165 235 175;', css)
+        # the WebP copy since B-229 (same pixels, so the same slices)
+        self.assertIn('border-image: url(../images/ui/frame.webp) 180 165 235 175;', css)
 
 
 class SlotLayoutTests(TestCase):
@@ -874,13 +876,13 @@ class InterimScreensCssTests(TestCase):
 
     def test_backdrop_is_the_lab_blurred_and_darkened(self):
         backdrop = self.rules('body::before')
-        self.assertIn('url(../images/ui/bg-lab.jpg)', backdrop)
+        self.assertIn('url(../images/ui/bg-lab.webp)', backdrop)
         self.assertIn('filter: blur(6px) brightness(60%);', backdrop)
         self.assertIn('position: fixed;', backdrop)
         self.assertIn('display: none;', self.rules('body[data-screen="play"]::before'))
 
     def test_frame_shows_on_every_screen(self):
-        self.assertIn('border-image: url(../images/ui/frame.png) 180 165 235 175;', self.rules('.frame'))
+        self.assertIn('border-image: url(../images/ui/frame.webp) 180 165 235 175;', self.rules('.frame'))
         self.assertNotIn('display: none', self.rules('.frame'))
         self.assertNotRegex(self.css(), r'\]\s*\.frame\s*{')
 
@@ -2298,7 +2300,9 @@ class AudioTests(TestCase):
         # fetch (records URLs in `fetched`; URLs in `missing` answer 404),
         # AudioContext (starts 'suspended'; decodeAudioData resolves; its
         # buffer sources log play / stop and are listed in `sources`), and
-        # a document keeping its listeners in `listeners`. `a` is audio.js,
+        # a document keeping its listeners in `listeners`, and an idle that
+        # comes at once (requestIdleCallback; B-229: nothing downloads
+        # before it). `a` is audio.js,
         # `S` state.js. `played()` are the files started so far (the silent
         # unlock sample left out), `kinds()` their pools, `sounding()` the pooled
         # files playing now, `clear()` empties the log, `settle()` lets the
@@ -2326,6 +2330,7 @@ class AudioTests(TestCase):
             "   stop() { if (!s.on) return; s.on = false; log.push({ op: 'stop', src: s.buffer.url }); } };"
             "   sources.push(s); return s; } };"
             "globalThis.document = { addEventListener(t, fn, c) { listeners[t] = fn; }, removeEventListener(t, fn, c) { delete listeners[t]; } };"
+            "globalThis.requestIdleCallback = (fn) => fn();"
             f"const a = await import('{self.MODULE.as_uri()}');"
             f"const S = await import('{self.STATE.as_uri()}');"
             "const out = (v) => console.log(JSON.stringify(v));"
@@ -2404,25 +2409,29 @@ class AudioTests(TestCase):
             ['flip.muted', False, 'true', True, 'false', False, False, False, False, 'no throw', False])
 
     def test_nothing_plays_on_load_and_a_gesture_unlocks(self):
-        # init() downloads every clip once (and fetches his new voice's
-        # manifest, B-223) and plays nothing, with no
-        # AudioContext yet; the first pointerup / touchend / click /
-        # keydown makes one context, resumes it and plays one silent
-        # sample (iOS opens the output on that), then the clips decode.
-        # The listeners stay: a later gesture finding the context
+        # init() plays nothing, with no AudioContext yet; once the page is
+        # idle (B-229, here at once) it fetches his new voice's manifest
+        # (B-223) and then one clip of each pool (here, with no manifest
+        # lines, the five prototype pools'); the first pointerup / touchend
+        # / click / keydown makes one context, resumes it and plays one
+        # silent sample (iOS opens the output on that), then the clips
+        # decode. The listeners stay: a later gesture finding the context
         # suspended (the phone switched apps) resumes it again; one
         # finding it running does nothing.
         self.assertEqual(self.run_node(
+            "Math.random = () => 0;"
             "a.init(); const before = [fetched.length, new Set(fetched).size, fetched.filter((u) => u === '/static/voice/manifest.json').length,"
             " ctxs.length, log.length, Object.keys(listeners).sort()];"
             "a.play('swipe'); const early = log.length;"
             "listeners.touchend(); const c = ctxs[0]; const first = [ctxs.length, c.state, c.resumes, log.filter((e) => e.op !== 'loop').map((e) => e.src)];"
-            "await settle(); clear(); a.play('swipe'); const after = kinds();"
+            "await settle(); const pools = fetched.slice(1).map(short); clear(); a.play('swipe'); const after = kinds();"
             "listeners.click(); const quiet = [ctxs.length, c.resumes];"
             "c.state = 'interrupted'; listeners.pointerup();"
-            "out([before, early, first, after, quiet, [c.state, c.resumes], Object.keys(listeners).length]);"),
-            [[26, 26, 1, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
-             [1, 'running', 1, ['silence']], ['swipe'], [1, 1], ['running', 2], 4])
+            "out([before, early, first, pools, after, quiet, [c.state, c.resumes], Object.keys(listeners).length]);"),
+            [[1, 1, 1, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
+             [1, 'running', 1, ['silence']],
+             ['correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3', 'celebration/tada.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3'],
+             ['swipe'], [1, 1], ['running', 2], 4])
 
     def test_no_web_audio_means_silent_not_broken(self):
         self.assertEqual(self.run_node(
@@ -2516,17 +2525,19 @@ class AudioTests(TestCase):
     def test_hmm_no_is_downloaded_and_decoded_once_for_both_pools(self):
         # BACKLOG B-203: the 'locked' pool is the error pool's "hmm no";
         # the file is fetched once and decoded once (decodeAudioData takes
-        # over its bytes), and both pools play it
+        # over its bytes), and both pools play it. Since B-229 one clip a
+        # pool is fetched at first: here the error pool's is "hmm no"
+        # (index 4 of its ten), so the locked pool asks for nothing more
         self.assertEqual(self.run_node(
             "const decodes = []; const dec = AudioContext.prototype.decodeAudioData;"
             "AudioContext.prototype.decodeAudioData = function (d) { decodes.push(d.url); return dec.call(this, d); };"
-            "await ready(); S.setState({ muted: false, speaking: false });"
+            "Math.random = () => 0.45; await ready(); S.setState({ muted: false, speaking: false });"
             "const url = '/static/sounds/error/hmm%20no.mp3';"
             "a.play('locked'); a.play('locked'); const locked = played(); clear();"
-            "Math.random = () => 0.45; a.play('error');"     # index 4 of the ten error clips
+            "a.play('error');"
             "out([fetched.filter((u) => u === url).length, decodes.filter((u) => u === url).length, decodes.length,"
             " new Set(decodes).size, locked, played(), sounding()]);"),
-            [1, 1, 25, 25, ['error/hmm no.mp3', 'error/hmm no.mp3'], ['error/hmm no.mp3'], ['error']])
+            [1, 1, 4, 4, ['error/hmm no.mp3', 'error/hmm no.mp3'], ['error/hmm no.mp3'], ['error']])
 
     def test_a_tap_on_the_held_back_speaker_says_hmm_no(self):
         # renderSound plays MOMENTS.speakerLocked.sound ('locked') on each
@@ -2672,8 +2683,8 @@ class MuteToggleTests(TestCase):
         # the markup so both load up front (no flash on the first toggle)
         html = self.client.get('/').content.decode()
         inner = re.search(r'<button id="mute-btn"[^>]*>(.*?)</button>', html, flags=re.S).group(1)
-        on = inner.index('<img class="switch-on" src="/static/images/ui/mute-switch-on.png" alt="" />')
-        off = inner.index('<img class="switch-off" src="/static/images/ui/mute-switch-off.png" alt="" />')
+        on = inner.index('<img class="switch-on" src="/static/images/ui/mute-switch-on.webp" alt="" />')
+        off = inner.index('<img class="switch-off" src="/static/images/ui/mute-switch-off.webp" alt="" />')
         switch = inner.index('<span class="switch" aria-hidden="true">')
         self.assertLess(inner.index('class="icon-sound"'), switch)
         self.assertLess(inner.index('class="icon-muted"'), switch)
@@ -9367,6 +9378,7 @@ class CorrectWordVoiceTests(TestCase):
             "     setTimeout(() => s.onended && s.onended(), 0); } };"
             "   sources.push(s); return s; } };"
             "globalThis.document = { addEventListener(t, fn, c) { listeners[t] = fn; } };"
+            "globalThis.requestIdleCallback = (fn) => fn();"
             f"const a = await import('{self.MODULE.as_uri()}');"
             f"const S = await import('{self.STATE.as_uri()}');"
             f"const C = await import('{self.CHARACTER.as_uri()}');"
@@ -9491,9 +9503,10 @@ class CorrectWordVoiceTests(TestCase):
     # --- the manifest at init ---
 
     def test_init_fetches_the_manifest_once_and_the_line_pools_clips(self):
-        # once, at init; then the clips of the pools the moments name
-        # (B-223: correct, streak; B-224: wrong and the others; the start
-        # screen's greet, 2026-10-24) are downloaded and decoded; pools no
+        # once, as the page goes idle (B-229; here at once); then a clip of
+        # each pool the moments name (B-223: correct, streak; B-224: wrong
+        # and the others; the start screen's greet, 2026-10-24, first: it
+        # waits for its clip) is downloaded and decoded; pools no
         # moment names (murmur), gags,
         # Hebrew guesses, letters and words wait (a word's own come when
         # it starts)
@@ -9503,9 +9516,9 @@ class CorrectWordVoiceTests(TestCase):
             "await ready(); const voice = fetched.filter((u) => u.startsWith('/static/voice/'));"
             "out([voice, decodes.filter((u) => u.startsWith('/static/voice/')), errors]);")
         self.assertEqual(res, [
-            ['/static/voice/manifest.json', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/greet-01.mp3',
+            ['/static/voice/manifest.json', '/static/voice/robot/greet-01.mp3', '/static/voice/robot/correct-01.mp3',
              '/static/voice/robot/wrong-01.mp3', '/static/voice/robot/streak-01.mp3'],
-            ['/static/voice/robot/correct-01.mp3', '/static/voice/robot/greet-01.mp3', '/static/voice/robot/wrong-01.mp3',
+            ['/static/voice/robot/greet-01.mp3', '/static/voice/robot/correct-01.mp3', '/static/voice/robot/wrong-01.mp3',
              '/static/voice/robot/streak-01.mp3'], []])
 
     def test_a_missing_or_broken_manifest_is_empty_with_no_error(self):
@@ -9513,15 +9526,17 @@ class CorrectWordVoiceTests(TestCase):
         # throws, the wrong shape: nothing listed, nothing thrown or logged;
         # a correct check still says the word, then the prototype clip
         res = self.run_node(
+            # each case a fresh audio.js (B-229: one page fetches the
+            # manifest once, as it goes idle)
             "const cases = [undefined, new Error('bad json'), NOJSON, { clips: ['robot/correct-01.mp3'] }, 'x'];"
-            "const res = [];"
-            "for (const m of cases) {"
-            " MAN = m; fetched.length = 0; a.init(); await settle();"
+            "const res = []; Math.random = () => 0; let b;"
+            "for (const [i, m] of cases.entries()) {"
+            f" MAN = m; fetched.length = 0; b = await import('{self.MODULE.as_uri()}?case' + i); b.init(); await settle();"
             " res.push(fetched.filter((u) => u.startsWith('/static/voice/')));"
             "}"
             "const f = globalThis.fetch; globalThis.fetch = (u) => { if (u.endsWith('manifest.json')) throw new Error('no'); return f(u); };"
-            "a.init(); await settle(); globalThis.fetch = f; listeners.pointerup(); await settle();"
-            "S.subscribe(a.renderSound); Math.random = () => 0; await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
+            f"b = await import('{self.MODULE.as_uri()}?throws'); b.init(); await settle(); globalThis.fetch = f; listeners.pointerup(); await settle();"
+            "S.subscribe(b.renderSound); await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([res, atCheck, played(), errors]);")
         self.assertEqual(res, [[['/static/voice/manifest.json']] * 5, ['words/animals/cat.mp3'],
                                ['words/animals/cat.mp3', 'correct/bingo.mp3'], []])
@@ -9536,7 +9551,7 @@ class CorrectWordVoiceTests(TestCase):
         real = json.loads(self.MANIFEST.read_text())
         manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
         res = self.run_node(
-            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound); Math.random = () => 0.99;"
+            f"MAN = {json.dumps(manifest)}; Math.random = () => 0.99; await ready(); S.subscribe(a.renderSound);"
             "const listed = a.listedClips(MAN);"
             "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([listed.length, listed.filter((f) => f.startsWith('words/')).length, a.linePools().map((p) => a.poolClips(listed, p).length),"
@@ -9621,13 +9636,13 @@ class CorrectWordVoiceTests(TestCase):
     def test_correct_without_a_gag_says_a_correct_line_else_the_prototype(self):
         res = self.run_node(
             "MAN = man('robot/correct-01.mp3', 'robot/correct-02.mp3', 'robot/streak-01.mp3', 'gags/animals/dog.mp3');"
-            "await ready(); S.subscribe(a.renderSound); Math.random = () => 0.6;"
+            "Math.random = () => 0.6; await ready(); S.subscribe(a.renderSound);"
             "await check(); await end('words/animals/cat.mp3'); const pool = played();"
             "out(pool);")
         self.assertEqual(res, ['words/animals/cat.mp3', 'robot/correct-02.mp3'])
         res = self.run_node(
-            "MAN = man('robot/streak-01.mp3', 'words/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
-            "Math.random = () => 0;"
+            "MAN = man('robot/streak-01.mp3', 'words/animals/cat.mp3');"
+            "Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
             "await check(); const atCheck = played(); await end('words/animals/cat.mp3');"
             "out([atCheck, played(), kinds()]);")
         # no gag, no correct line: the prototype correct clip, after the word
@@ -9636,7 +9651,7 @@ class CorrectWordVoiceTests(TestCase):
     def test_streak_says_the_word_then_a_streak_line_else_the_gag_else_a_correct_line(self):
         files = ['robot/streak-01.mp3', 'gags/animals/cat.mp3', 'robot/correct-01.mp3']
         res = [self.run_node(
-            f"MAN = man(...{json.dumps(files[k:])}); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            f"MAN = man(...{json.dumps(files[k:])}); Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
             "await checkStreak(); const atCheck = played(); await end('words/animals/cat.mp3'); out([atCheck, played(), kinds()]);")
             for k in range(len(files) + 1)]
         self.assertEqual(res, [
@@ -9851,7 +9866,7 @@ class GagNeedsTheWordTests(TestCase):
                      ['gags/animals/cat.mp3', 'robot/correct-01.mp3', 'robot/streak-01.mp3', 'robot/tutorial-done-01.mp3'],
                      ['gags/animals/cat.mp3']]
         res = [self.run_node(
-            f"MAN = man(...{json.dumps(files)}); await ready(); S.subscribe(a.renderSound); Math.random = () => 0; let n = 0;"
+            f"MAN = man(...{json.dumps(files)}); Math.random = () => 0; await ready(); S.subscribe(a.renderSound); let n = 0;"
             "const say = async (kind, held) => {"
             " S.setState({ screen: 'theme', current: { word: null, placed: [] }, round: { index: 0, size: 5, results: [] } }); await settle();"
             " hold.clear(); if (held) hold.add(CAT);"
@@ -10174,8 +10189,8 @@ class MomentLinesTests(TestCase):
         real = json.loads(self.MANIFEST.read_text())
         manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
         res = self.run_node(
-            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound);"
-            "Math.random = () => 0; const res = {};"
+            f"MAN = {json.dumps(manifest)}; Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
+            "const res = {};"
             "for (const [k, [from, to]] of Object.entries(T)) res[k] = [await go(from, to), kinds()];"
             "await go(...MISS2); await end('error/actually that is cleverly wrong.mp3'); const miss = [played(), kinds(), when('letters/a.mp3')];"
             "const boost = []; for (const k of ['remember', 'first', 'cleanup']) { await go(...BOOST[k]); boost.push([played(), on().map(when)]); }"
@@ -10345,7 +10360,7 @@ class MomentLinesTests(TestCase):
         res = self.run_node(
             "['wrong-01', 'mumble-01', 'hint-01'].forEach((id) => hold.add(`/static/voice/robot/${id}.mp3`));"
             "hold.add('/static/voice/letters/a.mp3');"
-            "MAN = lineMan('letters/a.mp3'); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "MAN = lineMan('letters/a.mp3'); Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
             "const wrong = await go(...T.wrong);"
             "await release('/static/voice/robot/mumble-01.mp3'); const mumble = await go(...T.wrong);"
             "const miss = await go(...MISS2); await end('robot/mumble-01.mp3'); const missAll = played();"
@@ -10648,7 +10663,7 @@ class QuietRobotTests(TestCase):
 
     def test_the_last_slot_filled_says_nothing_and_his_press_line_is_rare(self):
         res = self.run_sound(
-            "MAN = lineMan(); await ready(); S.subscribe(a.renderSound);"
+            "MAN = lineMan(); Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
             "const filled = []; for (const r of [0, 0.99]) { Math.random = () => r; filled.push([await go(...T.filledEarly), kinds()]); }"
             "const press = {}; for (const r of [0, 0.33, 0.34, 0.99]) { Math.random = () => r; press[r] = [await go(...T.filledNudge), kinds()]; }"
             # at most once per word: a re-render plays nothing more
@@ -10659,8 +10674,9 @@ class QuietRobotTests(TestCase):
             "Math.random = () => 0; const later = [await go(nudge(1), nudge(2)), await go(nudge(2), nudge(3)), await go(nudge(5), nudge(6))];"
             "out([filled, press, again, dome, later]);")
         filled, press, again, dome, later = res
-        # the swipe alone, never his press line, whatever the draw
-        self.assertEqual(filled, [[['swipe/swipe1.mp3'], ['o']], [['swipe/swipe4.mp3'], ['o']]])
+        # the swipe alone, never his press line, whatever the draw (B-229:
+        # its pool's second clip was fetched after the first played)
+        self.assertEqual(filled, [[['swipe/swipe1.mp3'], ['o']], [['swipe/swipe2.mp3'], ['o']]])
         self.assertEqual(press, {'0': [['robot/press-01.mp3'], ['v']], '0.33': [['robot/press-01.mp3'], ['v']],
                                  '0.34': [[], []], '0.99': [[], []]})
         self.assertEqual(again, [])
@@ -10707,14 +10723,17 @@ class QuietRobotTests(TestCase):
         real = json.loads(self.MANIFEST.read_text())
         manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
         res = self.run_sound(
-            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound);"
+            f"MAN = {json.dumps(manifest)}; Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
             "const at = async (r, from, to) => { Math.random = () => r; return [await go(from, to), kinds()]; };"
             "out([await at(0, ...T.wrong), await at(0.5, ...T.wrong), await at(0.99, ...T.thirdMiss),"
             " await at(0.99, ...T.speakerLocked), await at(0.99, ...T.filledEarly), await at(0.99, ...T.end0)]);")
+        # (B-229: a clip a pool at first, one more after each of its plays;
+        # the error pool also has the locked pool's "hmm no", the last of
+        # its clips decoded here)
         self.assertEqual(res, [
             [['error/actually that is cleverly wrong.mp3'], ['v']], [[], []],
-            [['error/you can do better.mp3'], ['v']], [['error/hmm no.mp3'], ['v']],
-            [['swipe/swipe4.mp3'], ['o']], [['celebration/tada.mp3'], ['o']]])
+            [['error/hmm no.mp3'], ['v']], [['error/hmm no.mp3'], ['v']],
+            [['swipe/swipe1.mp3'], ['o']], [['celebration/tada.mp3'], ['o']]])
 
     def test_the_quiet_gap(self):
         res = self.run_sound(
@@ -12417,9 +12436,10 @@ class PictureWordWinTests(TestCase):
             "P.renderPicture(own(0), onWin); const start = take();"
             "const where = made().map((k) => [k.className, k.parent.name, k.attrs.src, k.style.transformOrigin, k.style.opacity, k.dataset.part, k.alt]);"
             "const origin = tvBody.style.transformOrigin;"
-            # plate and rest decoded, the parts not yet: the still picture stays
-            "await decodeAll(); P.renderPicture(own(0, { tuned: true }), onWin); const half = on();"
-            "await decodeMade(); const full = on();"
+            # plate and rest decoded, the parts not yet: the layers show
+            # (B-229), the parts hidden until each has decoded
+            "await decodeAll(); P.renderPicture(own(0, { tuned: true }), onWin); const half = [on(), made().map((k) => k.style.visibility || '')];"
+            "await decodeMade(); const full = [on(), made().map((k) => k.style.visibility || '')];"
             # the bat: its win drawing, hidden at rest; the next word's drawings fetched ahead
             "P.renderPicture(own(1), onWin); const bat = [made().map((k) => [k.className, k.parent.name, k.attrs.src, k.style.opacity]), subject.attrs.src, tvBody.style.transformOrigin];"
             "out([start.map((c) => c.slice(0, 3)), where, origin, half, full, bat, prefetched]);")
@@ -12433,7 +12453,9 @@ class PictureWordWinTests(TestCase):
                                  ['tv-part', 'tvbody', '/w/cat-legs.webp', '50% 80%', '1', 'legs', ''],
                                  ['tv-part', 'actor', '/w/cat-water.webp', '50% 90%', None, 'water', '']])
         self.assertEqual(origin, '50% 95%')
-        self.assertEqual([half, full], [False, True])                # the layers show once every drawing has decoded
+        # the layers show once the plate and the rest drawing have decoded;
+        # each part shows once it has (B-229)
+        self.assertEqual([half, full], [[True, ['hidden'] * 3], [True, [''] * 3]])
         self.assertEqual(bat, [[['tv-frame', 'tvbody', '/w/bat-win.webp', '0']], '/w/sway-subject.webp', '51% 14%'])
         # only the current and the next word's: the bat's plate, cutout and win drawing; then the duck's nothing
         self.assertEqual(prefetched, ['/w/sway-plate.webp', '/w/sway-subject.webp', '/w/bat-win.webp'])
@@ -12498,13 +12520,42 @@ class PictureWordWinTests(TestCase):
                                      {'offset': 0.95, 'opacity': 0, 'easing': 'step-end'}, {'offset': 1, 'opacity': 0}])
         self.assertEqual(won, [0.7, 0.16])
 
+    def test_a_check_before_its_parts_decode_plays_without_them(self):
+        # B-229: the layers show once the plate and the rest drawing have
+        # decoded; a correct check before the parts have plays the word's
+        # own win without them (the body's track, the jolts, the
+        # particles), not the shared move; the parts stay hidden until the
+        # move ends (one decoded meanwhile shows then); the bat's win
+        # drawing not decoded: no swap, the subject still moves
+        res = self.run_own(
+            "P.renderPicture(own(0), onWin); await decodeAll(); P.renderPicture(own(0, { tuned: true }), onWin); const shows = on(); take();"
+            "P.renderPicture(correctOwn(0), onWin);"
+            "const c = take().filter((x) => x[1] !== 'confetti-piece' && x[1] !== '').map((x) => x.slice(0, 2));"
+            "const hidden = made().map((k) => k.style.visibility);"
+            "await decodeMade(); const mid = made().map((k) => k.style.visibility);"
+            "anim('tvbody')[0].finish(); await tick(); const after = made().map((k) => k.style.visibility || '');"
+            "P.renderPicture(own(1), onWin); await decodeAll(); P.renderPicture(own(1, { tuned: true }), onWin); take();"
+            "P.renderPicture(correctOwn(1), onWin);"
+            "const bat = take().filter((x) => ['tv-frame', 'subject', 'tvbody'].includes(x[1])).map((x) => x.slice(0, 2));"
+            "out([shows, c, hidden, mid, after, bat, won]);")
+        shows, calls, hidden, mid, after, bat, won = res
+        self.assertTrue(shows)
+        self.assertEqual(calls, [['animate', 'flash'], ['pause', 'actor'], ['animate', 'tvbody'], ['animate', 'card'], ['animate', 'actor']])
+        self.assertEqual(hidden, ['hidden'] * 3)
+        self.assertEqual(mid, ['hidden'] * 3)          # decoded during the move: still out of it
+        self.assertEqual(after, [''] * 3)
+        self.assertEqual(bat, [['animate', 'tvbody']])
+        self.assertEqual(won, [0.4, 0.16])             # their own wins, not the shared one
+
     def test_reduced_motion_no_layers_or_no_entry_play_the_shared_win(self):
         res = self.run_own(
             "const ready = async (i, o = {}) => { P.renderPicture(at(i, o), onWin); await decodeAll(); P.renderPicture(at(i, { tuned: true, ...o }), onWin); };"
             "const correct = (i, o = {}) => ({ ...at(i, { tuned: true, ...o }), current: { word: words[i].word, status: 'correct' } });"
             "reduced = true; await readyOwn(0); take(); P.renderPicture(correctOwn(0), onWin); const calm = take(); const calmFx = burst.kids.length; const calmLayers = layers().length;"
             "reduced = false;"
-            "P.renderPicture(own(0, { roundsStarted: 2 }), onWin); await decodeAll(); P.renderPicture(own(0, { tuned: true, roundsStarted: 2 }), onWin); take();"
+            # its layers not decoded yet (B-229: a check before only its
+            # parts have decoded plays its own win, the test above)
+            "P.renderPicture(own(0, { roundsStarted: 2 }), onWin); P.renderPicture(own(0, { tuned: true, roundsStarted: 2 }), onWin); take();"
             "P.renderPicture(correctOwn(0, { roundsStarted: 2 }), onWin); const early = take().filter((x) => x[1] !== 'confetti-piece').map((x) => x.slice(0, 2));"
             "await ready(0, { roundsStarted: 3 }); take(); P.renderPicture(correct(0, { roundsStarted: 3 }), onWin); const plain = take().filter((x) => x[1] !== 'confetti-piece').map((x) => x.slice(0, 2));"
             "await readyOwn(2); take(); P.renderPicture(correctOwn(2), onWin); const duck = take().filter((x) => x[1] !== 'confetti-piece').map((x) => x.slice(0, 2));"
@@ -12938,3 +12989,350 @@ class KeysTests(TestCase):
         nxt = main[main.index('\nfunction onNext('):]
         self.assertLess(nxt.index('recordProgress('), nxt.index('recordKeys('))
         self.assertIn('keys: keys.ring,', nxt)
+
+
+class FastStartTests(TestCase):
+    """BACKLOG B-229: the game opens and plays without waiting for its
+    sounds. The UI uses the WebP copies of its images (the PNG and JPG
+    originals stay, unused). audio.js fetches nothing of his voice or the
+    game sounds before the page has loaded and gone idle (afterIdle); then
+    the manifest and one clip of each pool (firstFetches), and one more of
+    a pool after each of its plays (newClip); a word's own clips as it
+    starts (wordFetches), ahead of the pools' (RANK, nextDownload), which
+    wait while a round starts or a new word's picture tunes in
+    (holdsPools; a word's own one at a time then, FETCH_AT_ONCE). The
+    word's picture is fetched with high priority."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    CSS = ROOT / 'static' / 'css' / 'game.css'
+    HTML = ROOT / 'templates' / 'spelling_game' / 'index.html'
+    UI = ROOT / 'static' / 'images' / 'ui'
+    MODULE = JS / 'audio.js'
+    STATE = JS / 'state.js'
+    CHARACTER = JS / 'character.js'
+    MANIFEST = ROOT / 'static' / 'voice' / 'manifest.json'
+    # the UI images the game shows (the robot's puppet parts have no WebP
+    # copies and stay PNG; the old robot-*.png poses are not drawn)
+    SHOWN = ('bg-lab', 'frame', 'console', 'dome-off', 'dome-ready', 'dome-pressed', 'lever-up', 'lever-down',
+             'speaker-off', 'speaker-on', 'speaker-cap', 'mute-switch-on', 'mute-switch-off')
+
+    @staticmethod
+    def webp_size(path):
+        b = Path(path).read_bytes()[:30]
+        assert b[:4] == b'RIFF' and b[8:12] == b'WEBP', path
+        kind = b[12:16]
+        if kind == b'VP8X':
+            return (int.from_bytes(b[24:27], 'little') + 1, int.from_bytes(b[27:30], 'little') + 1)
+        if kind == b'VP8L':
+            bits = int.from_bytes(b[21:25], 'little')
+            return ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1)
+        return (int.from_bytes(b[26:28], 'little') & 0x3FFF, int.from_bytes(b[28:30], 'little') & 0x3FFF)
+
+    @staticmethod
+    def old_size(path):
+        b = Path(path).read_bytes()
+        if b[:8] == b'\x89PNG\r\n\x1a\n':
+            return (int.from_bytes(b[16:20], 'big'), int.from_bytes(b[20:24], 'big'))
+        i = 2
+        while i < len(b):
+            marker, size = b[i + 1], int.from_bytes(b[i + 2:i + 4], 'big')
+            if marker in (0xC0, 0xC1, 0xC2):
+                return (int.from_bytes(b[i + 7:i + 9], 'big'), int.from_bytes(b[i + 5:i + 7], 'big'))
+            i += 2 + size
+        return None
+
+    def node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        # Stand-ins: fetch records each URL in `fetched` and answers only
+        # when the test says (`done(...urls)`, `fail(url)`: a 404); the
+        # manifest answers `MAN`; requestIdleCallback keeps its calls in
+        # `idles` until `idle()` runs them; a document keeping its
+        # listeners. No AudioContext is made (no gesture), so nothing
+        # plays. `a` is audio.js, `S` state.js; `short(url)` the file
+        # under static/sounds/ or static/voice/; `since(n)` the files
+        # fetched after the first `n`; `word(w, o)` a play-screen state on
+        # animals' word `w`.
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const fetched = []; const pend = new Map(); const listeners = {}; const idles = []; let MAN = null;"
+            "globalThis.fetch = (url) => { fetched.push(url); return new Promise((r) => pend.set(url, (ok = true) => r(url.endsWith('manifest.json')"
+            " ? { ok: !!MAN && ok, json: () => Promise.resolve(MAN) } : { ok, arrayBuffer: () => Promise.resolve({ url }) }))); };"
+            "globalThis.document = { addEventListener(t, fn) { listeners[t] = fn; } };"
+            "globalThis.requestIdleCallback = (fn, o) => { idles.push([fn, o]); };"
+            f"const a = await import('{self.MODULE.as_uri()}');"
+            f"const S = await import('{self.STATE.as_uri()}');"
+            "const tick = () => new Promise((r) => setTimeout(r, 0));"
+            "const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };"
+            "const done = async (...urls) => { for (const u of urls) { const f = pend.get(u); pend.delete(u); f(); } await settle(); };"
+            "const fail = async (u) => { const f = pend.get(u); pend.delete(u); f(false); await settle(); };"
+            "const idle = async () => { idles.splice(0).forEach(([fn]) => fn()); await settle(); };"
+            "const short = (u) => decodeURIComponent(u.replace('/static/sounds/', '').replace('/static/voice/', ''));"
+            "const since = (n) => fetched.slice(n).map(short);"
+            "const inFlight = () => [...pend.keys()].map(short);"
+            "const man = (...files) => ({ clips: Object.fromEntries(files.map((f) => [f, { id: f }])) });"
+            "const word = (w, o = {}) => ({ screen: 'play', theme: 'animals', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3,"
+            " speaking: false, muted: false, pressed: null, lockedTaps: 0, nudges: 0, tuned: false, startingRound: false,"
+            " round: { index: 0, size: 5, results: [] }, current: { word: w, audio: `/static/voice/words/animals/${w}.mp3`, status: 'playing',"
+            " placed: [...w].map(() => null) }, ...o });"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    # --- the WebP images ---
+
+    def test_the_ui_uses_the_webp_images_and_the_originals_stay(self):
+        html = self.client.get('/').content.decode()
+        css = re.sub(r'/\*.*?\*/', '', self.CSS.read_text(), flags=re.S)
+        for name in self.SHOWN:
+            webp = self.UI / f'{name}.webp'
+            old = self.UI / (f'{name}.jpg' if name == 'bg-lab' else f'{name}.png')
+            # the copy and its original, the same picture size
+            self.assertTrue(old.exists(), old)
+            self.assertEqual(self.webp_size(webp), self.old_size(old), name)
+            self.assertIn(f'images/ui/{name}.webp', html + css, name)
+        self.assertIn('url(../images/ui/bg-lab.webp)', css)
+        self.assertIn('url(../images/ui/frame.webp)', css)
+        # no PNG or JPG of static/images/ui/ itself is used anywhere (the
+        # robot's puppet parts, in robot/, have no WebP copy)
+        flat = re.compile(r'images/ui/[^/\'"()\s]+\.(?:png|jpg)')
+        self.assertEqual(flat.findall(html), [])
+        self.assertEqual(flat.findall(css), [])
+        for f in sorted(self.JS.glob('*.js')):
+            self.assertEqual(flat.findall(f.read_text()), [], f.name)
+        self.assertEqual(sorted(p.name for p in (self.UI / 'robot').glob('*.webp')), [])
+        self.assertIn('/static/images/ui/robot/head.png', html)
+
+    def test_the_word_picture_is_fetched_first(self):
+        html = self.client.get('/').content.decode()
+        self.assertIn('<img id="play-image" src="" alt="" fetchpriority="high" />', html)
+
+    # --- the pure part (audio.js) ---
+
+    def test_the_numbers(self):
+        self.assertEqual(self.node("out([a.IDLE, a.FETCH_AT_ONCE, a.RANK]);"),
+                         [{'timeout': 1000, 'wait': 250}, {'free': 2, 'held': 1}, {'word': 0, 'first': 1, 'more': 2}])
+
+    def test_after_idle_waits_for_load_then_the_idle(self):
+        res = self.node(
+            "const win = (o) => { const w = { calls: [], document: { readyState: 'interactive' }, ...o,"
+            " addEventListener(t, fn, opt) { w.calls.push(['listen', t, opt]); w.load = fn; },"
+            " setTimeout(fn, ms) { w.calls.push(['timeout', ms]); w.later = fn; } };"
+            " if (o && o.ric) w.requestIdleCallback = (fn, opt) => { w.calls.push(['idle', opt]); w.later = fn; }; return w; };"
+            "let ran = 0; const fn = () => { ran++; };"
+            # loading: nothing until `load`, then the idle (with its timeout)
+            "const w1 = win({ ric: true }); a.afterIdle(fn, w1); const t1 = [w1.calls.slice(), ran];"
+            "w1.load(); const t2 = [w1.calls.slice(), ran]; w1.later(); const t3 = ran;"
+            # no requestIdleCallback (Safari): a short wait after `load`
+            "const w2 = win(); a.afterIdle(fn, w2); w2.load(); const t4 = [w2.calls.slice(), ran]; w2.later();"
+            # already loaded: straight to the idle
+            "const w3 = win({ ric: true, document: { readyState: 'complete' } }); a.afterIdle(fn, w3);"
+            "out([t1, t2, t3, t4, ran, w3.calls]);")
+        t1, t2, t3, t4, ran, w3 = res
+        self.assertEqual(t1, [[['listen', 'load', {'once': True}]], 0])
+        self.assertEqual(t2, [[['listen', 'load', {'once': True}], ['idle', {'timeout': 1000}]], 0])
+        self.assertEqual(t3, 1)
+        self.assertEqual(t4, [[['listen', 'load', {'once': True}], ['timeout', 250]], 1])
+        self.assertEqual([ran, w3], [2, [['idle', {'timeout': 1000}]]])
+
+    def test_a_new_clip_is_one_not_asked_for_yet(self):
+        self.assertEqual(self.node(
+            "const u = ['a', 'b', 'c', 'd'];"
+            "out([a.newClip(u, new Set(), () => 0), a.newClip(u, new Set(), () => 0.99), a.newClip(u, new Set(['a', 'b']), () => 0),"
+            " a.newClip(u, new Set(['a', 'b']), () => 0.99), a.newClip(u, new Set(u)), a.newClip([], new Set())]);"),
+            ['a', 'd', 'c', 'd', None, None])
+
+    def test_the_first_fetches_one_clip_a_pool_the_greeting_first(self):
+        res = self.node(
+            "const files = ['robot/wrong-01.mp3', 'robot/wrong-02.mp3', 'robot/greet-01.mp3', 'robot/greet-02.mp3', 'robot/correct-01.mp3',"
+            " 'robot/murmur-01.mp3', 'words/animals/cat.mp3', 'gags/animals/cat.mp3', 'hebrew/animals/cat.mp3', 'letters/a.mp3'];"
+            "const at = (r) => a.firstFetches(files, () => r).map((x) => [short(x.url), x.pool || x.kind]);"
+            # "hmm no" is the error pool's fifth: the locked pool then has its clip
+            "out([at(0), at(0.99), at(0.45).map((x) => x[1]), a.firstFetches([], () => 0).map((x) => x.kind)]);")
+        first, last, shared, none = res
+        self.assertEqual(first, [
+            ['robot/greet-01.mp3', 'greet'],
+            ['correct/bingo.mp3', 'correct'], ['error/actually that is cleverly wrong.mp3', 'error'], ['celebration/tada.mp3', 'tada'],
+            ['swipe/swipe1.mp3', 'swipe'], ['error/hmm no.mp3', 'locked'],
+            ['robot/correct-01.mp3', 'correct'], ['robot/wrong-01.mp3', 'wrong']])
+        self.assertEqual([x[0] for x in last], [
+            'robot/greet-02.mp3', 'correct/you have a spelling superpower.mp3', 'error/you can do better.mp3', 'celebration/tada.mp3',
+            'swipe/swipe4.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3', 'robot/wrong-02.mp3'])
+        self.assertEqual(shared, ['greet', 'correct', 'error', 'tada', 'swipe', 'correct', 'wrong'])
+        # no manifest: the prototype pools still get theirs
+        self.assertEqual(none, ['correct', 'error', 'tada', 'swipe', 'locked'])
+
+    def test_the_real_manifest_one_clip_a_pool(self):
+        real = json.loads(self.MANIFEST.read_text())
+        res = self.node(
+            f"const files = a.listedClips({json.dumps(real)});"
+            "const first = a.firstFetches(files);"
+            "const pools = a.linePools().filter((p) => a.poolClips(files, p).length);"
+            "out([first.filter((x) => x.pool).map((x) => x.pool), pools, first.filter((x) => x.pool).every((x) => a.poolOf(short(x.url)) === x.pool),"
+            " first.filter((x) => x.kind).length, first.length, files.filter((f) => f.startsWith('robot/')).length]);")
+        first_pools, pools, own, kinds, n, all_lines = res
+        self.assertEqual(first_pools[0], 'greet')
+        self.assertEqual(sorted(first_pools), sorted(pools))       # one clip each, of its own pool
+        self.assertTrue(own)
+        self.assertIn(kinds, (4, 5))                               # "hmm no" may be the error pool's
+        self.assertLess(n, all_lines)
+
+    def test_a_words_own_clips_in_the_order_they_are_needed(self):
+        self.assertEqual(self.node(
+            "const files = ['gags/animals/cat.mp3', 'gags/animals/cat-2.mp3', 'hebrew/animals/cat.mp3', 'letters/c.mp3', 'letters/a.mp3', 'letters/t.mp3'];"
+            "out([a.wordFetches(files, 'animals', 'cat', '/static/voice/words/animals/cat.mp3').map(short),"
+            " a.wordFetches(['letters/e.mp3'], 'animals', 'bee', '/w/bee.mp3'), a.wordFetches([], 'animals', 'cat', null)]);"),
+            [['hebrew/animals/cat.mp3', 'words/animals/cat.mp3', 'gags/animals/cat.mp3', 'gags/animals/cat-2.mp3',
+              'letters/c.mp3', 'letters/a.mp3', 'letters/t.mp3'], ['/w/bee.mp3', '/static/voice/letters/e.mp3'], []])
+
+    def test_the_pools_wait_while_a_round_starts_or_a_picture_tunes_in(self):
+        self.assertEqual(self.node(
+            "out([a.holdsPools(null), a.holdsPools({ screen: 'start' }), a.holdsPools({ screen: 'stages', startingRound: true }),"
+            " a.holdsPools(word('cat')), a.holdsPools(word('cat', { tuned: true })),"
+            " a.holdsPools({ screen: 'play', current: { word: null } }), a.holdsPools({ screen: 'round-end', current: { word: 'cat' } })]);"),
+            [False, False, True, True, False, False, False])
+
+    def test_the_next_download(self):
+        self.assertEqual(self.node(
+            "const q = [{ rank: 2, seq: 1 }, { rank: 1, seq: 5 }, { rank: 1, seq: 3 }, { rank: 0, seq: 9 }, { rank: 0, seq: 8 }];"
+            "out([a.nextDownload(q), a.nextDownload(q.slice(0, 3)), a.nextDownload(q, true), a.nextDownload(q.slice(0, 3), true),"
+            " a.nextDownload([]), a.nextDownload([{ rank: 2, seq: 1 }])]);"),
+            [4, 2, 4, -1, -1, 0])
+
+    def test_a_round_start_stops_the_pools_downloads(self):
+        self.assertEqual(self.node(
+            "const going = [{ rank: 0, url: 'w' }, { rank: 1, url: 'f' }, { rank: 2, url: 'm' }];"
+            "out([a.toStop(going, { startingRound: true }).map((j) => j.url), a.toStop(going, word('cat')), a.toStop(going, null),"
+            " a.toStop([], { startingRound: true })]);"),
+            [['f', 'm'], [], [], []])
+
+    # --- what audio.js fetches, and when ---
+
+    def test_nothing_before_the_page_is_idle_then_the_manifest_then_a_clip_a_pool(self):
+        res = self.node(
+            "MAN = man('robot/greet-01.mp3', 'robot/greet-02.mp3', 'robot/correct-01.mp3', 'robot/correct-02.mp3', 'robot/wrong-01.mp3');"
+            "Math.random = () => 0; a.init(); S.subscribe(a.renderSound);"
+            "S.setState({ screen: 'theme' }); await settle(); const before = [fetched.length, idles.map((x) => x[1])];"
+            "await idle(); const atIdle = since(0);"
+            "await done('/static/voice/manifest.json'); const first = inFlight();"
+            "const order = []; while (pend.size) { const [u] = pend.keys(); order.push(short(u)); await done(u); }"
+            "out([before, atIdle, first, order]);")
+        before, at_idle, first, order = res
+        self.assertEqual(before, [0, [{'timeout': 1000}]])
+        self.assertEqual(at_idle, ['manifest.json'])
+        # two at a time, the greeting's first
+        self.assertEqual(first, ['robot/greet-01.mp3', 'correct/bingo.mp3'])
+        self.assertEqual(order, ['robot/greet-01.mp3', 'correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3',
+                                 'celebration/tada.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3', 'robot/wrong-01.mp3'])
+
+    def test_a_failed_clip_asks_for_another_of_its_pool(self):
+        res = self.node(
+            "MAN = man('robot/greet-01.mp3', 'robot/greet-02.mp3', 'robot/greet-03.mp3');"
+            "Math.random = () => 0; a.init(); await idle(); await done('/static/voice/manifest.json');"
+            "await fail('/static/voice/robot/greet-01.mp3');"
+            "while (pend.size) { const [u] = pend.keys(); await done(u); }"
+            "out(since(1).filter((f) => f.startsWith('robot/')));")
+        self.assertEqual(res, ['robot/greet-01.mp3', 'robot/greet-02.mp3'])
+
+    def test_a_words_own_clips_come_first_and_the_pools_wait_for_its_picture(self):
+        res = self.node(
+            "MAN = man('robot/greet-01.mp3', 'robot/correct-01.mp3', 'hebrew/animals/cat.mp3', 'gags/animals/cat.mp3',"
+            " 'letters/c.mp3', 'letters/a.mp3', 'letters/t.mp3', 'hebrew/animals/dog.mp3');"
+            "Math.random = () => 0; a.init(); S.subscribe(a.renderSound); S.setState({ screen: 'stages' }); await idle();"
+            "await done('/static/voice/manifest.json'); const busy = inFlight();"
+            # a station tapped: the round starts; the two on their way stop
+            # (their answers come too late) and no pool clip starts
+            "S.setState({ startingRound: true }); await done(...pend.keys()); const starting = inFlight();"
+            # its first word: its own clips, one at a time while the picture tunes in, the Hebrew guess first
+            "let n = fetched.length; S.setState(word('cat')); await settle(); const tuning = [since(n), inFlight()];"
+            "await done(...pend.keys()); const next = inFlight();"
+            # the picture locks: the word's other clips and then the pools', two at a time
+            "S.setState({ tuned: true }); await settle(); const locked = inFlight();"
+            "const rest = []; while (pend.size) { const [u] = pend.keys(); rest.push(short(u)); await done(u); }"
+            "out([busy, starting, tuning, next, locked, rest]);")
+        busy, starting, tuning, nxt, locked, rest = res
+        self.assertEqual(busy, ['robot/greet-01.mp3', 'correct/bingo.mp3'])
+        self.assertEqual(starting, [])
+        self.assertEqual(tuning, [['hebrew/animals/cat.mp3'], ['hebrew/animals/cat.mp3']])
+        self.assertEqual(nxt, ['words/animals/cat.mp3'])
+        self.assertEqual(locked, ['words/animals/cat.mp3', 'gags/animals/cat.mp3'])
+        # the two stopped as the round started come back first of the pools'
+        self.assertEqual(rest, ['words/animals/cat.mp3', 'gags/animals/cat.mp3', 'letters/c.mp3', 'letters/a.mp3', 'letters/t.mp3',
+                                'robot/greet-01.mp3', 'correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3',
+                                'celebration/tada.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3'])
+
+    def test_a_words_clips_not_started_leave_with_it(self):
+        res = self.node(
+            "MAN = man('hebrew/animals/cat.mp3', 'gags/animals/cat.mp3', 'hebrew/animals/dog.mp3');"
+            "Math.random = () => 0; a.init(); S.subscribe(a.renderSound); await idle(); await done('/static/voice/manifest.json');"
+            "while (pend.size) { const [u] = pend.keys(); await done(u); }"
+            "let n = fetched.length; S.setState(word('cat')); await settle();"
+            "S.setState(word('dog', { round: { index: 1, size: 5, results: [{ correct: true }] } })); await settle();"
+            "await done(...pend.keys()); await done(...pend.keys()); await done(...pend.keys());"
+            "out(since(n));")
+        # the cat's Hebrew guess was on its way; its clip and gag never start
+        self.assertEqual(res, ['hebrew/animals/cat.mp3', 'hebrew/animals/dog.mp3', 'words/animals/dog.mp3'])
+
+    def test_a_pool_gets_one_more_clip_after_each_play(self):
+        # the prototype pools (AudioTests' stand-ins: every download answers
+        # at once): one swipe at first, one more after each play, until
+        # the four are in
+        res = AudioTests.run_node(self, (
+            "Math.random = () => 0; await ready(); S.setState({ muted: false, speaking: false });"
+            "const swipes = () => fetched.filter((u) => u.includes('/swipe/')).map(short);"
+            "const seen = [swipes()];"
+            "for (let i = 0; i < 4; i++) { a.play('swipe'); await settle(); seen.push(swipes()); }"
+            "out(seen);"))
+        self.assertEqual(res, [['swipe/swipe1.mp3'], ['swipe/swipe1.mp3', 'swipe/swipe2.mp3'],
+                               ['swipe/swipe1.mp3', 'swipe/swipe2.mp3', 'swipe/swipe3.mp3'],
+                               ['swipe/swipe1.mp3', 'swipe/swipe2.mp3', 'swipe/swipe3.mp3', 'swipe/swipe4.mp3'],
+                               ['swipe/swipe1.mp3', 'swipe/swipe2.mp3', 'swipe/swipe3.mp3', 'swipe/swipe4.mp3']])
+
+    def test_his_line_pool_gets_one_more_clip_after_each_line(self):
+        # CorrectWordVoiceTests' stand-ins: a correct check says the word,
+        # then a line of pool `correct`; that pool then asks for one more
+        res = CorrectWordVoiceTests.run_node(self, (
+            "MAN = man('robot/correct-01.mp3', 'robot/correct-02.mp3', 'robot/correct-03.mp3');"
+            "Math.random = () => 0; await ready(); S.subscribe(a.renderSound);"
+            "const lines = () => fetched.filter((u) => u.includes('/robot/correct-')).map(short);"
+            "const before = lines(); await check(); await end('words/animals/cat.mp3'); const said = played(); await settle();"
+            "out([before, said, lines()]);"))
+        self.assertEqual(res, [['robot/correct-01.mp3'], ['words/animals/cat.mp3', 'robot/correct-01.mp3'],
+                               ['robot/correct-01.mp3', 'robot/correct-02.mp3']])
+
+    def test_the_next_words_picture_and_layers_load_at_the_lock(self):
+        # tv.js: the next word's picture starts loading as this one locks,
+        # before main.js is told (its pools wait for that, holdsPools), not
+        # as the word starts; picture.js: the next word's layers at the lock
+        # too (its own layers as the word starts)
+        tv = TvTuneTests.run_node(self, (
+            "const told = []; V.renderTv(at(0, 'bus'), () => told.push(prefetched.slice()));"
+            "const atStart = prefetched.slice(); run(200);"
+            "out([atStart, told, prefetched]);"), prelude=TvTuneTests.FAKE)
+        self.assertEqual(tv, [[], [['/w/car.webp']], ['/w/car.webp']])
+        pic = PictureLifeTests.run_node(self, (
+            "P.renderPicture(at(0)); const atStart = [prefetched.slice(), take().filter((c) => c[0] === 'src').map((c) => c[2])];"
+            "await decodeAll(); P.renderPicture(at(0)); const decoded = prefetched.slice();"
+            "P.renderPicture(at(0, { tuned: true })); const locked = prefetched.slice();"
+            "P.renderPicture(at(0, { tuned: true })); out([atStart, decoded, locked, prefetched]);"), prelude=PictureLifeTests.FAKE)
+        self.assertEqual(pic, [[[], ['/w/breathe-plate.webp', '/w/breathe-subject.webp']], [],
+                               ['/w/sway-plate.webp', '/w/sway-subject.webp'], ['/w/sway-plate.webp', '/w/sway-subject.webp']])
+
+    def test_docs(self):
+        # CLAUDE.md's audio.js bullets: what is fetched when, and the new
+        # engine handles (the old `bytes` and `buffers` gone)
+        claude = (self.ROOT / 'CLAUDE.md').read_text()
+
+        def bullet(start):
+            text = claude[claude.index(start):]
+            return text[:text.index('\n  - ')]
+        main = bullet('  - `audio.js` is the only place sounds play.')
+        for phrase in ('B-229', 'afterIdle', 'firstFetches', 'newClip', 'wordFetches', 'holdsPools', 'nextDownload', 'toStop', 'FETCH_AT_ONCE'):
+            self.assertIn(phrase, main, phrase)
+        handles = bullet('  - `audio.js` may hold audio engine handles:')
+        for phrase in ('`soundClips`', '`net`', '`lineClips`', '`wordClips`'):
+            self.assertIn(phrase, handles, phrase)
+        self.assertNotIn('`bytes`, `buffers`', handles)

@@ -658,3 +658,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 - A word's own win (B-228) peaks with B-227's warm flash and dot sparks, not the reference's amber ring, screen tint and 8 drawn star-sparks the human approved on the Word Win Preview page; decide whether per-word wins should use the reference's peak.
 - Themes with no wins file (Food, Home, Transportation) get a 404 for `static/data/wins/<theme>.json` at every round start (B-228); a `wins` pointer in themes.json or a wins index, the next time content is edited, would drop the request.
 - A word's own win's sounds (B-228) play on after the next-word tap cuts its picture mid-win; stop the `sfx` sources on a new word if that sounds wrong.
+- WebP copies of the robot's puppet parts (`static/images/ui/robot/*.png`, 0.26 MB on every start; content, made by the human): B-229 left them PNG.
+- Serve the static JS and CSS compressed on the Linode (0.57 MB as files, 0.18 MB gzipped): the largest part left of B-229's 1 MB and 3 s start targets (DECISIONS 2026-10-28).
+- The hidden screens' images (the play screen's console, dome, lever, speaker and robot hands; the theme cards' pictures, about 0.3 MB) load with the start screen; load them once it is idle, for B-229's start targets.
+- On a slow network a first visit's greeting is silent: B-229 fetches nothing before the page is idle, and the first tap often comes earlier.
