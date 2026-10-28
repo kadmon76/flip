@@ -581,7 +581,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Pure helpers (the retimed move table, `WIN_MS`, the robot's wait for the win, the chime's notes) tested through `node`.
   - Docs: CHARACTER.md moment map (Correct, 3 in a row, Tutorial done: he watches the win, then speaks); CLAUDE.md's picture.js, audio.js and character.js bullets where they describe the win and the correct check; DESIGN.md "Sound" (the chime).
   - Screenshots: `win-out.png` (mid-win, the subject partly outside the TV screen), `win-then-word.png` (just after the win, the scope mouth showing the word). Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/110
 
 ### B-228 Each animal's own win on a correct word
 - why: every word picture should act out its own funny win, with its own sound (human, 2026-10-18 and 2026-10-27); the human approved all 32 Animals wins one by one on the Word Win Preview page (2026-10-27/28). The data and the drawings are in the repo; this item plays them in the game.
@@ -596,7 +596,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - The particle kinds, the sound recipes and the data reader are pure where they can be (no DOM: e.g. the keyframe lists built from a win, the sound schedule, which drawings a word needs) and tested through `node` with the real `animals.json`: every word's tracks start at 0 and end at 1, every part named has its file, every fx kind and sfx name used exists.
   - Docs: CLAUDE.md's picture.js and audio.js bullets (the wins file, parts, the effect sounds); DESIGN.md "Motion" (per-word wins) and "Sound" (their effects).
   - Screenshots: mid-win frames for `giraffe` (neck tangled), `dolphin` (in the air, splash still in place), `crab` (half off the right edge, clipped) and `bat` (wings open); a side-by-side with the reference player at the same moment for one of them. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/110
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
