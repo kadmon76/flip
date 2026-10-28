@@ -614,7 +614,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
-- Picture peek and win frames: once the data carries `face` or `win_image` (the win-frame batch), the face peeks every 3–7s and the win swaps in the second frame, as the prototype's bat (B-221, B-222 leave them out).
+- Picture peek: once the data carries `face`, the face peeks every 3–7s (B-221, B-222 leave it out; a win's second frame is B-228's, from the wins file's `frame`, e.g. the bat).
 - Slow say boost (PROGRESSION.md): the robot says the word in parts; needs the new voice clips.
 - Buy a new theme with gears (PROGRESSION.md "Build decisions"): once Food and Home are in the data; which themes are open from the start and the price are open questions.
 - Kept letters draggable on later stages (PROGRESSION.md "Lever rule"); M4 locks them on every stage.
@@ -652,3 +652,9 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 - His `boost-slow` line (the slow say boost, before the slow word): not wired by B-224; waits for the slow say boost (above).
 - Renaming or removing a player on the start screen (players and names, chat 2026-10-24): today a player can only be added.
 - Tune B-226's starting values: with `TALK_GAP` 8 s and the dome nudge's first at 4 s (B-212), the dome nudge's `press` line is never heard after an answer (the answer's own line is still playing or ended under 8 s before; DECISIONS 2026-10-27).
+- The robot's correct-check pump still plays 1 s after the check when the kid presses next during the win, over the next word's tune-in (B-227); drop his waiting steps on a new word.
+- The silent loop (audio.js `keepAlive`, B-227) keeps playing while the page is hidden; pause it on `visibilitychange` and play it again at the next gesture, so iOS does not keep the game as Now Playing in the background.
+- `zoom` (B-222) hangs at the top of the page, behind the header, for its beat since B-227 stopped clipping the subject; decide whether it keeps the screen's clip or peaks lower (words outside Animals keep it after B-228).
+- A word's own win (B-228) peaks with B-227's warm flash and dot sparks, not the reference's amber ring, screen tint and 8 drawn star-sparks the human approved on the Word Win Preview page; decide whether per-word wins should use the reference's peak.
+- Themes with no wins file (Food, Home, Transportation) get a 404 for `static/data/wins/<theme>.json` at every round start (B-228); a `wins` pointer in themes.json or a wins index, the next time content is edited, would drop the request.
+- A word's own win's sounds (B-228) play on after the next-word tap cuts its picture mid-win; stop the `sfx` sources on a new word if that sounds wrong.
