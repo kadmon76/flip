@@ -610,7 +610,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Pure helpers (which clips to fetch first, which next after a play) tested through `node`.
   - Docs: CLAUDE.md's audio.js bullet (what is fetched when).
   - Screenshots: the start screen and the first word, both taken under the throttled network. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/113
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
