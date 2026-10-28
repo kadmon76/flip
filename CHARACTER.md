@@ -90,7 +90,7 @@ Pose and movement change together; never more than one change per 300ms.
 | Tutorial: round start (a player's first word ever, `state.tutorial`; 2026-10-24) | as Round start, before the picture locks | — | none (the drag line comes as the picture locks) | the tutorial word only | always (no line) |
 | Tutorial: drag (the picture has locked and the kid has placed no letter; coach.js `coachStep` 'drag'; instead of Picture shown) | points, eyes wide, while the ghost mitten carries a letter to the slot | — | `tutorial-drag` | the tutorial word only | always |
 | Tutorial: press (every slot full; instead of All slots filled) | points at the dome, eyes wide, while the ghost mitten taps it | swipe | `tutorial-press` | the tutorial word only | always |
-| Tutorial: done (the tutorial word checked correct; instead of Correct or 3 in a row) | as Correct | he says the word as on Correct, then a line of pool `tutorial-done`, else the word's gag, else `correct` | after the word: `tutorial-done`, else `gag`, else `correct` | once per player | always |
+| Tutorial: done (the tutorial word checked correct; instead of Correct or 3 in a row) | as Correct: he watches the TV's win, then pumps (B-227) | the win's chime with the win; when it ends he says the word as on Correct, then a line of pool `tutorial-done`, else the word's gag, else `correct` | after the word: `tutorial-done`, else `gag`, else `correct` | once per player | always |
 | Key earned (the round end of a round that brought a theme key; keys.js, human 2026-10-24) | not drawn there yet; the steps are a point with wide eyes | — | after his round-end line: `key` | when a round brings a key | always |
 | Theme opened (a key opens a locked theme on the theme screen) | not drawn there yet; the steps are a gasp | — | `theme-open` | each theme opened | always |
 | Wrong check | confused eyes, puzzled eyebrows, head-shake, shrug | error clip | `wrong`, else `mumble` | always | sometimes (1/2) |
@@ -98,8 +98,8 @@ Pose and movement change together; never more than one change per 300ms.
 | Second miss: his letter (B-206; the wrong check that leaves one bulb lit) | when the peek ends: happy, small pop (half the pop), points up at his letter | — | after the line before it: `hint`, then his letter's name (`letters/<letter>.mp3`, "Eigh!" … "Zee!"), or the name alone | always | always |
 | Boost given (`boostGiven`, B-219: a boost the kid paid for) | as his letter lands in its slot (or as the clean-up's extra blocks have puffed away): his second-miss letter's steps, happy, small pop, points up at it | — | as it lands, by the boost: `boost-slot` (Remember this one), `boost-first` (First letter), `boost-clean` (Clean-up); then, for a letter, its name, or the name alone | every boost | always |
 | Third miss | covers his eyes (dot eyes, worried), then relief (happy eyes) as the blocks fly in | error clip | `reveal-open` | always | always |
-| Correct | fist pump, happy eyes, pop | he says the word, clean and complete (the word's own clip, as his voice), then one line: the word's gag (`gags/<theme>/<word>.mp3`, or its `-2`, at random), else a line of pool `correct`; with neither, a correct clip after the word (B-223) | after the word: `gag`, else `correct` | always | always |
-| 3 correct in a row (the third only; the 4th and 5th in a row are Correct again, so each says its gag; human, 2026-10-24) | two fists pumping, double pop, cap sparks | he says the word as on Correct, then a line of pool `streak`, else the word's gag, else a line of pool `correct`; with none, a correct clip after the word (B-223) | after the word: `streak`, else `gag`, else `correct` | once per run of 3 | always |
+| Correct | while the TV's win plays (1 s, B-227) he watches it: looks up at the TV with happy eyes, his hands at rest, no pump, no talk; when it ends: fist pump, happy eyes, pop | the win's chime (made in code, an effect) with the win; when the win ends he says the word, clean and complete (the word's own clip, as his voice), then one line: the word's gag (`gags/<theme>/<word>.mp3`, or its `-2`, at random), else a line of pool `correct`; with neither, a correct clip after the word (B-223) | after the word: `gag`, else `correct` | always | always |
+| 3 correct in a row (the third only; the 4th and 5th in a row are Correct again, so each says its gag; human, 2026-10-24) | he watches the TV's win as on Correct (B-227); when it ends: two fists pumping, double pop, cap sparks | the win's chime with the win; when it ends he says the word as on Correct, then a line of pool `streak`, else the word's gag, else a line of pool `correct`; with none, a correct clip after the word (B-223) | after the word: `streak`, else `gag`, else `correct` | once per run of 3 | always |
 | Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | tada (an effect, under his line) | by the stars: 3 `end-high`, 2 `end-mid`, 0–1 `end-low` | always | always |
 | Speaker locked (from B-219: a boost the kid can't afford; the speaker always plays the word since B-215) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | `no-gears` | every time | always |
 
@@ -112,8 +112,9 @@ plays what the manifest lists. On each moment he says a random clip of
 the first pool in "His lines" that has one (`robot/<pool>-NN.mp3`; the
 word's gag and Hebrew guess are its own clips); a moment with no new clip
 yet keeps its existing clip from `static/sounds/` (Sound), or says
-nothing where it has none. On a correct check he says the word himself,
-then his line after it (B-223, the two Correct rows above); after his
+nothing where it has none. On a correct check he first watches the TV's
+win (1 s, B-227: none of his voice starts during it), then says the word
+himself, then his line after it (B-223, the two Correct rows above); after his
 letter lands (the second miss, a letter boost) he says its name (B-224).
 The word he says and his lines are his voice, so he talks with them
 (Talking, above), while the word the speaker plays is not. A moment that

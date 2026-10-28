@@ -19,14 +19,21 @@
 //     page is hidden (main.js renders it again on visibilitychange).
 //   - prefers-reduced-motion: the two layers show still.
 //   - the win (BACKLOG B-222, DESIGN "Feedback", Correct; the prototype's
-//     layer 3 "Win"): when the word is checked correct, once, the TV
-//     flashes warm white, sparks burst from it and its subject plays the
-//     word's `win` move inside the TV's mask (its idle paused meanwhile and
-//     played again after it); the drive blows exhaust puffs, the splash
-//     throws drops. A word whose layers are not showing (no `motion`, or
-//     not decoded yet) pops its whole picture instead. Reduced motion: the
-//     flash and an opacity pulse, no move and no sparks. It is cancelled
-//     with the life (a new word, leaving the play screen, a hidden page).
+//     layer 3 "Win"): when the word is checked correct, once and at once,
+//     the TV flashes warm white, sparks burst from it and its subject plays
+//     the word's `win` move (its idle paused meanwhile and played again
+//     after it); the drive blows exhaust puffs, the splash throws drops.
+//     Every win lasts WIN_MS (1 s, BACKLOG B-227), and the robot speaks
+//     when it ends (character.js waitFor). While its move runs the subject
+//     may leave the TV screen (the card's `win-out` class: the screen stops
+//     clipping it, so it is drawn over the TV's frame and the lab, while
+//     the plate, the specks, the puffs and drops, the flash and the
+//     scanlines stay inside); back at rest inside it as the move ends. A
+//     word whose layers are not showing (no `motion`, or not decoded yet)
+//     pops its whole picture instead, clipped by the screen. Reduced
+//     motion: the flash and an opacity pulse, no move and no sparks. It is
+//     cancelled with the life (a new word, leaving the play screen, a
+//     hidden page).
 // renderPicture is a state subscriber after tv.js's renderTv. It never
 // mutates state and takes no input (.tv-life has pointer-events: none).
 // The TV's quiet bar, its dim flicker (on .card) and the wrong-check
@@ -247,58 +254,61 @@ export function scaleOf(width) {
 
 // --- The win (design/reference/tv-motion.html layer 3 "Win"; BACKLOG B-222) ---
 
-// The win moves, one per `win` in the data: keyframes and timing for
-// Element.animate, played once on the subject, from the word's pivot (or
-// the move's own `pivot`), each ending exactly where it started (a full
-// turn counts as where it started). `cheer`, `bungee` and `drive` are the
-// prototype's WIN, its keyframes, durations and easing as they are;
-// `drive` blurs the subject on its fast part and blows exhaust puffs
-// (`fx`). The others are new, in the same spirit, big and silly, 1.2-1.9s;
-// a keyframe's `easing` runs from it to the next one that sets the same
-// property. A % in translate is of the picture.
+// How long every win lasts, ms (BACKLOG B-227: 1 s, the human's choice
+// after the "Win Length Test"; one number the human may tune): each move
+// of WIN, the whole picture's pop and reduced motion's pulse play over it,
+// and the robot's moment and voice and the cogs' flight start when it ends
+// (character.js waitFor, celebrate.js).
+export const WIN_MS = 1000;
+
+// The win moves, one per `win` in the data: keyframes for Element.animate,
+// played once over WIN_MS on the subject, from the word's pivot (or the
+// move's own `pivot`), each ending exactly where it started (a full turn
+// counts as where it started). A keyframe's `easing` runs from it to the
+// next one that sets the same property, so each beat lands where its
+// keyframe's offset says (B-227: none eases the whole move). `cheer`,
+// `bungee` and `drive` are the prototype's WIN, its keyframes as they are,
+// its ease-in-out on each keyframe; `drive` blurs the subject on its fast
+// part and blows exhaust puffs (`fx`). The others are new, in the same
+// spirit, big and silly (B-222: 1.2-1.9s, retimed to WIN_MS by B-227,
+// their shapes kept). A % in translate is of the picture.
 export const WIN = {
     // jumps for joy: a squash, a stretch up, a bounce (the prototype's)
     cheer: {
         keyframes: [
-            { transform: 'translateY(0) scale(1,1)' },
-            { transform: 'translateY(0) scale(0.9,1.1)', offset: 0.06 },
-            { transform: 'translateY(-3%) scale(1.14,0.94)', offset: 0.16 },
-            { transform: 'translateY(-5%) scale(1,1)', offset: 0.34 },
-            { transform: 'translateY(2%) scale(1,1.02)', offset: 0.55 },
-            { transform: 'translateY(-2%) scale(1,1)', offset: 0.75 },
+            { transform: 'translateY(0) scale(1,1)', easing: 'ease-in-out' },
+            { transform: 'translateY(0) scale(0.9,1.1)', offset: 0.06, easing: 'ease-in-out' },
+            { transform: 'translateY(-3%) scale(1.14,0.94)', offset: 0.16, easing: 'ease-in-out' },
+            { transform: 'translateY(-5%) scale(1,1)', offset: 0.34, easing: 'ease-in-out' },
+            { transform: 'translateY(2%) scale(1,1.02)', offset: 0.55, easing: 'ease-in-out' },
+            { transform: 'translateY(-2%) scale(1,1)', offset: 0.75, easing: 'ease-in-out' },
             { transform: 'translateY(0) scale(1,1)' },
         ],
-        duration: 1900,
-        easing: 'ease-in-out',
     },
     // stretches, swings one way and the other on a spring (the prototype's)
     bungee: {
         keyframes: [
-            { transform: 'rotate(0) scale(1,1)' },
-            { transform: 'rotate(0) scale(0.92,1.18)', offset: 0.14 },
-            { transform: 'rotate(-9deg) scale(1.06,0.88)', offset: 0.3 },
-            { transform: 'rotate(11deg) scale(0.97,1.08)', offset: 0.46 },
-            { transform: 'rotate(-6deg) scale(1.02,0.96)', offset: 0.62 },
-            { transform: 'rotate(3deg) scale(1,1.02)', offset: 0.78 },
+            { transform: 'rotate(0) scale(1,1)', easing: 'ease-in-out' },
+            { transform: 'rotate(0) scale(0.92,1.18)', offset: 0.14, easing: 'ease-in-out' },
+            { transform: 'rotate(-9deg) scale(1.06,0.88)', offset: 0.3, easing: 'ease-in-out' },
+            { transform: 'rotate(11deg) scale(0.97,1.08)', offset: 0.46, easing: 'ease-in-out' },
+            { transform: 'rotate(-6deg) scale(1.02,0.96)', offset: 0.62, easing: 'ease-in-out' },
+            { transform: 'rotate(3deg) scale(1,1.02)', offset: 0.78, easing: 'ease-in-out' },
             { transform: 'rotate(0) scale(1,1)' },
         ],
-        duration: 1400,
-        easing: 'ease-in-out',
     },
     // drives off one side, blurred, and skids back in from the other (the
     // prototype's), with its exhaust puffs
     drive: {
         keyframes: [
-            { transform: 'translateX(0) skewX(0) scale(1,1)', filter: 'none' },
-            { transform: 'translateX(4%) skewX(-3deg) scale(1.03,0.96)', filter: 'none', offset: 0.1 },
-            { transform: 'translateX(-140%) skewX(12deg) scale(1.04,0.98)', filter: 'blur(2px)', offset: 0.36 },
-            { transform: 'translateX(140%) skewX(12deg) scale(1,1)', filter: 'blur(2px)', offset: 0.37 },
-            { transform: 'translateX(-7%) skewX(-7deg) scale(1.02,0.97)', filter: 'none', offset: 0.74 },
-            { transform: 'translateX(2%) skewX(2deg) scale(1,1)', filter: 'none', offset: 0.87 },
+            { transform: 'translateX(0) skewX(0) scale(1,1)', filter: 'none', easing: 'ease-in-out' },
+            { transform: 'translateX(4%) skewX(-3deg) scale(1.03,0.96)', filter: 'none', offset: 0.1, easing: 'ease-in-out' },
+            { transform: 'translateX(-140%) skewX(12deg) scale(1.04,0.98)', filter: 'blur(2px)', offset: 0.36, easing: 'ease-in-out' },
+            { transform: 'translateX(140%) skewX(12deg) scale(1,1)', filter: 'blur(2px)', offset: 0.37, easing: 'ease-in-out' },
+            { transform: 'translateX(-7%) skewX(-7deg) scale(1.02,0.97)', filter: 'none', offset: 0.74, easing: 'ease-in-out' },
+            { transform: 'translateX(2%) skewX(2deg) scale(1,1)', filter: 'none', offset: 0.87, easing: 'ease-in-out' },
             { transform: 'translateX(0) skewX(0) scale(1,1)', filter: 'none' },
         ],
-        duration: 1500,
-        easing: 'ease-in-out',
         fx: 'exhaust',
     },
     // a crouch, a high hop with one full turn in the air, a squash on
@@ -323,7 +333,6 @@ export const WIN = {
             { offset: 0.9, translate: '0% 0.8%', scale: '1.02 0.98', easing: 'ease-out' },
             { offset: 1, translate: '0% 0%', rotate: '360deg', scale: '1 1' },
         ],
-        duration: 1600,
         pivot: 'center',
     },
     // wobbles, topples over to one side from its base, lies there a
@@ -343,7 +352,6 @@ export const WIN = {
             { transform: 'rotate(2deg)', offset: 0.95, easing: 'ease-in-out' },
             { transform: 'rotate(0deg)' },
         ],
-        duration: 1800,
     },
     // dips, leaps up in an arc (tilting up as it rises, down as it falls)
     // and splashes back in, throwing teal and cream drops as it leaves
@@ -359,7 +367,6 @@ export const WIN = {
             { transform: 'translate(0%, -3%) rotate(-2deg) scale(0.97, 1.03)', offset: 0.86, easing: 'ease-in-out' },
             { transform: 'translate(0%, 0%) rotate(0deg) scale(1, 1)' },
         ],
-        duration: 1700,
         fx: 'drops',
     },
     // a squash, a big bouncy pop to 1.25, and settles (also the whole
@@ -375,11 +382,11 @@ export const WIN = {
             { transform: 'scale(1.02, 1.01)', offset: 0.9, easing: 'ease-out' },
             { transform: 'scale(1, 1)' },
         ],
-        duration: 1200,
     },
     // a crouch, then it shoots off the top, stretched and blurred; a beat
-    // (about 350ms) with the TV empty; it drops back in from above and
-    // lands squashed
+    // up there (a tenth of the move; since B-227 the screen no longer
+    // clips it, so it hangs over the TV's frame); it drops back in from
+    // above and lands squashed
     zoom: {
         keyframes: [
             { transform: 'translateY(0%) scale(1, 1)', filter: 'none', easing: 'ease-in-out' },
@@ -391,36 +398,40 @@ export const WIN = {
             { transform: 'translateY(1%) scale(1.03, 0.97)', filter: 'none', offset: 0.9, easing: 'ease-out' },
             { transform: 'translateY(0%) scale(1, 1)', filter: 'none' },
         ],
-        duration: 1500,
     },
 };
 
-// The win move `name` for Element.animate, played once: { keyframes,
-// options, origin (its own pivot's transform-origin, else null: the
-// word's), fx (its puffs or drops, else null) }, or null for none.
+// The win move `name` for Element.animate, played once over WIN_MS:
+// { keyframes, options, origin (its own pivot's transform-origin, else
+// null: the word's), fx (its puffs or drops, else null) }, or null for
+// none.
 export function winOf(name) {
     if (!has(WIN, name)) return null;
-    const { keyframes, pivot, fx, ...timing } = WIN[name];
-    return { keyframes, options: timing, origin: pivot ? PIVOTS[pivot] : null, fx: fx || null };
+    const { keyframes, pivot, fx } = WIN[name];
+    return { keyframes, options: { duration: WIN_MS }, origin: pivot ? PIVOTS[pivot] : null, fx: fx || null };
 }
 
 // The drive's exhaust puffs (the prototype's puff calls in its
 // celebrate): each at x, y (of the picture), drifting dx, dy and `size`
-// wide (of the picture's width), over `duration` after `delay` ms. The
-// first two blow from the exhaust as it drives off; the last two, at 72%
-// and 76% of the move (1500ms), from the front as it skids back in.
+// wide (of the picture's width), starting `at` and lasting `span` of the
+// move. The first two blow from the exhaust as it drives off; the last
+// two, at 72% and 76% of the move, from the front as it skids back in.
+// The prototype's ms of its 1500ms drive, so they keep their place in the
+// move retimed to WIN_MS (B-227).
 export const EXHAUST = [
-    { x: 0.86, y: 0.84, dx: 0.1, dy: -0.03, size: 0.06, duration: 900, delay: 80 },
-    { x: 0.92, y: 0.8, dx: 0.14, dy: -0.06, size: 0.05, duration: 1000, delay: 160 },
-    { x: 0.3, y: 0.86, dx: 0.1, dy: -0.04, size: 0.06, duration: 900, delay: 1080 },
-    { x: 0.22, y: 0.84, dx: 0.06, dy: -0.06, size: 0.05, duration: 900, delay: 1140 },
+    { x: 0.86, y: 0.84, dx: 0.1, dy: -0.03, size: 0.06, at: 80 / 1500, span: 900 / 1500 },
+    { x: 0.92, y: 0.8, dx: 0.14, dy: -0.06, size: 0.05, at: 160 / 1500, span: 1000 / 1500 },
+    { x: 0.3, y: 0.86, dx: 0.1, dy: -0.04, size: 0.06, at: 1080 / 1500, span: 900 / 1500 },
+    { x: 0.22, y: 0.84, dx: 0.06, dy: -0.06, size: 0.05, at: 1140 / 1500, span: 900 / 1500 },
 ];
 
 // The splash's drops: a burst of `count` at each `at` of the move (as it
 // leaps out, as it splashes back in), from the water line (`y`, x in
 // `x.least` + up to `x.range`, of the picture), each `size` wide (of the
 // picture's width), flying up `rise` and out `spread` (away from the
-// middle) and falling back, over `duration` ms; teal and cream in turn.
+// middle) and falling back, over `duration` of the move (B-222's 550-850ms
+// of its 1700ms splash, so they keep their pace in the move retimed to
+// WIN_MS, B-227); teal and cream in turn.
 export const DROPS = {
     bursts: [{ at: 0.16, count: 8 }, { at: 0.74, count: 6 }],
     x: { least: 0.3, range: 0.4 },
@@ -428,13 +439,15 @@ export const DROPS = {
     rise: { least: 0.1, range: 0.16 },
     spread: { least: 0.06, range: 0.16 },
     size: { least: 0.026, range: 0.016 },
-    duration: { least: 550, range: 300 },
+    duration: { least: 550 / 1700, range: 300 / 1700 },
     colours: ['teal', 'cream'],
 };
 
-// The drops of a splash `duration` ms long, each { x, y, dx, rise, size
-// (of the picture), duration, delay (ms), colour }, drawn from `rand`.
-export function dropSpecs(duration, rand = Math.random) {
+const ms = (v) => Math.round(v * 10) / 10;
+
+// The drops of a splash `move` ms long, each { x, y, dx, rise, size (of
+// the picture), duration, delay (ms), colour }, drawn from `rand`.
+export function dropSpecs(move, rand = Math.random) {
     const { bursts, x, y, rise, spread, size, colours } = DROPS;
     const out = [];
     for (const burst of bursts) {
@@ -446,8 +459,8 @@ export function dropSpecs(duration, rand = Math.random) {
                 dx: (at < 0.5 ? -1 : 1) * (spread.least + rand() * spread.range),
                 rise: rise.least + rand() * rise.range,
                 size: size.least + rand() * size.range,
-                duration: DROPS.duration.least + rand() * DROPS.duration.range,
-                delay: burst.at * duration,
+                duration: ms((DROPS.duration.least + rand() * DROPS.duration.range) * move),
+                delay: ms(burst.at * move),
                 colour: colours[out.length % colours.length],
             });
         }
@@ -455,9 +468,10 @@ export function dropSpecs(duration, rand = Math.random) {
     return out;
 }
 
-// A puff (EXHAUST) on a picture `w` px wide, as the prototype's puff():
-// { className, left, top, size, keyframes, options }.
-export function puffOf(spec, w) {
+// A puff (EXHAUST) on a picture `w` px wide in a drive `move` ms long, as
+// the prototype's puff(): { className, left, top, size, keyframes,
+// options }.
+export function puffOf(spec, w, move = WIN_MS) {
     return {
         className: 'tv-puff',
         left: `${spec.x * 100}%`,
@@ -468,7 +482,7 @@ export function puffOf(spec, w) {
             { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.95, offset: 0.2 },
             { transform: `translate(calc(-50% + ${px(spec.dx * w)}), calc(-50% + ${px(spec.dy * w)})) scale(1.5)`, opacity: 0 },
         ],
-        options: { duration: spec.duration, delay: spec.delay, easing: 'ease-out', fill: 'both' },
+        options: { duration: ms(spec.span * move), delay: ms(spec.at * move), easing: 'ease-out', fill: 'both' },
     };
 }
 
@@ -494,11 +508,11 @@ export function dropOf(spec, w) {
     };
 }
 
-// The pieces a win move's `fx` throws on a picture `w` px wide, `duration`
+// The pieces a win move's `fx` throws on a picture `w` px wide, `move`
 // ms long: the drive's puffs, the splash's drops, or none.
-export function fxOf(fx, duration, w, rand = Math.random) {
-    if (fx === 'exhaust') return EXHAUST.map((s) => puffOf(s, w));
-    if (fx === 'drops') return dropSpecs(duration, rand).map((s) => dropOf(s, w));
+export function fxOf(fx, move, w, rand = Math.random) {
+    if (fx === 'exhaust') return EXHAUST.map((s) => puffOf(s, w, move));
+    if (fx === 'drops') return dropSpecs(move, rand).map((s) => dropOf(s, w));
     return [];
 }
 
@@ -512,10 +526,10 @@ export const FLASH = {
 };
 
 // Reduced motion's win (the prototype's): the picture's opacity dips to
-// 0.7 and back in 400ms.
+// 0.7 and back, over the win's WIN_MS (B-227; the prototype's 400ms).
 export const PULSE = {
     keyframes: [{ opacity: 1 }, { opacity: 0.7 }, { opacity: 1 }],
-    duration: 400,
+    duration: WIN_MS,
 };
 
 // The sparks (as they were in celebrate.js until B-222; game.css
@@ -694,12 +708,13 @@ function start(d, life) {
 }
 
 // Every animation of the life is cancelled (the layers are back at rest;
-// a win move on the subject, its puffs and drops too) and the specks and
-// the puffs or drops are gone.
+// a win move on the subject, its puffs and drops too), the specks and the
+// puffs or drops are gone and the screen clips the subject again.
 function halt(d) {
     d.life.getAnimations({ subtree: true }).forEach((a) => a.cancel());
     d.motes.textContent = '';
     d.fx.textContent = '';
+    d.card.classList.remove('win-out');
 }
 
 // --- Render: the win (BACKLOG B-222) ---
@@ -707,10 +722,12 @@ function halt(d) {
 // The word's win, as it is checked correct: the TV's warm flash; then, on
 // the layers (when they show), the subject's win move from its pivot
 // (WIN), its idle paused until the move ends and then played on, with
-// the move's puffs or drops; with no layers showing (a word without
+// the move's puffs or drops, the subject free to leave the TV screen
+// meanwhile (`win-out`, B-227); with no layers showing (a word without
 // `motion`, or its layers not decoded or the picture not locked yet), the
-// whole picture's pop; and the sparks from the TV. Reduced motion: the
-// flash and the picture's opacity pulse (PULSE), no move and no sparks.
+// whole picture's pop, clipped by the screen; and the sparks from the TV.
+// Reduced motion: the flash and the picture's opacity pulse (PULSE), no
+// move and no sparks. Every one lasts WIN_MS.
 function win(d) {
     const layers = !!(shown.life && shown.tuned && shown.ready);
     d.flash.animate(FLASH.keyframes, { duration: FLASH.duration, easing: FLASH.easing });
@@ -724,8 +741,12 @@ function win(d) {
         d.subject.style.transformOrigin = move.origin || shown.life.origin;
         const idle = d.actor.getAnimations();
         idle.forEach((a) => a.pause());
+        d.card.classList.add('win-out');
         d.subject.animate(move.keyframes, move.options).finished
-            .then(() => idle.forEach((a) => a.play()), () => {});
+            .then(() => {
+                d.card.classList.remove('win-out');
+                idle.forEach((a) => a.play());
+            }, () => {});
         throwFx(d, fxOf(move.fx, move.options.duration, d.card.clientWidth));
     } else {
         d.still.animate(move.keyframes, move.options);

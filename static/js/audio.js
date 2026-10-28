@@ -16,9 +16,10 @@
 //     pool), else the moment's prototype clip; after his letter lands, its
 //     name (`letters/`). On a correct check (the moments with
 //     MOMENTS[moment].word, B-223) he says the word himself first, from
-//     the word's `audio` decoded when the word started (sayPlan, speak);
-//     the word's gag only after it (B-225: with the word not ready, a
-//     shared line or the prototype clip plays alone).
+//     the word's `audio` decoded when the word started (sayPlan, speak),
+//     once the TV's win has played (B-227: character.js waitFor); the
+//     word's gag only after it (B-225: with the word not ready, a shared
+//     line or the prototype clip plays alone).
 //     His idle peeks whisper too (peekLine, told by character.js).
 //     How often (BACKLOG B-226): per moment character.js saysLine, from
 //     its CHATTER table: always, or sometimes / rare at a chance and never
@@ -26,9 +27,18 @@
 //     dropped drops only his voice (no prototype clip in its place), the
 //     effects play;
 //   - the TV's tune-in hiss and channel click (BACKLOG B-214): made in
-//     code, no sound file (hiss), played when tv.js starts a tune-in.
+//     code, no sound file (hiss), played when tv.js starts a tune-in;
+//   - the win's chime (BACKLOG B-227): two bright notes made in code, no
+//     sound file (chime), played with the TV's win on a correct check
+//     (the moments with MOMENTS[moment].win).
+// On iPhone the silent switch would mute all of the Web Audio sound: at
+// the first gesture the page asks to play like a media app
+// (navigator.audioSession, where there is one) and a silent clip made in
+// code loops in an <audio> element (keepAlive), so the page counts as
+// playing media (B-227).
 // `state.muted` (localStorage `flip.muted`, read and written only here
-// through loadMuted / saveMuted) means no sound plays at all.
+// through loadMuted / saveMuted) means no sound plays at all (the silent
+// loop pauses too).
 //
 // Everything above "Playback" is pure (no DOM, no Audio) and a Django
 // test runs it through node; the AudioContext is only created on the
@@ -102,9 +112,10 @@ export const FILES = {
 // starts over the target word, the speaker's or the one he says (DESIGN
 // "Sound", CHARACTER "Rules"). The swipe is an effect, not his voice: it
 // plays whenever a block goes into a slot and may overlap anything. So
-// are the round end's tada (B-224: under his end line) and the TV's hiss
-// (B-214; made in code, not a pool).
-export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'fx', swipe: 'fx', locked: 'voice', hiss: 'fx', word: 'voice', line: 'voice' };
+// are the round end's tada (B-224: under his end line), the TV's hiss
+// (B-214; made in code, not a pool) and the win's chime (B-227; made in
+// code too).
+export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'fx', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', word: 'voice', line: 'voice' };
 
 // The TV's tune-in hiss (BACKLOG B-214, design/reference/tv-motion.html
 // hiss()): white noise `tail` s longer than the hiss, its first samples
@@ -124,6 +135,60 @@ export function hissEnvelope(ms) {
         ['set', HISS.gain, end * HISS.hold],
         ['ramp', HISS.floor, end],
     ];
+}
+
+// The win's chime (BACKLOG B-227, design/reference/word-wins.html
+// SFX.chime): two bright `type` notes, about C6 then G6 (`f`, Hz), the
+// second `at` 0.09 s after the first. Each one's gain rises from `floor`
+// to its `peak` in `attack` s and falls back to `floor` by its `dur`; its
+// oscillator stops `stop` s after that. The peaks are the reference's
+// (0.28, 0.26) through its master gain (0.55), straight out.
+export const CHIME = {
+    type: 'triangle',
+    floor: 0.0001,
+    attack: 0.008,
+    stop: 0.05,
+    notes: [
+        { f: 1046, at: 0, dur: 0.35, peak: 0.154 },
+        { f: 1568, at: 0.09, dur: 0.5, peak: 0.143 },
+    ],
+};
+
+// A chime note's gain: [how, value, at s from the chime's start], how
+// 'set' (setValueAtTime) or 'ramp' (exponentialRampToValueAtTime).
+export function chimeEnvelope(note) {
+    return [
+        ['set', CHIME.floor, note.at],
+        ['ramp', note.peak, note.at + CHIME.attack],
+        ['ramp', CHIME.floor, note.at + note.dur],
+    ];
+}
+
+// The silent clip that loops while the sound is on (BACKLOG B-227, the
+// iPhone's silent switch): `seconds` of zeros, 16-bit mono PCM at `rate`.
+export const SILENT = { rate: 8000, seconds: 1 };
+
+// The bytes of a WAV file of `seconds` of silence at `rate` samples a
+// second (16-bit mono PCM: the 44-byte header, then the zeros).
+export function silentWav(seconds = SILENT.seconds, rate = SILENT.rate) {
+    const n = Math.round(seconds * rate);
+    const bytes = new Uint8Array(44 + n * 2);
+    const view = new DataView(bytes.buffer);
+    const text = (at, t) => { for (let i = 0; i < t.length; i++) bytes[at + i] = t.charCodeAt(i); };
+    text(0, 'RIFF');
+    view.setUint32(4, 36 + n * 2, true);
+    text(8, 'WAVE');
+    text(12, 'fmt ');
+    view.setUint32(16, 16, true);       // the fmt chunk's size
+    view.setUint16(20, 1, true);        // PCM
+    view.setUint16(22, 1, true);        // mono
+    view.setUint32(24, rate, true);
+    view.setUint32(28, rate * 2, true); // bytes a second
+    view.setUint16(32, 2, true);        // bytes a sample
+    view.setUint16(34, 16, true);       // bits a sample
+    text(36, 'data');
+    view.setUint32(40, n * 2, true);
+    return bytes;
 }
 
 // The analyser on the robot's voice (design/reference/robot-puppet.html):
@@ -346,7 +411,7 @@ export function saveMuted(muted, storage = globalThis.localStorage) {
 let ctx = null;             // the AudioContext, made on the first gesture
 const bytes = {};           // kind -> [Promise of the clip's bytes, or null]
 const buffers = {};         // kind -> [decoded AudioBuffer, or null until decoded]
-const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224) and the TV's hiss (B-214), { src, kind }
+const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214) and the win's chime (B-227), { src, kind }
 // When his voice last went quiet (BACKLOG B-226): the performance.now() ms
 // at which a clip of his voice last ended or was cut (-Infinity before he
 // ever spoke), for the quiet gap (character.js CHATTER.TALK_GAP, saysLine).
@@ -375,6 +440,14 @@ const wave = new Uint8Array(ANALYSER.samples);
 // call its `onEnd`). No other module reads it; whether the word is playing
 // is `state.speaking`, set by main.js, and that is the truth.
 let wordClip = null;
+
+// The looping silent clip (BACKLOG B-227): an HTMLAudioElement playing
+// silentWav, made on the first gesture, playing while the sound is on and
+// paused while muted, so iOS counts the page as playing media and its
+// silent switch does not mute the Web Audio sound (his voice, the
+// effects, the hiss, the chime). An engine handle, not game state: no
+// other module reads it and nothing decides game logic from it.
+let keepAlive = null;
 
 function download(url) {
     try {
@@ -488,21 +561,39 @@ export function init() {
         });
     }
     loadManifest();
-    // iOS 17+: play like a media app (heard with the silent switch on, as
-    // the <audio> clips were). Older iOS and other browsers lack it.
-    try {
-        if (globalThis.navigator && navigator.audioSession) navigator.audioSession.type = 'playback';
-    } catch (e) {
-        // nothing to do
-    }
     for (const type of UNLOCK_EVENTS) document.addEventListener(type, unlock, true);
 }
 
+// The silent loop's element (keepAlive), or null where it cannot be made.
+function silentLoop() {
+    try {
+        const el = new Audio(URL.createObjectURL(new Blob([silentWav()], { type: 'audio/wav' })));
+        el.loop = true;
+        return el;
+    } catch (e) {
+        return null;
+    }
+}
+
+// The silent loop plays, unless muted or already playing; a play the
+// browser refuses is tried again on the next gesture.
+function keepAwake() {
+    if (!keepAlive || !keepAlive.paused || state.muted) return;
+    try {
+        const p = keepAlive.play();
+        if (p && p.catch) p.catch(() => {});
+    } catch (e) {
+        // the next gesture tries again
+    }
+}
+
 // Every gesture (capture phase, so a drop's own pointerup comes first):
-// the first one makes the context and decodes the clips; any one finding
-// the context not running (not yet started, or suspended / interrupted
-// after the phone switched apps) resumes it and plays one silent sample,
-// which is what really opens the output on iOS.
+// the first one makes the context and decodes the clips, asks to play like
+// a media app and makes the silent loop (B-227: the iPhone's silent switch
+// then mutes none of it); any one finds the silent loop playing (unless
+// muted); any one finding the context not running (not yet started, or
+// suspended / interrupted after the phone switched apps) resumes it and
+// plays one silent sample, which is what really opens the output on iOS.
 function unlock() {
     if (!ctx) {
         const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -520,7 +611,16 @@ function unlock() {
             analyser = null;        // no analyser: his voice goes straight out, he just does not show it
         }
         decodeAll();
+        // iOS 17+: play like a media app, heard with the silent switch on.
+        // Older iOS and other browsers lack it; the silent loop covers them.
+        try {
+            if (globalThis.navigator && navigator.audioSession) navigator.audioSession.type = 'playback';
+        } catch (e) {
+            // nothing to do
+        }
+        keepAlive = silentLoop();
     }
+    keepAwake();
     if (ctx.state === 'running') return;
     try {
         const p = ctx.resume();
@@ -702,11 +802,12 @@ function reducedMotion() {
 // What he says on the moments of one state change (`moments`, from
 // snapshot `prev` to `now`, read from state `s`): per moment its plan
 // (sayPlan, from the clips decoded now: a clip not ready is skipped, never
-// waited for): its effect at once; his voice, the word (B-223), his line or
-// the prototype clip, and the name of the letter he placed (B-224), one
-// after the other, each moment's no sooner than the moment starts in his
-// script (waitFor: a boost's when its letter lands; startsOf: the second
-// miss's letter when his peek is over). The picture's line is the one of
+// waited for): its effect at once (and on a correct check the win's chime,
+// B-227); his voice, the word (B-223), his line or the prototype clip, and
+// the name of the letter he placed (B-224), one after the other, each
+// moment's no sooner than the moment starts in his script (waitFor: a
+// boost's when its letter lands, a correct check's when the TV's win ends,
+// B-227; startsOf: the second miss's letter when his peek is over). The picture's line is the one of
 // his look (picksFor), the round end's by its stars, a boost's by its
 // kind. Whether each moment says its line (BACKLOG B-226): character.js
 // saysLine, its tier and chance, and the quiet gap, from how long his
@@ -720,6 +821,8 @@ function speak(moments, s, prev, now) {
     const plans = moments.map((m) => sayPlan(m, clipsFor(s, letterGiven(m, prev, now, word)), ready, Math.random,
         { variant: picks[m], stars: now.stars, boostKind: now.boostKind }, saysLine(m, now, quiet, Math.random)));
     for (const p of plans) if (p.fx) play(p.fx);
+    // a correct check (B-227): the win's chime, an effect, with the TV's win
+    if (moments.some((m) => MOMENTS[m].win)) chime();
     const wait = waitFor(moments, prev, now, reducedMotion());
     const starts = startsOf(moments, picks).map((t) => wait + t);
     voice(voiceChain(plans, starts), moments.every((m) => MOMENTS[m].ifQuiet));
@@ -779,6 +882,40 @@ export function hiss(ms) {
         src.stop(t + ms / 1000 + HISS.stop);
     } catch (e) {
         // no hiss here; the picture still tunes in
+    }
+}
+
+// The win's chime (BACKLOG B-227): two notes made here (CHIME,
+// chimeEnvelope), straight out; an effect, so it may overlap anything.
+// Muted or before the first gesture: nothing. Kept with the playing
+// sources, so the mute stops it.
+function chime() {
+    if (state.muted || !ctx) return;
+    try {
+        if (ctx.state !== 'running') {
+            const p = ctx.resume();
+            if (p && p.catch) p.catch(() => {});
+        }
+        const t = ctx.currentTime;
+        for (const note of CHIME.notes) {
+            const osc = ctx.createOscillator();
+            osc.type = CHIME.type;
+            osc.frequency.setValueAtTime(note.f, t + note.at);
+            const gain = ctx.createGain();
+            for (const [how, value, at] of chimeEnvelope(note)) {
+                if (how === 'set') gain.gain.setValueAtTime(value, t + at);
+                else gain.gain.exponentialRampToValueAtTime(value, t + at);
+            }
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            const entry = { src: osc, kind: 'chime' };
+            live.add(entry);
+            osc.onended = () => live.delete(entry);
+            osc.start(t + note.at);
+            osc.stop(t + note.at + note.dur + CHIME.stop);
+        }
+    } catch (e) {
+        // no chime here; the win still plays
     }
 }
 
@@ -843,10 +980,12 @@ export function stopWord() {
     el.pause();
 }
 
-// Everything stops: the word and every pooled clip.
+// Everything stops: the word, every pooled clip and the made sounds, and
+// the silent loop pauses (B-227).
 function silence() {
     stopWord();
     [...live].forEach(stopSource);
+    if (keepAlive && !keepAlive.paused) keepAlive.pause();
 }
 
 // Memo of the last state heard (CLAUDE.md "Subscribers may keep a memo"):
@@ -859,7 +998,8 @@ let last = { snap: NONE, muted: false };
 // line too). A new word (or none: the round end, the back arrow) stops his
 // voice, whatever he was saying of the last one (B-223, B-224), and loads
 // its own clips (loadWord), muted or not. On mute everything playing
-// stops; while muted nothing plays.
+// stops and the silent loop pauses; while muted nothing plays; on unmute
+// the silent loop plays again (B-227).
 export function renderSound(state) {
     const snap = snapshot(state);
     const prev = last;
@@ -872,6 +1012,7 @@ export function renderSound(state) {
         if (!prev.muted) silence();
         return;
     }
+    if (prev.muted) keepAwake();
     const moments = momentsFor(prev.snap, snap);
     if (!moments.length) return;
     // A moment the table marks `waitReady` (the greeting) comes with the
