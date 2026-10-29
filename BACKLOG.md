@@ -632,7 +632,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
   - Pure parts (bulbs at round start, after a check, round over, spare earned) tested through `node`.
   - Docs: CLAUDE.md "Product rules" (Mistakes: 3 bulbs per round, not per word), its main.js/score/save-module bullets; PROGRESSION.md "Guardrails"; CHARACTER.md if a moment changes.
   - Screenshots: a round with 2 bulbs left on its third word; the round end after the bulbs ran out on word 3; a round end with the spare bulb popping in; the next round starting with 4 bulbs. Checklist passes.
-- status:
+- status: done: https://github.com/kadmon76/flip/pull/119
 
 ## Later / not now
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
