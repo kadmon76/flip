@@ -33,6 +33,7 @@ import { domeAction } from './controls.js';
 import { motionFor } from './motion.js';
 import { coachStep } from './coach.js';
 import { WIN_MS } from './picture.js';
+import { HINT_AT } from './bulbs.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -170,8 +171,9 @@ export const FX = {
     ],
 };
 
-// Moment -> the steps he takes and the clip that goes with it (audio.js's
-// pools: 'swipe', 'error', 'correct', 'tada', 'locked'; null for none).
+// Moment -> the steps he takes and the sound that goes with it (audio.js's
+// pools: 'swipe', 'error', 'correct', 'locked'; or 'fanfare', the round
+// end's, made in code, BACKLOG B-230; null for none).
 // His voice (BACKLOG M4b; audio.js sayPlan plays it):
 //   - `lines` (B-224): the pools of his new lines the moment plays, in
 //     order: a random clip of the first that has one ready ('gag': the
@@ -181,8 +183,10 @@ export const FX = {
 //     prototype clip), or nothing. A moment with variants has `lines` per
 //     variant (the picture's line is the one of his look); `lines` may be
 //     { by, ... }, the lines picked by a fact of the moment (linesOf):
-//     the round end's stars, the boost's kind. The swipe and the tada are
-//     effects: they play whatever his line is.
+//     the round end's stars, the boost's kind. The swipe and the round
+//     end's fanfare are effects: they play whatever his line is; the
+//     fanfare first, his end line when it ends (B-230: audio.js
+//     fanfareWait).
 //   - `word: true` (a correct check: correct, streak; B-223): the target
 //     word first, clean and complete, from the word's own clip, then,
 //     when it ends, his line. 'gag' plays only after the word: with the
@@ -224,8 +228,10 @@ export const FX = {
 //   - "All slots filled": filledEarly (pointing at the dome, no line:
 //     BACKLOG B-226) in the first EARLY_ROUNDS rounds of the session;
 //     filled after that, which is "Letter placed";
-//   - "Wrong check ... peek": he peeks when the miss leaves one lives
-//     bulb lit, on the first miss it is "Wrong";
+//   - "Wrong check ... peek": he peeks on the word's own second miss,
+//     the one that brings his letter (bulbs.js HINT_AT; since BACKLOG
+//     B-231 the TV's bulbs are the round's, so it is no longer the miss
+//     that leaves one bulb lit), on its first it is "Wrong";
 //   - "Round end": clapping for 2-3 stars, his rest pose for 0-1 (never
 //     sad). He is not on the round-end screen, so nothing shows it yet.
 // Not in the reference: blockReturned (a block back to the bench, B-108)
@@ -467,10 +473,10 @@ export const MOMENTS = {
             { at: 0.3, fx: 'clap' },
             { at: 2.5, hands: 'rest' },
         ],
-        sound: 'tada',
+        sound: 'fanfare',
         lines: { by: 'stars', 2: ['end-mid'], 3: ['end-high'] },
     },
-    roundEnd: { steps: [{ at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest' }], sound: 'tada', lines: ['end-low'] },
+    roundEnd: { steps: [{ at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'calm', hands: 'rest' }], sound: 'fanfare', lines: ['end-low'] },
     // Theme keys (human, 2026-10-24; keys.js): after his round-end line,
     // the round brought a key; on the theme screen, a key opened a theme.
     // He is not drawn on those screens yet, so only his voice shows them;
@@ -560,8 +566,8 @@ export const STREAK = 3;
 // guess: they exist only where funny). `first`: the snapshot field that
 // counts the moment on the word; only its first (the field at 1) may
 // speak (the dome nudge's `nudges`). A line dropped drops only his voice:
-// the moment's pose, moves and effect sound (the swipe, the tada) play as
-// ever, and no prototype clip plays in its place (audio.js sayPlan).
+// the moment's pose, moves and effect sound (the swipe, the fanfare) play
+// as ever, and no prototype clip plays in its place (audio.js sayPlan).
 // PRESS_WAIT: seconds [least, most] the kid neither presses the dome nor
 // moves a block, with every slot filled on a filledEarly word, before his
 // press line may come (filledNudge; a random wait, pressWait).
@@ -635,7 +641,7 @@ export function isChange(step) {
 const round3 = (t) => Math.round(t * 1000) / 1000;
 
 // The steps of `moments` (one state change: at most two, e.g. the miss
-// that leaves one bulb lit is his peek and his letter) as one script,
+// that brings his letter is his peek and his letter) as one script,
 // `at` seconds from now. The next moment starts when the one before takes
 // its last step (but at least CHANGE_MS after the one before started),
 // and that step and any later ones are dropped: every moment starts with
@@ -873,7 +879,10 @@ export function snapshot(state) {
         round: state.roundsStarted,
         key: onWord ? `${wordKey(state)}:${current.word}` : null,
         status: onWord ? current.status : null,
+        // the round's bulbs still lit (BACKLOG B-231) and the word's own
+        // wrong checks
         lives,
+        misses: onWord ? current.misses || 0 : 0,
         placed: onWord ? current.placed.map((p) => (p ? p.tileId : '-')).join(',') : '',
         filled: onWord && current.placed.length > 0 && current.placed.every(Boolean),
         idleBeat: state.idleBeat,
@@ -933,12 +942,14 @@ export function momentsFor(prev, now) {
     }
     if (prev.key !== now.key) return now.tuned ? [look] : [];
     if (now.tuned && !prev.tuned) return [look];
-    if (now.status !== prev.status || now.lives < prev.lives) {
+    if (now.status !== prev.status || now.lives < prev.lives || now.misses > prev.misses) {
+        // a reveal: the word's third miss, or the round's last bulb gone
+        // (B-231)
         if (now.status === 'revealed') return ['thirdMiss'];
         if (now.status === 'correct') return [now.tutorial ? 'tutorialDone' : now.streak === STREAK ? 'streak' : 'correct'];
         if (now.status === 'wrong') {
-            const miss = now.lives === 1 ? 'wrongPeek' : 'wrong';
-            // the miss that leaves one bulb also gave his letter (B-206)
+            const miss = now.misses === HINT_AT ? 'wrongPeek' : 'wrong';
+            // the word's second miss also gave his letter (B-206)
             return now.hint !== -1 && now.hint !== prev.hint ? [miss, 'hintGiven'] : [miss];
         }
     }
@@ -1093,7 +1104,8 @@ const withWin = (m) => !!(MOMENTS[m] && MOMENTS[m].win);
 // line): a boost's moment waits for what it did to land (boostLands); a
 // correct check's for the TV's win to end (BACKLOG B-227: WIN_MS, under
 // reduced motion too, whose pulse lasts as long); the others start at
-// once.
+// once. (The round end's line also waits for its fanfare, audio.js
+// fanfareWait, B-230; he is not drawn there, so no step of his waits.)
 export function waitFor(moments, prev, now, reduced = false) {
     if (moments.includes('boostGiven')) return boostLands(prev, now, reduced);
     return moments.some(withWin) ? WIN_MS / 1000 : 0;
@@ -1158,7 +1170,7 @@ export function pressDue(state, armed) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, misses: 0, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
 
 // --- Render ---
 

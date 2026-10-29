@@ -2,10 +2,9 @@
 // BACKLOG B-108, B-114). Its sounds:
 //   - the target word: the per-word `audio` file from the content JSON,
 //     played when the kid taps the speaker on the console (speakWord);
-//   - the robot's voice and the effects (the block swipe, the round end's
-//     tada): pools of the existing clips under static/sounds/, downloaded
-//     a few at a time (see "Fetching" below), decoded into Web Audio
-//     buffers on the first gesture and
+//   - the robot's voice and the block swipe: pools of the existing clips
+//     under static/sounds/, downloaded a few at a time (see "Fetching"
+//     below), decoded into Web Audio buffers on the first gesture and
 //     played by renderSound, a state subscriber, for the moments
 //     character.js's table (MOMENTS[moment].sound) gives a state change.
 //     There is no second trigger list here;
@@ -31,6 +30,13 @@
 //     code, no sound file (hiss), played when tv.js starts a tune-in;
 //   - the win's chime (BACKLOG B-227): two bright notes made in code, no
 //     sound file (chime), played with the TV's win on a correct check;
+//   - the round end's fanfare (BACKLOG B-230): three bright notes made in
+//     code, no sound file (fanfare), played as the round-end screen shows;
+//     his end line, and the key line after it, start when it ends
+//     (fanfareWait), so only one voice is heard there. The tada
+//     (static/sounds/celebration/tada.mp3, a clip of the prototype
+//     character's voice that played under his end line, B-224) is no
+//     longer played;
 //   - each word's own win's sounds (BACKLOG B-228): its `sfx` (the theme's
 //     wins file, wins.js), effects made in code as the reference
 //     design/reference/word-wins.html makes them (SFX), each at its time,
@@ -78,8 +84,10 @@ export const VOICE_BASE = '/static/voice/';
 export const MANIFEST_URL = `${VOICE_BASE}manifest.json`;
 
 // The clips of each pool (DESIGN "Sound": correct -> correct/, wrong ->
-// error/, round end -> celebration/tada.mp3, block into slot -> swipe/);
-// his voice's prototype clips where his new voice has no line yet.
+// error/, block into slot -> swipe/); his voice's prototype clips where
+// his new voice has no line yet. The round end has no clip since B-230
+// (its fanfare is made in code; celebration/tada.mp3 stays on disk,
+// unused).
 // The browser cannot list a directory, so they are spelled out; a test
 // checks this list against the files on disk. Read-only content in M1.
 export const FILES = {
@@ -113,7 +121,6 @@ export const FILES = {
             'you can do better.mp3',
         ],
     },
-    tada: { dir: 'celebration', names: ['tada.mp3'] },
     swipe: { dir: 'swipe', names: ['swipe1.mp3', 'swipe2.mp3', 'swipe3.mp3', 'swipe4.mp3'] },
     // His "not yet" (moment speakerLocked, on a change of `lockedTaps`;
     // BACKLOG B-203; since B-219 a boost the kid can't afford, as the
@@ -135,10 +142,11 @@ export const FILES = {
 // starts over the target word, the speaker's or the one he says (DESIGN
 // "Sound", CHARACTER "Rules"). The swipe is an effect, not his voice: it
 // plays whenever a block goes into a slot and may overlap anything. So
-// are the round end's tada (B-224: under his end line), the TV's hiss
-// (B-214; made in code, not a pool), the win's chime (B-227; made in
-// code too) and a word's own win's sounds (B-228, `sfx`; made in code).
-export const CHANNEL = { correct: 'voice', error: 'voice', tada: 'fx', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', sfx: 'fx', word: 'voice', line: 'voice' };
+// are the TV's hiss (B-214; made in code, not a pool), the win's chime
+// (B-227; made in code too), a word's own win's sounds (B-228, `sfx`;
+// made in code) and the round end's fanfare (B-230; made in code, before
+// his end line, not under it).
+export const CHANNEL = { correct: 'voice', error: 'voice', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', sfx: 'fx', fanfare: 'fx', word: 'voice', line: 'voice' };
 
 // The TV's tune-in hiss (BACKLOG B-214, design/reference/tv-motion.html
 // hiss()): white noise `tail` s longer than the hiss, its first samples
@@ -185,6 +193,48 @@ export function chimeEnvelope(note) {
         ['ramp', note.peak, note.at + CHIME.attack],
         ['ramp', CHIME.floor, note.at + note.dur],
     ];
+}
+
+// The round end's fanfare (BACKLOG B-230): three bright `type` notes
+// rising, about C5, E5 and G5 (`f`, Hz), each `at` 0.12 s after the one
+// before, the last one held. Each one's gain rises from `floor` to its
+// `peak` in `attack` s, stays there until `hold` and falls back to `floor`
+// by its `dur` (both from its `at`); its oscillator stops `stop` s after
+// that. Straight out, at about the chime's level (CHIME).
+export const FANFARE = {
+    type: 'triangle',
+    floor: 0.0001,
+    attack: 0.01,
+    stop: 0.05,
+    notes: [
+        { f: 523, at: 0, hold: 0.06, dur: 0.16, peak: 0.15 },
+        { f: 659, at: 0.12, hold: 0.06, dur: 0.16, peak: 0.15 },
+        { f: 784, at: 0.24, hold: 0.3, dur: 0.4, peak: 0.15 },
+    ],
+};
+
+// A fanfare note's gain: [how, value, at s from the fanfare's start], how
+// 'set' (setValueAtTime) or 'ramp' (exponentialRampToValueAtTime).
+export function fanfareEnvelope(note) {
+    return [
+        ['set', FANFARE.floor, note.at],
+        ['ramp', note.peak, note.at + FANFARE.attack],
+        ['set', note.peak, note.at + note.hold],
+        ['ramp', FANFARE.floor, note.at + note.dur],
+    ];
+}
+
+// Seconds from the fanfare's start until its last note has faded out.
+export function fanfareLength(fanfare = FANFARE) {
+    return Math.round(Math.max(...fanfare.notes.map((n) => n.at + n.dur)) * 1000) / 1000;
+}
+
+// Seconds his voice waits on a state change for the fanfare (BACKLOG
+// B-230): when one of `moments` has it for its sound (MOMENTS[m].sound:
+// the round end's), his line and the key line after it start when it has
+// ended (fanfareLength), never under it; 0 for any other moments.
+export function fanfareWait(moments) {
+    return moments.some((m) => !!MOMENTS[m] && MOMENTS[m].sound === 'fanfare') ? fanfareLength() : 0;
 }
 
 // --- Each word's own win's sounds (BACKLOG B-228) ---
@@ -506,8 +556,8 @@ export function pickLine(lines, clips = {}, ready = () => true, rand = Math.rand
 // name of the letter he just placed, or null }; `how` picks the moment's
 // lines (character.js linesOf: { variant, stars, boostKind }). Returns
 // { fx, word, line, sound, letter }:
-//   - fx: the moment's sound when it is an effect (the swipe, the tada),
-//     which plays whatever he says;
+//   - fx: the moment's sound when it is an effect (the swipe, the round
+//     end's fanfare, B-230), which plays whatever he says;
 //   - word: on a moment that says the word (MOMENTS[moment].word, B-223),
 //     the word's clip when it is ready;
 //   - line: a ready clip of the first of its lines with one (pickLine);
@@ -603,9 +653,9 @@ export function newClip(urls, have = new Set(), rand = Math.random) {
 // manifest's list), { url, kind } for a prototype pool (FILES). First the
 // pools of a moment that waits for its clip (MOMENTS[m].waitReady: the
 // greeting, which comes with the first tap), then the prototype pools
-// (the swipe on every block, the round end's tada, his fallbacks), then
-// his other pools in the moment table's order (linePools). A file two
-// pools name is fetched once; a pool with no clip has none.
+// (the swipe on every block, his fallbacks), then his other pools in the
+// moment table's order (linePools). A file two pools name is fetched
+// once; a pool with no clip has none.
 export function firstFetches(files, rand = Math.random, moments = MOMENTS, peek = PEEK) {
     const early = linePools(Object.fromEntries(Object.entries(moments).filter(([, m]) => m && m.waitReady)), {});
     const later = linePools(moments, peek).filter((pool) => !early.includes(pool));
@@ -716,7 +766,7 @@ let ctx = null;             // the AudioContext, made on the first gesture
 // (BACKLOG B-229: a clip a pool at first, one more after each play), and a
 // file two pools name ('hmm no' in error and locked) has one.
 const soundClips = new Map();
-const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214), the win's chime (B-227) and a word's own win's sounds (B-228), { src, kind }
+const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214), the win's chime (B-227), a word's own win's sounds (B-228) and the round end's fanfare (B-230), { src, kind }
 // When his voice last went quiet (BACKLOG B-226): the performance.now() ms
 // at which a clip of his voice last ended or was cut (-Infinity before he
 // ever spoke), for the quiet gap (character.js CHATTER.TALK_GAP, saysLine).
@@ -1099,13 +1149,13 @@ function startPool(kind, then = null, wait = 0) {
     return true;
 }
 
-// Play a random clip of pool `kind` ('correct', 'error', 'tada', 'swipe',
+// Play a random clip of pool `kind` ('correct', 'error', 'swipe',
 // 'locked').
 // Muted, before the first gesture, or while the pool is still decoding:
 // nothing. A voice clip cuts the voice clip playing, and does not start
 // while the target word plays (`state.speaking`, or the word he says on a
 // correct check, B-223): the word is spoken clean and is never cut. The
-// effects (the swipe, the tada) may overlap anything.
+// effect (the swipe) may overlap anything.
 export function play(kind) {
     if (state.muted || !ctx || !FILES[kind]) return;
     if (CHANNEL[kind] === 'voice') {
@@ -1183,18 +1233,21 @@ function reducedMotion() {
 // What he says on the moments of one state change (`moments`, from
 // snapshot `prev` to `now`, read from state `s`): per moment its plan
 // (sayPlan, from the clips decoded now: a clip not ready is skipped, never
-// waited for): its effect at once (the win's chime and a word's own win's
-// sounds are not here: picture.js starts them with the TV's win, winSound,
-// B-228); his voice, the word (B-223), his line or the prototype clip, and
-// the name of the letter he placed (B-224), one after the other, each
-// moment's no sooner than the moment starts in his script (waitFor: a
-// boost's when its letter lands, a correct check's when the TV's win ends,
-// B-227; startsOf: the second miss's letter when his peek is over). The picture's line is the one of
-// his look (picksFor), the round end's by its stars, a boost's by its
-// kind. Whether each moment says its line (BACKLOG B-226): character.js
-// saysLine, its tier and chance, and the quiet gap, from how long his
-// voice has been quiet as the change comes (quietFor); one it drops plays
-// only its effect (and the lines it always says).
+// waited for): its effect at once (the swipe; the round end's fanfare,
+// B-230; the win's chime and a word's own win's sounds are not here:
+// picture.js starts them with the TV's win, winSound, B-228); his voice,
+// the word (B-223), his line or the prototype clip, and the name of the
+// letter he placed (B-224), one after the other, each moment's no sooner
+// than the moment starts in his script (waitFor: a boost's when its letter
+// lands, a correct check's when the TV's win ends, B-227; fanfareWait: the
+// round end's when its fanfare ends, B-230; startsOf: the second miss's
+// letter when his peek is over, the key line after the end line). The
+// picture's line is the one of his look (picksFor), the round end's by its
+// stars, a boost's by its kind. Whether each moment says its line
+// (BACKLOG B-226): character.js saysLine, its tier and chance, and the
+// quiet gap, from how long his voice has been quiet as the change comes
+// (quietFor); one it drops plays only its effect (and the lines it always
+// says).
 function speak(moments, s, prev, now) {
     const picks = picksFor(moments, now);
     const ready = (url) => !!bufferOf(url);
@@ -1202,8 +1255,11 @@ function speak(moments, s, prev, now) {
     const quiet = quietFor();
     const plans = moments.map((m) => sayPlan(m, clipsFor(s, letterGiven(m, prev, now, word)), ready, Math.random,
         { variant: picks[m], stars: now.stars, boostKind: now.boostKind }, saysLine(m, now, quiet, Math.random)));
-    for (const p of plans) if (p.fx) play(p.fx);
-    const wait = waitFor(moments, prev, now, reducedMotion());
+    for (const p of plans) {
+        if (p.fx === 'fanfare') fanfare();
+        else if (p.fx) play(p.fx);
+    }
+    const wait = waitFor(moments, prev, now, reducedMotion()) + fanfareWait(moments);
     const starts = startsOf(moments, picks).map((t) => wait + t);
     voice(voiceChain(plans, starts), moments.every((m) => MOMENTS[m].ifQuiet));
 }
@@ -1297,6 +1353,41 @@ function chime(when = null) {
         }
     } catch (e) {
         // no chime here; the win still plays
+    }
+}
+
+// The round end's fanfare (BACKLOG B-230): three notes made here
+// (FANFARE, fanfareEnvelope), straight out, from now; an effect, played as
+// the round-end screen shows, his end line due when it ends (speak,
+// fanfareWait). Muted or before the first gesture: nothing. Kept with the
+// playing sources, so the mute stops it.
+function fanfare() {
+    if (state.muted || !ctx) return;
+    try {
+        if (ctx.state !== 'running') {
+            const p = ctx.resume();
+            if (p && p.catch) p.catch(() => {});
+        }
+        const t = ctx.currentTime || 0;
+        for (const note of FANFARE.notes) {
+            const osc = ctx.createOscillator();
+            osc.type = FANFARE.type;
+            osc.frequency.setValueAtTime(note.f, t + note.at);
+            const gain = ctx.createGain();
+            for (const [how, value, at] of fanfareEnvelope(note)) {
+                if (how === 'set') gain.gain.setValueAtTime(value, t + at);
+                else gain.gain.exponentialRampToValueAtTime(value, t + at);
+            }
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            const entry = { src: osc, kind: 'fanfare' };
+            live.add(entry);
+            osc.onended = () => live.delete(entry);
+            osc.start(t + note.at);
+            osc.stop(t + note.at + note.dur + FANFARE.stop);
+        }
+    } catch (e) {
+        // no fanfare here; the round end still shows, his line still waits for its length
     }
 }
 
@@ -1421,10 +1512,13 @@ function silence() {
 let last = { snap: NONE, muted: false };
 
 // State subscriber: says what each state change's moments call for
-// (character.js's table; speak), on every screen (the round end's tada and
-// line too). A new word (or none: the round end, the back arrow) stops his
-// voice, whatever he was saying of the last one (B-223, B-224), and loads
-// its own clips (loadWord), muted or not. The downloads waiting go on
+// (character.js's table; speak), on every screen (the round end's fanfare
+// and line too). A new word (or none: the round end, the back arrow) stops
+// his voice, whatever he was saying of the last one (B-223, B-224), also a
+// clip still due (start(when): the word he says after the TV's win, his
+// line after it), so nothing of the last word is heard over the round end
+// (B-230), and loads its own clips (loadWord), muted or not. The
+// downloads waiting go on
 // once a round has started and the new word's picture has locked
 // (BACKLOG B-229, pump: holdsPools). On mute everything playing
 // stops and the silent loop pauses; while muted nothing plays; on unmute

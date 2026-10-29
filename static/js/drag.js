@@ -380,8 +380,9 @@ export function returnAll(current) {
     };
 }
 
-// The robot's letter on the second miss (BACKLOG B-206): the wrong check
-// that leaves one lives bulb lit also places one letter, on every stage.
+// The robot's letter on the second miss (BACKLOG B-206): the word's own
+// second wrong check (bulbs.js HINT_AT; the bulbs are the round's since
+// BACKLOG B-231) also places one letter, on every stage.
 // { index, tileId, back }: the first slot that is empty or holds a wrong
 // letter (`index`; a locked slot is always right and is skipped), the
 // block that gets its right letter (`tileId`) and the block already in
@@ -452,7 +453,8 @@ export function afterHint(current) {
     return current.status === 'wrong' && solved ? { ...current, status: 'playing' } : current;
 }
 
-// The third miss (main.js onCheck): every slot gets its right letter from
+// The third miss, or the round's last bulb gone (BACKLOG B-231, bulbs.js
+// missKind; main.js onCheck): every slot gets its right letter from
 // the word's own blocks. A block already in its right slot stays there (a
 // locked one stays locked: the given letter, a lever-locked one, the
 // robot's letter, a boost's letter, BACKLOG B-219), so on the reveal only

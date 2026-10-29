@@ -172,9 +172,9 @@
     </div>
 
     <!-- Play screen: the lab scene (DESIGN.md "Layout", v5). The TV
-         picture (.card) and the brass plate (lives bulbs, split-flap
-         counter) are placed over the background image; the slot rail
-         (#letter-boxes) and the bench of letter blocks (#letter-tray)
+         picture (.card) and the brass plate (the round's bulbs, 3 to 5,
+         BACKLOG B-231, card.js; split-flap counter) are placed over the
+         background image; the slot rail (#letter-boxes) and the bench of letter blocks (#letter-tray)
          follow below the machine, and the console sits at the bottom of
          the safe area. Ids are keyed on by card.js, controls.js and
          main.js; do not rename. No text anywhere on this screen (DESIGN
@@ -212,7 +212,7 @@
         </div>
         <div class="win-fx" aria-hidden="true"></div>
         <div class="plate">
-            <div class="hearts" aria-label="Lives">
+            <div id="tv-bulbs" class="hearts" aria-label="Lives">
                 <span></span><span></span><span></span>
             </div>
             <p id="word-counter" class="word-counter"></p>
@@ -361,7 +361,11 @@
          #round-words. Each star is a dark star plus a lit "fill" layer
          that celebrate.js pops in; it also pops the bulb of a stage the
          round just cleared, as the stars finish, and then the key the
-         round earned (#round-key, locks.js; human, 2026-10-24). -->
+         round earned (#round-key, locks.js; human, 2026-10-24).
+         #round-spare (BACKLOG B-231) is the spare bulb a perfect round
+         earned, a TV bulb right of the stars (a div, so the stars' span
+         rules skip it), shown by main.js and popped in by celebrate.js
+         after the stars. -->
     <div id="screen-round-end" class="screen" style="display: none;">
         <div id="round-stars" class="stars" aria-label="Stars">
             <span>
@@ -376,6 +380,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
                 <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
             </span>
+            <div id="round-spare" class="bulb round-spare" role="img" aria-label="spare bulb" hidden></div>
         </div>
         <div class="round-stage-row">
             <div id="round-stages" class="stage-bulbs" role="img" aria-label="Stages"></div>

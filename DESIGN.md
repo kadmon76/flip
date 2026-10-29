@@ -100,8 +100,8 @@ contact shadow (dark, blurred, offset down-right, ~40% opacity).
   brightness only, no script per frame; stopped on a new word, off the
   play screen and while the page is hidden. Reduced motion: the two
   layers show still.
-- **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: three
-  lives bulbs. Right: split-flap counter "2 / 5".
+- **Brass plate** under the TV: x 24.5%–72.5%, y 33.3%–38.5%. Left: the
+  round's bulbs, 3 to 5 (B-231; 4 or 5 drawn smaller and closer). Right: split-flap counter "2 / 5".
 - **Slot rail:** brass, full safe width, directly below the machine
   (~y 347–413), rail padding 8px. A word breaks as rarely as possible
   (BACKLOG B-213): 1–6 letters, one row of 46x46px slots, gap 6px; 7–8
@@ -170,11 +170,11 @@ is an icon, a light, a sound, motion or the robot. No result-line text.
 - **Back** (`#play-back-btn`): play screen only, in the header left of the mute toggle: the sticker book's line arrow as a cream glyph (code, 30px) with a contact shadow and no face, 48x48 tap area. Tap → the theme's stage screen at once, the round dropped (B-201, B-217).
 
 ## Feedback (no words)
-- Wrong check: blocks in wrong slots wiggle ±6px (300ms); one lives bulb
-  flickers three times and goes dark (`--bulb-off`); the TV picture gets a
+- Wrong check: blocks in wrong slots wiggle ±6px (300ms); one of the round's bulbs
+  flickers three times and goes dark (`--bulb-off`; none on the tutorial word, B-231); the TV picture gets a
   150ms static flicker; robot: Wrong check moment (CHARACTER.md).
-- Second miss (the wrong check that leaves one bulb lit, every stage; B-206): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
-- Third wrong: correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on a stage with extra letters, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
+- Second miss (the word's own second wrong check, every stage; B-206, B-231): the wrong blocks wiggle as above; then the block in the first wrong slot hops back to its bench spot (the lever's hop), then that slot's right letter flies in from where it lay (the reveal's fly-in) and locks, clunking in as it lands (the locked look, "Controls and states"); robot `confused` peek, then `happy` with a 10px pop when the peek ends. No sound beyond the miss's error clip.
+- Third wrong (the word's own third, or the round's last bulb, after which the round ends; B-231): correct blocks fly into the slots in order (120ms stagger), from wherever they lie (another slot or, on a stage with extra letters, their bench spot, starting at the bench's size); an extra letter in a slot hops back to its bench spot (B-207);
   robot: Third miss moment (CHARACTER.md).
 - Correct: slots pulse once (a word with an entry in its theme's wins file plays that win instead: Motion, "Per-word wins", B-228); the TV picture plays the word's own win
   (BACKLOG B-222; `design/reference/tv-motion.html` layer 3 "Win"): its
@@ -229,12 +229,12 @@ lands, the second miss or a letter boost, its name, `letters/`), and
 where the pool has no clip yet the existing clip in `static/sounds/`, or
 nothing where the moment has none:
 correct → the win's chime with the TV's win (B-227: two bright notes made in code, triangle waves, about C6 then G6, the second 0.09 s after the first; on every correct check, the tutorial word's too; a word with its own win, B-228, has the chime at the win's peak and its own sounds with it, made in code as the reference player makes them, each at its time: the cat's purring motor and sputter, the giraffe's slide, boings and dizzy wobble, and so on, through one gain of 0.55; under reduced motion too), then, once the 1 s win has played, the robot says the word, then his line (CHARACTER.md, B-223), a `correct/` clip when his voice has no line for it, wrong (also the second miss and the reveal) → `error/`, the robot's head-shake (`speakerLocked`; from B-219 a boost the kid can't afford) → `error/hmm no.mp3`.
-Round end → `celebration/tada.mp3`, an effect under his end line (B-224).
+Round end → a short fanfare made in code (B-230: three bright notes rising, triangle waves, about C5, E5 and G5, 0.12 s apart, the last held about 0.4 s; an effect), as the round-end screen shows; his end line (and the key line after it) starts when the fanfare ends, never under it, and nothing of the last word's voice plays on into the round end (the word he says, his line, a clip still due all stop as it shows). `celebration/tada.mp3`, a clip of the prototype character's voice, is no longer played.
 Block into slot → `swipe/` (not a block back to the bench or the reset
 lever; the reveal fly-in plays no swipe, only his `reveal-open` line or the error clip). One voice clip at a
 time; a new one cuts the previous, except the target word: the word stops
 the voice clip playing, and a voice clip due while the word plays is
-dropped. How often he speaks is CHARACTER.md's Says column (B-226): a sometimes or rare line is dropped while he talks and for 8 s after his voice went quiet, and a dropped line plays no clip in its place. The swipe, the round end's tada, the TV's tune-in hiss (B-214, made in code), the win's chime (B-227, made in code) and a word's own win's sounds (B-228, made in code) are effects and may overlap anything. Muted: nothing
+dropped. How often he speaks is CHARACTER.md's Says column (B-226): a sometimes or rare line is dropped while he talks and for 8 s after his voice went quiet, and a dropped line plays no clip in its place. The swipe, the TV's tune-in hiss (B-214, made in code), the win's chime (B-227, made in code), a word's own win's sounds (B-228, made in code) and the round end's fanfare (B-230, made in code; his end line waits for it) are effects and may overlap anything. Muted: nothing
 plays; a speaker tap that would play the word is ignored, and the robot's head-shake still comes, silently. All playback goes through `audio.js`.
 
 ## Other screens (interim, until designed)
@@ -246,6 +246,8 @@ theme's picture, not its name, two to a row. These are placeholders; a design pa
 will replace them.
 
 Theme keys (human, 2026-10-24): a locked theme's card shows its picture greyed and dimmed under a brass padlock. While the kid holds a key the locked cards glow amber and their padlocks rock now and then, and the key holder (a brass key and the count in split-flaps) shows top right, beside the player's name; a tap on a glowing card opens it: the padlock rises, swells, turns and fades away and the picture brightens (`unlock`), and the robot says his theme-open line. With no key a locked card does nothing. On the round end the key a round earned pops in right of the stage bulbs after the stars (`keyPop`), and the robot says his key line after his end line.
+
+Spare bulb (B-231): on the round end of a perfect round that brought a spare, a lit bulb (the TV bulb's look, 28px) right of the stars pops in after them (`sparePop`: swells to 1.4 and settles while its light comes on, 0.4 s; reduced motion a fade), before the stage bulb's pop and the key's.
 
 Start screen (human, 2026-10-24): the game opens on it. The robot, still and waving, stacked from his puppet parts (not the old still poses), over a grid of square cream cards, three to a row: one per player on the device showing the animal picture the kid picked (a word picture's cutout), and a new-player card with a plus while there is room (6 players at most). A card is the start. The picker shows the pictures no player has taken; with no player yet it shows at once and has no back arrow. A picture picked opens the name step: the picture, a cream name field (Andika Bold 24px, centred, any language, optional, 12 characters at most), back and go (a check mark); go or the keyboard's enter adds the player and starts. Each card shows the player's name under the picture (cut with an ellipsis when long). The theme screen has the player's picture on a small icon button, top left, back to the start screen to switch player, and their name beside it in cream.
 

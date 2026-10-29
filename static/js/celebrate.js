@@ -7,7 +7,9 @@
 // round-end screen pops the
 // earned stars in one after another and, when the round cleared its
 // stage, then lights that stage's bulb with a pop (BACKLOG B-216), and
-// then pops in the theme key the round earned (human, 2026-10-24); on the
+// then pops in the theme key the round earned (human, 2026-10-24); the
+// spare bulb a perfect round earned pops in beside the stars right after
+// them, before the bulb and the key (BACKLOG B-231); on the
 // theme screen a key opening a theme pops the card's padlock off. It
 // runs as a state subscriber after
 // card.js, the round-end render and the gear counters' (cogs.js), compares the new state with the last
@@ -49,13 +51,16 @@ export function renderCelebrate(state) {
     }
 
     if (screen === 'round-end' && prev.screen !== 'round-end') {
+        const spare = !!state.round.spareEarned;
         popStars();
-        if (state.round.justCleared) popBulb(state.round.stage);
-        if (state.round.keyEarned) popKey(!!state.round.justCleared);
+        if (spare) popSpare();
+        if (state.round.justCleared) popBulb(state.round.stage, spare);
+        if (state.round.keyEarned) popKey(!!state.round.justCleared, spare);
     } else if (screen !== 'round-end' && prev.screen === 'round-end') {
         settle(document.querySelectorAll('#round-stars .fill'));
         settleBulbs(document.querySelectorAll('#round-stages .bulb'));
         settle(document.querySelectorAll('#round-key'));
+        settleSpare();
     }
 
     // a key opened a theme, here on the theme screen
@@ -69,15 +74,16 @@ export function renderCelebrate(state) {
 // --- Theme keys (human, 2026-10-24) ---
 
 // The round's key (locks.js has shown it) pops in once the stars have
-// (starsDone), and after the stage bulb's pop when the round cleared its
-// stage (`afterBulb`): it scales up from 0 with the overshoot and turns
-// into place. Reduced motion: it fades in.
-function popKey(afterBulb) {
+// (starsDone), after the spare bulb's pop when the round earned one
+// (`afterSpare`, BACKLOG B-231) and after the stage bulb's pop when the
+// round cleared its stage (`afterBulb`): it scales up from 0 with the
+// overshoot and turns into place. Reduced motion: it fades in.
+function popKey(afterBulb, afterSpare = false) {
     const key = document.getElementById('round-key');
     if (!key || key.hidden) return;
     const m = motionFor('keyPop', reducedMotion());
     const stars = document.querySelectorAll('#round-stars .earned .fill').length;
-    const delay = starsDone(stars) + (afterBulb ? motionFor('bulbPop', false).duration : 0);
+    const delay = spareDone(stars, afterSpare) + (afterBulb ? motionFor('bulbPop', false).duration : 0);
     gsap.killTweensOf(key);
     const done = () => gsap.set(key, { clearProps: 'transform,opacity' });
     if (m.duration > 0) {
@@ -303,6 +309,13 @@ export function starsDone(stars) {
     return stars > 0 ? (stars - 1) * m.stagger + m.duration : 0;
 }
 
+// Seconds after the round-end screen shows when the stars and, with
+// `spare` (the round earned a spare bulb, BACKLOG B-231), the spare
+// bulb's pop after them are done: when the stage bulb's pop starts. Pure.
+export function spareDone(stars, spare) {
+    return starsDone(stars) + (spare ? motionFor('sparePop', false).duration : 0);
+}
+
 // Drop what the bulb pop set inline (its light and scale), so the
 // render's class (lit or `off`) is what shows again.
 function unsetBulbs(bulbs) {
@@ -318,10 +331,12 @@ function settleBulbs(bulbs) {
 }
 
 // The bulb of `stage` (the round's, which it just cleared; the render
-// has lit it) stays dark until the stars have popped in (starsDone),
-// then its light comes on while it swells and settles back (`bulbPop`).
-// Reduced motion: nothing here, the render's lit bulb simply shows.
-function popBulb(stage) {
+// has lit it) stays dark until the stars have popped in (starsDone), and
+// the spare bulb after them when the round earned one (`afterSpare`,
+// spareDone), then its light comes on while it swells and settles back
+// (`bulbPop`). Reduced motion: nothing here, the render's lit bulb simply
+// shows.
+function popBulb(stage, afterSpare = false) {
     const bulb = document.querySelector(`#round-stages .bulb[data-stage="${stage}"]`);
     if (!bulb) return;
     const m = motionFor('bulbPop', reducedMotion());
@@ -329,10 +344,44 @@ function popBulb(stage) {
     const stars = document.querySelectorAll('#round-stars .earned .fill').length;
     gsap.killTweensOf(bulb);
     gsap.set(bulb, { '--lit': 0 });
-    gsap.timeline({ delay: starsDone(stars), onComplete: () => unsetBulbs([bulb]) })
+    gsap.timeline({ delay: spareDone(stars, afterSpare), onComplete: () => unsetBulbs([bulb]) })
         .to(bulb, { '--lit': 1, duration: m.duration / 2, ease: m.ease }, 0)
         .to(bulb, { scale: m.scale, duration: m.duration / 2, ease: m.ease, transformOrigin: '50% 50%' }, 0)
         .to(bulb, { scale: 1, duration: m.duration / 2, ease: m.ease }, m.duration / 2);
+}
+
+// --- Round end: the spare bulb (BACKLOG B-231) ---
+
+// The spare bulb a perfect round earned (main.js has shown it, lit) is
+// not there until the stars have popped in (starsDone), then it grows
+// from nothing past its size and settles back while its light comes on
+// (`sparePop`). Reduced motion: it fades in.
+function popSpare() {
+    const bulb = document.getElementById('round-spare');
+    if (!bulb || bulb.hidden) return;
+    const m = motionFor('sparePop', reducedMotion());
+    const stars = document.querySelectorAll('#round-stars .earned .fill').length;
+    const delay = starsDone(stars);
+    gsap.killTweensOf(bulb);
+    if (m.duration > 0) {
+        gsap.set(bulb, { scale: 0, '--lit': 0, transformOrigin: '50% 50%' });
+        gsap.timeline({ delay, onComplete: () => unsetBulbs([bulb]) })
+            .to(bulb, { '--lit': 1, duration: m.duration / 2, ease: m.ease }, 0)
+            .to(bulb, { scale: m.scale, duration: m.duration / 2, ease: m.ease }, 0)
+            .to(bulb, { scale: 1, duration: m.duration / 2, ease: m.ease }, m.duration / 2);
+    } else if (m.fade > 0) {
+        gsap.fromTo(bulb, { opacity: 0 }, { opacity: 1, duration: m.fade, delay, onComplete: () => gsap.set(bulb, { clearProps: 'opacity' }) });
+    }
+}
+
+// Leaving the round-end screen: the spare bulb's pop, still running or
+// waiting, stops and what it set inline (its scale, light or fade) goes.
+function settleSpare() {
+    const spare = document.querySelectorAll('#round-spare');
+    if (!spare.length) return;
+    gsap.killTweensOf(spare);
+    unsetBulbs(spare);
+    gsap.set(spare, { clearProps: 'opacity' });
 }
 
 // --- Round end: star pop ---

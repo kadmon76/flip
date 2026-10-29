@@ -14,7 +14,9 @@
 // BACKLOG B-218): a word's at its correct check, the round's at its end,
 // kept in state.gears for the gear counters (cogs.js); and spent on boosts
 // (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
-// the boost itself.
+// the boost itself. The round's bulbs (bulbs.js, BACKLOG B-231): 3 and the
+// player's spare bulbs for the whole round, one off per wrong check; the
+// round ends when the last goes off; a perfect round earns a spare.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -44,6 +46,7 @@ import { forTheme as progressFor, currentStage, record as recordProgress, load a
 import { load as loadPlayers, add as addPlayer, select as selectPlayer, markTutored } from './players.js';
 import { renderCoach, resetCoach } from './coach.js';
 import { load as loadKeys, open as openTheme, record as recordKeys, isOpen, held as keysHeld } from './keys.js';
+import { load as loadSpares, record as recordBulbs, startBulbs, afterCheck, missKind, roundOver, BULBS } from './bulbs.js';
 import { renderLocks, padlock } from './locks.js';
 // The save modules' keys, for the first player to take over the saves
 // made before players existed (players.js add); each key stays named only
@@ -57,7 +60,6 @@ import { renderStart, renderPlayerButton } from './start.js';
 const $ = (id) => document.getElementById(id);
 
 const ROUND_SIZE = 5;
-const LIVES = 3;
 let tileSeq = 0;
 
 // A fresh tile id for round.js makeWord, unique over the session (card.js
@@ -302,6 +304,10 @@ async function startRound({ name, dataUrl }, chosen = null) {
     const stage = chosen === null ? currentStage(data, progress) : chosen;
     const words = pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
+    // The round's bulbs (BACKLOG B-231, bulbs.js startBulbs): 3 and the
+    // player's spare bulbs, for the whole round (state.lives, the ones
+    // still lit; round.bulbs, how many the TV shows).
+    const bulbs = startBulbs(loadSpares());
     stopWord();
     setState({
         theme: name,
@@ -309,10 +315,10 @@ async function startRound({ name, dataUrl }, chosen = null) {
         wins,
         words,
         screen: 'play',
-        round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },
+        round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },
         current: makeWord(words[0], stage, newTileId),
         tutorial: needsTutorial(),
-        lives: LIVES,
+        lives: bulbs,
         pressed: null,
         speaking: false,
         roundsStarted: state.roundsStarted + 1,
@@ -386,13 +392,24 @@ function onCheck(extra = {}) {
     const correct = answer === current.word;
     const results = [...round.results];
     // clean (BACKLOG B-218, gears.js isClean): checked correct on the
-    // word's first check (no bulb lost to a wrong check yet), with no
-    // boost; boosted (BACKLOG B-219, boost.js isBoosted): the word took a
-    // boost, so it still counts for its stage and earns its correct-word
-    // gear, but no clean gear and no sticker.
+    // word's first check (none of the word's own wrong checks yet,
+    // `current.misses`; the round's bulbs are counted apart, BACKLOG
+    // B-231), with no boost; boosted (BACKLOG B-219, boost.js isBoosted):
+    // the word took a boost, so it still counts for its stage and earns
+    // its correct-word gear, but no clean gear and no sticker.
+    const misses = current.misses || 0;
     const boosted = isBoosted(current);
-    const clean = isClean(correct, LIVES - lives, boosted);
+    const clean = isClean(correct, misses, boosted);
     results[round.index] = { word: current.word, correct, clean, boosted };
+    // A wrong check (BACKLOG B-231, bulbs.js): one of the round's bulbs
+    // goes off (afterCheck; none on the tutorial word) and the word counts
+    // one more miss of its own; what it does to the word (missKind) is the
+    // word's own rule: its second miss brings the robot's letter, its third
+    // reveals it, and so does the round's last bulb going off (the round
+    // then ends after it, onNext).
+    const missed = misses + 1;
+    const left = correct ? lives : afterCheck(lives, false, state.tutorial);
+    const kind = correct ? null : missKind(missed, left);
 
     if (correct) {
         // Only a clean word goes into the sticker book (PROGRESSION.md
@@ -408,22 +425,21 @@ function onCheck(extra = {}) {
         setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, gears, ...extra });
         tutorialSeen();
         armNudge();
-    } else if (lives - 1 <= 0) {
-        setState({ lives: 0, round: { ...round, results }, current: revealed(current), ...extra });
+    } else if (kind === 'reveal') {
+        setState({ lives: left, round: { ...round, results }, current: { ...revealed(current), misses: missed }, ...extra });
         tutorialSeen();
         armNudge();
     } else {
-        // The miss that leaves one bulb lit also gives one letter, on
-        // every stage (BACKLOG B-206, drag.js giveHint): in the same
-        // setState, so the robot (character.js hintGiven) and the fly-in
+        // The word's own second miss also gives one letter, on every
+        // stage (BACKLOG B-206, drag.js giveHint): in the same setState,
+        // so the robot (character.js hintGiven) and the fly-in
         // (feedback.js) see it with the miss. A word then checked correct
-        // is solved as any other (a bulb is left), but not clean: it earns
-        // no sticker and no clean gear (BACKLOG B-218). The check notes the
-        // letters it found right, the ones the lever keeps (drag.js
-        // checkedWrong, BACKLOG B-215b).
-        const checked = checkedWrong(current);
-        const left = lives - 1;
-        setState({ lives: left, round: { ...round, results }, current: left === 1 ? giveHint(checked) : checked, ...extra });
+        // is solved as any other, but not clean: it earns no sticker and
+        // no clean gear (BACKLOG B-218). The check notes the letters it
+        // found right, the ones the lever keeps (drag.js checkedWrong,
+        // BACKLOG B-215b).
+        const checked = { ...checkedWrong(current), misses: missed };
+        setState({ lives: left, round: { ...round, results }, current: kind === 'hint' ? giveHint(checked) : checked, ...extra });
         // With extras his letter can finish the word, in place of an extra
         // letter (BACKLOG B-207, drag.js afterHint): the word then reopens
         // and the dome lights at once. Its own setState, after the
@@ -433,10 +449,13 @@ function onCheck(extra = {}) {
     }
 }
 
-// Next word, or the round-end screen after the fifth. The dome offers it
-// only after a correct answer or a reveal, so every word has a result by
-// then; one without would count as wrong. The word clip stops with its
-// word. At the round end the theme's missed words are recorded (missed.js,
+// Next word, or the round-end screen after the fifth, or sooner when the
+// round's last bulb has gone off (BACKLOG B-231, bulbs.js roundOver: the
+// word it went off on was revealed; the words not reached are not played,
+// have no result and are recorded as nothing, not as missed). The dome
+// offers it only after a correct answer or a reveal, so every word has a
+// result by then; one without would count as wrong. The word clip stops
+// with its word. At the round end the theme's missed words are recorded (missed.js,
 // BACKLOG B-208): the words not checked correct are remembered, the ones
 // checked correct come out; and so is its progress (progress.js, BACKLOG
 // B-216): the words checked correct are solved, and the round's stage is
@@ -445,9 +464,12 @@ function onCheck(extra = {}) {
 // stage bulbs, and state.progress is read again for the theme cards and
 // the stage map (BACKLOG B-217); and reaching the round end earns the
 // round's gears (gears.js GEARS.round, BACKLOG B-218; its words' gears
-// were added at their checks). A round left with the back button never
-// gets here, so it records nothing and earns no round gears (B-201). The
-// next word starts by the round's stage rules, as the first did (BACKLOG
+// were added at their checks); and the spare bulbs (bulbs.js record,
+// BACKLOG B-231): the round's spares still lit are kept and a perfect
+// round earns one (round.spareEarned, popped in by celebrate.js). A
+// round left with the back button never gets here, so it records
+// nothing and earns no round gears (B-201). The round's bulbs carry on to
+// the next word, which starts by the round's stage rules, as the first did (BACKLOG
 // B-215). Before it starts, the struggle help (BACKLOG B-220, round.js
 // swapForStruggle; PROGRESSION.md "Guardrails"): when this word and the
 // two before it were not clean (a wrong check, a boost or a reveal), the
@@ -464,15 +486,16 @@ function onNext(extra = {}) {
 
     stopWord();
     const nextIndex = round.index + 1;
-    if (nextIndex >= round.size) {
+    if (roundOver(state.lives, round.index, round.size)) {
         recordMissed(state.theme, results);
         const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);
         // theme keys (keys.js; human, 2026-10-24): a first stage cleared,
         // or the safety key after rounds with none
         const all = loadProgress();
         const keys = recordKeys(state.progress, all, (state.themes || []).map((t) => t.name));
+        const spare = recordBulbs(state.lives, results, round.size);
         setState({
-            round: { ...round, results, cleared: progress.cleared, justCleared, keyEarned: keys.earned },
+            round: { ...round, results, cleared: progress.cleared, justCleared, keyEarned: keys.earned, spareEarned: spare.earned },
             progress: all,
             keys: keys.ring,
             gears: addGears(GEARS.round),
@@ -492,7 +515,6 @@ function onNext(extra = {}) {
             round: { ...round, index: nextIndex, results },
             current: makeWord(words[nextIndex], state.round.stage, newTileId),
             tutorial: false,
-            lives: LIVES,
             speaking: false,
             lastInput: performance.now(),
             idleBeat: null,
@@ -690,11 +712,15 @@ function renderStageBulbs(el, stages, cleared) {
     el.setAttribute('aria-label', `stages cleared: ${stages.filter((s) => cleared.includes(s)).length} / ${stages.length}`);
 }
 
-// Stars, the theme's stage bulbs, the score as split-flaps, the
+// Stars, the spare bulb a perfect round earned beside them (BACKLOG
+// B-231, round.spareEarned; celebrate.js pops it in), the theme's stage
+// bulbs, the score as split-flaps (the words solved out of the round's
+// size, also when its bulbs ran out early), the
 // new-sticker count (a sticker and "+N", the sticker dark at +0; only a
 // clean word can be new in the book, BACKLOG B-218) and one row per word
-// (thumbnail, word, a sticker if the word is new in the book, a lit or
-// dark bulb); the round's gears beside the count are cogs.js's. No
+// played (thumbnail, word, a sticker if the word is new in the book, a lit
+// or dark bulb; a word the round did not reach, its bulbs gone, has no
+// row); the round's gears beside the count are cogs.js's. No
 // English (DESIGN "Words on screen"): only the words and numbers.
 // The rows are rebuilt from state.round.results on every render; the
 // list is small and nothing on this screen is interactive per row.
@@ -707,6 +733,7 @@ function renderRoundEnd(state) {
     document.querySelectorAll('#round-stars span').forEach((star, i) => {
         star.classList.toggle('earned', i < stars);
     });
+    $('round-spare').hidden = !state.round.spareEarned;
     renderStageBulbs($('round-stages'), stagesOf(state.data), state.round.cleared || []);
     renderFlaps($('round-score'), `${correct} / ${size}`);
     const fresh = results.filter((r) => r.correct && r.newSticker).length;
@@ -722,7 +749,8 @@ function renderRoundEnd(state) {
     const list = $('round-words');
     list.innerHTML = '';
     state.words.forEach((entry, i) => {
-        const ok = !!(results[i] && results[i].correct);
+        if (!results[i]) return;
+        const ok = !!results[i].correct;
         const li = document.createElement('li');
         li.className = ok ? 'correct' : 'wrong';
 
@@ -742,7 +770,7 @@ function renderRoundEnd(state) {
             li.appendChild(badge);
         }
 
-        // lit bulb: checked correct; dark bulb: missed (the lives bulbs' look)
+        // lit bulb: checked correct; dark bulb: missed (the TV's bulbs' look)
         const bulb = document.createElement('span');
         bulb.className = ok ? 'bulb' : 'bulb off';
         bulb.setAttribute('aria-label', ok ? 'correct' : 'wrong');
@@ -752,8 +780,8 @@ function renderRoundEnd(state) {
     });
 }
 
-// New round in the same theme: new random words, hearts and results
-// reset by startRound, at the theme's current stage (progress.js
+// New round in the same theme: new random words, the round's bulbs (its
+// spares too, BACKLOG B-231) and results reset by startRound, at the theme's current stage (progress.js
 // currentStage, BACKLOG B-216), so after a round that cleared its stage
 // it is the next one; also after a replay of a cleared stage (B-217
 // leaves play again as B-216 made it). Falls back to the theme screen if
@@ -780,7 +808,7 @@ function leaveRound(patch) {
         data: null,
         wins: null,
         words: [],
-        round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },
+        round: { index: 0, size: ROUND_SIZE, stage: null, bulbs: BULBS, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,
