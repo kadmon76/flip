@@ -16,8 +16,8 @@
 //   land back at 0 within `duration` (wrong check).
 // - `shake`: the same swing for the slot rail when the reset lever is
 //   pulled.
-// - `flicker`: the lives bulb just lost flickers `flashes` times, then
-//   stays dark.
+// - `flicker`: the round's bulb just lost (BACKLOG B-231) flickers
+//   `flashes` times, then stays dark.
 // - `tvStatic`: the TV picture jitters `distance` px under static.
 // - `flyIn`: on a reveal the right blocks fly into the slots one after
 //   another (`stagger`), landing like a snap into a slot.
@@ -55,6 +55,11 @@
 //   (human, 2026-10-24, celebrate.js) pops in after the stars and the
 //   stage bulb: it scales up from 0 with the overshoot and turns from
 //   `turn` degrees, within `duration`. Reduced motion: a fade in.
+// - `sparePop`: on the round-end screen, the spare bulb a perfect round
+//   earned (BACKLOG B-231, celebrate.js) pops in right after the stars:
+//   it grows from 0 to `scale` and settles back to its size while its
+//   light comes on, within `duration`, ease-out (the stage bulb's swell,
+//   no overshoot). Reduced motion: a fade in.
 // - `unlock`: a key opens a theme (celebrate.js): the card's padlock
 //   rises `height` px, swells to `scale` and turns `turn` degrees as it
 //   fades out, within `duration`, while the picture brightens. Reduced
@@ -79,6 +84,7 @@ export const MOTION = {
     puff: { duration: 0.3, ease: 'power2.out', scale: 1.3, count: 6, distance: 30, fade: 0.2 },
     trayIn: { duration: 0.15, ease: 'power2.out', scale: 0.9, distance: 6, fade: 0.15 },
     keyPop: { duration: 0.4, ease: 'back.out(1.6)', scale: 1, turn: -40, fade: 0.2 },
+    sparePop: { duration: 0.4, ease: 'power2.out', scale: 1.4, fade: 0.2 },
     unlock: { duration: 0.5, ease: 'power2.in', scale: 1.3, turn: -25, height: 18, fade: 0.25 },
 };
 

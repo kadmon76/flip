@@ -1,12 +1,13 @@
 // card.js — renders the play screen from state: the picture on the TV
-// screen, the lives bulbs and split-flap counter on the brass plate, the
-// slots on the rail (#letter-boxes) and the letter blocks on the bench
+// screen, the round's bulbs (BACKLOG B-231) and split-flap counter on the
+// brass plate, the slots on the rail (#letter-boxes) and the letter blocks on the bench
 // (#letter-tray). Tile elements are keyed by tile id and kept alive
 // across renders: they are moved between their bench spot and the slots,
 // never recreated, so a re-render can't destroy a tile that is mid-drag.
 
 import { makeDraggable, destroyDraggable, setDragEnabled, isLocked } from './drag.js';
 import { slotLayout, blockLayout } from './layout.js';
+import { BULBS } from './bulbs.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,7 +23,7 @@ export function renderCard(state) {
     const { current, lives, round } = state;
 
     renderImage(current);
-    renderHearts(lives);
+    renderHearts(lives, round.bulbs);
     renderCounter(round);
     renderBoxes(current.placed.length, current.break);
     // The given letter's block (easy, BACKLOG B-204; round.js makeWord)
@@ -74,8 +75,20 @@ function renderImage(current) {
     img.alt = '';
 }
 
-function renderHearts(lives) {
-    document.querySelectorAll('.hearts span').forEach((heart, i) => {
+// The round's bulbs (BACKLOG B-231, bulbs.js): one per bulb the round
+// started with (`count`, round.bulbs: 3 and the player's spares, up to
+// 5), lit while `lives` (the ones still lit) reaches them, from the left.
+// The spans are a DOM cache, made or removed only when the count changes
+// (a new round), so a bulb feedback.js is flickering is never replaced;
+// `data-count` lets game.css fit 4 or 5 on the plate.
+function renderHearts(lives, count) {
+    const row = $('tv-bulbs');
+    if (!row) return;
+    const n = Number.isInteger(count) && count > 0 ? count : Math.max(BULBS, Number.isInteger(lives) ? lives : 0);
+    while (row.children.length > n) row.lastElementChild.remove();
+    while (row.children.length < n) row.appendChild(document.createElement('span'));
+    row.dataset.count = String(n);
+    Array.from(row.children).forEach((heart, i) => {
         heart.classList.toggle('lost', i >= lives);
     });
 }

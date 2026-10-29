@@ -112,6 +112,24 @@ glows, never depends on whether a placed letter is right.
   telling the kid. None on stage 1, or when there is nothing solved to
   swap in.
 - **Mistakes never cost gears.**
+- **Bulbs for the whole round** (B-231; the kid's idea, decided by the
+  human 2026-10-28, from stage 1). A round starts with 3 bulbs plus the
+  kid's spare bulbs; the TV shows them (up to 5) and they do not refill
+  on a new word. Each wrong check, on any word, turns one off; the first
+  word's tutorial costs none. Per word nothing else changes: the robot's
+  letter after the word's own second miss, the reveal after its own
+  third, the lever rule. When the last bulb goes off, the word on screen
+  is revealed (it counts as missed and comes back later) and the round
+  ends after it: the round end shows the stars for the words solved out
+  of the round's 5 and records the round as any finished round (progress,
+  missed words, gears, keys). Words not reached are not played and not
+  counted as missed.
+- **A spare bulb for a perfect round** (B-231). Every word of the round
+  correct on the first check with no boost earns one spare bulb for the
+  next round, at most 2 held. The next round starts with them; a wrong
+  check turns a spare off first, the spares still lit at the round's end
+  are kept and the ones turned off are gone, so a perfect round can earn
+  one again. Kept per player (bulbs.js).
 
 ## Build decisions (2026-10-21, starting values)
 These answer the doc's open questions so the build can start; each can

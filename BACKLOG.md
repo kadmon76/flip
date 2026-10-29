@@ -656,7 +656,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 - Sticker book reachable from the round-end screen (B-112 puts the only "Stickers" button on the theme screen).
 - TV picture: content images carry their own light square backdrop, so the word picture shows as a light card on the teal tube instead of the subject on teal as in v5; needs transparent-background pictures from the content pipeline.
 - Wrong-box tint (from closed PR #18, B-109): boxes holding a wrong letter keep an error-colour tint until the kid next moves a block; main has the wiggle and the bulb flicker but no tint.
-- Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
+- Robot peek randomness (issue #34 B): PR #33 (B-115) peeks only after the wrong check that leaves one bulb lit, since B-231 the word's own second wrong check; CHARACTER.md "Peek" now also asks for a rare random peek after the first wrong check.
 - Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
 - `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
@@ -683,3 +683,5 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 - Serve the static JS and CSS compressed on the Linode (0.57 MB as files, 0.18 MB gzipped): the largest part left of B-229's 1 MB and 3 s start targets (DECISIONS 2026-10-28).
 - The hidden screens' images (the play screen's console, dome, lever, speaker and robot hands; the theme cards' pictures, about 0.3 MB) load with the start screen; load them once it is idle, for B-229's start targets.
 - On a slow network a first visit's greeting is silent: B-229 fetches nothing before the page is idle, and the first tap often comes earlier.
+- The robot has no moment of his own for the round's last bulb (a nervous peek) or for a spare bulb earned (B-231: his peek stays on the word's second miss, the spare pops in on the round end, where he is not drawn); both need a line pool.
+- A round left with the back button keeps the spare bulbs it turned off (B-231 records spares only at the round end, as B-201 records nothing for a round left); decide whether leaving should cost them.

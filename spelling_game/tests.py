@@ -1586,11 +1586,22 @@ class CharacterTests(TestCase):
             "const used = new Set(Object.values(c.MOMENTS).map((m) => m.sound).filter(Boolean)); out([...used].sort());"),
             ['correct', 'error', 'fanfare', 'locked', 'swipe'])
 
-    def test_wrong_check_confused_and_a_peek_on_the_last_bulb(self):
+    def test_wrong_check_confused_and_a_peek_on_the_words_second_miss(self):
+        # since BACKLOG B-231 the bulbs are the round's: he peeks on the
+        # word's own second miss (the one that brings his letter), not on
+        # the miss that leaves one bulb lit
         self.assertEqual(self.run_node(
-            "out([moments(st({ current: cur('playing', 'tac') }), st({ lives: 2, current: cur('wrong', 'tac') })),"
-            " moments(st({ lives: 2, current: cur('playing', 'act') }), st({ lives: 1, current: cur('wrong', 'act') }))]);"),
-            [['wrong'], ['wrongPeek']])
+            "const miss = (n, o = {}) => ({ ...cur('wrong', 'act'), misses: n, ...o });"
+            "out([moments(st({ current: cur('playing', 'tac') }), st({ lives: 2, current: { ...cur('wrong', 'tac'), misses: 1 } })),"
+            " moments(st({ lives: 2, current: { ...cur('playing', 'act'), misses: 1 } }), st({ lives: 1, current: miss(2) })),"
+            # the round's last-but-one bulb on the word's first miss: no peek
+            " moments(st({ lives: 2, current: cur('playing', 'act') }), st({ lives: 1, current: miss(1) })),"
+            # the word's second miss with bulbs to spare: the peek
+            " moments(st({ lives: 5, current: { ...cur('playing', 'act'), misses: 1 } }), st({ lives: 4, current: miss(2) })),"
+            # the tutorial word costs no bulb: the miss is still heard
+            " moments(st({ lives: 3, current: cur('playing', 'act') }), st({ lives: 3, current: miss(1) })),"
+            " c.snapshot(st({ current: miss(2) })).misses, c.snapshot(st()).misses, c.NONE.misses]);"),
+            [['wrong'], ['wrongPeek'], ['wrong'], ['wrongPeek'], ['wrong'], 2, 0, 0])
 
     def test_third_miss_oops_then_happy(self):
         self.assertEqual(self.run_node(
@@ -3145,7 +3156,7 @@ class PlayBackTests(TestCase):
         leave = self.function('leaveRound')
         self.assertLess(leave.index('stopWord();'), leave.index('setState({'))
         self.assertLess(leave.index('...patch,'), leave.index('data: null,'))
-        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false, keyEarned: false },',
+        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },',
                      'current: { word: null,', 'speaking: false,', 'pressed: null,', 'idleBeat: null,'):
             self.assertIn(decl, leave, decl)
 
@@ -3264,7 +3275,8 @@ class StageTests(TestCase):
         state = (self.JS / 'state.js').read_text()
         self.assertNotRegex(state, r'\n    level:')
         self.assertNotRegex(state, r'\n    streak:')
-        self.assertIn('\n    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },', state)
+        self.assertIn('\n    round: { index: 0, size: 5, stage: null, bulbs: 3, results: [], cleared: [], justCleared: false, keyEarned: false,'
+                      ' spareEarned: false },', state)
         # lockedTaps stays (the robot's head-shake; B-219 adds to it)
         self.assertRegex(state, r'\n    lockedTaps: 0,')
 
@@ -3332,15 +3344,16 @@ class StageTests(TestCase):
     def test_the_stage_is_fixed_for_the_round(self):
         start = self.main_function('startRound')
         self.assertIn("import { stagesOf } from './stage.js';", (self.JS / 'main.js').read_text())
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },', start)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false,'
+                      ' spareEarned: false },', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
         # nothing else writes a round's stage; leaving a round clears it
         main = self.code('main.js')
-        self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, results:', main)), 2)
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },',
-                      self.main_function('leaveRound'))
+        self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, bulbs(: [^,}]+)?, results:', main)), 2)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, bulbs: BULBS, results: [], cleared: [], justCleared: false,'
+                      ' keyEarned: false, spareEarned: false },', self.main_function('leaveRound'))
         for name in ('onCheck', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
 
@@ -3732,7 +3745,8 @@ class StageStartTests(TestCase):
         start = self.function('startRound')
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
         self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
-        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, results: [], cleared: [], justCleared: false, keyEarned: false },', start)
+        self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false,'
+                      ' spareEarned: false },', start)
         nxt = self.function('onNext')
         self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', nxt)
 
@@ -4123,7 +4137,7 @@ class LeverTests(TestCase):
         self.assertIn("setState({ pressed: 'lever', current: returnAll(state.current) });", lever)
         self.assertNotIn('round.', lever)
         check = self.function('onCheck', 'main.js')
-        self.assertIn('const checked = checkedWrong(current);', check)
+        self.assertIn('const checked = { ...checkedWrong(current), misses: missed };', check)
         self.assertEqual(check.count('checkedWrong('), 1)
         # nothing else writes the lever's facts
         for name in ('main.js', 'card.js', 'feedback.js', 'controls.js', 'character.js'):
@@ -4323,8 +4337,10 @@ class HintTests(TestCase):
     def test_the_robot_is_confused_then_gives_the_letter_happy(self):
         res = self.run_node(
             "const P = (s) => s.map((p) => (p ? { letter: p[0], tileId: p[1], ...(p[2] ? { locked: true, hint: true } : {}) } : null));"
+            # a round of three bulbs, so the word's own misses (BACKLOG
+            # B-231) are the bulbs lost
             "const st = (lives, status, placed) => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives,"
-            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status, placed: P(placed) } });"
+            " round: { index: 0, size: 5, results: [] }, current: { word: 'cat', status, placed: P(placed), misses: 3 - lives } });"
             "const m = (a, b) => R.momentsFor(R.snapshot(a), R.snapshot(b));"
             "const checked = st(2, 'playing', [['a', 't0'], ['c', 't1'], ['t', 't2']]);"
             "const hinted = st(1, 'wrong', [['c', 't1', 1], null, ['t', 't2']]);"
@@ -4474,22 +4490,25 @@ class HintTests(TestCase):
 
     # --- wiring ---
 
-    def test_the_check_that_leaves_one_bulb_gives_the_letter_on_every_stage(self):
+    def test_the_words_second_miss_gives_the_letter_on_every_stage(self):
         main = self.code('main.js')
         self.assertIn("import { checkedWrong, returnAll, giveHint, afterHint, revealed } from './drag.js';", main)
         check = self.function('onCheck')
         # the wrong check notes the letters it found right (BACKLOG B-215b)
-        self.assertIn('const checked = checkedWrong(current);', check)
-        self.assertIn('const left = lives - 1;', check)
-        self.assertIn('current: left === 1 ? giveHint(checked) : checked', check)
+        # and the word's own miss (BACKLOG B-231: the bulbs are the
+        # round's, so the word counts its misses apart, bulbs.js missKind)
+        self.assertIn('const checked = { ...checkedWrong(current), misses: missed };', check)
+        self.assertIn('const missed = misses + 1;', check)
+        self.assertIn('const kind = correct ? null : missKind(missed, left);', check)
+        self.assertIn("current: kind === 'hint' ? giveHint(checked) : checked", check)
         self.assertEqual(check.count('giveHint('), 1)
         # every stage: the round's stage is not read
         self.assertNotIn('stage', check)
         # a word checked correct after the hint is mastered like any other:
         # the result is the letters against the word, the sticker added
-        # before the lives are looked at
+        # before the misses are looked at
         self.assertIn("const correct = answer === current.word;", check)
-        self.assertLess(check.index('addSticker('), check.index('lives - 1 <= 0'))
+        self.assertLess(check.index('addSticker('), check.index("} else if (kind === 'reveal') {"))
         # the reveal keeps a right slot's object (so the hint letter stays
         # locked and marked through it); drag.js since B-207
         self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed', 'drag.js'))
@@ -4769,7 +4788,7 @@ class ExtrasTests(TestCase):
 
     def test_main_reopens_after_the_miss_in_a_setstate_of_its_own(self):
         check = self.function('onCheck')
-        miss = check.index("current: left === 1 ? giveHint(checked) : checked")
+        miss = check.index("current: kind === 'hint' ? giveHint(checked) : checked")
         after = check.index('const reopened = afterHint(state.current);')
         self.assertLess(miss, after)
         self.assertIn('if (reopened !== state.current) setState({ current: reopened });', check)
@@ -4787,8 +4806,10 @@ class ExtrasTests(TestCase):
         res = self.run_node(
             f"const before = {json.dumps(self.duck('duBk'))};"
             "const hinted = D.giveHint({ ...before, status: 'wrong' });"
+            # a round of three bulbs: the word's own misses (BACKLOG B-231)
+            # are the bulbs lost
             "const st = (lives, current) => ({ screen: 'play', roundsStarted: 3, idleBeat: null, lockedTaps: 0, lives,"
-            " round: { index: 0, size: 5, results: [] }, current });"
+            " round: { index: 0, size: 5, results: [] }, current: { ...current, misses: 3 - lives } });"
             "const a = H.snapshot(st(2, before)), b = H.snapshot(st(1, hinted)), c = H.snapshot(st(1, D.afterHint(hinted)));"
             "out([H.momentsFor(a, b), H.soundsFor(H.momentsFor(a, b)), H.momentsFor(b, c)]);")
         self.assertEqual(res, [['wrongPeek', 'hintGiven'], ['error'], []])
@@ -5174,7 +5195,7 @@ class MissedWordsTests(TestCase):
         # changes; a round left with the back button records nothing
         self.assertEqual(main.count('recordMissed('), 1)
         nxt = self.function('onNext')
-        end = nxt.index('if (nextIndex >= round.size) {')
+        end = nxt.index('if (roundOver(state.lives, round.index, round.size)) {')
         rec = nxt.index('recordMissed(state.theme, results);')
         self.assertLess(end, rec)
         self.assertLess(rec, nxt.index("screen: 'round-end'"))
@@ -5188,7 +5209,7 @@ class MissedWordsTests(TestCase):
         main = self.code('main.js')
         self.assertEqual(main.count('addSticker('), 1)
         check = self.function('onCheck')
-        branch = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
+        branch = check[check.index('if (correct) {'):check.index("} else if (kind === 'reveal') {")]
         self.assertIn('results[round.index].newSticker = clean && addSticker(state.theme, current.word);', branch)
         self.assertNotIn('missed', self.code('stickers.js'))
 
@@ -5754,14 +5775,14 @@ class NextDomeTests(TestCase):
         self.assertIn('if (next !== null) setTimeout(tick, next);', arm)
         self.assertIn('if (wait !== null) setTimeout(tick, wait);', arm)
         # armed right after the setState that answers the word: correct or
-        # revealed, not a miss with lives left
+        # revealed, not a miss that leaves the word open
         check = self.function('onCheck')
         self.assertEqual(check.count('armNudge();'), 2)
-        correct = check[check.index('if (correct) {'):check.index('} else if (lives - 1 <= 0) {')]
-        reveal = check[check.index('} else if (lives - 1 <= 0) {'):check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5)]
+        correct = check[check.index('if (correct) {'):check.index("} else if (kind === 'reveal') {")]
+        reveal = check[check.index("} else if (kind === 'reveal') {"):check.index('} else {', check.index("} else if (kind === 'reveal') {") + 5)]
         for branch in (correct, reveal):
             self.assertLess(branch.index('setState('), branch.index('armNudge();'))
-        miss = check[check.index('} else {', check.index('} else if (lives - 1 <= 0) {') + 5):]
+        miss = check[check.index('} else {', check.index("} else if (kind === 'reveal') {") + 5):]
         self.assertNotIn('armNudge', miss)
         # back to 0 on every new word, the round end and leaving the round
         # (leaveRound: the theme screen, or the stage screen, B-217)
@@ -7046,13 +7067,13 @@ class ProgressTests(TestCase):
         # words, before the screen changes; the round keeps the result
         self.assertEqual(main.count('recordProgress('), 1)
         nxt = self.function('onNext')
-        end = nxt.index('if (nextIndex >= round.size) {')
+        end = nxt.index('if (roundOver(state.lives, round.index, round.size)) {')
         rec = nxt.index('const { progress, justCleared } = recordProgress(state.theme, state.data, round.stage, results);')
         self.assertLess(end, rec)
         self.assertLess(nxt.index('recordMissed(state.theme, results);'), rec)
         self.assertLess(rec, nxt.index("screen: 'round-end'"))
         self.assertLess(rec, nxt.index('} else {', end))
-        self.assertIn('round: { ...round, results, cleared: progress.cleared, justCleared, keyEarned: keys.earned },', nxt)
+        self.assertIn('round: { ...round, results, cleared: progress.cleared, justCleared, keyEarned: keys.earned, spareEarned: spare.earned },', nxt)
         # a round left with the back button records nothing
         for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound', 'onPlayAgain'):
             self.assertNotIn('recordProgress', self.function(name), name)
@@ -7540,7 +7561,8 @@ class StruggleSwapTests(TestCase):
             "  const progressFor = (theme) => { asked.push(theme); return { solved, cleared: [1, 2] }; };"
             "  const stopWord = () => {}; const armIdle = () => {}; const recordMissed = () => {};"
             "  const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const recordKeys = () => ({ ring: {}, earned: false }); const loadProgress = () => ({});"
-            "  const addGears = () => 0; const GEARS = { round: 2 }; const LIVES = 3; const newTileId = () => 't';"
+            "  const addGears = () => 0; const GEARS = { round: 2 }; const newTileId = () => 't';"
+            "  state.lives = 3; const roundOver = (b, i, n) => !(b > 0) || i + 1 >= n; const recordBulbs = () => ({ spares: 0, earned: false });"
             "  const makeWord = (e, st) => ({ word: e.word, stage: st, status: 'playing' });"
             f"  {nxt}"
             "  onNext();"
@@ -7574,7 +7596,7 @@ class StruggleSwapTests(TestCase):
         self.assertIn("import { pickRound, makeWord, swapForStruggle } from './round.js';", main)
         self.assertEqual(main.count('swapForStruggle('), 1)
         nxt = self.function('onNext')
-        other = nxt.index('} else {', nxt.index('if (nextIndex >= round.size) {'))
+        other = nxt.index('} else {', nxt.index('if (roundOver(state.lives, round.index, round.size)) {'))
         call = nxt.index('const words = swapForStruggle(state.words, round.index, results, state.data, round.stage, progressFor(state.theme).solved);')
         self.assertLess(other, call)
         branch = nxt[call:]
@@ -7735,7 +7757,7 @@ class RoundEndStagesTests(TestCase):
             "out([M.motionFor('bulbPop', false), M.motionFor('bulbPop', true)]);")
         self.assertEqual(res, [{'duration': 0.3, 'ease': 'power2.out', 'scale': 1.5},
                                {'duration': 0, 'ease': 'none', 'scale': 1}])
-        self.assertIn("if (state.round.justCleared) popBulb(state.round.stage);", self.code('celebrate.js'))
+        self.assertIn("if (state.round.justCleared) popBulb(state.round.stage, spare);", self.code('celebrate.js'))
 
 
 class StageMapTests(TestCase):
@@ -8103,7 +8125,8 @@ class StageMapTests(TestCase):
             "let arrive = null; globalThis.fetch = () => new Promise((r) => { arrive = () => r({ json: () => ({ cat: { stage: 1 } }) }); });"
             "const progressFor = () => ({ solved: [], cleared: [] }); const currentStage = () => 1; const missedWords = () => [];"
             "const pickRound = () => ['cat']; const makeWord = (w, stage) => ({ word: w.word, stage }); const newTileId = () => 't1';"
-            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const LIVES = 3; const needsTutorial = () => false;"
+            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const needsTutorial = () => false;"
+            "const loadSpares = () => 0; const startBulbs = (n) => 3 + n;"
             "const loadWins = () => Promise.resolve(null);"
             + start +
             "const go = async (from, theme, leave, stage = 1) => {"
@@ -8329,10 +8352,10 @@ class GearsTests(TestCase):
     # --- main.js: the wiring, run through node ---
 
     CHECK = """
-        const state = { screen: 'play', theme: 'animals', gears: 5, lives: 3,
+        const state = { screen: 'play', theme: 'animals', gears: 5, lives: 3, tutorial: false,
             round: { index: 0, size: 5, results: [] }, current: null };
         const setState = (p) => Object.assign(state, p);
-        const LIVES = 3;
+        const { afterCheck, missKind } = await import('BULBS');
         const calls = [];
         const addSticker = (t, w) => { calls.push(['sticker', t, w]); return true; };
         let stored = 5;
@@ -8342,15 +8365,19 @@ class GearsTests(TestCase):
         const checkedWrong = (c) => ({ ...c, status: 'wrong' });
         const giveHint = (c) => c; const afterHint = (c) => c; const revealed = (c) => ({ ...c, status: 'revealed' });
         const armNudge = () => {}; const tutorialSeen = () => {};
+        // `lives`: the word's tries left (3 less its own misses, BACKLOG
+        // B-231), in a round with three bulbs lit
         const word = (w, letters, lives, boosts = 0) => {
-            state.lives = lives; state.round = { index: 0, size: 5, results: [] };
-            state.current = { word: w, status: 'playing', boosts, placed: letters.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) };
+            state.lives = 3; state.round = { index: 0, size: 5, results: [] };
+            state.current = { word: w, status: 'playing', boosts, misses: 3 - lives,
+                placed: letters.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) };
             calls.length = 0;
         };
     """
 
     def run_check(self, body):
-        return self.run_node(self.CHECK.replace('BOOST', (self.JS / 'boost.js').as_uri()) + self.function('onCheck') + body)
+        return self.run_node(self.CHECK.replace('BOOST', (self.JS / 'boost.js').as_uri()).replace('BULBS', (self.JS / 'bulbs.js').as_uri())
+                             + self.function('onCheck') + body)
 
     def test_a_clean_word_earns_its_sticker_and_two_gears_at_its_check(self):
         res = self.run_check(
@@ -8389,8 +8416,10 @@ class GearsTests(TestCase):
             "const addGears = (n) => { calls.push(n); stored += n; return stored; }; const { GEARS } = G;"
             "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const recordKeys = () => ({ ring: {}, earned: false });"
             "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
-            "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't'; const LIVES = 3;"
+            "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't';"
             "const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });"
+            f"const {{ roundOver }} = await import('{(self.JS / 'bulbs.js').as_uri()}'); state.lives = 3;"
+            "const recordBulbs = () => ({ spares: 0, earned: false });"
             + nxt +
             "onNext(); const mid = [state.screen, state.gears, calls.slice()];"
             "onNext(); out([mid, [state.screen, state.gears, calls.slice()], state.round.results]);")
@@ -9021,7 +9050,8 @@ class BoostTests(TestCase):
         # the result records the boost, and a boosted word is not clean
         check = self.function('onCheck')
         self.assertIn('const boosted = isBoosted(current);', check)
-        self.assertIn('const clean = isClean(correct, LIVES - lives, boosted);', check)
+        # the word's own wrong checks (BACKLOG B-231: the bulbs are the round's)
+        self.assertIn('const clean = isClean(correct, misses, boosted);', check)
         self.assertIn('results[round.index] = { word: current.word, correct, clean, boosted };', check)
         # the tray closes with a new word, a new round and leaving the round
         for name in ('startRound', 'onNext', 'leaveRound'):
@@ -9965,8 +9995,9 @@ class MomentLinesTests(TestCase):
             "const go = async (from, to) => { await hush(); S.setState(from); await settle(); await hush(); clear();"
             " S.setState(to); await settle(); return played(); };"
             # the second miss on "cat": his letter "a" in slot 1
-            "const MISS2 = [W({ placed: P('tac') }, { lives: 2 }),"
-            " W({ status: 'wrong', placed: [P('t')[0], { letter: 'a', tileId: 't9', locked: true, hint: true }, P('--c')[2]] }, { lives: 1 })];"
+            # (the word's own second miss, BACKLOG B-231: `misses` 2)
+            "const MISS2 = [W({ placed: P('tac'), misses: 1 }, { lives: 2 }),"
+            " W({ status: 'wrong', placed: [P('t')[0], { letter: 'a', tileId: 't9', locked: true, hint: true }, P('--c')[2]], misses: 2 }, { lives: 1 })];"
             # boosts on "cat" (as boost.js leaves them): Remember this one
             # on slot 2 ("t", the block there hops back first), First
             # letter ("c" from slot 2 into slot 0), Clean-up
@@ -13195,7 +13226,7 @@ class FastStartTests(TestCase):
         self.assertEqual(first_pools[0], 'greet')
         self.assertEqual(sorted(first_pools), sorted(pools))       # one clip each, of its own pool
         self.assertTrue(own)
-        self.assertIn(kinds, (4, 5))                               # "hmm no" may be the error pool's
+        self.assertIn(kinds, (3, 4))                               # "hmm no" may be the error pool's (no tada since B-230)
         self.assertLess(n, all_lines)
 
     def test_a_words_own_clips_in_the_order_they_are_needed(self):
@@ -13699,3 +13730,362 @@ class RoundEndFanfareTests(TestCase):
         self.assertIn('fanfare', row)
         self.assertNotIn('tada', row)
         self.assertNotIn('(the swipe, the tada)', character)
+
+
+class RoundBulbsTests(TestCase):
+    """Bulbs for the whole round and a spare bulb for a perfect round
+    (BACKLOG B-231, PROGRESSION.md "Guardrails"): bulbs.js's pure part and
+    store (`flip.bulbs.v1`, per player), main.js's onCheck, onNext and
+    startRound (run through node with stand-ins), the TV's bulbs (card.js),
+    the bulb flicker and static (feedback.js), the spare's pop
+    (celebrate.js) and the round end, all through node."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const store = new Map(); let writes = 0;"
+            "globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null),"
+            " setItem: (k, v) => { writes++; store.set(k, String(v)); }, removeItem: (k) => store.delete(k) };"
+            f"const B = await import('{(self.JS / 'bulbs.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'players.js').as_uri()}');"
+            "const clean = (word) => ({ word, correct: true, clean: true });"
+            "const PERFECT = ['cat', 'dog', 'pig', 'hen', 'fox'].map(clean);"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        code = self.code(file)
+        start = code.index(f'function {name}(')
+        start = code.rindex('\n', 0, start)
+        return code[start:code.index('\n}\n', start) + 2]
+
+    # --- bulbs.js: the pure part ---
+
+    def test_the_bulbs_at_the_round_start_and_after_a_check(self):
+        res = self.run_node(
+            "out([B.BULBS, B.SPARE_MAX, B.HINT_AT, B.WORD_MISSES,"
+            " [0, 1, 2, 5, -1, 'x', 1.5, null].map((n) => B.startBulbs(n)),"
+            # a wrong check turns one off, a correct one none, the tutorial word none; never below 0
+            " [B.afterCheck(3, false), B.afterCheck(3, true), B.afterCheck(1, false), B.afterCheck(0, false),"
+            "  B.afterCheck(3, false, true), B.afterCheck(5, false), B.afterCheck(undefined, false)]]);")
+        self.assertEqual(res, [3, 2, 2, 3, [3, 4, 5, 5, 3, 3, 3, 3], [2, 3, 0, 0, 3, 4, 0]])
+
+    def test_what_a_miss_does_and_when_the_round_is_over(self):
+        res = self.run_node(
+            # the word's own misses with this one, the round's bulbs after it
+            "out([[B.missKind(1, 2), B.missKind(2, 1), B.missKind(3, 5), B.missKind(1, 0), B.missKind(2, 0), B.missKind(2, 4)],"
+            # the round ends after its last word, or once no bulb is left
+            " [B.roundOver(2, 2, 5), B.roundOver(0, 2, 5), B.roundOver(3, 4, 5), B.roundOver(1, 0, 5), B.roundOver(0, 0, 5)]]);")
+        self.assertEqual(res, [['wrong', 'hint', 'reveal', 'reveal', 'reveal', 'hint'],
+                               [False, True, True, False, True]])
+
+    def test_a_perfect_round_earns_a_spare_and_the_spares_left_are_kept(self):
+        res = self.run_node(
+            "const notClean = [...PERFECT.slice(0, 4), { word: 'fox', correct: true, clean: false }];"
+            "const early = [clean('cat'), { word: 'dog', correct: true, clean: false }, { word: 'pig', correct: false, clean: false }];"
+            "out([B.isPerfect(PERFECT, 5), B.isPerfect(notClean, 5), B.isPerfect(PERFECT.slice(0, 3), 5), B.isPerfect([], 5),"
+            " B.isPerfect(null, 5), B.isPerfect([...PERFECT.slice(0, 4), null], 5),"
+            # three bulbs, perfect: one spare; with one or two spares lit, one more up to 2
+            " B.afterRound(3, PERFECT, 5), B.afterRound(4, PERFECT, 5), B.afterRound(5, PERFECT, 5),"
+            # not perfect: the spares still lit are kept, the ones turned off are gone
+            " B.afterRound(5, notClean, 5), B.afterRound(4, notClean, 5), B.afterRound(3, notClean, 5), B.afterRound(2, notClean, 5),"
+            # a round the bulbs ended early: none
+            " B.afterRound(0, early, 5)]);")
+        self.assertEqual(res, [
+            True, False, False, False, False, False,
+            {'spares': 1, 'earned': True}, {'spares': 2, 'earned': True}, {'spares': 2, 'earned': False},
+            {'spares': 2, 'earned': False}, {'spares': 1, 'earned': False}, {'spares': 0, 'earned': False},
+            {'spares': 0, 'earned': False},
+            {'spares': 0, 'earned': False}])
+
+    # --- bulbs.js: the store ---
+
+    def test_kept_per_player_clean_on_read_and_written_only_on_change(self):
+        res = self.run_node(
+            "P.add('fox', [], 'Noa');"
+            "const first = B.record(3, PERFECT, 5); const keys = [...store.keys()].filter((k) => k.startsWith('flip.bulbs'));"
+            "const held = B.load(); const w1 = writes;"
+            # the same count again: nothing written
+            "B.record(4, [], 5); const w2 = writes;"
+            "const other = (P.add('cat'), B.load());"
+            "const reads = ['{bad', '7', '-1', '1.5', '\"2\"', '2'].map((v) => (store.set('flip.bulbs.v1@p2', v), B.load()));"
+            "out([first, keys, held, w2 - w1, other, reads, B.clean(3), B.clean(-2), B.clean(1)]);")
+        self.assertEqual(res, [{'spares': 1, 'earned': True}, ['flip.bulbs.v1@p1'], 1, 0, 0, [0, 2, 0, 0, 0, 2], 2, 0, 1])
+
+    def test_only_bulbs_js_names_the_key_and_it_has_no_dom(self):
+        for path in sorted(self.JS.glob('*.js')):
+            text = path.read_text()
+            if path.name == 'bulbs.js':
+                self.assertIn("export const KEY = 'flip.bulbs.v1';", text)
+            else:
+                self.assertNotIn('flip.bulbs', text, path.name)
+        code = self.code('bulbs.js')
+        for word in ('document', 'window', 'state.', 'setState'):
+            self.assertNotIn(word, code, word)
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M), ["import { keyOf } from './players.js';"])
+        self.assertNotRegex(code, r'\nlet |\nvar ')
+        self.assertEqual(code.count('try {'), 4)   # storage, load (twice), save
+
+    # --- main.js ---
+
+    CHECK = """
+        const state = { screen: 'play', theme: 'animals', gears: 0, lives: 3, tutorial: false,
+            round: { index: 0, size: 5, results: [] }, current: null };
+        const setState = (p) => Object.assign(state, p);
+        const { afterCheck, missKind } = B;
+        const hints = [];
+        const addSticker = () => true; const addGears = () => 0; const wordGears = () => 0;
+        const isClean = (correct, wrong, boosted) => correct === true && wrong === 0 && !boosted;
+        const isBoosted = () => false;
+        const checkedWrong = (c) => ({ ...c, status: 'wrong' });
+        const giveHint = (c) => { hints.push(c.word); return c; }; const afterHint = (c) => c;
+        const revealed = (c) => ({ ...c, status: 'revealed' });
+        const armNudge = () => {}; const tutorialSeen = () => {};
+        const word = (w, misses = 0) => {
+            state.current = { word: w, status: 'playing', misses, placed: w.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) };
+        };
+        const wrong = () => { state.current = { ...state.current, status: 'playing',
+            placed: state.current.word.split('').reverse().map((l, i) => ({ letter: l, tileId: 't' + i })) }; onCheck({ pressed: null });
+            return [state.lives, state.current.status, state.current.misses]; };
+        const right = () => { state.current = { ...state.current, status: 'playing',
+            placed: state.current.word.split('').map((l, i) => ({ letter: l, tileId: 't' + i })) }; onCheck({ pressed: null });
+            return [state.lives, state.current.status, state.round.results[state.round.index].clean]; };
+    """
+
+    def run_check(self, body):
+        return self.run_node(self.CHECK + self.function('onCheck') + body)
+
+    def test_each_wrong_check_turns_a_round_bulb_off_and_the_words_own_rules_stay(self):
+        res = self.run_check(
+            # a round of 3: the first word's two misses (his letter on its
+            # second), then right; the next word's first miss is the last bulb
+            "word('cat'); const a = [wrong(), wrong(), right(), hints.slice()];"
+            "state.round.index = 1; word('dog'); const b = [wrong()];"
+            # a round of 5: a word's own third miss reveals it, bulbs left
+            "state.lives = 5; state.round.index = 0; hints.length = 0; word('pig'); const c = [wrong(), wrong(), wrong(), hints.slice()];"
+            # the tutorial word costs no bulb; its own rules still apply
+            "state.lives = 3; state.tutorial = true; hints.length = 0; word('hen'); const d = [wrong(), wrong(), wrong(), hints.slice()];"
+            "state.tutorial = false; word('fox'); const e = [right()];"
+            "out([a, b, c, d, e]);")
+        a, b, c, d, e = res
+        self.assertEqual(a, [[2, 'wrong', 1], [1, 'wrong', 2], [1, 'correct', False], ['cat']])
+        self.assertEqual(b, [[0, 'revealed', 1]])
+        self.assertEqual(c, [[4, 'wrong', 1], [3, 'wrong', 2], [2, 'revealed', 3], ['pig']])
+        self.assertEqual(d, [[3, 'wrong', 1], [3, 'wrong', 2], [3, 'revealed', 3], ['hen']])
+        self.assertEqual(e, [[3, 'correct', True]])
+
+    NEXT = """
+        const calls = [];
+        const state = { theme: 'animals', data: {}, gears: 0, lives: 0, themes: [], progress: {},
+            words: ['cat', 'dog', 'pig', 'hen', 'fox'].map((word) => ({ word })),
+            round: { index: 2, size: 5, stage: 1, bulbs: 4, results: [clean('cat'), { word: 'dog', correct: true, clean: false },
+              { word: 'pig', correct: false, clean: false }] },
+            current: { word: 'pig', status: 'revealed' } };
+        const setState = (p) => Object.assign(state, p);
+        const { roundOver } = B;
+        const recordMissed = (t, r) => calls.push(['missed', r.map((x) => x.word)]);
+        const recordProgress = (t, d, s, r) => { calls.push(['progress', r.map((x) => x.word)]); return { progress: { cleared: [] }, justCleared: false }; };
+        const recordKeys = () => { calls.push(['keys']); return { ring: {}, earned: false }; };
+        const recordBulbs = (b, r, n) => { calls.push(['bulbs', b, r.length, n]); return B.afterRound(b, r, n); };
+        const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};
+        const addGears = (n) => { calls.push(['gears', n]); return n; }; const GEARS = { round: 2 };
+        const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't';
+        const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });
+    """
+
+    def test_the_last_bulb_ends_the_round_after_its_word(self):
+        res = self.run_node(
+            self.NEXT + self.function('onNext') +
+            "onNext({ pressed: null });"
+            "const ended = [state.screen, state.round.results.map((r) => r.word), state.round.spareEarned, calls.slice()];"
+            # bulbs left: the next word, the bulbs not refilled
+            "calls.length = 0; Object.assign(state, { screen: 'play', lives: 2, round: { ...state.round, index: 1, results: state.round.results.slice(0, 2) },"
+            " current: { word: 'dog', status: 'correct' } });"
+            "onNext({ pressed: null }); const goesOn = [state.screen, state.round.index, state.current.word, state.lives, calls.slice()];"
+            # a perfect round of 3 bulbs: a spare, recorded at its end
+            "calls.length = 0; Object.assign(state, { lives: 3, round: { ...state.round, index: 4, results: PERFECT },"
+            " current: { word: 'fox', status: 'correct' } });"
+            "onNext({ pressed: null }); out([ended, goesOn, [state.screen, state.round.spareEarned, calls.slice()]]);")
+        ended, goes_on, perfect = res
+        # the words not reached (hen, fox) have no result: not played, not missed
+        self.assertEqual(ended, ['round-end', ['cat', 'dog', 'pig'], False, [
+            ['missed', ['cat', 'dog', 'pig']], ['progress', ['cat', 'dog', 'pig']], ['keys'], ['bulbs', 0, 3, 5], ['gears', 2]]])
+        self.assertEqual(goes_on, ['play', 2, 'pig', 2, []])
+        self.assertEqual(perfect, ['round-end', True, [
+            ['missed', ['cat', 'dog', 'pig', 'hen', 'fox']], ['progress', ['cat', 'dog', 'pig', 'hen', 'fox']], ['keys'], ['bulbs', 3, 5, 5],
+            ['gears', 2]]])
+
+    def test_main_wiring(self):
+        main = self.code('main.js')
+        self.assertIn("import { load as loadSpares, record as recordBulbs, startBulbs, afterCheck, missKind, roundOver, BULBS } from './bulbs.js';", main)
+        self.assertNotIn('LIVES', main)
+        start = self.function('startRound')
+        self.assertIn('const bulbs = startBulbs(loadSpares());', start)
+        self.assertIn('lives: bulbs,', start)
+        self.assertIn('stage, bulbs, results: [],', start)
+        nxt = self.function('onNext')
+        self.assertIn('if (roundOver(state.lives, round.index, round.size)) {', nxt)
+        self.assertLess(nxt.index('recordKeys('), nxt.index('const spare = recordBulbs(state.lives, results, round.size);'))
+        self.assertIn('spareEarned: spare.earned', nxt)
+        # the round's bulbs carry on to the next word
+        self.assertEqual(len(re.findall(r'\blives:', nxt)), 0)
+        self.assertEqual(main.count('recordBulbs('), 1)
+        for name in ('onPlayBack', 'onThemes', 'onCheck', 'startRound', 'leaveRound'):
+            self.assertNotIn('recordBulbs', self.function(name), name)
+        self.assertIn('spareEarned: false', self.function('leaveRound'))
+        # the round end lists only the words played and shows the spare
+        end = self.function('renderRoundEnd')
+        self.assertIn('if (!results[i]) return;', end)
+        self.assertIn("$('round-spare').hidden = !state.round.spareEarned;", end)
+        self.assertIn('renderFlaps($(\'round-score\'), `${correct} / ${size}`);', end)
+
+    def test_the_template_and_the_state(self):
+        html = self.client.get('/').content.decode()
+        self.assertIn('<div id="tv-bulbs" class="hearts" aria-label="Lives">', html)
+        self.assertRegex(html, r'<div id="round-stars"[^>]*>[\s\S]*<div id="round-spare" class="bulb round-spare" role="img" aria-label="spare bulb" hidden></div>\s*</div>')
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n        misses: 0,\n', state)
+        self.assertIn('\n    lives: 3,\n', state)
+        css = (self.ROOT / 'static' / 'css' / 'game.css').read_text()
+        for rule in ('.hearts[data-count="4"] span {', '.hearts[data-count="5"] span {', '#round-spare {', '#round-spare[hidden] {'):
+            self.assertIn(rule, css, rule)
+
+    # --- the TV's bulbs (card.js) ---
+
+    def test_the_tv_shows_the_rounds_bulbs(self):
+        dom = LongWordTests.FAKE_DOM.replace(
+            'get firstChild()', 'get lastElementChild() { return this.children[this.children.length - 1] || null; }\n            get firstChild()')
+        res = self.run_node(
+            dom + "els['tv-bulbs'] = new El('div');"
+            f"const C = await import('{(self.JS / 'card.js').as_uri()}');"
+            f"const R = await import('{(self.JS / 'round.js').as_uri()}');"
+            "let seq = 0; const current = R.makeWord({ word: 'cat', image: 'c.webp' }, 1, () => `t${++seq}`);"
+            "const row = els['tv-bulbs'];"
+            "const show = (lives, bulbs) => { C.renderCard({ screen: 'play', lives, round: { index: 0, size: 5, bulbs }, current });"
+            " return [row.dataset.count, row.children.map((b) => (b.cls.has('lost') ? 0 : 1)).join('')]; };"
+            "const a = show(3, 3); const first = row.children[0];"
+            "out([a, show(2, 3), show(4, 4), show(5, 5), show(3, 5), show(0, 3), show(3, undefined), row.children[0] === first]);")
+        self.assertEqual(res, [['3', '111'], ['3', '110'], ['4', '1111'], ['5', '11111'], ['5', '11100'], ['3', '000'],
+                               ['3', '111'], True])
+
+    # --- the flicker and the static (feedback.js) ---
+
+    def test_the_bulb_lost_flickers_and_every_miss_has_its_static(self):
+        res = self.run_node(
+            "const log = []; const name = (el) => (Array.isArray(el) ? el.map((e) => e.id).join('+') : el.id);"
+            "const tl = { set(el) { log.push(['tl.set', name(el)]); return tl; }, to(el) { log.push(['tl.to', name(el)]); return tl; } };"
+            "globalThis.gsap = { set(el) { log.push(['set', name(el)]); }, to(el) { log.push(['to', name(el)]); },"
+            " fromTo(el) { log.push(['fromTo', name(el)]); }, timeline() { return tl; }, killTweensOf() {}, delayedCall() {} };"
+            "globalThis.window = { matchMedia: () => ({ matches: false }) };"
+            "const bulbs = [0, 1, 2, 3, 4].map((i) => ({ id: 'bulb' + i, style: { removeProperty() {} } }));"
+            "globalThis.document = {"
+            " querySelectorAll: (sel) => (sel === '#screen-play .hearts span' ? bulbs : []),"
+            " querySelector: (sel) => (sel === '#screen-play .tv-static' ? { id: 'static' } : null),"
+            " getElementById: (id) => (id === 'play-image' ? { id: 'img' } : { children: [] }) };"
+            f"const F = await import('{(self.JS / 'feedback.js').as_uri()}');"
+            "const st = (lives, misses, status = 'wrong', index = 0) => ({ screen: 'play', lives, pressed: null, lockedTaps: 0, boostMenu: null,"
+            " round: { index }, current: { word: 'cat', status, misses, placed: [], tray: [] } });"
+            "const step = (a, b) => { F.renderFeedback(a); log.length = 0; F.renderFeedback(b);"
+            " return [...new Set(log.map((e) => e[1]).filter((n) => /bulb|static/.test(n)))]; };"
+            "out([step(st(5, 0, 'playing'), st(4, 1)), step(st(3, 0, 'playing', 1), st(3, 1, 'wrong', 1)),"
+            " step(st(1, 1, 'playing', 2), st(0, 2, 'revealed', 2)), step(st(2, 1, 'wrong', 3), st(2, 1, 'wrong', 3))]);")
+        # five bulbs, a miss: the fifth flickers out, the static; the
+        # tutorial word's miss: no bulb, the static; the last bulb: the
+        # first flickers out; a re-render: nothing
+        self.assertEqual(res, [['bulb4', 'static'], ['static'], ['bulb0', 'static'], []])
+
+    # --- the spare's pop (celebrate.js) ---
+
+    def test_the_spare_pops_in_after_the_stars_then_the_bulb_and_the_key(self):
+        res = self.run_node(
+            "const log = []; let reduced = false;"
+            "const tl = (o) => { log.push(['timeline', Math.round((o.delay || 0) * 1000) / 1000]); const t = {"
+            " to(el, v, at) { log.push(['tl.to', el.id, v, at]); return t; } }; return t; };"
+            "globalThis.gsap = { set(el, v) { log.push(['set', el.id || [...el].map((e) => e.id).join('+'), v]); },"
+            " fromTo(el, a, b) { log.push(['fromTo', el.id, a, { ...b, onComplete: undefined, delay: Math.round((b.delay || 0) * 1000) / 1000 }]); },"
+            " timeline: tl, killTweensOf() {}, to() {} };"
+            "globalThis.window = { matchMedia: () => ({ matches: reduced }) };"
+            "const spare = { id: 'spare', hidden: false, style: { removeProperty() {} } };"
+            "const key = { id: 'key', hidden: false, style: { removeProperty() {} } };"
+            "const stage = { id: 'stage1', style: { removeProperty() {} } };"
+            "const fills = [1, 2, 3].map((i) => ({ id: 'star' + i }));"
+            "globalThis.document = {"
+            " getElementById: (id) => (id === 'round-spare' ? spare : id === 'round-key' ? key : null),"
+            " querySelector: (sel) => (sel.includes('data-stage=\"1\"') ? stage : null),"
+            " querySelectorAll: (sel) => (sel === '#round-stars .earned .fill' ? fills : sel === '#round-spare' ? [spare] : []) };"
+            f"const C = await import('{(self.JS / 'celebrate.js').as_uri()}');"
+            f"const M = await import('{(self.JS / 'motion.js').as_uri()}');"
+            "const play = { screen: 'play', current: { word: 'cat', status: 'correct' }, round: { stage: 1 } };"
+            "const end = (o) => ({ screen: 'round-end', current: { word: 'cat', status: 'correct' }, round: { stage: 1, ...o } });"
+            "C.renderCelebrate(play); log.length = 0; C.renderCelebrate(end({ spareEarned: true, justCleared: true, keyEarned: true }));"
+            "const all = log.slice(); log.length = 0; C.renderCelebrate(end({ spareEarned: true, justCleared: true, keyEarned: true }));"
+            "const again = log.slice(); log.length = 0; C.renderCelebrate(play); const left = log.filter((e) => e[1] === 'spare');"
+            "log.length = 0; C.renderCelebrate(end({ keyEarned: true })); const noSpare = log.slice();"
+            "C.renderCelebrate(play); log.length = 0; reduced = true; C.renderCelebrate(end({ spareEarned: true })); const still = log.slice();"
+            "out([all, again, left, noSpare, still, M.motionFor('sparePop', false), M.motionFor('sparePop', true),"
+            " [0, 3].map((n) => [C.spareDone(n, false), C.spareDone(n, true)])]);")
+        everything, again, left, no_spare, still, spec, spec_reduced, done = res
+        # the spare: hidden by its scale until the stars are done (0.6 s),
+        # then it swells to 1.4 and settles while its light comes on; the
+        # stage bulb after it (1.0 s), the key after the bulb (1.3 s)
+        self.assertEqual([e for e in everything if e[0] == 'timeline' or e[1] in ('spare', 'key')], [
+            ['set', 'spare', {'scale': 0, '--lit': 0, 'transformOrigin': '50% 50%'}],
+            ['timeline', 0.6],
+            ['tl.to', 'spare', {'--lit': 1, 'duration': 0.2, 'ease': 'power2.out'}, 0],
+            ['tl.to', 'spare', {'scale': 1.4, 'duration': 0.2, 'ease': 'power2.out'}, 0],
+            ['tl.to', 'spare', {'scale': 1, 'duration': 0.2, 'ease': 'power2.out'}, 0.2],
+            ['timeline', 1.0],
+            ['fromTo', 'key', {'scale': 0, 'rotation': -40}, {'scale': 1, 'rotation': 0, 'duration': 0.4, 'ease': 'back.out(1.6)', 'delay': 1.3}],
+        ])
+        self.assertEqual(again, [])
+        # leaving: what it set inline goes
+        self.assertEqual(left, [['set', 'spare', {'clearProps': 'transform,transformOrigin'}], ['set', 'spare', {'clearProps': 'opacity'}]])
+        # no spare: the key keeps its time (0.6 s, no bulb)
+        self.assertEqual([e for e in no_spare if e[1] in ('spare', 'key')],
+                         [['fromTo', 'key', {'scale': 0, 'rotation': -40}, {'scale': 1, 'rotation': 0, 'duration': 0.4, 'ease': 'back.out(1.6)', 'delay': 0.6}]])
+        # reduced motion: a fade in after the stars
+        self.assertEqual([e for e in still if e[1] == 'spare'], [['fromTo', 'spare', {'opacity': 0}, {'opacity': 1, 'duration': 0.2, 'delay': 0.6}]])
+        self.assertEqual(spec, {'duration': 0.4, 'ease': 'power2.out', 'scale': 1.4, 'fade': 0.2})
+        self.assertEqual(spec_reduced, {'duration': 0, 'ease': 'none', 'scale': 1, 'fade': 0.2})
+        self.assertEqual([[round(a, 6), round(b, 6)] for a, b in done], [[0, 0.4], [0.6, 1.0]])
+
+    # --- docs ---
+
+    def test_docs(self):
+        claude = (self.ROOT / 'CLAUDE.md').read_text()
+        rules = claude[claude.index('- Mistakes:'):claude.index('- Progression (M4')]
+        for phrase in ('3 bulbs per round, not per word (B-231)', 'spare bulbs (at most 2)', 'tutorial costs none',
+                       'its second miss brings the robot', 'its third reveals', "the round's last bulb goes off",
+                       'A perfect round (every word clean)'):
+            self.assertIn(phrase, rules, phrase)
+        self.assertNotIn('3 hearts per word', claude)
+        bullet = claude[claude.index('  - `bulbs.js` is'):]
+        bullet = bullet[:bullet.index('\n  - ')]
+        for phrase in ('`flip.bulbs.v1`', 'keyOf', 'try/catch', '`startBulbs`', '`afterCheck', '`missKind', '`roundOver',
+                       '`isPerfect', '`afterRound', '`record(', 'round.spareEarned', '`SPARE_MAX` (2)', '`BULBS` (3)'):
+            self.assertIn(phrase, bullet, phrase)
+        self.assertIn('keys.js and bulbs.js import only it', claude)
+        self.assertIn('isClean(correct, current.misses, boosted)', claude)
+        self.assertNotIn('LIVES - lives', claude)
+        self.assertIn('a round its bulbs ended early (B-231)', claude)
+        progression = (self.ROOT / 'PROGRESSION.md').read_text()
+        guard = progression[progression.index('## Guardrails'):progression.index('## Build decisions')]
+        for phrase in ('**Bulbs for the whole round** (B-231', '**A spare bulb for a perfect round** (B-231)', 'at most 2 held',
+                       'Words not reached are not played', 'tutorial costs none'):
+            self.assertIn(phrase, guard, phrase)
+        character = (self.ROOT / 'CHARACTER.md').read_text()
+        self.assertNotIn('leaves one bulb lit |', character)
+        self.assertIn("| The word's second wrong check (his letter comes; B-231) |", character)
+        self.assertIn("| Second miss: his letter (B-206; the word's own second wrong check) |", character)
+        self.assertIn("| Third miss (the word's own third, or the round's last bulb going off", character)

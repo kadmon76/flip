@@ -83,7 +83,12 @@ export const state = {
     // keyEarned (keys.js record, at the round end): the round brought a
     // theme key the kid can use now (locks.js shows it, celebrate.js pops
     // it, the robot says his key line).
-    round: { index: 0, size: 5, stage: null, results: [], cleared: [], justCleared: false, keyEarned: false },
+    // bulbs (BACKLOG B-231, bulbs.js startBulbs): the bulbs the round
+    // started with, 3 and the player's spare bulbs (up to 5), as many as
+    // the TV shows; spareEarned (bulbs.js record, at the round end): a
+    // perfect round brought a new spare bulb (main.js shows it beside the
+    // stars, celebrate.js pops it in).
+    round: { index: 0, size: 5, stage: null, bulbs: 3, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },
     // A round is being set up: true from a tap that starts one (a station
     // on the stage map, play again) until main.js startRound has the theme's data file
     // and shows the round, or finds the kid has left the screen the tap came
@@ -102,7 +107,7 @@ export const state = {
         // tray is [{ id, letter, used, given?, extra?, gone? }] in tray display order (given: stage 1's first letter's block, which has no bench spot; extra: on a stage with extras, a block whose letter is not in the word, round.js makeWord, never used by the hint or the reveal; gone: an extra block the clean-up boost took away, boost.js cleanUp, BACKLOG B-219: it is in no slot, keeps its bench spot empty and never comes back); used: it is in a slot; id is stable
         // for the life of the word so the DOM tile can be keyed to it
         tray: [],
-        // 'playing' | 'wrong' (checked, lives left; the next block move
+        // 'playing' | 'wrong' (checked, not revealed; the next block move
         // makes it 'playing' again, as does the robot's letter when it
         // finishes the word, drag.js afterHint) | 'correct' | 'revealed'
         status: 'playing',
@@ -129,8 +134,19 @@ export const state = {
         // main.js pay), for the robot's line on it (BACKLOG B-224); null
         // (or absent) before any.
         boostKind: null,
+        // The word's own wrong checks (BACKLOG B-231; main.js onCheck), 0
+        // (or absent) on a new word: its second brings the robot's letter
+        // (B-206), its third reveals it (bulbs.js missKind), and a word
+        // with one is not clean (gears.js isClean). Counted apart from the
+        // round's bulbs (`lives`).
+        misses: 0,
     },
-    lives: 3,                   // attempts left for the current word
+    // The round's bulbs still lit (BACKLOG B-231, bulbs.js): set to
+    // round.bulbs when a round starts (3 and the player's spare bulbs), one
+    // off per wrong check on any word (none on the tutorial word), never
+    // refilled on a new word; the round ends after the word its last went
+    // off on (revealed). The TV's bulbs are a render of it (card.js).
+    lives: 3,
     // Console control held down (DESIGN "Controls and states"): 'dome' for
     // 120ms after a press on the check dome, 'lever' for 250ms after a pull
     // on the reset lever; null otherwise.

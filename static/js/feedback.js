@@ -3,13 +3,16 @@
 // card.js has rendered, compares the new state with what it last rendered
 // and starts motion only on a transition; a re-render in the same state
 // does nothing. It never mutates state.
-//   - a lives bulb went out (any wrong check): that bulb flickers three
-//     times and stays dark, and the TV picture gets a short static flicker
+//   - one of the round's bulbs went out (any wrong check but the
+//     tutorial word's, BACKLOG B-231): that bulb flickers three times and
+//     stays dark; and on every wrong check (the word's own misses one
+//     more) the TV picture gets a short static flicker
 //   - status became 'wrong': blocks in wrong slots wiggle
-//   - status became 'revealed' (third miss): the right blocks fly into the
+//   - status became 'revealed' (the word's third miss, or the round's last
+//     bulb gone, B-231): the right blocks fly into the
 //     slots in order, and an extra letter (hard, BACKLOG B-207) that was
 //     in a slot hops back to the bench
-//   - the robot's letter appeared (the miss that leaves one bulb lit,
+//   - the robot's letter appeared (the word's second miss,
 //     drag.js giveHint): the wrong block in its slot hops back to the
 //     bench, then his letter flies in from where it was
 //   - the reset lever went down: the rail shakes and the blocks it took
@@ -40,8 +43,9 @@ import { centre } from './drag.js';
 // placement is kept so the reveal, the second-miss hint, the reset and a
 // boost can fly blocks from the slots they were in; `gone` (the blocks
 // the clean-up took away), `lockedTaps` and `menu` (state.boostMenu) for
-// the boosts (BACKLOG B-219).
-const NONE = { key: null, status: null, lives: null, pressed: null, placed: [], gone: [], lockedTaps: 0, menu: null };
+// the boosts (BACKLOG B-219); `lives` the round's bulbs still lit and
+// `misses` the word's own wrong checks (BACKLOG B-231).
+const NONE = { key: null, status: null, lives: null, misses: 0, pressed: null, placed: [], gone: [], lockedTaps: 0, menu: null };
 let last = NONE;
 
 function reducedMotion() {
@@ -56,6 +60,7 @@ export function renderFeedback(state) {
             key: `${round.index}:${current.word}`,
             status: current.status,
             lives,
+            misses: current.misses || 0,
             pressed,
             placed: current.placed,
             gone: current.tray.filter((t) => t.gone).map((t) => t.id),
@@ -70,11 +75,12 @@ export function renderFeedback(state) {
     // A new word or another screen: nothing else to react to yet.
     if (!onWord || prev.key !== now.key) return;
 
-    if (now.lives < prev.lives) {
-        flickerBulb(now.lives);
-        staticTv();
-    }
-    if (now.status === 'wrong' && (prev.status !== 'wrong' || now.lives < prev.lives)) {
+    // a wrong check: one of the round's bulbs out (none on the tutorial
+    // word, BACKLOG B-231), the static on every one
+    const missed = now.lives < prev.lives || now.misses > prev.misses;
+    if (now.lives < prev.lives) flickerBulb(now.lives);
+    if (missed) staticTv();
+    if (now.status === 'wrong' && (prev.status !== 'wrong' || missed)) {
         wiggleWrong(current);
     }
     if (hintSlot(now.placed) !== -1 && hintSlot(prev.placed) === -1) {
@@ -202,8 +208,9 @@ function wiggleWrong(current) {
     else if (m.fade > 0) dip(tiles, m.fade);
 }
 
-// The bulb at `index` (the one just lost; card.js has already rendered it
-// dark) lights up and goes out m.flashes times, then stays dark. Driven
+// The round's bulb at `index` (the one just lost, the last lit from the
+// left; card.js has already rendered it dark) lights up and goes out
+// m.flashes times, then stays dark. Driven
 // through the bulb's `--lit` custom property (game.css), so the render's
 // `lost` class stays the truth once the inline value is removed. Reduced
 // motion: one fade from lit to dark.
@@ -262,7 +269,7 @@ function staticTv() {
     }
 }
 
-// --- Third miss: reveal ---
+// --- Third miss (or the round's last bulb, BACKLOG B-231): reveal ---
 
 // Every block that is not already in its right slot flies there from the
 // slot it was in, in slot order, 120ms apart. A block that lay on the
@@ -302,7 +309,7 @@ function benchSpot(current, tileId) {
     return i === -1 ? null : document.getElementById('letter-tray').children[i] || null;
 }
 
-// The miss that left one bulb lit also gave the robot's letter, in the
+// The word's second miss also gave the robot's letter, in the
 // same render (drag.js giveHint): the block that was in that slot is on
 // the bench now and his letter is in the slot, locked. Both start where
 // the check found them (travel) and, if they were in a wrong slot,
@@ -418,7 +425,7 @@ function puffAway(ids) {
 
 // A boost the kid can't afford: the console's gear counter (the boost
 // button) flickers, off and on m.flashes times within m.duration, the
-// lives bulb's flicker. Reduced motion: one opacity dip.
+// TV bulb's flicker. Reduced motion: one opacity dip.
 function flickerGears() {
     const host = document.getElementById('console-gears');
     if (!host) return;

@@ -99,8 +99,9 @@ export function spend(n) {
 }
 
 // Whether a word's check was clean (pure): checked correct on the word's
-// first check, that is with no wrong check before it (each wrong check
-// costs a lives bulb, so main.js passes the bulbs lost), and with no
+// first check, that is with no wrong check before it (main.js passes the
+// word's own wrong checks, `current.misses`; since BACKLOG B-231 the
+// bulbs are the round's, so they no longer count them), and with no
 // boost (BACKLOG B-219: main.js passes boost.js isBoosted). Only a clean
 // word earns its sticker
 // (stickers.js add) and the clean gear.

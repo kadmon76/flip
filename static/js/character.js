@@ -33,6 +33,7 @@ import { domeAction } from './controls.js';
 import { motionFor } from './motion.js';
 import { coachStep } from './coach.js';
 import { WIN_MS } from './picture.js';
+import { HINT_AT } from './bulbs.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -227,8 +228,10 @@ export const FX = {
 //   - "All slots filled": filledEarly (pointing at the dome, no line:
 //     BACKLOG B-226) in the first EARLY_ROUNDS rounds of the session;
 //     filled after that, which is "Letter placed";
-//   - "Wrong check ... peek": he peeks when the miss leaves one lives
-//     bulb lit, on the first miss it is "Wrong";
+//   - "Wrong check ... peek": he peeks on the word's own second miss,
+//     the one that brings his letter (bulbs.js HINT_AT; since BACKLOG
+//     B-231 the TV's bulbs are the round's, so it is no longer the miss
+//     that leaves one bulb lit), on its first it is "Wrong";
 //   - "Round end": clapping for 2-3 stars, his rest pose for 0-1 (never
 //     sad). He is not on the round-end screen, so nothing shows it yet.
 // Not in the reference: blockReturned (a block back to the bench, B-108)
@@ -638,7 +641,7 @@ export function isChange(step) {
 const round3 = (t) => Math.round(t * 1000) / 1000;
 
 // The steps of `moments` (one state change: at most two, e.g. the miss
-// that leaves one bulb lit is his peek and his letter) as one script,
+// that brings his letter is his peek and his letter) as one script,
 // `at` seconds from now. The next moment starts when the one before takes
 // its last step (but at least CHANGE_MS after the one before started),
 // and that step and any later ones are dropped: every moment starts with
@@ -876,7 +879,10 @@ export function snapshot(state) {
         round: state.roundsStarted,
         key: onWord ? `${wordKey(state)}:${current.word}` : null,
         status: onWord ? current.status : null,
+        // the round's bulbs still lit (BACKLOG B-231) and the word's own
+        // wrong checks
         lives,
+        misses: onWord ? current.misses || 0 : 0,
         placed: onWord ? current.placed.map((p) => (p ? p.tileId : '-')).join(',') : '',
         filled: onWord && current.placed.length > 0 && current.placed.every(Boolean),
         idleBeat: state.idleBeat,
@@ -936,12 +942,14 @@ export function momentsFor(prev, now) {
     }
     if (prev.key !== now.key) return now.tuned ? [look] : [];
     if (now.tuned && !prev.tuned) return [look];
-    if (now.status !== prev.status || now.lives < prev.lives) {
+    if (now.status !== prev.status || now.lives < prev.lives || now.misses > prev.misses) {
+        // a reveal: the word's third miss, or the round's last bulb gone
+        // (B-231)
         if (now.status === 'revealed') return ['thirdMiss'];
         if (now.status === 'correct') return [now.tutorial ? 'tutorialDone' : now.streak === STREAK ? 'streak' : 'correct'];
         if (now.status === 'wrong') {
-            const miss = now.lives === 1 ? 'wrongPeek' : 'wrong';
-            // the miss that leaves one bulb also gave his letter (B-206)
+            const miss = now.misses === HINT_AT ? 'wrongPeek' : 'wrong';
+            // the word's second miss also gave his letter (B-206)
             return now.hint !== -1 && now.hint !== prev.hint ? [miss, 'hintGiven'] : [miss];
         }
     }
@@ -1162,7 +1170,7 @@ export function pressDue(state, armed) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, misses: 0, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
 
 // --- Render ---
 

@@ -1077,7 +1077,8 @@ body[data-screen="play"] .play-back-btn {
 }
 
 /* Brass plate under the TV (x 24.5-72.5%, y 33.3-38.5% of the picture):
-   lives bulbs on the left, the split-flap counter on the right. */
+   the round's bulbs on the left (BACKLOG B-231), the split-flap counter
+   on the right. */
 #screen-play .plate {
     position: absolute;
     left: 24.5%;
@@ -1090,7 +1091,8 @@ body[data-screen="play"] .play-back-btn {
     padding: 0 calc(15 * var(--u)) 0 calc(16 * var(--u));
 }
 
-/* Three lives bulbs (class kept from the hearts; card.js marks the lost
+/* The round's bulbs (BACKLOG B-231; class kept from the hearts; card.js
+   makes one per bulb the round started with, 3 to 5, and marks the lost
    ones): lit is amber with a warm glow, lost is the dark bulb colour.
    The span is the dark bulb; the lit glow is a layer over it whose
    opacity is --lit (1 lit, 0 lost by default). When a bulb goes out,
@@ -1127,6 +1129,29 @@ body[data-screen="play"] .play-back-btn {
 .hearts .lost::before,
 .bulb.off::before {
     opacity: var(--lit, 0);
+}
+
+/* 4 or 5 bulbs (a round with spare bulbs, BACKLOG B-231; card.js
+   data-count): smaller and closer, starting a little further left, so the
+   row stays on the plate's brass and clear of the counter at 360 wide. */
+.hearts[data-count="4"] {
+    gap: calc(5 * var(--u));
+    margin-left: calc(-3 * var(--u));
+}
+
+.hearts[data-count="4"] span {
+    width: calc(14 * var(--u));
+    height: calc(14 * var(--u));
+}
+
+.hearts[data-count="5"] {
+    gap: calc(4 * var(--u));
+    margin-left: calc(-6 * var(--u));
+}
+
+.hearts[data-count="5"] span {
+    width: calc(12 * var(--u));
+    height: calc(12 * var(--u));
 }
 
 /* split-flap counter "2 / 5": card.js renders one .flap per character */
@@ -2343,8 +2368,28 @@ body[data-screen="theme"] .header-gears {
     opacity: 1;
 }
 
+/* The spare bulb a perfect round earned (BACKLOG B-231; main.js shows it,
+   celebrate.js pops it in after the stars): a lit TV bulb (.bulb) right of
+   the stars, which stay centred. */
+#round-stars {
+    position: relative;
+}
+
+#round-spare {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    width: 28px;
+    height: 28px;
+    margin: -14px 0 0 14px;
+}
+
+#round-spare[hidden] {
+    display: none;
+}
+
 /* The theme's stages under the stars (BACKLOG B-216, interim): one bulb
-   per stage the theme has words in, the lives bulb's look (.bulb), lit
+   per stage the theme has words in, the TV bulb's look (.bulb), lit
    when the stage is cleared, dark when not (DESIGN "Other screens"
    conventions). Pulled up toward the stars, so the column grows by only
    the row's 18px and 6px of the screen's gap: nothing scrolls at 360x640.
@@ -2398,7 +2443,8 @@ body[data-screen="theme"] .header-gears {
     --sticker-size: 34px;
 }
 
-/* One row per word: the picture, the word (the only English allowed), a
+/* One row per word played (a word the round's bulbs ran out before has
+   none, BACKLOG B-231): the picture, the word (the only English allowed), a
    sticker if it is new in the book, and a bulb: lit when the word was
    checked correct, dark when it was missed. Rows are divided by a shaded line. */
 .round-words {
