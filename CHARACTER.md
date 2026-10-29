@@ -100,7 +100,7 @@ Pose and movement change together; never more than one change per 300ms.
 | Third miss | covers his eyes (dot eyes, worried), then relief (happy eyes) as the blocks fly in | error clip | `reveal-open` | always | always |
 | Correct | while the TV's win plays (1 s, B-227) he watches it: looks up at the TV with happy eyes, his hands at rest, no pump, no talk; when it ends: fist pump, happy eyes, pop | the win's chime (made in code, an effect) with the win; when the win ends he says the word, clean and complete (the word's own clip, as his voice), then one line: the word's gag (`gags/<theme>/<word>.mp3`, or its `-2`, at random), else a line of pool `correct`; with neither, a correct clip after the word (B-223) | after the word: `gag`, else `correct` | always | always |
 | 3 correct in a row (the third only; the 4th and 5th in a row are Correct again, so each says its gag; human, 2026-10-24) | he watches the TV's win as on Correct (B-227); when it ends: two fists pumping, double pop, cap sparks | the win's chime with the win; when it ends he says the word as on Correct, then a line of pool `streak`, else the word's gag, else a line of pool `correct`; with none, a correct clip after the word (B-223) | after the word: `streak`, else `gag`, else `correct` | once per run of 3 | always |
-| Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | tada (an effect, under his line) | by the stars: 3 `end-high`, 2 `end-mid`, 0–1 `end-low` | always | always |
+| Round end | claps (2–3 stars) / rest pose (0–1 stars, never sad); he is not on the round-end screen yet | the fanfare (made in code, an effect: three bright notes rising, about 0.64 s; B-230) as the screen shows; his line when it ends, never under it; nothing of the last word's voice plays on | after the fanfare, by the stars: 3 `end-high`, 2 `end-mid`, 0–1 `end-low` | always | always |
 | Speaker locked (from B-219: a boost the kid can't afford; the speaker always plays the word since B-215) | head-shake, frown, shrug | hmm no (placeholder, `error/hmm no.mp3`) | `no-gears` | every time | always |
 
 Voice lines: his new voice (pre-generated AI voice; `tools/voices.py`
@@ -126,7 +126,7 @@ always moment says its line every time; a sometimes or rare one says it
 at its chance, and never while he talks or for 8 s after a clip of his
 voice ended or was cut (`TALK_GAP`); the always moments and the word
 itself are never dropped. A dropped line drops only his voice: his pose,
-his moves and the effects (the swipe, the tada) play as ever, and no
+his moves and the effects (the swipe, the fanfare) play as ever, and no
 prototype clip plays in its place. Pools not wired yet: `murmur`,
 `reveal-close`, `sticker`, `stage`, `gear`, `boost-slow` (BACKLOG
 "Later / not now").

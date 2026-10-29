@@ -1569,21 +1569,22 @@ class CharacterTests(TestCase):
         # BACKLOG B-108: the robot's clips are MOMENTS[moment].sound, read
         # through soundsFor (audio.js plays them): swipe when a block goes
         # into a slot, the last one too; error on a wrong check and on the
-        # reveal; correct on a correct check (and a streak); tada when the
-        # round-end screen is shown; nothing else.
+        # reveal; correct on a correct check (and a streak); the fanfare,
+        # made in code, when the round-end screen is shown (B-230, in place
+        # of the tada); nothing else.
         sounds = self.run_node("out(Object.fromEntries(Object.keys(c.MOMENTS).map((m) => [m, c.soundsFor([m])])));")
         self.assertEqual(sounds, {
             'roundStart': [], 'picture': [], 'blockPlaced': ['swipe'], 'blockReturned': [],
             'filledEarly': ['swipe'], 'filled': ['swipe'], 'filledNudge': [], 'kidIdle': [], 'wake': [],
             'tutorialWave': [], 'tutorialDrag': [], 'tutorialPress': ['swipe'], 'tutorialDone': ['correct'], 'greet': [],
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
-            'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['tada'], 'roundEnd': ['tada'],
+            'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['fanfare'], 'roundEnd': ['fanfare'],
             'keyEarned': [], 'themeOpen': [], 'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
             "const used = new Set(Object.values(c.MOMENTS).map((m) => m.sound).filter(Boolean)); out([...used].sort());"),
-            ['correct', 'error', 'locked', 'swipe', 'tada'])
+            ['correct', 'error', 'fanfare', 'locked', 'swipe'])
 
     def test_wrong_check_confused_and_a_peek_on_the_last_bulb(self):
         self.assertEqual(self.run_node(
@@ -2339,7 +2340,7 @@ class AudioTests(TestCase):
             "const ready = async () => { a.init(); listeners.pointerup(); await settle(); };"
             "const short = (src) => decodeURIComponent(src.replace('/static/sounds/', ''));"
             "const played = () => log.filter((e) => e.op === 'play' && e.src !== 'silence').map((e) => short(e.src));"
-            "const kinds = () => played().map((f) => f.split('/')[0].replace('celebration', 'tada'));"
+            "const kinds = () => played().map((f) => f.split('/')[0]);"
             "const sounding = () => sources.filter((s) => s.on && s.buffer.url !== 'silence').map((s) => short(s.buffer.url).split('/')[0]).sort();"
             "const clear = () => { log.length = 0; };"
             "const put = (ids) => ids.map((id) => (id ? { letter: 'x', tileId: id } : null));"
@@ -2356,29 +2357,35 @@ class AudioTests(TestCase):
         return json.loads(result.stdout)
 
     def test_pools_are_exactly_the_existing_clips(self):
-        # correct/*, error/*, celebration/tada.mp3, swipe/*: every file on
-        # disk and nothing else (a renamed clip fails here, not on a phone)
+        # correct/*, error/*, swipe/*: every file on disk and nothing else
+        # (a renamed clip fails here, not on a phone)
         files = self.run_node("out(a.FILES);")
-        self.assertEqual(set(files), {'correct', 'error', 'tada', 'swipe', 'locked'})
+        self.assertEqual(set(files), {'correct', 'error', 'swipe', 'locked'})
         for kind, dir_ in (('correct', 'correct'), ('error', 'error'), ('swipe', 'swipe')):
             self.assertEqual(files[kind]['dir'], dir_)
             on_disk = sorted(f.name for f in (self.SOUNDS / dir_).iterdir() if f.is_file())
             self.assertEqual(sorted(files[kind]['names']), on_disk, kind)
-        self.assertEqual(files['tada'], {'dir': 'celebration', 'names': ['tada.mp3']})
+        # BACKLOG B-230: the round end's tada, a clip of the prototype
+        # character's voice, stays on disk, in no pool (its fanfare is made
+        # in code)
         self.assertTrue((self.SOUNDS / 'celebration' / 'tada.mp3').exists())
+        self.assertNotIn('celebration', [f['dir'] for f in files.values()])
         # BACKLOG B-203: the held-back speaker's "hmm no", the existing clip
         self.assertEqual(files['locked'], {'dir': 'error', 'names': ['hmm no.mp3']})
         self.assertTrue((self.SOUNDS / 'error' / 'hmm no.mp3').exists())
 
     def test_urls_are_encoded(self):
         urls = self.run_node(
-            "out([a.clipUrl('error', 'hmm no.mp3'), a.clipUrl('tada', 'tada.mp3'), a.poolUrls('swipe'),"
+            "out([a.clipUrl('error', 'hmm no.mp3'), a.clipUrl('correct', 'bingo.mp3'), a.poolUrls('swipe'),"
             " a.poolUrls('correct').filter((u) => / /.test(u)).length, a.clipUrl('correct', 'a b.mp3', '/x/')]);")
         self.assertEqual(urls, [
-            '/static/sounds/error/hmm%20no.mp3', '/static/sounds/celebration/tada.mp3',
+            '/static/sounds/error/hmm%20no.mp3', '/static/sounds/correct/bingo.mp3',
             [f'/static/sounds/swipe/swipe{i}.mp3' for i in range(1, 5)], 0, '/x/correct/a%20b.mp3'])
         self.assertIn('unknown kind', self.run_node(
             "try { a.clipUrl('music', 'x.mp3'); out('no error'); } catch (e) { out(e.message); }"))
+        # no pool of the tada since B-230
+        self.assertIn('unknown kind', self.run_node(
+            "try { a.clipUrl('tada', 'tada.mp3'); out('no error'); } catch (e) { out(e.message); }"))
 
     def test_pick_is_random_within_the_pool(self):
         self.assertEqual(self.run_node(
@@ -2388,13 +2395,13 @@ class AudioTests(TestCase):
 
     def test_channels(self):
         # the TV's tune-in hiss (B-214) is an effect, like the swipe, and
-        # so are the round end's tada (B-224: under his end line) and the
-        # win's chime (B-227) and a word's own win's sounds (B-228); the
+        # so are the win's chime (B-227), a word's own win's sounds (B-228)
+        # and the round end's fanfare (B-230, in place of the tada); the
         # word he says on a correct check and his lines (B-223, B-224) are
         # his voice
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
-                         {'correct': 'voice', 'error': 'voice', 'tada': 'fx', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
-                          'chime': 'fx', 'sfx': 'fx', 'word': 'voice', 'line': 'voice'})
+                         {'correct': 'voice', 'error': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
+                          'chime': 'fx', 'sfx': 'fx', 'fanfare': 'fx', 'word': 'voice', 'line': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -2412,10 +2419,10 @@ class AudioTests(TestCase):
         # init() plays nothing, with no AudioContext yet; once the page is
         # idle (B-229, here at once) it fetches his new voice's manifest
         # (B-223) and then one clip of each pool (here, with no manifest
-        # lines, the five prototype pools'); the first pointerup / touchend
-        # / click / keydown makes one context, resumes it and plays one
-        # silent sample (iOS opens the output on that), then the clips
-        # decode. The listeners stay: a later gesture finding the context
+        # lines, the four prototype pools'; no tada since B-230); the first
+        # pointerup / touchend / click / keydown makes one context, resumes
+        # it and plays one silent sample (iOS opens the output on that),
+        # then the clips decode. The listeners stay: a later gesture finding the context
         # suspended (the phone switched apps) resumes it again; one
         # finding it running does nothing.
         self.assertEqual(self.run_node(
@@ -2430,13 +2437,13 @@ class AudioTests(TestCase):
             "out([before, early, first, pools, after, quiet, [c.state, c.resumes], Object.keys(listeners).length]);"),
             [[1, 1, 1, 0, 0, ['click', 'keydown', 'pointerup', 'touchend']], 0,
              [1, 'running', 1, ['silence']],
-             ['correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3', 'celebration/tada.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3'],
+             ['correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3'],
              ['swipe'], [1, 1], ['running', 2], 4])
 
     def test_no_web_audio_means_silent_not_broken(self):
         self.assertEqual(self.run_node(
             "delete globalThis.AudioContext; a.init(); listeners.pointerup(); await settle();"
-            "['correct', 'error', 'tada', 'swipe', 'locked'].forEach(a.play); out([ctxs.length, played()]);"),
+            "['correct', 'error', 'swipe', 'locked'].forEach(a.play); out([ctxs.length, played()]);"),
             [0, []])
 
     def test_a_clip_that_fails_to_download_is_left_out(self):
@@ -2461,15 +2468,15 @@ class AudioTests(TestCase):
             "a.play('error'); S.setState({ speaking: true }); let ended = 0;"
             "a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
             "const word = made[made.length - 1]; const voiceCut = sounding();"
-            "clear(); a.play('correct'); a.play('tada'); a.play('swipe');"
+            "clear(); a.play('correct'); a.play('swipe');"
             "out([voiceCut, kinds(), word.paused, ended]);"),
-            # the effects (the tada since B-224, the swipe) may overlap it
-            [[], ['tada', 'swipe'], False, 0])
+            # the effect (the swipe) may overlap it
+            [[], ['swipe'], False, 0])
 
     def test_muted_means_no_sound_at_all(self):
         self.assertEqual(self.run_node(
             "await ready(); S.setState({ muted: true, speaking: false }); const n = made.length;"
-            "['correct', 'error', 'tada', 'swipe', 'locked'].forEach(a.play);"
+            "['correct', 'error', 'swipe', 'locked'].forEach(a.play);"
             "let ended = 0; a.speakWord('/static/sounds/themes/animals/cat.mp3', () => ended++);"
             "out([played(), made.length - n, ended]);"),
             [[], 0, 1])
@@ -2479,9 +2486,9 @@ class AudioTests(TestCase):
         # each state change: swipe for a block into a slot (the last one
         # too), nothing for a block back to the bench or the lever, error
         # on a wrong check (B-226: a "sometimes" moment, here at a draw
-        # under its chance) and the reveal, correct on a correct check,
-        # tada once when the round-end screen shows; and nothing at all
-        # while muted.
+        # under its chance) and the reveal, correct on a correct check, no
+        # clip when the round-end screen shows (B-230: its fanfare is made
+        # in code, RoundEndFanfareTests); and nothing at all while muted.
         steps = self.run_node(
             "await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
             "const go = (o) => { clear(); S.setState(st(o)); return kinds(); };"
@@ -2507,7 +2514,7 @@ class AudioTests(TestCase):
             ['error'],                      # the third miss reveals
             [],                             # the next word
             ['correct'],                    # correct check
-            ['tada'], [],                   # round-end shown, once
+            [], [],                         # round-end shown: no clip (B-230)
         ])
 
     def test_mute_stops_everything_and_keeps_it_silent(self):
@@ -2528,6 +2535,8 @@ class AudioTests(TestCase):
         # over its bytes), and both pools play it. Since B-229 one clip a
         # pool is fetched at first: here the error pool's is "hmm no"
         # (index 4 of its ten), so the locked pool asks for nothing more
+        # (three decodes: the correct, error and swipe pools'; no tada
+        # since B-230)
         self.assertEqual(self.run_node(
             "const decodes = []; const dec = AudioContext.prototype.decodeAudioData;"
             "AudioContext.prototype.decodeAudioData = function (d) { decodes.push(d.url); return dec.call(this, d); };"
@@ -2537,7 +2546,7 @@ class AudioTests(TestCase):
             "a.play('error');"
             "out([fetched.filter((u) => u === url).length, decodes.filter((u) => u === url).length, decodes.length,"
             " new Set(decodes).size, locked, played(), sounding()]);"),
-            [1, 1, 4, 4, ['error/hmm no.mp3', 'error/hmm no.mp3'], ['error/hmm no.mp3'], ['error']])
+            [1, 1, 3, 3, ['error/hmm no.mp3', 'error/hmm no.mp3'], ['error/hmm no.mp3'], ['error']])
 
     def test_a_tap_on_the_held_back_speaker_says_hmm_no(self):
         # renderSound plays MOMENTS.speakerLocked.sound ('locked') on each
@@ -2559,8 +2568,8 @@ class AudioTests(TestCase):
     def test_back_to_themes_stops_the_word_and_plays_nothing(self):
         # BACKLOG B-201: the play screen's back button (main.js onPlayBack
         # -> onThemes) stops the word clip and clears the round in one
-        # setState; renderSound plays nothing for it (no tada after the
-        # fifth word either), and the stopped clip never calls its onEnd
+        # setState; renderSound plays nothing for it (no round end after
+        # the fifth word either), and the stopped clip never calls its onEnd
         self.assertEqual(self.run_node(
             "await ready(); S.subscribe(a.renderSound);"
             "const back = (o) => ({ ...o, screen: 'theme', theme: null, words: [], round: { index: 0, size: 5, results: [] },"
@@ -9698,7 +9707,7 @@ class CorrectWordVoiceTests(TestCase):
             "a.play('swipe'); const fx = on();"
             "await end('words/animals/cat.mp3'); const after = on();"
             "out([dropped, fx, after, log.filter((e) => e.op === 'stop').map((e) => short(e.src))]);")
-        # (the tada, an effect since B-224, is not his voice)
+        # (only his voice is dropped)
         self.assertEqual(res[0], [['words/animals/cat.mp3'], ['words/animals/cat.mp3']])
         # the swipe, an effect, plays over the word
         self.assertEqual([res[1][0], res[1][1].split('/')[0], len(res[1])], ['words/animals/cat.mp3', 'swipe', 2])
@@ -9707,7 +9716,7 @@ class CorrectWordVoiceTests(TestCase):
 
     def test_the_line_is_his_voice_clip_like_any_other(self):
         # cut by the next voice clip, by a speaker tap, by leaving the word
-        # (the next word, the round end with its tada, the back arrow)
+        # (the next word, the round end, the back arrow)
         res = self.run_node(
             "MAN = man('gags/animals/cat.mp3'); await ready(); S.subscribe(a.renderSound);"
             "const res = []; let n = 1;"
@@ -9722,11 +9731,11 @@ class CorrectWordVoiceTests(TestCase):
             "await say(); S.setState({ ...correct({ roundsStarted: n }), screen: 'round-end', round: { index: 4, size: 5,"
             " results: [0, 1, 2, 3, 4].map(() => ({ correct: true })) } }); res.push(on().map((f) => f.split('/')[0]));"
             "await say(); S.setState({ screen: 'stages', current: { word: null, placed: [] } });"
-            " res.push(on().filter((f) => !f.startsWith('celebration/')));"
+            " res.push(on());"
             "out(res);")
-        # (the round end's tada, an effect since B-224, plays on; only his
-        # voice is checked after it)
-        self.assertEqual(res, [['error'], [[], False], [], ['celebration'], []])
+        # (the round end plays no clip since B-230: its fanfare is made in
+        # code, and this manifest has no end line)
+        self.assertEqual(res, [['error'], [[], False], [], [], []])
 
     def test_a_speaker_tap_or_leaving_while_he_says_the_word_drops_the_line(self):
         # a tap on the speaker while he says the word: the word starts again
@@ -9901,7 +9910,7 @@ class MomentLinesTests(TestCase):
     pool of his new lines (`lines`); audio.js plays a random clip of it that
     the manifest lists, else the moment's prototype clip (or nothing). The
     picture: the word's Hebrew guess, else his look's pool; the round end by
-    its stars, the tada an effect under the line; a boost by its kind. After
+    its stars, after its fanfare (B-230; the tada is gone); a boost by its kind. After
     his letter lands (hintGiven, boostGiven) its name, after his line or
     alone. One clip at a time, never over the word, nothing while muted; a
     line that can't play now is dropped; a moment that comes on its own
@@ -10023,12 +10032,13 @@ class MomentLinesTests(TestCase):
         self.assertEqual(res['ifQuiet'], ['picture', 'filledNudge', 'kidIdle', 'domeNudge'])
         self.assertTrue(res['peekQuiet'])
         self.assertEqual(res['letter'], [['hintGiven', 'hint'], ['boostGiven', 'boost']])
-        # the prototype column is as it was (the tada is now an effect)
+        # the prototype column is as it was (the round end's fanfare, made
+        # in code, an effect, in place of the tada since B-230)
         self.assertEqual(res['sounds'], {
             'roundStart': None, 'picture': None, 'blockPlaced': 'swipe', 'blockReturned': None, 'filledEarly': 'swipe',
             'filled': 'swipe', 'filledNudge': None, 'kidIdle': None, 'wake': None, 'tutorialWave': None, 'tutorialDrag': None,
             'tutorialPress': 'swipe', 'tutorialDone': 'correct', 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
-            'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'tada', 'roundEnd': 'tada', 'keyEarned': None, 'themeOpen': None, 'speakerLocked': 'locked',
+            'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'fanfare', 'roundEnd': 'fanfare', 'keyEarned': None, 'themeOpen': None, 'speakerLocked': 'locked',
             'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
 
     def test_the_pools_are_the_contents_and_the_unwired_ones_are_listed_later(self):
@@ -10107,8 +10117,8 @@ class MomentLinesTests(TestCase):
         self.assertEqual([res['wrong'], res['wrongMumble'], res['wrongNone']], [p(line='w'), p(line='m'), p(sound='error')])
         # his letter: its name after his line, or alone; not ready: none
         self.assertEqual([res['hint'], res['hintAlone'], res['hintNoLetter']], [p(line='hi', letter='L'), p(letter='L'), p(line='hi')])
-        # the round end by its stars; the tada an effect with it
-        self.assertEqual([res['end3'], res['end2'], res['end0']], [p(fx='tada', line='eh'), p(fx='tada'), p(fx='tada', line='el')])
+        # the round end by its stars; the fanfare an effect with it (B-230)
+        self.assertEqual([res['end3'], res['end2'], res['end0']], [p(fx='fanfare', line='eh'), p(fx='fanfare'), p(fx='fanfare', line='el')])
         self.assertEqual([res['boostFirst'], res['boostSlot']], [p(line='bf', letter='L'), p(letter='L')])
         self.assertEqual([res['locked'], res['roundStart'], res['placed']], [p(sound='locked'), p(), p(fx='swipe')])
         # one after the other: the line (or prototype), then the letter
@@ -10170,10 +10180,9 @@ class MomentLinesTests(TestCase):
             'filledEarly': [['swipe/swipe1.mp3'], ['o']], 'filledNudge': line('press'),
             'domeNudge': line('press'), 'kidIdle': line('idle'), 'wake': line('wake'), 'wrong': line('wrong'),
             'secondMiss': line('mumble'), 'thirdMiss': line('reveal-open'),
-            'end3': [['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v']],
-            'end2': [['celebration/tada.mp3', 'robot/end-mid-01.mp3'], ['o', 'v']],
-            'end1': [['celebration/tada.mp3', 'robot/end-low-01.mp3'], ['o', 'v']],
-            'end0': [['celebration/tada.mp3', 'robot/end-low-01.mp3'], ['o', 'v']],
+            # the round end: his line by its stars, alone (its fanfare is
+            # made in code, B-230: RoundEndFanfareTests)
+            'end3': line('end-high'), 'end2': line('end-mid'), 'end1': line('end-low'), 'end0': line('end-low'),
             'speakerLocked': line('no-gears'), 'boostRemember': line('boost-slot'), 'boostFirst': line('boost-first'),
             'boostCleanup': line('boost-clean'),
         }
@@ -10182,8 +10191,9 @@ class MomentLinesTests(TestCase):
     def test_with_no_clip_in_the_pool_the_prototype_sound_or_nothing(self):
         # static/voice/manifest.json's words and letters only (the first
         # batch, #82): no shared line, so every moment plays what it played
-        # before B-224 (nothing where it had nothing; the tada now as an
-        # effect); only the letter names are new. Later batches add shared
+        # before B-224 (nothing where it had nothing; the round end no clip
+        # at all: its fanfare is made in code, B-230, and no prototype clip
+        # plays in its line's place); only the letter names are new. Later batches add shared
         # lines to the real manifest; they are left out here so this case
         # stays tested.
         real = json.loads(self.MANIFEST.read_text())
@@ -10200,8 +10210,7 @@ class MomentLinesTests(TestCase):
         self.assertEqual(res, {
             'roundStart': [[], []], 'picture': [[], []], 'filledEarly': [['swipe/swipe1.mp3'], ['o']], 'filledNudge': [[], []],
             'domeNudge': [[], []], 'kidIdle': [[], []], 'wake': [[], []], 'wrong': err, 'secondMiss': err, 'thirdMiss': err,
-            'end3': [['celebration/tada.mp3'], ['o']], 'end2': [['celebration/tada.mp3'], ['o']],
-            'end1': [['celebration/tada.mp3'], ['o']], 'end0': [['celebration/tada.mp3'], ['o']],
+            'end3': [[], []], 'end2': [[], []], 'end1': [[], []], 'end0': [[], []],
             'speakerLocked': [['error/hmm no.mp3'], ['v']],
             # his letter's name alone, as it lands (below); the clean-up: nothing
             'boostRemember': [['letters/t.mp3'], ['v']], 'boostFirst': [['letters/c.mp3'], ['v']], 'boostCleanup': [[], []]})
@@ -10370,17 +10379,24 @@ class MomentLinesTests(TestCase):
         self.assertEqual(res, [['error/actually that is cleverly wrong.mp3'], ['robot/mumble-01.mp3'],
                                ['robot/mumble-01.mp3'], ['robot/mumble-01.mp3']])
 
-    def test_the_round_end_s_tada_is_an_effect_under_his_line(self):
+    def test_the_round_end_s_line_starts_when_its_fanfare_ends(self):
+        # BACKLOG B-230: no tada under his end line; his line alone, due
+        # when the fanfare (made in code, RoundEndFanfareTests) has ended:
+        # the context's clock stands at 100 as the round end shows
         res = self.run_node(
             "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
             "await go(...T.end3); const both = [on(), kinds(), on().map(when)];"
             "await end('robot/end-high-01.mp3'); const after = on();"
-            "out([both, after]);")
-        self.assertEqual(res, [[['celebration/tada.mp3', 'robot/end-high-01.mp3'], ['o', 'v'], [0, 0]], ['celebration/tada.mp3']])
+            "out([both, after, a.fanfareLength()]);")
+        (files, kinds, starts), after, length = res
+        self.assertEqual([files, kinds, after], [['robot/end-high-01.mp3'], ['v'], []])
+        self.assertAlmostEqual(starts[0], 100 + length)
+        self.assertAlmostEqual(length, 0.64)
 
     def test_leaving_the_word_stops_his_voice(self):
         # whatever he is saying of the word stops when it is left: the
-        # next word, the round end (its tada and line start), the back arrow
+        # next word, the round end (its line starts, after its fanfare,
+        # B-230), the back arrow
         res = self.run_node(
             "MAN = lineMan(); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
             "const next = W({}, { round: { index: 1, size: 5, results: [{ correct: true }] }, tuned: false });"
@@ -10388,7 +10404,7 @@ class MomentLinesTests(TestCase):
             "await go(...T.wrong); S.setState(END(4)); await settle(); const atEnd = on();"
             "await go(...T.wrong); S.setState(STAGES); await settle(); const back = on();"
             "out([pressing, atNext, atEnd, back]);")
-        self.assertEqual(res, [['robot/press-01.mp3'], [], ['celebration/tada.mp3', 'robot/end-mid-01.mp3'], []])
+        self.assertEqual(res, [['robot/press-01.mp3'], [], ['robot/end-mid-01.mp3'], []])
 
     def test_his_peeks_whisper_only_while_he_is_quiet(self):
         res = self.run_node(
@@ -10658,7 +10674,7 @@ class QuietRobotTests(TestCase):
         self.assertEqual([res['wrong'], res['wrongNone'], res['wrongNoneSaid']], [p(), p(), p(sound='error')])
         self.assertEqual([res['filledNudge'], res['filledNudgeSaid']], [p(), p(line='pr')])
         # the effects, the word and his letter's name are as ever
-        self.assertEqual([res['placed'], res['end']], [p(fx='swipe'), p(fx='tada')])
+        self.assertEqual([res['placed'], res['end']], [p(fx='swipe'), p(fx='fanfare')])
         self.assertEqual([res['correct'], res['hint']], [p(word='W'), p(letter='L')])
 
     def test_the_last_slot_filled_says_nothing_and_his_press_line_is_rare(self):
@@ -10712,14 +10728,15 @@ class QuietRobotTests(TestCase):
         a = res['always']
         self.assertEqual(a['speakerLocked'], ['robot/no-gears-01.mp3'])
         self.assertEqual(a['thirdMiss'], ['robot/reveal-open-01.mp3'])
-        self.assertEqual(a['end3'], ['celebration/tada.mp3', 'robot/end-high-01.mp3'])
+        self.assertEqual(a['end3'], ['robot/end-high-01.mp3'])
         self.assertEqual(a['boostFirst'], ['robot/boost-first-01.mp3'])
 
     def test_a_dropped_line_plays_no_prototype_clip_in_its_place(self):
         # a manifest with no shared line (the prototype clips fill in): a
         # wrong check under its chance says the error clip as before; over
         # it, nothing (the error clip is his voice, not an effect); the
-        # reveal and the head-shake always; the swipe and the tada as ever
+        # reveal and the head-shake always; the swipe as ever; the round
+        # end no clip (its fanfare is made in code, B-230)
         real = json.loads(self.MANIFEST.read_text())
         manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith(('words/', 'letters/'))})
         res = self.run_sound(
@@ -10733,7 +10750,7 @@ class QuietRobotTests(TestCase):
         self.assertEqual(res, [
             [['error/actually that is cleverly wrong.mp3'], ['v']], [[], []],
             [['error/hmm no.mp3'], ['v']], [['error/hmm no.mp3'], ['v']],
-            [['swipe/swipe1.mp3'], ['o']], [['celebration/tada.mp3'], ['o']]])
+            [['swipe/swipe1.mp3'], ['o']], [[], []]])
 
     def test_the_quiet_gap(self):
         res = self.run_sound(
@@ -10772,7 +10789,7 @@ class QuietRobotTests(TestCase):
         self.assertEqual(res['hebrew@1'], ['hebrew/animals/cat.mp3'])
         self.assertEqual(res['correct@1'], ['words/animals/cat.mp3'])
         self.assertEqual(res['correctLine'], ['words/animals/cat.mp3', 'robot/correct-01.mp3'])
-        self.assertEqual(res['end@1'], ['celebration/tada.mp3', 'robot/end-high-01.mp3'])
+        self.assertEqual(res['end@1'], ['robot/end-high-01.mp3'])
         self.assertEqual([res['peek@7.9'], res['peek@8']], [[], ['robot/peek-01.mp3']])
         self.assertEqual(res['wrongOverHim'], [[], ['robot/no-gears-01.mp3']])
         self.assertEqual(res['startAfterCut'], [])
@@ -13155,15 +13172,16 @@ class FastStartTests(TestCase):
         first, last, shared, none = res
         self.assertEqual(first, [
             ['robot/greet-01.mp3', 'greet'],
-            ['correct/bingo.mp3', 'correct'], ['error/actually that is cleverly wrong.mp3', 'error'], ['celebration/tada.mp3', 'tada'],
+            ['correct/bingo.mp3', 'correct'], ['error/actually that is cleverly wrong.mp3', 'error'],
             ['swipe/swipe1.mp3', 'swipe'], ['error/hmm no.mp3', 'locked'],
             ['robot/correct-01.mp3', 'correct'], ['robot/wrong-01.mp3', 'wrong']])
         self.assertEqual([x[0] for x in last], [
-            'robot/greet-02.mp3', 'correct/you have a spelling superpower.mp3', 'error/you can do better.mp3', 'celebration/tada.mp3',
+            'robot/greet-02.mp3', 'correct/you have a spelling superpower.mp3', 'error/you can do better.mp3',
             'swipe/swipe4.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3', 'robot/wrong-02.mp3'])
-        self.assertEqual(shared, ['greet', 'correct', 'error', 'tada', 'swipe', 'correct', 'wrong'])
-        # no manifest: the prototype pools still get theirs
-        self.assertEqual(none, ['correct', 'error', 'tada', 'swipe', 'locked'])
+        self.assertEqual(shared, ['greet', 'correct', 'error', 'swipe', 'correct', 'wrong'])
+        # no manifest: the prototype pools still get theirs (no tada since
+        # B-230)
+        self.assertEqual(none, ['correct', 'error', 'swipe', 'locked'])
 
     def test_the_real_manifest_one_clip_a_pool(self):
         real = json.loads(self.MANIFEST.read_text())
@@ -13226,7 +13244,7 @@ class FastStartTests(TestCase):
         # two at a time, the greeting's first
         self.assertEqual(first, ['robot/greet-01.mp3', 'correct/bingo.mp3'])
         self.assertEqual(order, ['robot/greet-01.mp3', 'correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3',
-                                 'celebration/tada.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3', 'robot/wrong-01.mp3'])
+                                 'swipe/swipe1.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3', 'robot/wrong-01.mp3'])
 
     def test_a_failed_clip_asks_for_another_of_its_pool(self):
         res = self.node(
@@ -13262,7 +13280,7 @@ class FastStartTests(TestCase):
         # the two stopped as the round started come back first of the pools'
         self.assertEqual(rest, ['words/animals/cat.mp3', 'gags/animals/cat.mp3', 'letters/c.mp3', 'letters/a.mp3', 'letters/t.mp3',
                                 'robot/greet-01.mp3', 'correct/bingo.mp3', 'error/actually that is cleverly wrong.mp3',
-                                'celebration/tada.mp3', 'swipe/swipe1.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3'])
+                                'swipe/swipe1.mp3', 'error/hmm no.mp3', 'robot/correct-01.mp3'])
 
     def test_a_words_clips_not_started_leave_with_it(self):
         res = self.node(
@@ -13336,3 +13354,348 @@ class FastStartTests(TestCase):
         for phrase in ('`soundClips`', '`net`', '`lineClips`', '`wordClips`'):
             self.assertIn(phrase, handles, phrase)
         self.assertNotIn('`bytes`, `buffers`', handles)
+
+
+class RoundEndFanfareTests(TestCase):
+    """BACKLOG B-230: the round end, one voice at a time. The tada (a clip
+    of the prototype character's voice) no longer plays under the robot's
+    end line: as the round-end screen shows, audio.js plays a short fanfare
+    made in code (FANFARE: three bright triangle notes rising, about C5,
+    E5, G5, 0.12 s apart, the last held about 0.4 s), an effect the mute
+    stops; his end line, and the key line after it, start when it ends
+    (fanfareWait). Whatever he was saying of the last word (the word and
+    its gag, a line still due with start(when)) stops as the round end
+    shows, and nothing of the prototype voice plays over it. Through node
+    with CorrectWordVoiceTests' stand-in context and WinFirstTests'
+    oscillators; the one-voice checks run its clock event by event."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    def setUp(self):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+
+    def pure(self, body):
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            f"const A = await import('{(self.JS / 'audio.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'character.js').as_uri()}');"
+            f"{body}"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    # On top of WinFirstTests.VOICE (its oscillators, `chimes()`): the
+    # context's clock is CLOCK; each buffer source records `file`, `voice`
+    # (through his analyser), `calledAt` (the clock at its start() call),
+    # `startAt` (its start(when), or the clock for now), `endAt` (startAt +
+    # its length, LEN by file, else 1 s), `stopAt`
+    # (the clock at its stop(), or null) and `endedAt` (when it played to
+    # its end); `run(to)` moves the clock on to `to`, ending each source
+    # that plays to its end on the way, in order (its onended, as a
+    # browser does), and `peak` is the most of his voice's sources started
+    # and not stopped or ended at once, from the round end on (a clip due
+    # counts from its start() call). `recs()` the records. The round:
+    # "cat" the last of five, the four before it correct; `last(o)` the
+    # word showing, `right(o)` checked correct, `shown(o)` revealed, `END(key)`
+    # the round end (3 stars; `key`: the round brought a key).
+    SIM = """
+        let CLOCK = 10; let T = Infinity; let peak = 0;
+        Object.defineProperty(AudioContext.prototype, 'currentTime', { get() { return CLOCK; }, configurable: true });
+        const LEN = { 'words/animals/cat.mp3': 0.8, 'gags/animals/cat.mp3': 1.6, 'robot/end-high-01.mp3': 2,
+            'robot/key-01.mp3': 1.5, 'robot/reveal-open-01.mp3': 1.8, 'robot/press-01.mp3': 1.2 };
+        const records = [];
+        const count = () => { if (CLOCK >= T) peak = Math.max(peak, sources.filter((s) => s.on && s.rec && s.rec.voice).length); };
+        { const mk = AudioContext.prototype.createBufferSource;
+          AudioContext.prototype.createBufferSource = function () { const s = mk.call(this); const go = s.start; const halt = s.stop;
+            s.start = (w) => { const file = short(s.buffer.url);
+              if (file !== 'silence') { const at = w > 0 ? w : CLOCK;
+                s.rec = { file, voice: s.to === an, calledAt: CLOCK, startAt: at, endAt: at + (LEN[file] || 1), stopAt: null, endedAt: null }; records.push(s.rec); }
+              go(w); count(); };
+            s.stop = () => { if (s.rec && s.on && s.rec.stopAt === null) s.rec.stopAt = CLOCK; halt(); };
+            return s; }; }
+        const run = async (to) => { for (;;) { await settle();
+            const due = sources.filter((s) => s.on && s.rec && s.rec.stopAt === null).sort((x, y) => x.rec.endAt - y.rec.endAt)[0];
+            if (!due || due.rec.endAt > to) { CLOCK = Math.max(CLOCK, to); return; }
+            CLOCK = Math.max(CLOCK, due.rec.endAt); due.on = false; due.rec.endedAt = due.rec.endAt; due.onended(); count(); } };
+        const recs = () => records.map((r) => ({ ...r }));
+        const BEFORE = [0, 1, 2, 3].map(() => ({ correct: true }));
+        const ALL = { index: 4, size: 5, results: [...BEFORE, { correct: true }] };
+        const last = (o = {}) => st({ round: { index: 4, size: 5, results: BEFORE }, ...o });
+        const right = (o = {}) => st({ round: ALL, current: { word: 'cat', audio: CAT, status: 'correct', placed: put(['t1', 't2', 't3']) }, ...o });
+        const shown = (o = {}) => st({ lives: 0, round: { index: 4, size: 5, results: [...BEFORE, { correct: false }] },
+            current: { word: 'cat', audio: CAT, status: 'revealed', placed: put(['t1', 't2', 't3']) }, ...o });
+        const END = (key = false, o = {}) => ({ ...right(), screen: 'round-end', round: { ...ALL, keyEarned: key },
+            current: { word: null, placed: [] }, speaking: false, nudges: 0, ...o });
+        const roundEnd = async (state) => { T = CLOCK; peak = 0; S.setState(state); await settle(); count(); };
+        const LINES = ['robot/end-high-01.mp3', 'robot/key-01.mp3', 'gags/animals/cat.mp3', 'robot/reveal-open-01.mp3',
+            'robot/press-01.mp3', 'robot/correct-01.mp3'];
+    """
+
+    def voice(self, body):
+        me = SimpleNamespace(MODULE=self.JS / 'audio.js', STATE=self.JS / 'state.js', CHARACTER=self.JS / 'character.js',
+                             assertEqual=self.assertEqual)
+        return CorrectWordVoiceTests.run_node(me, WinFirstTests.VOICE + self.SIM + body)
+
+    def sounding(self, rec):
+        """The time a record sounded: [start, end), None if it never did."""
+        end = rec['endAt']
+        for t in (rec['stopAt'], rec['endedAt']):
+            if t is not None:
+                end = min(end, t)
+        return (rec['startAt'], end) if end > rec['startAt'] else None
+
+    def assertOneVoiceAtTheRoundEnd(self, records, t_end, peak, length=0.64):
+        """From the round end on: at most one clip of his voice at once;
+        none of it before the fanfare has ended; nothing of the prototype
+        voice; and nothing of the word before it still sounding."""
+        self.assertLessEqual(peak, 1)
+        heard = [(r, self.sounding(r)) for r in records]
+        heard = [(r, span) for r, span in heard if span and span[1] > t_end + 1e-9]
+        for r, (start, _) in heard:
+            self.assertTrue(r['voice'], r)                                      # no effect clip (no tada)
+            self.assertGreaterEqual(start, t_end + length - 1e-9, r)           # none under the fanfare
+            self.assertFalse(r['file'].startswith(('correct/', 'error/', 'celebration/')), r)
+        spans = sorted(span for _, span in heard)
+        for (a0, a1), (b0, b1) in zip(spans, spans[1:]):
+            self.assertLessEqual(a1, b0 + 1e-9, spans)                        # one after the other
+        return [r['file'] for r, _ in sorted(heard, key=lambda x: x[1])]
+
+    # --- the fanfare (audio.js) ---
+
+    def test_the_fanfares_notes(self):
+        fanfare, envelopes, length, chime = self.pure(
+            "out([A.FANFARE, A.FANFARE.notes.map((n) => A.fanfareEnvelope(n)), A.fanfareLength(), A.CHIME]);")
+        log2 = __import__('math').log2
+        self.assertEqual(fanfare['type'], 'triangle')
+        notes = fanfare['notes']
+        # about C5, E5 and G5 (within 3 cents), rising
+        for note, hz in zip(notes, (523.25, 659.26, 783.99)):
+            self.assertAlmostEqual(1200 * log2(note['f'] / hz), 0, delta=3)
+        self.assertEqual([n['f'] for n in notes], sorted(n['f'] for n in notes))
+        # 0.12 s apart; the first two short, the last held about 0.4 s
+        self.assertEqual([n['at'] for n in notes], [0, 0.12, 0.24])
+        self.assertEqual([(n['hold'], n['dur']) for n in notes], [(0.06, 0.16), (0.06, 0.16), (0.3, 0.4)])
+        self.assertEqual([fanfare['floor'], fanfare['attack'], fanfare['stop']], [0.0001, 0.01, 0.05])
+        # at about the chime's level (B-227), straight out
+        self.assertEqual([n['peak'] for n in notes], [0.15, 0.15, 0.15])
+        self.assertLessEqual(max(n['peak'] for n in notes), max(n['peak'] for n in chime['notes']))
+        # each note: up from silence, held at its peak, down to silence by its end
+        for env, note in zip(envelopes, notes):
+            self.assertEqual([e[:2] for e in env], [['set', 0.0001], ['ramp', note['peak']], ['set', note['peak']], ['ramp', 0.0001]])
+            self.assertEqual([round(e[2], 6) for e in env],
+                             [note['at'], round(note['at'] + 0.01, 6), round(note['at'] + note['hold'], 6), round(note['at'] + note['dur'], 6)])
+        # it has ended 0.64 s after it starts (the last note's end)
+        self.assertAlmostEqual(length, 0.64)
+
+    def test_the_end_line_starts_when_the_fanfare_ends(self):
+        res = self.pure(
+            "const w = (m) => A.fanfareWait(m);"
+            "out([w(['roundEndGood']), w(['roundEnd']), w(['roundEndGood', 'keyEarned']), w(['roundEnd', 'keyEarned']),"
+            " ['correct', 'streak', 'tutorialDone', 'wrong', 'thirdMiss', 'picture', 'greet', 'keyEarned', 'themeOpen', 'blockPlaced'].map((m) => w([m])),"
+            " w([]), Object.entries(C.MOMENTS).filter(([, m]) => m.sound === 'fanfare').map(([k]) => k),"
+            " Object.keys(A.FILES), A.CHANNEL.fanfare, A.CHANNEL.tada === undefined,"
+            " C.startsOf(['roundEndGood', 'keyEarned']), C.startsOf(['roundEnd', 'keyEarned'])]);")
+        (good, low, good_key, low_key, others, none, fanfare_moments, files, channel, no_tada,
+         starts_good, starts_low) = res
+        self.assertEqual([good, low, good_key, low_key], [0.64] * 4)
+        self.assertEqual(others, [0] * 10)
+        self.assertEqual(none, 0)
+        # the round end's two moments are the fanfare's; no pool of the tada
+        self.assertEqual(fanfare_moments, ['roundEndGood', 'roundEnd'])
+        self.assertEqual(files, ['correct', 'error', 'swipe', 'locked'])
+        self.assertEqual([channel, no_tada], ['fx', True])
+        # the key line comes after the end line (character.js startsOf), so
+        # both wait for the fanfare: 0.64 and 3.14 s, or 0.64 and 0.94 s
+        self.assertEqual([starts_good, starts_low], [[0, 2.5], [0, 0.3]])
+
+    def test_the_round_end_plays_the_fanfare_then_his_line_then_the_key_line(self):
+        res = self.voice(
+            "MAN = man(...LINES); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "S.setState(last()); await run(10); S.setState(right()); await run(14);"
+            "oscs.length = 0; startsAt.length = 0; clear(); await roundEnd(END(true));"
+            "const at = [CLOCK, chimes(), voiceStarts(), kinds()];"
+            "await run(30); out([at, voiceStarts(), recs().filter((r) => r.startAt >= T).map((r) => [r.file, r.startAt, r.endedAt])]);")
+        (t, notes, due, kinds), starts, after = res
+        self.assertEqual(t, 14)
+        # three triangle oscillators, straight out, at once, 0.12 s apart
+        self.assertEqual(len(notes), 3)
+        for note, (f, at, hold, dur) in zip(notes, ((523, 14, 0.06, 0.16), (659, 14.12, 0.06, 0.16), (784, 14.24, 0.3, 0.4))):
+            self.assertEqual((note['type'], note['out']), ('triangle', 'out'))
+            self.assertEqual(note['f'][0][:2], ['set', f])
+            self.assertAlmostEqual(note['at'], at)
+            self.assertAlmostEqual(note['stops'][0], at + dur + 0.05)
+            self.assertEqual([g[:2] for g in note['gain']], [['set', 0.0001], ['ramp', 0.15], ['set', 0.15], ['ramp', 0.0001]])
+            self.assertAlmostEqual(note['gain'][2][2], at + hold)
+            self.assertAlmostEqual(note['gain'][3][2], at + dur)
+        # his end line due when the fanfare has ended, as his voice; no clip
+        # with the fanfare (no tada)
+        self.assertEqual([f for f, _ in due], ['robot/end-high-01.mp3'])
+        self.assertAlmostEqual(due[0][1], 14.64)
+        self.assertEqual(kinds, ['v'])
+        # the key line after the end line has ended, no sooner than 3.14 s
+        self.assertEqual([f for f, _ in starts], ['robot/end-high-01.mp3', 'robot/key-01.mp3'])
+        self.assertAlmostEqual(starts[1][1], 14 + 0.64 + 2.5)
+        self.assertEqual([r[0] for r in after], ['robot/end-high-01.mp3', 'robot/key-01.mp3'])
+        self.assertAlmostEqual(after[0][2], 16.64)
+        self.assertGreaterEqual(after[1][1], after[0][2])
+
+    def test_the_mute_stops_the_fanfare_and_muted_there_is_none(self):
+        res = self.voice(
+            "MAN = man(...LINES); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "S.setState(last()); await run(10); S.setState(right()); await run(14); oscs.length = 0;"
+            "await roundEnd(END()); const n = oscs.length; S.setState({ muted: true }); await settle();"
+            "const stopped = oscs.map((o) => o.stops.includes('now')); const line = recs().filter((r) => r.startAt >= T).map((r) => [r.file, r.stopAt]);"
+            # muted as the round end shows: no fanfare, no line
+            "S.setState({ muted: false, screen: 'theme', current: { word: null, placed: [] } }); await settle();"
+            "S.setState(last({ roundsStarted: 2, muted: true })); await run(20); S.setState(right({ roundsStarted: 2, muted: true })); await run(24);"
+            "oscs.length = 0; const k = records.length; await roundEnd(END(false, { roundsStarted: 2, muted: true })); await run(40);"
+            "out([n, stopped, line, oscs.length, records.length - k]);")
+        n, stopped, line, muted_oscs, muted_clips = res
+        self.assertEqual(n, 3)
+        self.assertEqual(stopped, [True, True, True])
+        # his line, due after the fanfare, stopped with it
+        self.assertEqual(line, [['robot/end-high-01.mp3', 14]])
+        self.assertEqual([muted_oscs, muted_clips], [0, 0])
+
+    # --- one voice at a time, every way into the round end ---
+
+    def test_a_round_ended_right_after_the_last_words_correct_check(self):
+        # the check at 10: his word due when the TV's win ends (11), its
+        # gag after it, the chime at once; the dome tapped at 10.3 (the
+        # dome is "next" at once): the word due is stopped before it
+        # starts, its gag never comes; then the fanfare, his end line at
+        # 10.94, the key line after it
+        res = self.voice(
+            "MAN = man(...LINES); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "S.setState(last()); await run(9); CLOCK = 10; S.setState(right()); await settle(); a.winSound(null);"
+            "const due = recs().map((r) => [r.file, r.startAt]); await run(10.3); await roundEnd(END(true)); await run(40);"
+            "out([due, recs(), T, peak]);")
+        due, records, t_end, peak = res
+        self.assertEqual(due, [['words/animals/cat.mp3', 11]])
+        word = [r for r in records if r['file'] == 'words/animals/cat.mp3']
+        self.assertEqual(len(word), 1)
+        self.assertIsNone(self.sounding(word[0]))                                # never heard
+        self.assertNotIn('gags/animals/cat.mp3', [r['file'] for r in records])
+        self.assertEqual(self.assertOneVoiceAtTheRoundEnd(records, t_end, peak), ['robot/end-high-01.mp3', 'robot/key-01.mp3'])
+
+    def test_a_round_ended_while_he_says_the_last_word_or_its_gag(self):
+        res = self.voice(
+            "MAN = man(...LINES); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const out2 = [];"
+            "for (const [n, at] of [[1, 11.4], [2, 12.5]]) {"
+            " S.setState({ screen: 'theme', current: { word: null, placed: [] } }); await settle(); records.length = 0;"
+            " CLOCK = 10 + 100 * n; S.setState(last({ roundsStarted: n })); await run(CLOCK); clockOn();"
+            " S.setState(right({ roundsStarted: n })); await run(CLOCK + at - 10); await roundEnd(END(false, { roundsStarted: n }));"
+            " await run(CLOCK + 30); out2.push([recs(), T, peak]); }"
+            "out(out2);")
+        (word_cut, t1, p1), (gag_cut, t2, p2) = res
+        # cut in the middle of the word (11 to 11.8): the word stops there
+        word = next(r for r in word_cut if r['file'] == 'words/animals/cat.mp3')
+        self.assertAlmostEqual(word['stopAt'], t1)
+        self.assertNotIn('gags/animals/cat.mp3', [r['file'] for r in word_cut])
+        self.assertEqual(self.assertOneVoiceAtTheRoundEnd(word_cut, t1, p1), ['robot/end-high-01.mp3'])
+        # in the middle of the gag (11.8 to 13.4): the gag stops there
+        gag = next(r for r in gag_cut if r['file'] == 'gags/animals/cat.mp3')
+        self.assertAlmostEqual(gag['stopAt'], t2)
+        self.assertEqual(self.assertOneVoiceAtTheRoundEnd(gag_cut, t2, p2), ['robot/end-high-01.mp3'])
+
+    def test_a_round_ended_over_his_reveal_line_or_his_dome_nudge(self):
+        res = self.voice(
+            "MAN = man(...LINES); await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const res = [];"
+            # the third miss: his reveal-open line at once; next at 0.5 s
+            "S.setState(last({ lives: 1 })); await run(10); records.length = 0; S.setState(shown()); await run(10.5);"
+            "await roundEnd(END(false, { round: { index: 4, size: 5, results: [...BEFORE, { correct: false }], keyEarned: false } }));"
+            "await run(40); res.push([recs(), T, peak]);"
+            # the dome nudge: his press line (a minute on: past his quiet gap); next while he says it
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] } }); await settle(); records.length = 0;"
+            "CLOCK = 100; S.setState(last({ roundsStarted: 2 })); await run(100); S.setState(right({ roundsStarted: 2 })); await run(105); clockOn();"
+            "S.setState(right({ roundsStarted: 2, nudges: 1 })); await run(105.4); await roundEnd(END(false, { roundsStarted: 2 }));"
+            "await run(140); res.push([recs(), T, peak]);"
+            "out(res);")
+        (reveal, t1, p1), (nudge, t2, p2) = res
+        line = next(r for r in reveal if r['file'] == 'robot/reveal-open-01.mp3')
+        self.assertAlmostEqual(line['stopAt'], t1)
+        # (four of five right: 2 stars, his end-mid line, not in this manifest: nothing)
+        self.assertEqual(self.assertOneVoiceAtTheRoundEnd(reveal, t1, p1), [])
+        press = next(r for r in nudge if r['file'] == 'robot/press-01.mp3')
+        self.assertAlmostEqual(press['stopAt'], t2)
+        self.assertEqual(self.assertOneVoiceAtTheRoundEnd(nudge, t2, p2), ['robot/end-high-01.mp3'])
+
+    def test_with_only_the_prototype_clips_nothing_of_them_over_the_round_end(self):
+        # no line of his new voice (the words' clips only): the correct
+        # check's prototype correct clip after the word, the reveal's error
+        # clip; at the round end none of correct/, error/ or celebration/
+        # plays, and no clip in his line's place: the fanfare alone
+        real = json.loads((self.ROOT / 'static' / 'voice' / 'manifest.json').read_text())
+        manifest = dict(real, clips={k: v for k, v in real['clips'].items() if k.startswith('words/')})
+        res = self.voice(
+            f"MAN = {json.dumps(manifest)}; await ready(); S.subscribe(a.renderSound); Math.random = () => 0;"
+            "const res = [];"
+            # right after the check, and once the correct clip after the word plays
+            "for (const [n, at] of [[1, 10.3], [2, 12.2]]) {"
+            " S.setState({ screen: 'theme', current: { word: null, placed: [] } }); await settle(); records.length = 0;"
+            " CLOCK = 10 + 100 * n; S.setState(last({ roundsStarted: n })); await run(CLOCK); clockOn();"
+            " S.setState(right({ roundsStarted: n })); await run(CLOCK + at - 10); oscs.length = 0;"
+            " await roundEnd(END(false, { roundsStarted: n })); await run(CLOCK + 30); res.push([recs(), T, peak, oscs.length]); }"
+            # the reveal's error clip
+            "S.setState({ screen: 'theme', current: { word: null, placed: [] } }); await settle(); records.length = 0;"
+            "CLOCK = 400; S.setState(last({ roundsStarted: 3, lives: 1 })); await run(400); clockOn(); S.setState(shown({ roundsStarted: 3 })); await run(400.4);"
+            "oscs.length = 0; await roundEnd(END(false, { roundsStarted: 3 })); await run(430); res.push([recs(), T, peak, oscs.length]);"
+            "out(res);")
+        (fast, t1, p1, o1), (late, t2, p2, o2), (reveal, t3, p3, o3) = res
+        self.assertEqual([o1, o2, o3], [3, 3, 3])                       # the fanfare each time
+        late_correct = [r for r in late if r['file'].startswith('correct/')]
+        self.assertEqual(len(late_correct), 1)                          # his correct clip was playing
+        self.assertAlmostEqual(late_correct[0]['stopAt'], t2)
+        self.assertTrue(any(r['file'].startswith('error/') for r in reveal))
+        for records, t, p in ((fast, t1, p1), (late, t2, p2), (reveal, t3, p3)):
+            self.assertEqual(self.assertOneVoiceAtTheRoundEnd(records, t, p), [])
+            self.assertEqual([r['file'] for r in records if r['calledAt'] >= t], [])     # no clip started at all
+
+    def test_the_only_way_into_the_round_end_stops_the_speakers_word(self):
+        # main.js has one way into the round end, onNext's last word; it
+        # stops the speaker's word first and sets `speaking` false in the
+        # same setState (the word he says and his line stop in audio.js
+        # renderSound, as the word's key changes, above)
+        main = (self.JS / 'main.js').read_text()
+        self.assertEqual(main.count("screen: 'round-end'"), 1)
+        body = main[main.index('function onNext('):]
+        body = body[:body.index('\n}\n')]
+        self.assertIn("screen: 'round-end'", body)
+        self.assertLess(body.index('stopWord();'), body.index("screen: 'round-end'"))
+        end = body[body.index("screen: 'round-end'"):]
+        self.assertIn('speaking: false', end[:end.index('});')])
+
+    def test_the_tada_is_never_played(self):
+        # it stays on disk (read-only content), named in no code
+        self.assertTrue((self.ROOT / 'static' / 'sounds' / 'celebration' / 'tada.mp3').exists())
+        for f in sorted(self.JS.rglob('*.js')):
+            code = re.sub(r'/\*.*?\*/|//[^\n]*', '', f.read_text(), flags=re.S)
+            self.assertNotIn('tada', code, f.name)
+            self.assertNotIn('celebration/', code, f.name)
+
+    def test_docs(self):
+        # CLAUDE.md's audio.js bullets, DESIGN.md "Sound" and CHARACTER.md's
+        # round end: the fanfare, and the tada gone
+        claude = (self.ROOT / 'CLAUDE.md').read_text()
+        main = claude[claude.index('  - `audio.js` is the only place sounds play.'):]
+        main = main[:main.index('\n  - ')]
+        for phrase in ('B-230', 'fanfare', '`FANFARE`', '`fanfareEnvelope`', '`fanfareLength`', '`fanfareWait`', 'never played'):
+            self.assertIn(phrase, main, phrase)
+        self.assertNotIn("the round end's tada, under his end line", main)
+        handles = claude[claude.index('  - `audio.js` may hold audio engine handles:'):]
+        self.assertIn("the round end's fanfare, B-230", handles[:handles.index('\n  - ')])
+        design = (self.ROOT / 'DESIGN.md').read_text()
+        sound = design[design.index('## Sound'):design.index('## Other screens')]
+        self.assertIn('Round end → a short fanfare made in code (B-230', sound)
+        self.assertIn('is no longer played', sound)
+        self.assertNotIn("the round end's tada", sound)
+        character = (self.ROOT / 'CHARACTER.md').read_text()
+        row = next(line for line in character.splitlines() if line.startswith('| Round end |'))
+        self.assertIn('fanfare', row)
+        self.assertNotIn('tada', row)
+        self.assertNotIn('(the swipe, the tada)', character)

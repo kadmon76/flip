@@ -660,7 +660,7 @@ Decided by the human on 2026-10-26: the prototype is ready as a game; next come 
 - Fold card.js's `renderCounter` onto `flaps.js` `renderFlaps` (same split-flap markup; left out of B-116 as a refactor).
 - `console.png` has stray dark opaque pixels at its top-left and top-right corners that show as dark notches at both ends of the console's brass rail; needs a cleaned asset from the human (assets are read-only in M1).
 - The robot is drawn only on the play screen, so CHARACTER's "Round end" moment (happy for 2–3 stars, idle for 0–1), already picked in `character.js` as `roundEndGood`/`roundEnd`, isn't shown anywhere yet (B-115).
-- Replace the placeholder game sounds (swipe, tada, prototype clips still used where a moment has no new line) with ones that fit the lab look; the human will provide them. The robot's voice is M4b.
+- Replace the placeholder game sounds (swipe, prototype clips still used where a moment has no new line) with ones that fit the lab look; the human will provide them. The robot's voice is M4b.
 - Upgrade the Linode's Python (3.8 today) so the server can follow newer Django; until then keep backend code 3.8-compatible (CLAUDE.md).
 - `spelling_game` models have no migrations (warning on every deploy); add them before login and server-side sticker saving.
 - A dome-aimed point pose for the robot's dome nudge (B-212 reuses `point`, turned 32° down, while the dome is ~13° down from his hand at 360); tune it on `design/reference/robot-puppet.html` with the human.
