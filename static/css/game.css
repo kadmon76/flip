@@ -70,6 +70,17 @@
     --static-light: color-mix(in srgb, var(--cream) 70%, transparent);
     --static-dark: color-mix(in srgb, var(--ink) 55%, transparent);
     --puff-shade: color-mix(in srgb, var(--ink) 14%, transparent);   /* the win's exhaust puffs, their shaded side (B-222) */
+    /* the boss (BACKLOG B-232): the thief's red tin lit and shaded, the
+       lamps red behind him and his antenna lamp's glow, the lab dimmed
+       red, the zap's light, the end card's scrim */
+    --error-hi: color-mix(in srgb, var(--error) 85%, #fff);
+    --error-lo: color-mix(in srgb, var(--error) 85%, #000);
+    --glow-error: color-mix(in srgb, var(--error) 60%, transparent);
+    --dim-error: color-mix(in srgb, var(--error) 28%, transparent);
+    --dim-deep: color-mix(in srgb, var(--bench-deep) 72%, transparent);
+    --alarm-sweep: color-mix(in srgb, var(--error) 30%, transparent);
+    --glow-zap: color-mix(in srgb, var(--teal-glow) 55%, transparent);
+    --scrim: color-mix(in srgb, var(--bench-deep) 72%, transparent);
 
     /* type (DESIGN.md "Type"): Andika Bold for the letter blocks,
        Courier Prime Bold for the split-flap logo and counter. The interim
@@ -3030,4 +3041,1232 @@ body[data-screen="theme"] .header-gears {
 .round-key .key-icon {
     width: 100%;
     height: 100%;
+}
+
+/* --- Boss: the thief bot (BACKLOG B-232; bossview.js, bossfx.js, thief.js) --- */
+
+/* The boss screen is the play scene (screens.js shows #screen-play for
+   state.screen 'boss'): the lab, the frame, the console with the robot
+   behind it and the dome, with the play screen's own parts hidden and the
+   boss's shown. Interim, like the other code-drawn objects (DESIGN "The
+   layer model", its exception for the boss): the thief, the vent, the
+   track, the card table and its cards and the console's window are drawn
+   in code (CSS and thief.js's inline SVG) until a design pass, in the
+   palette, lit from the upper left. */
+.boss,
+.boss-dim,
+.boss-window,
+.boss-fx,
+.boss-bubble,
+.boss-end {
+    display: none;
+}
+
+body[data-screen="boss"] .boss {
+    display: flex;
+}
+
+body[data-screen="boss"] .boss-dim,
+body[data-screen="boss"] .boss-window,
+body[data-screen="boss"] .boss-fx,
+body[data-screen="boss"] .boss-bubble:not([hidden]) {
+    display: block;
+}
+
+body[data-screen="boss"] .boss-end:not([hidden]) {
+    display: grid;
+}
+
+body[data-screen="boss"] #screen-play .card,
+body[data-screen="boss"] #screen-play .win-fx,
+body[data-screen="boss"] #screen-play .plate,
+body[data-screen="boss"] #letter-boxes,
+body[data-screen="boss"] #letter-tray,
+body[data-screen="boss"] #reset-btn,
+body[data-screen="boss"] #speak-btn,
+body[data-screen="boss"] #console-gears {
+    display: none;
+}
+
+/* the scene draws its own sharp picture, as the play screen does */
+body[data-screen="boss"]::before {
+    display: none;
+}
+
+/* the header's back arrow: to the stage map, the boss dropped (main.js
+   onPlayBack) */
+body[data-screen="boss"] .play-back-btn {
+    display: flex;
+}
+
+/* The dome stays the zapper at rest: its off look, no blinking, no halo,
+   no taps (controls.js renders it only on the play screen); it lights
+   while a zap leaves it (bossfx.js: #boss.is-firing). */
+body[data-screen="boss"] #check-btn {
+    pointer-events: none;
+}
+
+body[data-screen="boss"] #check-btn .sprite img,
+body[data-screen="boss"] #check-btn.is-next .dome-ready,
+body[data-screen="boss"] #check-btn.is-ready .dome-ready {
+    opacity: 0;
+    animation: none;
+}
+
+body[data-screen="boss"] #check-btn .sprite .dome-off,
+body[data-screen="boss"] #screen-play:has(.boss.is-firing) #check-btn .sprite .dome-ready {
+    opacity: 1;
+}
+
+body[data-screen="boss"] #check-btn::after,
+body[data-screen="boss"] #screen-play .console::after {
+    display: none;
+}
+
+/* The lab dimmed red, with the alarm's light turning over it during the
+   entrance (bossview.js: .is-on), under the robot (z-index -2) and the
+   console (-1), over the scene's picture; clipped to the scene, so the
+   turning light never makes the page scroll. */
+.boss-dim {
+    position: absolute;
+    inset: 0;
+    z-index: -3;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 30%, var(--dim-error), var(--dim-deep) 85%);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
+
+.boss-dim.is-on {
+    opacity: 1;
+}
+
+.boss-alarm {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 140%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    background: conic-gradient(from 0deg, transparent 0deg, var(--alarm-sweep) 25deg, transparent 50deg, transparent 180deg, var(--alarm-sweep) 205deg, transparent 230deg);
+    opacity: 0;
+}
+
+.boss-alarm.is-on {
+    opacity: 1;
+    animation: boss-alarm 1.1s linear infinite;
+}
+
+@keyframes boss-alarm {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+/* The boss's column under the logo, the play screen's sides: the pairs
+   found and the kid's gears, the thief's track, the card table. At 360
+   wide: 70-96, 102-232, from 238 the table (3 rows end about 495, over
+   the bench, clear of the robot's head at 585 and the console). */
+.boss {
+    --thief-w: calc(116 * var(--u));
+    /* his walk: from --thief-start right of the rail's left end (clear of
+       the frame) until his front is --thief-past into the vent */
+    --thief-start: 14px;
+    --thief-past: 6px;
+    position: absolute;
+    top: var(--below-logo);
+    left: 14px;
+    right: 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.boss-hud {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 26px;
+    padding: 0 22px 0 16px;
+}
+
+/* the pairs: one small card per pair, dark, lit with the zap's teal when
+   found */
+.boss-pairs {
+    display: flex;
+    gap: 5px;
+}
+
+.boss-pairs i {
+    width: 13px;
+    height: 17px;
+    border-radius: 3px;
+    background: linear-gradient(160deg, var(--bulb-off-hi), var(--bulb-off-lo));
+    box-shadow: inset 0 0 0 1.5px var(--ink), 1px 2px 2px var(--shadow-contact);
+    transition: background-color 0.2s;
+}
+
+.boss-pairs i.is-found {
+    background: var(--teal-glow);
+    box-shadow: inset 0 0 0 1.5px var(--ink), 0 0 6px 1px var(--glow-zap);
+}
+
+/* the kid's gears (cogs.js), as the theme screen's header counter */
+.boss-gears {
+    height: 24px;
+    gap: 5px;
+    --cog-size: 24px;
+    --flap-w: min(17px, 51px / var(--digits, 1));
+    --flap-h: 22px;
+    --flap-font: var(--flap-w);
+}
+
+/* The track: a brass rail from his start to the vent, its lamps (red
+   behind him: bossview.js), the vent at its end with its alarm lamp, and
+   the thief standing on it. His x is set every frame from the clock
+   (bossview.js renderBossClock, boss.js thiefAt); the lamps lie on the
+   stretch his middle walks. */
+.boss-track {
+    position: relative;
+    flex: 0 0 auto;
+    height: calc(146 * var(--u));
+    pointer-events: none;
+}
+
+.boss-rail {
+    position: absolute;
+    left: 0;
+    right: calc(44 * var(--u));
+    bottom: 4px;
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(to bottom, var(--brass-hi), var(--brass) 45%, var(--brass-dark));
+    box-shadow: inset 0 0 0 1.5px var(--ink), 2px 4px 5px var(--shadow-contact);
+}
+
+.boss-lamps {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: calc(var(--thief-start) + var(--thief-w) / 2);
+    right: calc(var(--thief-w) / 2 - var(--thief-past));
+}
+
+.boss-lamp {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, var(--bulb-off-hi), var(--bulb-off) 45%, var(--bulb-off-lo));
+    box-shadow: 0 0 0 1px var(--ink);
+}
+
+.boss-lamp.is-red {
+    background: radial-gradient(circle at 38% 32%, var(--error-hi), var(--error) 45%, var(--error-lo));
+    box-shadow: 0 0 0 1px var(--ink), 0 0 6px 1px var(--glow-error);
+}
+
+/* lit once from him to the vent at the start (bossfx.js), so the kid
+   sees the goal */
+.boss-lamp.is-lit {
+    background: radial-gradient(circle at 38% 32%, var(--amber-hi), var(--amber) 45%, var(--amber-deep));
+    box-shadow: 0 0 0 1px var(--ink), 0 0 7px 2px var(--glow-amber);
+}
+
+/* a knock-back turns red lamps back off with a flash of the zap's light */
+.boss-lamp.is-flash {
+    animation: boss-lamp-flash 0.5s ease-out;
+}
+
+@keyframes boss-lamp-flash {
+    from {
+        background: var(--teal-glow);
+        box-shadow: 0 0 0 1px var(--ink), 0 0 10px 4px var(--glow-zap);
+    }
+}
+
+.boss-vent {
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    width: calc(48 * var(--u));
+}
+
+.boss-vent-art,
+.boss-vent-art svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.boss-vent-art svg {
+    filter: drop-shadow(2px 3px 3px var(--shadow-contact));
+}
+
+.v-box {
+    fill: var(--charcoal);
+    stroke: var(--ink);
+    stroke-width: 3;
+}
+
+.v-hole {
+    fill: var(--bench-deep);
+}
+
+.v-slats {
+    stroke: var(--charcoal-hi);
+    stroke-width: 3;
+}
+
+.v-rivet {
+    fill: var(--brass);
+}
+
+.v-base {
+    fill: var(--brass-dark);
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+.v-lamp {
+    fill: var(--error-lo);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+}
+
+.v-lamp-hi {
+    fill: none;
+    stroke: var(--error-hi);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.v-halo {
+    fill: var(--glow-error);
+    opacity: 0;
+}
+
+/* past three quarters (boss.js NEAR) the alarm lamp flashes */
+.boss-vent.is-near .v-lamp {
+    animation: boss-vent-lamp 0.5s steps(2) infinite;
+}
+
+.boss-vent.is-near .v-halo {
+    animation: boss-vent-halo 0.5s ease-in-out infinite;
+}
+
+@keyframes boss-vent-lamp {
+    50% {
+        fill: var(--error-hi);
+    }
+}
+
+@keyframes boss-vent-halo {
+    50% {
+        opacity: 1;
+    }
+}
+
+/* The thief on his track: the outer box is placed from the clock every
+   frame (translateX), the inner one takes bossfx.js's one-shot moves
+   (dropping in, hopping to the table, diving into the vent), his pose is
+   a class on .thief. Over the table (he hops onto it). */
+.boss-thief {
+    position: absolute;
+    left: 0;
+    bottom: 12px;
+    z-index: 3;
+    width: var(--thief-w);
+    will-change: transform;
+    pointer-events: none;
+}
+
+.thief-move {
+    display: block;
+}
+
+.thief {
+    display: block;
+}
+
+.thief svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    filter: drop-shadow(2px 4px 3px var(--shadow-contact));
+}
+
+/* his parts, lit from the upper left (thief.js names them): his thin
+   brass legs and arms and the antenna wire in an ink outline, so they
+   read on the dark lab */
+.t-limb,
+.t-limb-o,
+.t-wire,
+.t-wire-o {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.t-limb-o {
+    stroke: var(--ink);
+    stroke-width: 7;
+}
+
+.t-limb {
+    stroke: var(--brass-hi);
+    stroke-width: 3.2;
+}
+
+.t-limb-o.t-arm {
+    stroke-width: 9;
+}
+
+.t-limb.t-arm {
+    stroke-width: 4.6;
+}
+
+.t-foot {
+    fill: var(--brass-dark);
+    stroke: var(--ink);
+    stroke-width: 2.2;
+}
+
+.t-brass {
+    fill: var(--brass);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+}
+
+.t-key-bow {
+    fill: var(--brass-hi);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+}
+
+.t-wire-o {
+    stroke: var(--ink);
+    stroke-width: 5.5;
+}
+
+.t-wire {
+    stroke: var(--brass-hi);
+    stroke-width: 2.2;
+}
+
+.t-lamp {
+    fill: var(--error-hi);
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+.t-lamp-halo {
+    fill: var(--glow-error);
+}
+
+.t-spring {
+    display: none;
+    fill: none;
+    stroke: var(--brass-hi);
+    stroke-width: 3;
+    stroke-linejoin: round;
+}
+
+.t-tin {
+    fill: var(--error);
+    stroke: var(--ink);
+    stroke-width: 4;
+}
+
+.t-tin-hi {
+    fill: none;
+    stroke: var(--error-hi);
+    stroke-width: 6;
+    stroke-linecap: round;
+}
+
+.t-seam {
+    fill: none;
+    stroke: var(--error-lo);
+    stroke-width: 2.5;
+    stroke-dasharray: 4 4;
+}
+
+.t-rivet {
+    fill: var(--brass-hi);
+    stroke: var(--ink);
+    stroke-width: 1.2;
+}
+
+.t-rim {
+    fill: var(--brass);
+    stroke: var(--ink);
+    stroke-width: 3.5;
+}
+
+.t-glass {
+    fill: var(--charcoal);
+    stroke: var(--brass-dark);
+    stroke-width: 2;
+}
+
+.t-iris {
+    fill: var(--amber-deep);
+}
+
+.t-black {
+    fill: var(--ink);
+}
+
+.t-glint {
+    fill: var(--cream-hi);
+}
+
+.t-squint,
+.t-dizzy {
+    display: none;
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.t-grille {
+    fill: var(--brass-dark);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+}
+
+.t-bars {
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+.t-point {
+    display: none;
+}
+
+/* the stolen part (thief.js partIcon): a plain brass horn */
+.boss-part {
+    display: block;
+}
+
+.boss-part svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.p-tube {
+    fill: none;
+    stroke: var(--brass-dark);
+    stroke-width: 5;
+    stroke-linecap: round;
+}
+
+.p-bell-lo {
+    fill: var(--brass-dark-lo);
+}
+
+.p-bell {
+    fill: var(--brass);
+    stroke: var(--ink);
+    stroke-width: 2.4;
+}
+
+.p-shine {
+    fill: none;
+    stroke: var(--brass-hi);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+.p-mouth {
+    fill: var(--brass-dark);
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+/* His moving parts turn about their own points (in the drawing's units). */
+.t-all {
+    transform-box: view-box;
+    transform-origin: 66px 142px;
+}
+
+.t-leg-l {
+    transform-box: view-box;
+    transform-origin: 54px 112px;
+}
+
+.t-leg-r {
+    transform-box: view-box;
+    transform-origin: 76px 112px;
+}
+
+.t-key {
+    transform-box: view-box;
+    transform-origin: 13px 71.5px;
+    animation: thief-key 1.2s linear infinite;
+}
+
+.t-claw {
+    transform-box: view-box;
+    transform-origin: 103px 72px;
+    transition: transform 0.2s ease-out;
+}
+
+.t-pupil {
+    transform-box: view-box;
+    transition: transform 0.25s ease-out;
+}
+
+.t-lamp,
+.t-lamp-halo {
+    animation: thief-lamp 0.8s steps(2) infinite;
+}
+
+.t-dizzy {
+    transform-box: view-box;
+    transform-origin: 66px 57px;
+}
+
+/* sneak: tiptoeing, the body bobbing and swaying */
+.thief.is-walk .t-all {
+    animation: thief-tiptoe 0.42s ease-in-out infinite;
+}
+
+.thief.is-walk .t-leg-l {
+    animation: thief-step 0.42s ease-in-out infinite;
+}
+
+.thief.is-walk .t-leg-r {
+    animation: thief-step 0.42s ease-in-out infinite reverse;
+}
+
+/* laugh: the eye squints, the grille opens, the body shakes, the key
+   spins fast */
+.thief.is-laugh .t-pupil,
+.thief.is-laugh .t-glint,
+.thief.is-hit .t-pupil,
+.thief.is-hit .t-glint {
+    display: none;
+}
+
+.thief.is-laugh .t-squint {
+    display: inline;
+}
+
+.thief.is-laugh .t-mouth {
+    transform-box: view-box;
+    transform-origin: 66px 87px;
+    transform: scaleY(1.3);
+}
+
+.thief.is-laugh .t-all {
+    animation: thief-giggle 0.12s linear infinite;
+}
+
+.thief.is-laugh .t-key {
+    animation-duration: 0.25s;
+}
+
+/* hit: the eye spins, a spring pops out of his head, he rocks back */
+.thief.is-hit .t-dizzy {
+    display: inline;
+    animation: thief-dizzy 0.5s linear infinite;
+}
+
+.thief.is-hit .t-spring {
+    display: inline;
+    animation: thief-spring 0.35s ease-out;
+}
+
+.thief.is-hit .t-all {
+    transform: rotate(-8deg);
+}
+
+/* swap: the claw reaches down to grab */
+.thief.is-swap .t-claw {
+    transform: rotate(28deg);
+}
+
+/* point: an arm points along the track to the vent */
+.thief.is-point .t-point {
+    display: inline;
+}
+
+.thief.is-point .t-claw {
+    transform: rotate(18deg);
+}
+
+@keyframes thief-key {
+    0% {
+        transform: scaleY(1);
+    }
+    50% {
+        transform: scaleY(-1);
+    }
+    100% {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes thief-lamp {
+    50% {
+        fill: var(--error-lo);
+        opacity: 0.7;
+    }
+}
+
+@keyframes thief-tiptoe {
+    0%,
+    100% {
+        transform: translateY(0) rotate(-3deg);
+    }
+    50% {
+        transform: translateY(-5px) rotate(3deg);
+    }
+}
+
+@keyframes thief-step {
+    0%,
+    100% {
+        transform: rotate(-14deg);
+    }
+    50% {
+        transform: rotate(14deg);
+    }
+}
+
+@keyframes thief-giggle {
+    50% {
+        transform: translateY(-3px) rotate(2deg);
+    }
+}
+
+@keyframes thief-dizzy {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes thief-spring {
+    from {
+        transform: translateY(14px) scaleY(0.2);
+    }
+}
+
+/* The card table: green felt (the TV's teal) in an ink edge with a brass
+   ring, lit from above, a contact shadow under its lip. The cards in rows
+   of 5 (boss.js ROW), the last row centred. */
+.boss-table {
+    flex: 0 0 auto;
+    margin-top: 4px;
+    padding: 9px;
+    border-radius: 14px;
+    background: radial-gradient(ellipse at 50% 35%, var(--teal), var(--teal-lo) 75%);
+    box-shadow:
+        inset 0 0 0 3px var(--ink),
+        inset 0 0 0 6px var(--brass),
+        inset 0 0 0 7px var(--brass-dark),
+        0 5px 0 var(--brass-dark),
+        3px 10px 14px var(--shadow-contact);
+}
+
+.boss-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+}
+
+/* A card: a button that flips (3D, its back and its face), 3:4. */
+.boss-card {
+    position: relative;
+    flex: 0 0 auto;
+    width: calc((100% - 20px) / 5);
+    aspect-ratio: 3 / 4;
+    padding: 0;
+    border: 0;
+    background: none;
+    perspective: 600px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.boss-card:disabled {
+    cursor: default;
+}
+
+.bc-in {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform 0.4s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+.boss-card.is-up .bc-in {
+    transform: rotateY(180deg);
+}
+
+.bc-face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 2.5px solid var(--ink);
+    border-radius: 8px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    box-shadow: 1px 3px 3px var(--shadow-contact);
+}
+
+/* the back: amber stripes in a cream border, a brass cog */
+.bc-back {
+    background: repeating-linear-gradient(45deg, var(--amber) 0 6px, var(--amber-deep) 6px 12px);
+    box-shadow: inset 0 0 0 2.5px var(--cream), 1px 3px 3px var(--shadow-contact);
+}
+
+.bc-back svg {
+    width: 58%;
+    height: auto;
+}
+
+.cb-cog {
+    fill: var(--brass-dark);
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+.cb-hub {
+    fill: var(--cream);
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+/* the face: cream paper; a picture fills it; a word in Andika Bold, as
+   large as its longest line fits (--len, its letters), one line, or two
+   at the word's break for 7 letters or more (BACKLOG B-213's chunks;
+   bossview.js splitAt) */
+.bc-front {
+    transform: rotateY(180deg);
+    background: var(--cream-hi);
+    container-type: inline-size;
+}
+
+.bc-front img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.bc-word {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: var(--font-block);
+    font-weight: 700;
+    font-size: min(21px, calc(88cqi / (var(--len, 4) * 0.6)));
+    line-height: 1.1;
+    color: var(--ink);
+    white-space: nowrap;
+    /* one glyph per letter: Andika's ligatures (fi, fl, ff) would join two
+       letters, one of them marked, into one glyph */
+    font-variant-ligatures: none;
+}
+
+.bc-line {
+    display: block;
+}
+
+.bl {
+    display: inline-block;
+    transition: color 0.2s;
+}
+
+/* a fake caught or shown at the end: its wrong letters red, wavy-lined */
+.bl.is-bad {
+    color: var(--error);
+    text-decoration: underline wavy var(--error);
+    text-underline-offset: 3px;
+}
+
+/* a fake fixed at the end: the right letters it got in teal */
+.bl.is-fix {
+    color: var(--teal);
+}
+
+.boss-card.is-fixed .bc-front {
+    box-shadow: 0 0 10px 3px var(--glow-zap);
+}
+
+.boss-card.is-gone {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* The bubble over a fake caught: the right spelling, its fixed letters in
+   teal and underlined, pointing at the card (bossview.js places it). One
+   glyph per letter, each its own box (no ligature: in "fish" the "i" may
+   be a fixed letter and the "f" not). */
+.boss-bubble {
+    position: absolute;
+    z-index: 5;
+    padding: 3px 12px 5px;
+    transform: translate(-50%, -100%);
+    font-family: var(--font-block);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.15;
+    white-space: nowrap;
+    color: var(--ink);
+    background: var(--cream-hi);
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    box-shadow: 2px 5px 0 var(--shadow-deep);
+    pointer-events: none;
+    font-variant-ligatures: none;
+}
+
+.boss-bubble span {
+    display: inline-block;
+}
+
+.boss-bubble::after {
+    content: '';
+    position: absolute;
+    left: calc(50% + var(--tip, 0px));
+    bottom: -11px;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-top-color: var(--ink);
+}
+
+.boss-bubble .is-fix {
+    color: var(--teal);
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+}
+
+/* the zaps, sparks, bolts and the part's flight (bossfx.js), over the
+   scene, clipped to it */
+.boss-fx {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.fx-zap {
+    fill: none;
+    stroke: var(--cream-hi);
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.fx-zap-glow {
+    fill: none;
+    stroke: var(--teal-glow);
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    opacity: 0.4;
+}
+
+.fx-spark {
+    fill: var(--teal-glow);
+}
+
+.fx-spark.is-amber {
+    fill: var(--amber);
+}
+
+.fx-bolt {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+}
+
+.fx-bolt.is-tin {
+    fill: var(--error);
+}
+
+.fx-bolt.is-brass {
+    fill: var(--brass);
+}
+
+.fx-bolt.is-dark {
+    fill: var(--charcoal);
+}
+
+.fx-bolt.is-cream {
+    fill: var(--cream);
+}
+
+.fx-smoke {
+    fill: var(--cream);
+    opacity: 0.8;
+}
+
+/* The console's middle window (boss screen only; thief.js windowSvg): a
+   round brass port with dark glass, 13% of the console wide, on its
+   plate's middle; the part shows in it once he is beaten (.is-full). */
+.boss-window {
+    position: absolute;
+    left: 50%;
+    top: 52%;
+    width: calc(var(--console-w) * 0.13);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.boss-window-art,
+.boss-window-art svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.boss-window-art svg {
+    filter: drop-shadow(1px 2px 2px var(--shadow-contact));
+}
+
+.w-rim-lo {
+    fill: var(--brass-dark-lo);
+}
+
+.w-rim {
+    fill: var(--brass);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+}
+
+.w-glass {
+    fill: var(--teal-lo);
+    stroke: var(--brass-dark);
+    stroke-width: 2;
+}
+
+.w-shine {
+    fill: none;
+    stroke: var(--cream);
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.5;
+}
+
+.w-rivet {
+    fill: var(--brass-hi);
+}
+
+.boss-window .boss-part {
+    position: absolute;
+    inset: 22%;
+    opacity: 0;
+}
+
+.boss-window.is-full .boss-part {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px var(--glow-amber));
+}
+
+.boss-window.is-full .w-glass {
+    fill: var(--teal);
+}
+
+/* The end card over the scene: the part, the stars and the gears won (or
+   the thief getting away and the gears won), back to the stage map and
+   play again (icons only). */
+.boss-end {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    place-items: center;
+    padding: 24px;
+    background: var(--scrim);
+}
+
+.boss-end-card {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    width: min(100%, 290px);
+    padding: 18px 16px 16px;
+}
+
+.boss-end-art {
+    display: grid;
+    place-items: center;
+    width: 100px;
+    height: 100px;
+}
+
+.boss-end-art .boss-part {
+    width: 84px;
+    height: 84px;
+    filter: drop-shadow(0 0 12px var(--glow-amber));
+}
+
+.boss-end-art .thief {
+    width: 92px;
+}
+
+.boss-stars svg {
+    width: 46px;
+    height: 46px;
+}
+
+.boss-end.is-lost .boss-stars {
+    display: none;
+}
+
+.boss-end-gears {
+    gap: 5px;
+    --cog-size: 30px;
+    --flap-w: 24px;
+    --flap-h: 32px;
+    --flap-font: 24px;
+}
+
+.boss-end .actions {
+    gap: 32px;
+}
+
+/* The stage map (stagemap.js): a cleared stage whose boss waits shows the
+   thief's face on its station, pulsing; a beaten boss shows the part. A
+   badge on the station's top right corner. */
+.station {
+    position: relative;
+}
+
+.station-badge {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 34px;
+    height: 34px;
+    pointer-events: none;
+}
+
+.station-badge .thief-face,
+.station-badge .boss-part {
+    width: 100%;
+    height: 100%;
+}
+
+.thief-face {
+    display: block;
+}
+
+/* his face is drawn in a 40-unit box (the thief in 134): thinner lines */
+.thief-face .t-tin {
+    stroke-width: 1.8;
+}
+
+.thief-face .t-rim {
+    stroke-width: 1.4;
+}
+
+.thief-face .t-glass {
+    stroke-width: 0.8;
+}
+
+.thief-face .t-grille {
+    stroke-width: 1.1;
+}
+
+.thief-face .t-bars {
+    stroke-width: 0.9;
+}
+
+.thief-face .t-wire-o {
+    stroke-width: 2.6;
+}
+
+.thief-face .t-wire {
+    stroke-width: 1.1;
+}
+
+.thief-face .t-lamp {
+    stroke-width: 0.9;
+}
+
+.thief-face svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    filter: drop-shadow(1px 2px 2px var(--shadow-contact));
+}
+
+.station.has-boss .station-badge {
+    animation: boss-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.station.has-boss .station-badge .thief-face svg {
+    filter: drop-shadow(0 0 6px var(--glow-error));
+}
+
+/* The round end's thief button (a round that just cleared its stage):
+   his face, pulsing; three buttons then share the row. */
+.boss-btn .thief-face {
+    width: 42px;
+    height: 42px;
+}
+
+.boss-btn:not([hidden]) {
+    animation: boss-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.boss-btn[hidden] {
+    display: none;
+}
+
+#screen-round-end .actions:has(#boss-btn:not([hidden])) {
+    gap: 22px;
+}
+
+@keyframes boss-pulse {
+    from {
+        transform: scale(1);
+    }
+    to {
+        transform: scale(1.12);
+    }
+}
+
+/* Reduced motion: no shake or bounce; the thief slides, the cards turn
+   at once, the alarm and the pulses stand still. The clock still runs. */
+@media (prefers-reduced-motion: reduce) {
+    .boss-alarm.is-on,
+    .thief.is-walk .t-all,
+    .thief.is-walk .t-leg-l,
+    .thief.is-walk .t-leg-r,
+    .thief.is-laugh .t-all,
+    .thief.is-hit .t-dizzy,
+    .thief.is-hit .t-spring,
+    .t-key,
+    .station.has-boss .station-badge,
+    .boss-btn:not([hidden]) {
+        animation: none;
+    }
+
+    .bc-in {
+        transition: none;
+    }
 }

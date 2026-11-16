@@ -34,6 +34,7 @@ import { motionFor } from './motion.js';
 import { coachStep } from './coach.js';
 import { WIN_MS } from './picture.js';
 import { HINT_AT } from './bulbs.js';
+import { ENTRANCE } from './boss.js';
 
 // --- The puppet (design/reference/robot-puppet.html) ---
 
@@ -522,6 +523,62 @@ export const MOMENTS = {
         lines: ['press'],
         ifQuiet: true,
     },
+    // The boss (BACKLOG B-232, CHARACTER.md "During a boss"): he is on the
+    // boss screen (the play scene) behind the console as ever. His voice
+    // there is only the words he reads (audio.js, a beat's `say`), so these
+    // have no lines and no sound. bossIn: the lights go red, he gasps, then
+    // ducks behind the console as the alarm turns (boss.js ENTRANCE.duck);
+    // bossReady: the cards are dealt, he pops back up, set to go; bossPair:
+    // a pair, he cheers (a fist pump, happy eyes); bossFix: a fake fixes
+    // itself at the end, glad, pointing up at it; bossOops: a miss or a
+    // fake caught, puzzled, a shrug; bossWon: the thief burst, two fists
+    // and a double pop; bossLost: the thief got away, he covers his eyes,
+    // then rest (never sad).
+    bossIn: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'wide', brows: 'worried', hands: 'gasp', pop: 1 },
+            { at: ENTRANCE.duck, sink: 300, hands: 'rest', eyes: 'dots', brows: 'worried', look: [0, -12] },
+        ],
+        sound: null,
+    },
+    bossReady: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'idle', brows: 'frown', hands: 'rest', look: [0, -16], pop: 1 },
+            { at: 1.2, brows: 'calm', look: [0, 0] },
+        ],
+        sound: null,
+    },
+    bossPair: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'happy', brows: 'up', hands: 'pump', pop: 1 },
+            { at: 0.3, fx: 'pump' },
+            { at: 1.5, hands: 'rest', eyes: 'idle', brows: 'calm' },
+        ],
+        sound: null,
+    },
+    bossFix: { steps: LETTER_GIVEN, sound: null },
+    bossOops: {
+        steps: [
+            { at: 0, sink: 0, head: 6, eyes: 'confused', brows: 'puzzled', hands: 'shrug' },
+            { at: 1.3, hands: 'rest', eyes: 'idle', brows: 'calm', head: 0 },
+        ],
+        sound: null,
+    },
+    bossWon: {
+        steps: [
+            { at: 0, sink: 0, head: 0, eyes: 'happy', brows: 'up', hands: 'pump2', pop: 2 },
+            { at: 0.25, fx: 'pump2' },
+            { at: 1.85, hands: 'rest', eyes: 'happy', brows: 'calm' },
+        ],
+        sound: null,
+    },
+    bossLost: {
+        steps: [
+            { at: 0, sink: 0, head: -3, eyes: 'dots', brows: 'worried', hands: 'cover' },
+            { at: 1.4, hands: 'rest', eyes: 'idle', brows: 'calm', head: 0 },
+        ],
+        sound: null,
+    },
 };
 
 // The kid-idle peek (kidIdle's `peek` step): PEEK.wait seconds after it,
@@ -912,7 +969,25 @@ export function snapshot(state) {
         // the themes opened with a key so far (one more: themeOpen)
         keyEarned: screen === 'round-end' && !!round.keyEarned,
         opened: state.keys && Array.isArray(state.keys.opened) ? state.keys.opened.length : 0,
+        // the boss (BACKLOG B-232): its run, and its beat (one more: a
+        // boss moment)
+        bossRun: screen === 'boss' && state.boss ? state.boss.run : null,
+        bossSeq: screen === 'boss' && state.boss ? state.boss.beat.seq : 0,
+        bossKind: screen === 'boss' && state.boss ? state.boss.beat.kind : null,
     };
+}
+
+// The robot's moment on a boss beat (BACKLOG B-232; pure): a new boss, he
+// ducks (bossIn); the cards dealt (the 'start' beat), he pops up; a pair,
+// he cheers; a fake fixed, glad; a miss or a fake caught, puzzled; the
+// thief burst, two fists; his escape, he covers his eyes. Other beats
+// (a flip, his swap, the ending's show, the burst, lost): nothing.
+const BOSS_MOMENTS = { start: 'bossReady', pair: 'bossPair', fix: 'bossFix', miss: 'bossOops', fake: 'bossOops', won: 'bossWon', escape: 'bossLost' };
+
+function bossMoments(prev, now) {
+    if (prev.screen !== 'boss' || prev.bossRun !== now.bossRun) return ['bossIn'];
+    if (now.bossSeq === prev.bossSeq) return [];
+    return BOSS_MOMENTS[now.bossKind] ? [BOSS_MOMENTS[now.bossKind]] : [];
 }
 
 // The moments between two snapshots, in the order they happen; [] when
@@ -922,6 +997,8 @@ export function snapshot(state) {
 // word, so he looks up at the picture and not at the snow. A new round
 // starts with his wave at once.
 export function momentsFor(prev, now) {
+    // the boss (BACKLOG B-232): his moments on its beats only
+    if (now.screen === 'boss') return now.bossRun === null ? [] : bossMoments(prev, now);
     // The start screen's player tap (main.js onPlayer): he greets the kid.
     if (now.screen === 'theme' && prev.screen === 'start') return ['greet'];
     // a key opened a theme (main.js onTheme)
@@ -1170,7 +1247,7 @@ export function pressDue(state, armed) {
 
 // The snapshot before any state was seen: where renderRobot and audio.js's
 // renderSound start comparing from.
-export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, misses: 0, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0 };
+export const NONE = { screen: null, round: 0, key: null, status: null, lives: null, misses: 0, placed: '', filled: false, idleBeat: null, lockedTaps: 0, hint: -1, boost: -1, boosts: 0, boostKind: null, nudges: 0, filledNudged: false, tuned: false, streak: 0, tutorial: false, tutor: null, stars: null, keyEarned: false, opened: 0, bossRun: null, bossSeq: 0, bossKind: null };
 
 // --- Render ---
 
@@ -1537,14 +1614,19 @@ function stopLife() {
 
 // `onPeek` (main.js: audio.js peekLine) is told each time he peeks over
 // the edge while sunk (BACKLOG B-224: his whisper).
+// The screens he is drawn on: the play screen, and the boss screen (BACKLOG
+// B-232), which is the play scene.
+const onStage = (screen) => screen === 'play' || screen === 'boss';
+
 export function renderRobot(state, onPeek = null) {
     const now = snapshot(state);
     const prev = last.snap;
     const moments = momentsFor(prev, now);
-    const wasOnPlay = prev.screen === 'play';
+    const wasOnPlay = onStage(prev.screen);
     last = { ...last, snap: now };
-    if (now.screen !== 'play') {
-        // He is only on the play screen; steps still waiting are dropped.
+    if (!onStage(now.screen)) {
+        // He is only on the play screen (and the boss's); steps still
+        // waiting are dropped.
         if (wasOnPlay) stopLife();
         return;
     }
@@ -1591,7 +1673,7 @@ export function renderTalk(wave) {
     if (quiet && talk.still) return;
     talk = { ...talk, level: quiet ? 0 : level, brow: quiet ? 0 : brow, still: quiet };
     const d = parts();
-    if (!d || last.snap.screen !== 'play') return;
+    if (!d || !onStage(last.snap.screen)) return;
     const scope = scopeLine(wave, talk.level);
     d.scope.setAttribute('d', scope.d);
     d.scope.setAttribute('opacity', String(scope.opacity));

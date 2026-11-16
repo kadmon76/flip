@@ -2,7 +2,7 @@
 // Only this module mutates state; everything else calls setState().
 
 export const state = {
-    screen: 'start',            // 'start' | 'theme' | 'stages' | 'play' | 'round-end' | 'gallery'
+    screen: 'start',            // 'start' | 'theme' | 'stages' | 'play' | 'round-end' | 'gallery' | 'boss' (BACKLOG B-232: the play scene, screens.js)
     // The players on this device (players.js load(): [{ id, pic }]), for
     // the start screen's cards (start.js), and the one playing in this
     // session, set when the kid taps their card or picks a new picture
@@ -28,9 +28,11 @@ export const state = {
     // theme screen.
     theme: null,
     // The kid's progress per theme as progress.js load() reads it from
-    // the browser ({ "<theme>": { solved, cleared } }): main.js sets it at
-    // start-up and again after each round's record, so the theme cards'
-    // bulbs and the stage map (BACKLOG B-217) are a render of state.
+    // the browser ({ "<theme>": { solved, cleared, bosses, bossLosses } },
+    // the bosses since BACKLOG B-232): main.js sets it at start-up, again
+    // after each round's record and after a boss is won or lost, so the
+    // theme cards' bulbs and the stage map (BACKLOG B-217) are a render of
+    // state.
     // progress.js stays the only reader and writer of the stored copy.
     progress: {},
     // The kid's gears (BACKLOG B-218, PROGRESSION.md "Gears"), as gears.js
@@ -201,6 +203,36 @@ export const state = {
     // picture has locked (main.js onTuned, told by tv.js). The robot's
     // "Picture shown" moment plays on the change (character.js).
     tuned: false,
+    // The boss at the end of a stage (BACKLOG B-232, PROGRESSION.md
+    // "Bosses"; boss.js the rules, main.js the beats, bossview.js and
+    // bossfx.js the screen): null with no boss in play, else
+    //   run: this boss's number (bossRuns), theme, stage, rules (boss.js
+    //     rulesOf: pairs, fakes, secs to the vent, read 'flip' or 'match',
+    //     slower after losses);
+    //   cards: the table in its order (boss.js dealDeck: { id, kind 'pic',
+    //     'word' or 'fake', word, text, image, audio, brk }; his swap
+    //     changes the order), pairs: how many pairs;
+    //   phase: 'entrance' (lights, alarm, he drops in, the deal), 'play',
+    //     'ending' (the last pair found: the fakes shown and fixed),
+    //     'burst' (the final zap), 'won' (the part in the console's
+    //     window), 'escape' (he reached the vent), 'lost';
+    //   busy: a beat plays, taps do nothing; up: the cards face up (two at
+    //     most); gone: the pairs off the table; found, row (pairs in a
+    //     row), gears (earned this boss, added to state.gears as earned);
+    //   holds: what stops him ('pair', 'swap', 'away', 'end'; boss.js hold,
+    //     release) and clock: his walk (boss.js startClock: { start, secs,
+    //     events }; his place is boss.js thiefAt of it and the time, never
+    //     a per-frame setState); null until the cards are dealt;
+    //   caught: the fake caught now (its red letters, the bubble), shown:
+    //     the fakes turned up at the end, fixed: the ones fixed so far;
+    //   beat: the last beat ({ kind, seq, ... }: 'entrance', 'start',
+    //     'flip', 'pair', 'miss', 'swap', 'fake', 'show', 'fix', 'burst',
+    //     'won', 'escape', 'lost'; `say`: the word the robot reads, audio.js);
+    //     bossfx.js, audio.js and character.js play each one once;
+    //   stars (a win's, boss.js bossStars), card: the end card shows.
+    boss: null,
+    // Bosses started this session; a new boss's `run` is one more.
+    bossRuns: 0,
 };
 
 const subscribers = [];

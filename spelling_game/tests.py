@@ -1467,7 +1467,7 @@ class CharacterTests(TestCase):
             'roundStart', 'picture', 'blockPlaced', 'blockReturned', 'filledEarly', 'filled', 'filledNudge', 'kidIdle', 'wake',
             'tutorialWave', 'tutorialDrag', 'tutorialPress', 'tutorialDone', 'greet',
             'wrong', 'wrongPeek', 'thirdMiss', 'correct', 'streak', 'roundEndGood', 'roundEnd', 'keyEarned', 'themeOpen', 'speakerLocked', 'hintGiven',
-            'boostGiven', 'domeNudge'])
+            'boostGiven', 'domeNudge', 'bossIn', 'bossReady', 'bossPair', 'bossFix', 'bossOops', 'bossWon', 'bossLost'])
         # the idle peek: up to his eyes, looks left, right and ahead, sinks again
         # (B-224: a whisper of pool `peek`, only while he is quiet)
         self.assertEqual(self.run_node("out(c.PEEK);"), {'wait': 1.6, 'every': 4.8, 'steps': [
@@ -1580,6 +1580,9 @@ class CharacterTests(TestCase):
             'wrong': ['error'], 'wrongPeek': ['error'], 'thirdMiss': ['error'],
             'correct': ['correct'], 'streak': ['correct'], 'roundEndGood': ['fanfare'], 'roundEnd': ['fanfare'],
             'keyEarned': [], 'themeOpen': [], 'speakerLocked': ['locked'], 'hintGiven': [], 'boostGiven': [], 'domeNudge': [],
+            # the boss's (B-232): its sounds are made in code by its beats
+            # (audio.js bossSounds), none of his clips
+            'bossIn': [], 'bossReady': [], 'bossPair': [], 'bossFix': [], 'bossOops': [], 'bossWon': [], 'bossLost': [],
         })
         self.assertEqual(self.run_node("out([c.soundsFor(['roundStart', 'picture']), c.soundsFor([])]);"), [[], []])
         self.assertEqual(self.run_node(
@@ -1745,11 +1748,13 @@ class CharacterTests(TestCase):
         })
         # the idle sink and the peeks go down far enough to hide his
         # hands; every sink in a moment ends with him back up (0) except
-        # the idle one, which the peek and the wake undo
+        # the idle one, which the peek and the wake undo, and the boss's
+        # entrance (B-232: he ducks behind the console), which the boss's
+        # start undoes (bossReady)
         self.assertEqual(self.run_node(
             "out(Object.keys(c.MOMENTS).map((m) => [m, c.variantsOf(m).flatMap((v) => v.steps).filter((s) => 'sink' in s).map((s) => s.sink)])"
             ".filter(([, s]) => s.some((v) => v)));"),
-            [['kidIdle', [0, 150]], ['wrongPeek', [104, 0]]])
+            [['kidIdle', [0, 150]], ['wrongPeek', [104, 0]], ['bossIn', [0, 300]]])
         # puppet px as a share of the 505px canvas (the parts' xPercent / yPercent)
         self.assertEqual(self.run_node("out([c.CANVAS, c.EDGE, c.SCALE, c.pct(505), c.pct(-26), c.pct(0)]);"),
                          [505, 374, 0.24, 100, -5.1485, 0])
@@ -1862,7 +1867,13 @@ class PuppetTests(TestCase):
             'tutorialWave': ['wave'], 'tutorialDrag': ['point'], 'tutorialPress': ['point'], 'tutorialDone': ['pump2'], 'greet': ['wave'], 'wrong': ['shrug'],
             'wrongPeek': [None], 'thirdMiss': ['cover'], 'correct': ['pump'], 'streak': ['pump2'], 'roundEndGood': ['clap'],
             'roundEnd': ['rest'], 'keyEarned': ['point'], 'themeOpen': ['gasp'], 'speakerLocked': ['shrug'], 'hintGiven': ['pointUp'], 'boostGiven': ['pointUp'],
-            'domeNudge': ['point']})
+            'domeNudge': ['point'],
+            # the boss (B-232): a gasp as the lights go red (then he ducks),
+            # rest as he comes back up, a pump on a pair, pointing up at a
+            # fake fixed, a shrug on a miss or a fake, two fists on the win,
+            # covering his eyes as the thief gets away
+            'bossIn': ['gasp'], 'bossReady': ['rest'], 'bossPair': ['pump'], 'bossFix': ['pointUp'], 'bossOops': ['shrug'],
+            'bossWon': ['pump2'], 'bossLost': ['cover']})
 
     def test_the_hands_hide_before_they_sink_and_show_after_they_rise(self):
         # BACKLOG B-210 review: going below hideHands (40) the hands vanish
@@ -2409,10 +2420,10 @@ class AudioTests(TestCase):
         # so are the win's chime (B-227), a word's own win's sounds (B-228)
         # and the round end's fanfare (B-230, in place of the tada); the
         # word he says on a correct check and his lines (B-223, B-224) are
-        # his voice
+        # his voice; the boss's sounds (B-232) are effects too
         self.assertEqual(self.run_node("out(a.CHANNEL);"),
                          {'correct': 'voice', 'error': 'voice', 'swipe': 'fx', 'locked': 'voice', 'hiss': 'fx',
-                          'chime': 'fx', 'sfx': 'fx', 'fanfare': 'fx', 'word': 'voice', 'line': 'voice'})
+                          'chime': 'fx', 'sfx': 'fx', 'fanfare': 'fx', 'boss': 'fx', 'word': 'voice', 'line': 'voice'})
 
     def test_mute_flag_is_remembered_in_flip_muted(self):
         self.assertEqual(self.run_node(
@@ -3077,7 +3088,8 @@ class RobotLayoutTests(TestCase):
         # every moment of every sink and rise a moment uses
         self.assertGreaterEqual(r['clear'], 10)
         self.assertLess(r['clear'], 40)
-        self.assertEqual(r['sinks'], [0, 104, 150])
+        # (300: he ducks behind the console at the boss's entrance, B-232)
+        self.assertEqual(r['sinks'], [0, 104, 150, 300])
         self.assertEqual(r['shown'], [])
 
 
@@ -3134,10 +3146,11 @@ class PlayBackTests(TestCase):
         self.assertIn('color: var(--cream);', rule)
         self.assertNotIn('background:', rule.replace('background: none;', ''))   # no face on the v5 scene
         self.assertIn('display: flex;', self.rule('body[data-screen="play"] .play-back-btn'))
-        # nothing else shows it
+        # nothing else shows it but the boss screen (B-232: the play scene;
+        # back to the stage map, the boss dropped)
         css = self.css()
         shown = re.findall(r'\n([^{}\n]*\.play-back-btn[^{}\n]*?)\s*{[^}]*display: (?!none)', css)
-        self.assertEqual(shown, ['body[data-screen="play"] .play-back-btn'])
+        self.assertEqual(shown, ['body[data-screen="play"] .play-back-btn', 'body[data-screen="boss"] .play-back-btn'])
 
     def test_tap_drops_the_round_and_goes_to_the_stage_screen(self):
         # since B-217 the back arrow goes to the theme's stage screen (the
@@ -3374,8 +3387,10 @@ class StageTests(TestCase):
         self.assertIn('startingRound: false,', last)
         main = self.code('main.js')
         # (since B-217 also cleared when the kid left while the data file
-        # was on its way: StageMapTests)
-        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 4)
+        # was on its way: StageMapTests; a boss starts the same way, B-232,
+        # one start of either at a time)
+        self.assertEqual(len(re.findall(r'\bstartingRound:', main)), 8)
+        self.assertEqual(len(re.findall(r'\bstartingRound:', self.main_function('startBoss'))), 4)
         for name in ('onPlayAgain', 'onThemes', 'onNext', 'onPlayBack'):
             self.assertNotIn('startingRound:', self.main_function(name), name)
 
@@ -6796,15 +6811,22 @@ class ProgressTests(TestCase):
     """The kid's progress per theme (BACKLOG B-216, PROGRESSION.md
     "Stages"): static/js/progress.js keeps the solved words and the
     cleared stages per theme in localStorage `flip.progress.v1` (shape
-    { "<theme>": { "solved": [word, ...], "cleared": [stage, ...] } };
-    read and written only there, in try/catch); currentStage(data,
-    progress) and afterRound(progress, data, stage, results) are pure. Run
-    through node with a fake localStorage; the wiring in main.js (the
-    stage at startRound, the record at the round end only) is checked in
-    the source."""
+    { "<theme>": { "solved": [word, ...], "cleared": [stage, ...],
+    "bosses": [stage, ...], "bossLosses": { stage: n } } }, the bosses
+    since BACKLOG B-232; read and written only there, in try/catch);
+    currentStage(data, progress) and afterRound(progress, data, stage,
+    results) are pure. Run through node with a fake localStorage; the
+    wiring in main.js (the stage at startRound, the record at the round end
+    only) is checked in the source."""
 
     ROOT = Path(__file__).resolve().parent.parent
     JS = ROOT / 'static' / 'js'
+
+    # A theme's progress as progress.js reads it (B-232: with its bosses;
+    # an entry saved before has its cleared stages' bosses beaten).
+    @staticmethod
+    def prog(solved=(), cleared=(), bosses=(), losses=None):
+        return {'solved': list(solved), 'cleared': list(cleared), 'bosses': list(bosses), 'bossLosses': losses or {}}
 
     # In-memory localStorage (SEED: the key's initial value or null),
     # counting writes; THROW makes getItem / setItem throw.
@@ -6855,7 +6877,7 @@ class ProgressTests(TestCase):
 
     def test_missing_key_is_no_progress(self):
         self.assertEqual(self.run_node("out([P.load(), P.forTheme('animals'), raw(), writes]);"),
-                         [{}, {'solved': [], 'cleared': []}, None, 0])
+                         [{}, self.prog(), None, 0])
 
     def test_a_round_end_records_the_solved_words_and_the_cleared_stage(self):
         # animals stage 1 is cat and dog: both checked correct (dog with
@@ -6866,9 +6888,11 @@ class ProgressTests(TestCase):
             " [{ word: 'cat', correct: true, newSticker: true }, { word: 'frog', correct: false },"
             "  { word: 'dog', correct: true, newSticker: false }, { word: 'fish', correct: true }, { word: 'duck', correct: false }]);"
             "out([r, JSON.parse(raw()), P.forTheme('animals')]);")
-        self.assertEqual(res, {'progress': {'solved': ['cat', 'dog', 'fish'], 'cleared': [1]}, 'justCleared': True})
-        self.assertEqual(stored, {'animals': {'solved': ['cat', 'dog', 'fish'], 'cleared': [1]}})
-        self.assertEqual(mine, {'solved': ['cat', 'dog', 'fish'], 'cleared': [1]})
+        # a stage just cleared: its boss still to beat (B-232)
+        mine_ = self.prog(['cat', 'dog', 'fish'], [1])
+        self.assertEqual(res, {'progress': mine_, 'justCleared': True})
+        self.assertEqual(stored, {'animals': mine_})
+        self.assertEqual(mine, mine_)
 
     def test_a_stage_clears_once_every_one_of_its_words_is_solved(self):
         # round 1: cat right, dog revealed: stage 1 not cleared; round 2:
@@ -6888,23 +6912,29 @@ class ProgressTests(TestCase):
         res = self.run_node(
             f"out(P.afterRound({{ solved: ['cat', 'dog'], cleared: [1] }}, {json.dumps(data)}, 2,"
             " [{ word: 'cat', correct: false }, { word: 'frog', correct: true }]));")
-        self.assertEqual(res, {'progress': {'solved': ['cat', 'dog', 'frog'], 'cleared': [1, 2]}, 'justCleared': True})
+        self.assertEqual(res, {'progress': self.prog(['cat', 'dog', 'frog'], [1, 2], [1]), 'justCleared': True})
 
     def test_only_the_rounds_stage_is_cleared(self):
         # transportation today: stage 1 is only bus, stage 2 has no word;
         # a stage-1 round of bus, car, truck (stage 3) and two of stage 4,
         # all right, clears stage 1 only, though car and truck are all of
-        # stage 3; the next round is stage 3 (2 is skipped), which clears
-        # at its end, its words being solved
+        # stage 3; stage 1's boss then guards the next stage (B-232): the
+        # current stage stays 1 until he is beaten; then it is stage 3 (2
+        # is skipped), which clears at its end, its words being solved,
+        # and its boss guards stage 4
         data = json.dumps(self.content('transportation'))
         res = self.run_node(
             f"const data = {data};"
             "const a = P.record('transportation', data, 1, ['bus', 'car', 'truck', 'taxi', 'boat'].map((word) => ({ word, correct: true })));"
+            "const guard = P.currentStage(data, P.forTheme('transportation'));"
+            "P.recordBoss('transportation', 1, true);"
             "const next = P.currentStage(data, P.forTheme('transportation'));"
             "const b = P.record('transportation', data, next, ['car', 'truck', 'bus', 'plane', 'train'].map((word) => ({ word, correct: false })));"
-            "out([a.progress.cleared, a.justCleared, next, b.progress.cleared, b.justCleared,"
+            "const guard2 = P.currentStage(data, P.forTheme('transportation'));"
+            "P.recordBoss('transportation', next, true);"
+            "out([a.progress.cleared, a.justCleared, guard, next, b.progress.cleared, b.justCleared, guard2,"
             " P.currentStage(data, P.forTheme('transportation'))]);")
-        self.assertEqual(res, [[1], True, 3, [1, 3], True, 4])
+        self.assertEqual(res, [[1], True, 1, 3, [1, 3], True, 3, 4])
 
     def test_a_cleared_stage_stays_cleared_when_the_data_adds_words(self):
         # stage 1 cleared with cat and dog; the data later adds pig to it:
@@ -6914,7 +6944,7 @@ class ProgressTests(TestCase):
             f"const data = {json.dumps(data)}; const before = {{ solved: ['cat', 'dog', 'frog'], cleared: [1] }};"
             "const r = P.afterRound(before, data, 1, [{ word: 'pig', correct: false }]);"
             "out([r, P.currentStage(data, r.progress)]);")
-        self.assertEqual(res, [{'progress': {'solved': ['cat', 'dog', 'frog'], 'cleared': [1]}, 'justCleared': False}, 2])
+        self.assertEqual(res, [{'progress': self.prog(['cat', 'dog', 'frog'], [1], [1]), 'justCleared': False}, 2])
 
     def test_a_stage_with_no_word_or_no_stage_is_never_cleared(self):
         # transportation has no stage-2 word; a value that is not a stage
@@ -6925,22 +6955,24 @@ class ProgressTests(TestCase):
             f"const data = {json.dumps(data)};"
             "out([2, null, '1', 'Long', 7].map((st) => P.afterRound({ solved: [], cleared: [] }, data, st,"
             " [{ word: 'bus', correct: true }])).concat([P.afterRound({}, {}, 1, [{ word: 'ox', correct: true }])]));")
-        self.assertEqual(res, [{'progress': {'solved': ['bus'], 'cleared': []}, 'justCleared': False}] * 5
-                         + [{'progress': {'solved': ['ox'], 'cleared': []}, 'justCleared': False}])
+        self.assertEqual(res, [{'progress': self.prog(['bus']), 'justCleared': False}] * 5
+                         + [{'progress': self.prog(['ox']), 'justCleared': False}])
 
     def test_odd_results_are_skipped(self):
         res = self.run_node(
             "out(P.afterRound(null, { ox: { stage: 1 } }, 1, [null, { word: 'ox' }, { word: '', correct: true },"
             " { correct: true }, { word: 'ox', correct: 'yes' }, { word: 7, correct: true }]));")
-        self.assertEqual(res, {'progress': {'solved': [], 'cleared': []}, 'justCleared': False})
+        self.assertEqual(res, {'progress': self.prog(), 'justCleared': False})
         self.assertEqual(self.run_node("out(P.afterRound(undefined, null, 1, undefined));"),
-                         {'progress': {'solved': [], 'cleared': []}, 'justCleared': False})
+                         {'progress': self.prog(), 'justCleared': False})
 
     def test_cleared_stages_are_kept_in_stage_order(self):
         res = self.run_node(
             "out(P.afterRound({ solved: ['kite'], cleared: ['long', 3, 1] }, { ox: { stage: 2 }, kite: { stage: 'long' } }, 2,"
             " [{ word: 'ox', correct: true }]));")
-        self.assertEqual(res, {'progress': {'solved': ['kite', 'ox'], 'cleared': [1, 2, 3, 'long']}, 'justCleared': True})
+        # (saved before B-232: its cleared stages' bosses beaten; the one
+        # just cleared has its boss still to beat)
+        self.assertEqual(res, {'progress': self.prog(['kite', 'ox'], [1, 2, 3, 'long'], [1, 3, 'long']), 'justCleared': True})
 
     def test_after_round_leaves_its_inputs_alone(self):
         data = self.content('animals')
@@ -6979,12 +7011,11 @@ class ProgressTests(TestCase):
             'transportation': ['bus'], 'space': None, 'sea': {'solved': 'fish', 'cleared': 3},
         })
         lists = self.run_node("out(P.load());", seed=seed)
-        self.assertEqual(lists, {'animals': {'solved': ['cat', 'dog'], 'cleared': [1, 'long']},
-                                 'sea': {'solved': [], 'cleared': []}})
+        self.assertEqual(lists, {'animals': self.prog(['cat', 'dog'], [1, 'long'], [1, 'long']), 'sea': self.prog()})
         stored = self.run_node(
             "P.record('animals', { cat: { stage: 1 }, frog: { stage: 2 } }, 2, [{ word: 'frog', correct: true }]);"
             "out(JSON.parse(raw()));", seed='{oops')
-        self.assertEqual(stored, {'animals': {'solved': ['frog'], 'cleared': [2]}})
+        self.assertEqual(stored, {'animals': self.prog(['frog'], [2])})
 
     def test_blocked_storage_never_throws(self):
         res = self.run_node(
@@ -6994,8 +7025,8 @@ class ProgressTests(TestCase):
             "Object.defineProperty(globalThis, 'localStorage', { get() { throw new Error('denied'); } });"
             "const c = [P.load(), P.record('animals', { cat: { stage: 1 } }, 1, [{ word: 'cat', correct: true }])];"
             "out([a, b, c, writes]);")
-        empty = {'solved': [], 'cleared': []}
-        won = {'progress': {'solved': ['cat'], 'cleared': [1]}, 'justCleared': True}
+        empty = self.prog()
+        won = {'progress': self.prog(['cat'], [1]), 'justCleared': True}
         self.assertEqual(res, [[{}, empty], won, [{}, won], 0])
 
     def test_no_change_writes_nothing_and_other_themes_are_kept(self):
@@ -7007,17 +7038,20 @@ class ProgressTests(TestCase):
             "const quiet = writes;"
             "P.record('animals', data, 2, [{ word: 'frog', correct: true }]);"
             "out([quiet, writes, JSON.parse(raw()), P.record('', data, 1, []), P.record(null, data, 1, [])]);", seed=seed)
-        self.assertEqual(res[:3], [0, 1, {'animals': {'solved': ['cat', 'dog', 'frog'], 'cleared': [1, 2]},
-                                          'transportation': {'solved': ['bus'], 'cleared': [1]}}])
-        self.assertEqual(res[3:], [{'progress': {'solved': [], 'cleared': []}, 'justCleared': False}] * 2)
+        # (saved before B-232: the cleared stages' bosses beaten, kept so
+        # as they are written again)
+        self.assertEqual(res[:3], [0, 1, {'animals': self.prog(['cat', 'dog', 'frog'], [1, 2], [1]),
+                                          'transportation': self.prog(['bus'], [1], [1])}])
+        self.assertEqual(res[3:], [{'progress': self.prog(), 'justCleared': False}] * 2)
 
     # --- the modules together, as main.js runs them ---
 
     def test_clearing_stage_1_opens_the_next_stage(self):
-        # animals: a stage-1 round, every word right, clears stage 1; the
-        # next round (play again) is stage 2, whose rules give no first
-        # letter; its round starts with frog, the stage's word, then the
-        # review (cat, dog) and stage 3 (fish, duck)
+        # animals: a stage-1 round, every word right, clears stage 1; its
+        # boss then guards stage 2 (B-232): play again replays stage 1
+        # until he is beaten; then the next round is stage 2, whose rules
+        # give no first letter; its round starts with frog, the stage's
+        # word, then the review (cat, dog) and stage 3 (fish, duck)
         data = self.content('animals')
         res = self.run_node(
             f"const data = {json.dumps(data)};"
@@ -7026,11 +7060,13 @@ class ProgressTests(TestCase):
             "const first = P.currentStage(data, P.forTheme('animals'));"
             "const words = R.pickRound(data, 5, first, [], P.forTheme('animals').solved);"
             "const end = P.record('animals', data, first, words.map((word) => ({ word, correct: true })));"
+            "const guarded = P.currentStage(data, P.forTheme('animals'));"
+            "P.recordBoss('animals', first, true);"
             "const next = P.currentStage(data, P.forTheme('animals'));"
             "const again = R.pickRound(data, 5, next, [], P.forTheme('animals').solved);"
             "let seq = 0; const w = R.makeWord({ word: again[0], image: '', audio: '' }, next, () => `t${++seq}`);"
-            "out([first, words.slice().sort(), end.justCleared, next, again.slice().sort(), S.stageRules(next), w.placed.every((p) => p === null)]);")
-        self.assertEqual(res, [1, ['cat', 'dog', 'duck', 'fish', 'frog'], True, 2, ['cat', 'dog', 'duck', 'fish', 'frog'],
+            "out([first, words.slice().sort(), end.justCleared, guarded, next, again.slice().sort(), S.stageRules(next), w.placed.every((p) => p === null)]);")
+        self.assertEqual(res, [1, ['cat', 'dog', 'duck', 'fish', 'frog'], True, 1, 2, ['cat', 'dog', 'duck', 'fish', 'frog'],
                                {'givenFirst': False, 'extras': 0}, True])
 
     # --- wiring ---
@@ -7055,7 +7091,7 @@ class ProgressTests(TestCase):
 
     def test_main_plays_the_current_stage_and_records_only_at_the_round_end(self):
         main = self.code('main.js')
-        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';", main)
+        self.assertIn("import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations, recordBoss, bossLossesOf } from './progress.js';", main)
         start = self.function('startRound')
         self.assertIn('const stage = chosen === null ? currentStage(data, progress) : chosen;', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
@@ -7829,7 +7865,10 @@ class StageMapTests(TestCase):
             ['1:co', '3:co', '4:co', 'long:cso'],
             ['1:co', '3:so', '4:', 'long:'],
         ])
-        self.assertEqual(set(res[0][0]), {'stage', 'cleared', 'start', 'open'})
+        # (B-232: each station also says whether its boss is beaten and
+        # whether it waits; a progress saved before has its cleared
+        # stages' bosses beaten: BossGateTests)
+        self.assertEqual(set(res[0][0]), {'stage', 'cleared', 'beaten', 'boss', 'start', 'open'})
 
     def test_odd_stages_and_progress(self):
         # no stage: stage 1, as currentStage plays it; stages in STAGES
@@ -7880,13 +7919,15 @@ class StageMapTests(TestCase):
             "const own = P.record('animals', data, 3, [{ word: 'cat', correct: false }]);"
             "out([replay, after, wrong, quiet, own]);")
         replay, after, wrong, quiet, own = res
-        self.assertEqual(replay, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2]},
+        # (saved before B-232: the cleared stages' bosses beaten)
+        done = {'bosses': [1, 2], 'bossLosses': {}}
+        self.assertEqual(replay, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2], **done},
                                   'justCleared': False})
         self.assertEqual(self.look(after), ['1:co', '2:co', '3:so', '4:', '5:'])
-        self.assertEqual(wrong, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2]},
+        self.assertEqual(wrong, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2], **done},
                                  'justCleared': False})
         self.assertTrue(quiet)
-        self.assertEqual(own, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2, 3]},
+        self.assertEqual(own, {'progress': {'solved': ['cat', 'dog', 'frog', 'fish', 'duck'], 'cleared': [1, 2, 3], **done},
                                'justCleared': True})
 
     def test_progress_js_stays_pure_and_currentstage_reads_the_stations(self):
@@ -7966,6 +8007,8 @@ class StageMapTests(TestCase):
                 setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
                 removeAttribute(k) { delete this.attrs[k]; },
                 appendChild(c) { c.parent = this; this.children.push(c); return c; },
+                insertBefore(c, ref) { c.parent = this; this.children.splice(this.children.indexOf(ref), 0, c); return c; },
+                removeChild(c) { this.children = this.children.filter((x) => x !== c); return c; },
                 get lastElementChild() { return this.children[this.children.length - 1]; },
                 set innerHTML(v) { this.children = []; }, };
             return el;
@@ -8060,7 +8103,8 @@ class StageMapTests(TestCase):
         self.assertNotIn('localStorage', code)
         self.assertNotRegex(code, r'(?m)^(let|var) ')
         self.assertEqual(re.findall(r"^import .*$", code, flags=re.M),
-                         ["import { stations } from './progress.js';", "import { renderFlaps } from './flaps.js';"])
+                         ["import { stations } from './progress.js';", "import { renderFlaps } from './flaps.js';",
+                          "import { thiefFace, partIcon } from './thief.js';"])
 
     # --- main.js: the flow ---
 
@@ -8080,8 +8124,10 @@ class StageMapTests(TestCase):
     def test_a_cleared_or_current_station_starts_a_round_of_its_stage(self):
         on = self.function('onStation')
         self.assertIn("if (state.screen !== 'stages') return;", on)
-        self.assertIn('const open = stations(theme.stages, state.progress[theme.name]).some((s) => s.stage === stage && s.open);', on)
-        self.assertIn('if (open) startRound(theme, stage);', on)
+        self.assertIn('const station = stations(theme.stages, state.progress[theme.name]).find((s) => s.stage === stage && s.open);', on)
+        self.assertIn('if (!station) return;', on)
+        # (B-232: a cleared stage whose boss waits starts its boss)
+        self.assertIn('if (station.boss) startBoss(theme, stage);\n    else startRound(theme, stage);', on)
         start = self.function('startRound')
         self.assertTrue(start.lstrip().startswith('async function startRound({ name, dataUrl }, chosen = null) {'))
         self.assertIn('const stage = chosen === null ? currentStage(data, progress) : chosen;', start)
@@ -8097,7 +8143,7 @@ class StageMapTests(TestCase):
     def test_progress_is_in_state_read_at_start_up_and_after_each_record(self):
         state = (self.JS / 'state.js').read_text()
         self.assertIn('\n    progress: {},', state)
-        self.assertIn("'theme' | 'stages' | 'play' | 'round-end' | 'gallery'", state)
+        self.assertIn("'theme' | 'stages' | 'play' | 'round-end' | 'gallery' | 'boss'", state)
         main = self.code('main.js')
         self.assertIn('setState({ progress: loadProgress() });', main)
         self.assertLess(main.index('setState({ progress: loadProgress() });'), main.index('loadThemes();\n'))
@@ -8109,8 +8155,9 @@ class StageMapTests(TestCase):
         self.assertLess(nxt.index('progress: all,'), nxt.index("screen: 'round-end',"))
         # and when a player starts (startAs, the start screen, 2026-10-24)
         self.assertIn('progress: loadProgress(), gears: loadGears(),', self.function('startAs'))
-        self.assertEqual(len(re.findall(r'\bprogress: ', main)), 3)
-        self.assertEqual(main.count('loadProgress()'), 3)
+        # (and after a boss is won or lost, B-232: bossPair, bossEscape)
+        self.assertEqual(len(re.findall(r'\bprogress: ', main)), 4)
+        self.assertEqual(main.count('loadProgress()'), 5)
 
     def test_no_round_starts_once_the_kid_has_left_the_screen_the_tap_came_from(self):
         # review fix: a station tapped, then the stage screen's back arrow
@@ -8429,7 +8476,9 @@ class GearsTests(TestCase):
         # a word left without a check counts as missed, not clean
         self.assertEqual(results[1], {'word': 'dog', 'correct': False, 'clean': False})
         main = self.code('main.js')
-        self.assertEqual(main.count('addGears('), 2)
+        # (and a boss's pairs and win, B-232, as they are earned: bossPair)
+        self.assertEqual(main.count('addGears('), 3)
+        self.assertIn('const patch = { gears: addGears(earned) };', self.function('bossPair'))
         self.assertIn("import { load as loadGears, add as addGears, spend as spendGears, isClean, wordGears, GEARS } from './gears.js';", main)
         self.assertIn('setState({ gears: loadGears() });', main)
         self.assertLess(nxt.index('recordProgress('), nxt.index('gears: addGears(GEARS.round),'))
@@ -10070,7 +10119,9 @@ class MomentLinesTests(TestCase):
             'filled': 'swipe', 'filledNudge': None, 'kidIdle': None, 'wake': None, 'tutorialWave': None, 'tutorialDrag': None,
             'tutorialPress': 'swipe', 'tutorialDone': 'correct', 'greet': None, 'wrong': 'error', 'wrongPeek': 'error', 'thirdMiss': 'error',
             'correct': 'correct', 'streak': 'correct', 'roundEndGood': 'fanfare', 'roundEnd': 'fanfare', 'keyEarned': None, 'themeOpen': None, 'speakerLocked': 'locked',
-            'hintGiven': None, 'boostGiven': None, 'domeNudge': None})
+            'hintGiven': None, 'boostGiven': None, 'domeNudge': None,
+            # the boss's (B-232): no clip and no line, his voice there is only the words
+            'bossIn': None, 'bossReady': None, 'bossPair': None, 'bossFix': None, 'bossOops': None, 'bossWon': None, 'bossLost': None})
 
     def test_the_pools_are_the_contents_and_the_unwired_ones_are_listed_later(self):
         # every pool the table names is one of content/voice/robot-lines.json's;
@@ -10458,7 +10509,7 @@ class MomentLinesTests(TestCase):
         strip = lambda t: re.sub(r'/\*.*?\*/|//[^\n]*', '', t, flags=re.S)
         js = self.ROOT / 'static' / 'js'
         main = strip((js / 'main.js').read_text())
-        self.assertIn("import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine, winSound } from './audio.js';", main)
+        self.assertIn("import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine, winSound, bossTick } from './audio.js';", main)
         self.assertIn('subscribe((s) => renderRobot(s, peekLine));', main)
         self.assertNotIn('subscribe(renderRobot);', main)
         audio = strip(self.MODULE.read_text())
@@ -10578,8 +10629,11 @@ class QuietRobotTests(TestCase):
         voiced = {m for m, s in moments.items() if s['lines'] or s['word'] or s['sound'] in ('correct', 'error', 'locked')}
         self.assertLessEqual(voiced, set(rows))
         self.assertLessEqual(set(rows), set(moments) | {'peek'})
-        # the moments with no voice of his: the swipe's, the tutorial wave
-        self.assertEqual(sorted(set(moments) - set(rows)), ['blockPlaced', 'blockReturned', 'filled', 'filledEarly'])
+        # the moments with no voice of his: the swipe's, the tutorial wave,
+        # and the boss's (B-232: his voice there is only the words he
+        # reads, audio.js bossSay)
+        self.assertEqual(sorted(set(moments) - set(rows)), ['blockPlaced', 'blockReturned', 'bossFix', 'bossIn', 'bossLost', 'bossOops',
+                                                            'bossPair', 'bossReady', 'bossWon', 'filled', 'filledEarly'])
 
     def test_says_line_at_fixed_draws(self):
         res = self.run_character(
@@ -11291,7 +11345,7 @@ class PictureLifeTests(TestCase):
         # the win's sounds (B-228): audio.js winSound, told each win as it starts
         self.assertIn('subscribe((s) => renderPicture(s, winSound));', main)
         self.assertLess(main.index('subscribe((s) => renderTv(s, onTuned));'), main.index('subscribe((s) => renderPicture(s, winSound));'))
-        self.assertIn("document.addEventListener('visibilitychange', () => renderPicture(state, winSound));", main)
+        self.assertIn("document.addEventListener('visibilitychange', () => {\n    renderPicture(state, winSound);\n", main)
         pic = self.code('picture.js')
         # it never sets state and runs no script per frame: Web Animations
         # only, cancelled through getAnimations (no animation handle kept)
@@ -14089,3 +14143,765 @@ class RoundBulbsTests(TestCase):
         self.assertIn("| The word's second wrong check (his letter comes; B-231) |", character)
         self.assertIn("| Second miss: his letter (B-206; the word's own second wrong check) |", character)
         self.assertIn("| Third miss (the word's own third, or the round's last bulb going off", character)
+
+
+class BossTests(TestCase):
+    """The thief bot, the boss at the end of every stage (BACKLOG B-232,
+    PROGRESSION.md "Bosses"): boss.js's pure part (the stage table and the
+    slower walk, the deck, the fakes and the letter diff, the pair check,
+    the swap, the clock, stars and gears, the beats' numbers), the gate in
+    progress.js (bosses, bossLosses, old saves), main.js's beats (run
+    through node with stand-ins and a fake clock), audio.js's boss sounds,
+    character.js's boss moments, bossview.js's pure helpers, thief.js's
+    drawing, the template, CSS and docs."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+    DATA = ROOT / 'static' / 'data'
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const store = new Map(); let writes = 0;"
+            "globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null),"
+            " setItem: (k, v) => { writes++; store.set(k, String(v)); }, removeItem: (k) => store.delete(k) };"
+            f"const B = await import('{(self.JS / 'boss.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'progress.js').as_uri()}');"
+            f"const PL = await import('{(self.JS / 'players.js').as_uri()}');"
+            + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        code = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', code).start()
+        return code[start:code.index('\n}\n', start) + 2]
+
+    def data(self, theme):
+        return json.loads((self.DATA / f'{theme}.json').read_text())
+
+    def all_words(self):
+        return sorted({w for t in ('animals', 'food', 'home', 'transportation') for w in self.data(t)})
+
+    # --- boss.js: the stage table ---
+
+    def test_the_stage_table_and_the_slower_walk(self):
+        res = self.run_node(
+            "out([B.BOSS, B.ROW, B.SLOWER, [0, 1, 2, 3, 4, 5, 9, -1, 1.5, 'x'].map(B.slowerBy),"
+            " B.rulesOf(1), B.rulesOf(5, 2), B.rulesOf('long', 4), B.rulesOf('x'), B.rulesOf(3, 1)]);")
+        table, row, slower, slow, one, five, long_, odd, three = res
+        # BACKLOG B-232's table, as it is (starting values the human tunes)
+        self.assertEqual(table, {
+            '1': {'pairs': 5, 'fakes': 0, 'secs': 75, 'read': 'flip'},
+            '2': {'pairs': 5, 'fakes': 0, 'secs': 70, 'read': 'flip'},
+            '3': {'pairs': 6, 'fakes': 2, 'secs': 85, 'read': 'match'},
+            '4': {'pairs': 6, 'fakes': 2, 'secs': 80, 'read': 'match'},
+            '5': {'pairs': 6, 'fakes': 3, 'secs': 75, 'read': 'match'},
+            'long': {'pairs': 6, 'fakes': 3, 'secs': 95, 'read': 'match'},
+        })
+        self.assertEqual(row, 5)
+        self.assertEqual(slower, {'after': 2, 'per': 0.1, 'most': 0.3})
+        # after 2 losses 10% slower, 10% more per loss, at most 30%
+        self.assertEqual(slow, [0, 0, 0.1, 0.2, 0.3, 0.3, 0.3, 0, 0, 0])
+        self.assertEqual(one, {'pairs': 5, 'fakes': 0, 'secs': 75, 'read': 'flip', 'slower': 0})
+        self.assertEqual(five, {'pairs': 6, 'fakes': 3, 'secs': 83.333, 'read': 'match', 'slower': 0.1})
+        self.assertEqual(long_, {'pairs': 6, 'fakes': 3, 'secs': 135.714, 'read': 'match', 'slower': 0.3})
+        self.assertEqual(odd, one)
+        self.assertEqual(three['slower'], 0)
+
+    # --- boss.js: the deck ---
+
+    def test_the_deck_pairs_missed_first_and_fakes(self):
+        res = self.run_node(
+            f"const known = {json.dumps(self.all_words())};"
+            f"const data = {json.dumps(self.data('animals'))};"
+            "const deal = (stage, missed = []) => B.dealDeck(data, stage, missed, known, B.rulesOf(stage));"
+            "const shape = (d) => ({ pairs: d.pairs, n: d.cards.length, kinds: ['pic', 'word', 'fake'].map((k) => d.cards.filter((c) => c.kind === k).length) });"
+            "const stages = [1, 2, 3, 4, 5, 'long'].map((s) => shape(deal(s)));"
+            # every picture has its own word card, every card's word is of the stage; ids unique
+            "const checks = [];"
+            "for (let k = 0; k < 40; k++) for (const s of [1, 3, 5, 'long']) {"
+            " const d = deal(s, ['octopus', 'cat', 'shark', 'tiger', 'elephant']);"
+            " const pics = d.cards.filter((c) => c.kind === 'pic').map((c) => c.word);"
+            " const words = d.cards.filter((c) => c.kind === 'word').map((c) => c.word);"
+            " const fakes = d.cards.filter((c) => c.kind === 'fake');"
+            " checks.push(pics.slice().sort().join() === words.slice().sort().join()"
+            "  && d.cards.every((c) => data[c.word].stage === s)"
+            "  && new Set(d.cards.map((c) => c.id)).size === d.cards.length"
+            "  && fakes.every((f) => pics.includes(f.word) && f.text !== f.word && !known.includes(f.text) && !B.REAL_WORDS.includes(f.text) && f.text[0] === f.word[0])"
+            "  && new Set(fakes.map((f) => f.word)).size === fakes.length && new Set(fakes.map((f) => f.text)).size === fakes.length"
+            "  && d.cards.filter((c) => c.kind === 'word').every((c) => c.text === c.word)"
+            "  && d.cards.filter((c) => c.kind === 'pic').every((c) => c.text === null && c.image === data[c.word].image)"
+            "  && d.cards.every((c) => c.audio === data[c.word].audio)"
+            # the missed words of the stage come first (long has 8 words for 6 pairs)
+            "  && (s !== 'long' || (pics.includes('octopus') && pics.includes('elephant'))));"
+            "}"
+            "out([stages, checks.every(Boolean), checks.length]);")
+        stages, ok, n = res
+        # animals has 5 words a stage and 8 long: a stage with fewer words
+        # than its pairs uses all it has; fakes as the table says
+        self.assertEqual(stages, [
+            {'pairs': 5, 'n': 10, 'kinds': [5, 5, 0]}, {'pairs': 5, 'n': 10, 'kinds': [5, 5, 0]},
+            {'pairs': 5, 'n': 12, 'kinds': [5, 5, 2]}, {'pairs': 5, 'n': 12, 'kinds': [5, 5, 2]},
+            {'pairs': 5, 'n': 13, 'kinds': [5, 5, 3]}, {'pairs': 6, 'n': 15, 'kinds': [6, 6, 3]},
+        ])
+        self.assertTrue(ok)
+        self.assertEqual(n, 160)
+
+    def test_the_missed_words_of_the_stage_come_first_then_the_rest_at_random(self):
+        res = self.run_node(
+            "const data = { a: { stage: 1 }, b: { stage: 1 }, c: { stage: 1 }, d: { stage: 1 }, x: { stage: 2 } };"
+            "const rules = { pairs: 2, fakes: 0 };"
+            "const firsts = new Set(); const seconds = new Set();"
+            "for (let k = 0; k < 60; k++) { const d = B.dealDeck(data, 1, ['x', 'c'], [], rules);"
+            " const w = d.cards.filter((c) => c.kind === 'pic').map((c) => c.word).sort(); firsts.add(w.includes('c')); seconds.add(w.join()); }"
+            "const none = B.dealDeck({}, 1, [], [], rules); const odd = B.dealDeck(null, 'long', null, null, rules);"
+            "out([[...firsts], seconds.size > 1, none, odd]);")
+        firsts, varied, none, odd = res
+        self.assertEqual(firsts, [True])        # c, missed, always in; x is another stage's
+        self.assertTrue(varied)                 # the other place at random
+        self.assertEqual(none, {'cards': [], 'pairs': 0})
+        self.assertEqual(odd, {'cards': [], 'pairs': 0})
+
+    def test_the_fake_maker_and_the_letter_diff(self):
+        res = self.run_node(
+            "out([B.fakesOf('cat'), B.fakesOf('dog'), B.fakesOf('bug', ['bog']), B.fakesOf('Fish'), B.fakesOf('a'), B.fakesOf(7),"
+            " B.fakeOf('cat', [], () => 0), B.fakeOf('cat', [], () => 0.99), B.fakeOf('ox', ['ou']),"
+            " B.diffSpan('cta', 'cat'), B.diffSpan('cet', 'cat'), B.diffSpan('wulf', 'wolf'), B.diffSpan('cat', 'cat'),"
+            " B.letterMarks('sheeb', 'sheep'), B.letterMarks('tgier', 'tiger'), B.LOOK_ALIKE]);")
+        (cat, dog, bug, fish, a, seven, first, last, none, d1, d2, d3, d4, m1, m2, look) = res
+        # the first letter kept; a neighbouring swap after it, or a look-alike
+        self.assertEqual(cat, ['cet', 'cta'])
+        self.assertEqual(dog, ['dgo', 'doj'])                  # dug is a real word
+        self.assertEqual(bug, ['bgu', 'buj'])                  # bog: a game word here, and real
+        self.assertEqual(fish, ['fesh', 'fihs', 'fizh', 'fsih'])
+        self.assertEqual([a, seven], [[], []])
+        self.assertEqual([first, last, none], ['cet', 'cta', None])
+        self.assertEqual(d1, {'from': 1, 'toA': 3, 'toB': 3})
+        self.assertEqual(d2, {'from': 1, 'toA': 2, 'toB': 2})
+        self.assertEqual(d3, {'from': 1, 'toA': 2, 'toB': 2})
+        self.assertEqual(d4, {'from': 3, 'toA': 3, 'toB': 3})
+        self.assertEqual(m1, {'bad': [False, False, False, False, True], 'fixed': [False, False, False, False, True]})
+        self.assertEqual(m2, {'bad': [False, True, True, False, False], 'fixed': [False, True, True, False, False]})
+        self.assertEqual(look, [['c', 'k'], ['s', 'z'], ['b', 'd'], ['i', 'e'], ['o', 'u'], ['a', 'e'], ['m', 'n'], ['g', 'j'], ['v', 'w'], ['p', 'b']])
+
+    def test_no_fake_of_any_game_word_is_a_real_word(self):
+        res = self.run_node(
+            f"const known = {json.dumps(self.all_words())};"
+            "const bad = known.flatMap((w) => B.fakesOf(w, known).filter((f) => known.includes(f) || B.REAL_WORDS.includes(f) || f === w || f[0] !== w[0]));"
+            # the maker can spell these from game words, and never does:
+            # felafel (an accepted spelling of falafel), moues (a real word),
+            # hores (reads rude), moose, paste, dock (review, B-232)
+            "const near = [['falafel', 'felafel'], ['mouse', 'moues'], ['horse', 'hores'], ['mouse', 'moose'], ['pasta', 'paste'], ['duck', 'dock']];"
+            "B.REAL_WORDS.length = 0; const without = near.map(([w, f]) => B.fakesOf(w, known).includes(f));"
+            f"const R = await import('{(self.JS / 'boss.js').as_uri()}?again');"
+            "const listed = near.map(([, f]) => R.REAL_WORDS.includes(f)); const kept = near.map(([w, f]) => R.fakesOf(w, known).includes(f));"
+            "out([bad, known.filter((w) => B.fakesOf(w, known).length === 0), without, listed, kept]);")
+        bad, none, without, listed, kept = res
+        self.assertEqual([bad, none], [[], []])
+        self.assertEqual(without, [True] * 6)          # spelt by the maker but for the list
+        self.assertEqual(listed, [True] * 6)
+        self.assertEqual(kept, [False] * 6)
+
+    # --- boss.js: play ---
+
+    def test_the_pair_check(self):
+        res = self.run_node(
+            "const c = (id, kind, word, text = null) => ({ id, kind, word, text });"
+            "const pic = c('a', 'pic', 'cat'), word = c('b', 'word', 'cat', 'cat'), fake = c('f', 'fake', 'cat', 'cta');"
+            "const dog = c('d', 'pic', 'dog'), dogw = c('e', 'word', 'dog', 'dog');"
+            "out([B.judge(pic, word), B.judge(word, pic), B.judge(fake, pic), B.judge(pic, fake), B.judge(fake, word),"
+            " B.judge(fake, dog), B.judge(pic, dogw), B.judge(pic, dog), B.judge(word, dogw), B.judge(pic, pic), B.judge(null, pic)]);")
+        self.assertEqual(res, ['pair', 'pair', 'fake', 'fake', 'miss', 'miss', 'miss', 'miss', 'miss', 'miss', 'miss'])
+
+    def test_the_swap(self):
+        res = self.run_node(
+            "const cards = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }));"
+            "const picks = new Set(); let ok = true;"
+            "for (let k = 0; k < 200; k++) { const p = B.swapPick(cards, ['a'], ['b']); picks.add(p.slice().sort().join());"
+            " ok = ok && p[0] !== p[1] && p.every((id) => ['c', 'd', 'e'].includes(id)); }"
+            "out([ok, [...picks].sort(), B.swapPick(cards, ['a', 'b'], ['c']), B.swapCards(cards, 'b', 'e').map((c) => c.id),"
+            " B.swapCards(cards, 'b', 'z') === cards]);")
+        self.assertEqual(res, [True, ['c,d', 'c,e', 'd,e'], None, ['a', 'e', 'c', 'd', 'b'], True])
+
+    def test_stars_and_gears(self):
+        res = self.run_node(
+            "out([[0, 0.3, 0.449, 0.45, 0.6, 0.749, 0.75, 0.99, 1, NaN].map(B.bossStars), B.STARS_AT, B.BOSS_GEARS,"
+            " [1, 2, 3, 5].map(B.pairGears)]);")
+        self.assertEqual(res, [[3, 3, 3, 2, 2, 2, 1, 1, 1, 1], [0.45, 0.75], {'pair': 1, 'row': 1, 'win': 2}, [1, 2, 2, 2]])
+
+    # --- boss.js: the clock ---
+
+    def test_his_place_is_a_pure_function_of_time(self):
+        res = self.run_node(
+            "const at = (c, t) => Math.round(B.thiefAt(c, t).p * 10000) / 10000;"
+            "let c = B.startClock(1000, 10);"
+            "const walk = [0, 1000, 6000, 11000, 20000].map((t) => at(c, t));"
+            # stopped at 5 s (half way), knocked back 0.13 at 5.2 s, easing out over KNOCK.ms, walks on at 6 s
+            "c = B.withEvent(B.withEvent(B.withEvent(c, 'stop', 6000), 'knock', 6200, 0.13), 'go', 7000);"
+            "const knock = [6000, 6200, 6425, 6650, 6900, 7000, 8000].map((t) => at(c, t));"
+            "const walking = [6500, 7500].map((t) => B.thiefAt(c, t).walking);"
+            # a knock never takes him past his start; a push never past PUSH.cap
+            "const early = B.withEvent(B.startClock(0, 10), 'knock', 500, 0.13);"
+            "const late = B.withEvent(B.withEvent(B.startClock(0, 10), 'stop', 9800), 'push', 9900, 0.05);"
+            # events not yet come do nothing; events out of order are taken in time order
+            "const ahead = at(B.withEvent(B.startClock(0, 10), 'knock', 5000, 0.2), 4000);"
+            "const shuffled = B.withEvent(B.withEvent(B.startClock(0, 10), 'go', 4000), 'stop', 2000);"
+            "out([walk, knock, walking, [at(early, 400), at(early, 2000)], [at(late, 9900), at(late, 12000)], ahead,"
+            " [at(shuffled, 3000), at(shuffled, 5000)], B.thiefAt(null, 5), B.KNOCK, B.PUSH, B.NEAR, B.TICK]);")
+        walk, knock, walking, early, late, ahead, shuffled, none, k, push, near, tick = res
+        self.assertEqual(walk, [0, 0, 0.5, 1, 1])
+        # eased out: 0.875 of the way at half its time, there at its end
+        self.assertEqual(knock, [0.5, 0.5, 0.3863, 0.37, 0.37, 0.37, 0.47])
+        self.assertEqual(walking, [False, True])
+        self.assertEqual(early, [0.04, 0.15])                  # knocked back to his start, then walks
+        self.assertEqual(late, [0.98, 0.99])                   # pushed, never past the cap
+        self.assertEqual(ahead, 0.4)
+        self.assertEqual(shuffled, [0.2, 0.3])
+        self.assertEqual(none, {'p': 0, 'walking': False})
+        self.assertEqual(k, {'by': 0.13, 'big': 1.4, 'ms': 450})
+        self.assertEqual(push, {'by': 0.05, 'ms': 250, 'cap': 0.99})
+        self.assertEqual([near, tick], [0.75, {'every': 0.5, 'near': 0.25}])
+
+    def test_when_he_reaches_the_vent_holds_ticks_and_lamps(self):
+        res = self.run_node(
+            "const c = B.startClock(0, 10);"
+            "const knocked = B.withEvent(c, 'knock', 4000, 0.13);"
+            "const stopped = B.withEvent(c, 'stop', 3000);"
+            "let boss = { holds: [], clock: c };"
+            "const a = B.hold(boss, 'pair', 1000); const b = B.hold(a, 'away', 1500); const same = B.hold(b, 'away', 1600) === b;"
+            "const d = B.release(b, 'pair', 2000); const e = B.release(d, 'away', 2500); const f = B.release(e, 'away', 2600) === e;"
+            "const noClock = B.hold({ holds: [] }, 'away', 5);"
+            "out([B.reachesAt(c, 0), B.reachesAt(knocked, 4100), B.reachesAt(stopped, 5000), B.reachesAt(null, 0), B.reachesAt(c, 11000),"
+            " [a, b, d, e].map((x) => [x.holds, x.clock.events]), same, f, noClock,"
+            " [0, 0.75, 0.76, 1].map(B.tickEvery), [0, 0.04, 0.05, 0.5, 0.96, 1].map((p) => B.lampsBehind(p, 12)),"
+            " Math.round(B.thiefAt(e.clock, 4500).p * 1000) / 1000, B.thiefAt(e.clock, 4500).walking]);")
+        (r1, r2, r3, r4, r5, holds, same, f, no_clock, ticks, lamps, after, walking) = res
+        self.assertEqual([r1, r2, r3, r4, r5], [10000, 11300, None, None, 11000])
+        self.assertEqual(holds, [
+            [['pair'], [{'kind': 'stop', 'at': 1000}]],
+            [['pair', 'away'], [{'kind': 'stop', 'at': 1000}]],
+            [['away'], [{'kind': 'stop', 'at': 1000}]],
+            [[], [{'kind': 'stop', 'at': 1000}, {'kind': 'go', 'at': 2500}]],
+        ])
+        self.assertEqual([same, f], [True, True])
+        self.assertEqual(no_clock, {'holds': ['away']})
+        self.assertEqual(ticks, [0.5, 0.5, 0.25, 0.25])
+        self.assertEqual(lamps, [0, 0, 1, 6, 12, 12])
+        self.assertEqual([after, walking], [0.3, True])        # 1 s walked, stopped 1.5 s, 2 s walked
+
+    def test_the_slower_walk_after_losses(self):
+        res = self.run_node(
+            "const p = (losses) => Math.round(B.thiefAt(B.startClock(0, B.rulesOf(1, losses).secs), 75000).p * 1000) / 1000;"
+            "out([0, 1, 2, 3, 4, 7].map(p));")
+        # 75 s at stage 1's speed reaches the vent; 10%, 20%, 30% slower
+        self.assertEqual(res, [1, 1, 0.9, 0.8, 0.7, 0.7])
+
+    def test_the_beats_numbers(self):
+        res = self.run_node(
+            "out([B.BEAT, B.ENTRANCE, B.zapMs(false), B.zapMs(true), B.pairMs(false), B.pairMs(true), B.swapMs(), B.fakeMs(),"
+            " B.endingMs(2), B.endingMs(0), B.entranceMs(10), B.entranceMs(15)]);")
+        beat, entrance, z1, z2, p1, p2, swap, fake, end2, end0, e10, e15 = res
+        self.assertEqual(beat['flip'], 450)
+        self.assertEqual([z1, z2, p1, p2, swap, fake], [260, 480, 960, 1180, 1610, 2600])
+        self.assertEqual(end2, {'show': 0, 'fixes': [700, 2200], 'burst': 3700, 'card': 6800})
+        self.assertEqual(end0, {'show': None, 'fixes': [], 'burst': 0, 'card': 3100})
+        # the deal ends with the last card landed
+        self.assertEqual([e10, e15], [4555, 4830])
+        self.assertLess(entrance['alarm'], entrance['duck'])
+        self.assertLess(entrance['duck'], entrance['drop'])
+        self.assertLess(entrance['drop'], entrance['land'])
+        self.assertLess(entrance['land'], entrance['point'])
+        self.assertLess(entrance['point'] + entrance['sweep'], entrance['deal'])
+
+    def test_boss_js_is_pure(self):
+        code = self.code('boss.js')
+        for word in ('document', 'window', 'localStorage', 'setState', 'state.', 'performance'):
+            self.assertNotIn(word, code, word)
+        self.assertEqual(re.findall(r"^import .*$", code, flags=re.M), ["import { STAGES, isStage } from './stage.js';"])
+        self.assertNotRegex(code, r'(?m)^(let|var) ')
+
+    # --- progress.js: the gate ---
+
+    def test_the_gate_the_next_stage_opens_when_the_boss_is_beaten(self):
+        res = self.run_node(
+            "const look = (st) => st.map((s) => `${s.stage}:` + ['cleared', 'beaten', 'boss', 'start', 'open'].filter((k) => s[k]).map((k) => k[0] + k[1]).join(''));"
+            "const a = [1, 2, 3];"
+            "out([look(P.stations(a, { cleared: [], bosses: [] })), look(P.stations(a, { cleared: [1], bosses: [] })),"
+            " look(P.stations(a, { cleared: [1], bosses: [1] })), look(P.stations(a, { cleared: [1, 2, 3], bosses: [1, 2] })),"
+            " look(P.stations(a, { cleared: [1, 2, 3], bosses: [1, 2, 3] })),"
+            # a save from before the bosses: its cleared stages' bosses beaten
+            " look(P.stations(a, { solved: [], cleared: [1, 2] })),"
+            # a boss beaten on a stage not cleared does not count
+            " look(P.stations(a, { cleared: [], bosses: [1] })),"
+            " P.currentStage({ x: { stage: 1 }, y: { stage: 2 } }, { cleared: [1], bosses: [] }),"
+            " P.currentStage({ x: { stage: 1 }, y: { stage: 2 } }, { cleared: [1], bosses: [1] })]);")
+        self.assertEqual(res, [
+            ['1:stop', '2:', '3:'],
+            ['1:clbostop', '2:', '3:'],
+            ['1:clbeop', '2:stop', '3:'],
+            ['1:clbeop', '2:clbeop', '3:clbostop'],
+            ['1:clbeop', '2:clbeop', '3:clbestop'],
+            ['1:clbeop', '2:clbeop', '3:stop'],
+            ['1:stop', '2:', '3:'],
+            1, 2,
+        ])
+
+    def test_after_a_boss_wins_and_losses(self):
+        res = self.run_node(
+            "const p = { solved: ['cat'], cleared: [1, 2], bosses: [1], bossLosses: { '2': 2 } };"
+            "out([P.afterBoss(p, 2, true), P.afterBoss(p, 2, false), P.afterBoss(p, 1, true), P.afterBoss(p, 3, true), P.afterBoss(p, 3, false),"
+            " P.afterBoss(null, 1, true), P.bossLossesOf(p, 2), P.bossLossesOf(p, 'long'), P.bossLossesOf(null, 1), p]);")
+        win, loss, again, not_cleared, not_cleared_loss, nothing, l2, l_long, l_none, before = res
+        self.assertEqual(win, {'progress': {'solved': ['cat'], 'cleared': [1, 2], 'bosses': [1, 2], 'bossLosses': {}}, 'beaten': True})
+        self.assertEqual(loss, {'progress': {'solved': ['cat'], 'cleared': [1, 2], 'bosses': [1], 'bossLosses': {'2': 3}}, 'beaten': False})
+        self.assertEqual(again['beaten'], False)
+        self.assertEqual(not_cleared['progress']['bosses'], [1])
+        self.assertEqual(not_cleared_loss['progress']['bossLosses'], {'2': 2})
+        self.assertEqual(nothing, {'progress': {'solved': [], 'cleared': [], 'bosses': [], 'bossLosses': {}}, 'beaten': False})
+        self.assertEqual([l2, l_long, l_none], [2, 0, 0])
+        self.assertEqual(before['bossLosses'], {'2': 2})       # the input is left alone
+
+    def test_the_bosses_are_saved_per_player_and_old_saves_keep_their_stages(self):
+        res = self.run_node(
+            "PL.add('fox', [], 'Noa');"
+            "store.set('flip.progress.v1@p1', JSON.stringify({ animals: { solved: ['cat'], cleared: [1, 2] },"
+            " food: { solved: [], cleared: [1], bosses: ['x', 1, 3], bossLosses: { '1': 2, '2': -1, 'long': 1.5, 'zz': 4 } } }));"
+            "const read = P.load();"
+            "const won = P.recordBoss('animals', 2, true); const w1 = writes;"
+            "const same = P.recordBoss('animals', 2, true); const w2 = writes;"
+            "const lost = P.recordBoss('food', 1, false);"
+            "const stored = JSON.parse(store.get('flip.progress.v1@p1'));"
+            "out([read, w2 - w1, same.beaten, lost, stored, P.recordBoss('', 1, true)]);")
+        read, extra, same_beaten, lost, stored, none = res
+        # a save from before the bosses: its cleared stages' bosses beaten;
+        # odd bosses and losses dropped
+        self.assertEqual(read, {'animals': {'solved': ['cat'], 'cleared': [1, 2], 'bosses': [1, 2], 'bossLosses': {}},
+                                'food': {'solved': [], 'cleared': [1], 'bosses': [1], 'bossLosses': {'1': 2}}})
+        self.assertEqual(extra, 0)                             # nothing changed, nothing written
+        self.assertFalse(same_beaten)
+        self.assertEqual(lost['progress']['bossLosses'], {'1': 3})
+        self.assertEqual(stored['food'], {'solved': [], 'cleared': [1], 'bosses': [1], 'bossLosses': {'1': 3}})
+        self.assertEqual(none, {'progress': {'solved': [], 'cleared': [], 'bosses': [], 'bossLosses': {}}, 'beaten': False})
+
+    def test_keys_are_still_earned_on_clearing(self):
+        # keys.js counts a theme with a cleared stage, boss or not
+        res = self.run_node(
+            f"const K = await import('{(self.JS / 'keys.js').as_uri()}');"
+            "out([K.earnedOf({ animals: { cleared: [1], bosses: [] } }), K.earnedOf({ animals: { cleared: [], bosses: [] } })]);")
+        self.assertEqual(res, [1, 0])
+
+    # --- main.js: the beats, through node with a fake clock ---
+
+    BEATS = """
+        let now = 1000;
+        const timers = [];
+        const setTimeout = (fn, ms) => { timers.push({ fn, at: now + ms }); };
+        const performance = { now: () => now };
+        const advance = (ms) => { const end = now + ms; for (;;) { timers.sort((a, b) => a.at - b.at); const t = timers[0];
+            if (!t || t.at > end) break; timers.shift(); now = t.at; t.fn(); } now = end; };
+        const calls = [];
+        const subs = [];
+        const state = { screen: 'boss', gears: 10, progress: {}, boss: null };
+        const setState = (p) => { Object.assign(state, p); subs.forEach((f) => f(state)); };
+        const addGears = (n) => { calls.push(['gears', n]); return state.gears + n; };
+        const recordBoss = (t, s, won) => { calls.push(['record', t, s, won]); };
+        const loadProgress = () => ({ read: calls.length });
+        const { BEAT, KNOCK, PUSH, zapMs, pairMs, swapMs, fakeMs, judge, hold, release, withEvent, thiefAt, reachesAt, bossStars,
+            pairGears, BOSS_GEARS, swapPick, swapCards, startClock, entranceMs } = B;
+        const mk = (id, kind, word, text = null) => ({ id, kind, word, text, audio: '/' + word + '.mp3' });
+        const CARDS = [mk('c0', 'pic', 'cat'), mk('c1', 'word', 'cat', 'cat'), mk('c2', 'pic', 'dog'), mk('c3', 'word', 'dog', 'dog'),
+            mk('c4', 'fake', 'pig', 'pgi'), mk('c5', 'pic', 'pig'), mk('c6', 'word', 'pig', 'pig'), mk('c7', 'pic', 'hen'),
+            mk('c8', 'word', 'hen', 'hen')];
+        const fresh = (read = 'flip', o = {}) => ({ run: 1, theme: 'animals', stage: 3, rules: { pairs: 4, fakes: 1, secs: 100, read },
+            cards: CARDS, pairs: 4, phase: 'play', busy: false, holds: [], clock: startClock(now, 100), up: [], gone: [], found: 0, row: 0,
+            gears: 0, caught: null, shown: [], fixed: [], stars: 0, card: false, beat: { kind: 'start', seq: 2 }, ...o });
+        const b = () => state.boss;
+        const pick = () => ({ phase: b().phase, busy: b().busy, up: b().up, gone: b().gone, found: b().found, row: b().row, gears: b().gears,
+            holds: b().holds, beat: b().beat, caught: b().caught, shown: b().shown, fixed: b().fixed, card: b().card, stars: b().stars });
+        const tap = (...ids) => ids.forEach((id) => onBossCard(id));
+    """
+
+    def run_beats(self, body):
+        names = ('bossLater', 'onBossCard', 'judgeBoss', 'bossPair', 'bossFake', 'bossMiss', 'bossEnding', 'bossFix', 'bossBurst',
+                 'bossEscape', 'armEscape', 'onBossAway', 'leaveBoss')
+        main = self.code('main.js')
+        say = re.search(r'\nconst sayOf = [^\n]*\n', main).group(0)
+        return self.run_node(self.BEATS + say + 'let clockHeard = null;' + ''.join(self.function(n) for n in names) + body)
+
+    def test_flips_and_a_pair_and_a_second_pair_in_a_row(self):
+        res = self.run_beats(
+            "state.boss = fresh('flip');"
+            "tap('c1'); const flipWord = pick();"
+            "tap('c0'); const two = pick(); tap('c2'); const ignored = b().up;"
+            "advance(BEAT.flip); const paired = pick(); const events = b().clock.events.slice(); const gear1 = calls.slice();"
+            "advance(pairMs(false)); const after = pick(); const go = b().clock.events.slice(-1);"
+            "tap('c2', 'c3'); advance(BEAT.flip); const second = pick(); const knock2 = b().clock.events.find((e, i, all) => e.kind === 'knock' && i > 1);"
+            "advance(pairMs(true));"
+            # stage 3 reads only on a match: a word card flips silently, a fake is never read
+            "state.boss = fresh('match'); tap('c6'); const silent = b().beat.say; tap('c4'); const fakeFlip = b().beat.say;"
+            "state.boss = fresh('flip'); tap('c4'); const fakeOnFlip = b().beat.say;"
+            "out([flipWord, two, ignored, paired, events, gear1, after, go, second, knock2, silent, fakeFlip, fakeOnFlip]);")
+        flip_word, two, ignored, paired, events, gear1, after, go, second, knock2, silent, fake_flip, fake_on_flip = res
+        # stages 1-2: the robot reads a word card as it flips
+        self.assertEqual(flip_word['beat'], {'kind': 'flip', 'seq': 3, 'id': 'c1', 'say': {'word': 'cat', 'audio': '/cat.mp3', 'at': 0}})
+        self.assertEqual([flip_word['up'], flip_word['busy']], [['c1'], False])
+        self.assertEqual(two['beat']['say'], None)             # a picture: nothing to read
+        self.assertEqual([two['up'], two['busy']], [['c1', 'c0'], True])
+        self.assertEqual(ignored, ['c1', 'c0'])                # no third card while two are up
+        # a pair: the word said, the pair off the table, he stops and is
+        # knocked back as the zap lands, its gear now
+        self.assertEqual(paired['beat'], {'kind': 'pair', 'seq': 5, 'ids': ['c1', 'c0'], 'big': False, 'last': False,
+                                          'say': {'word': 'cat', 'audio': '/cat.mp3', 'at': 0}})
+        self.assertEqual([paired['found'], paired['row'], paired['gone'], paired['gears'], paired['holds']], [1, 1, ['c1', 'c0'], 1, ['pair']])
+        self.assertEqual(events, [{'kind': 'stop', 'at': 1450}, {'kind': 'knock', 'at': 1710, 'by': 0.13}])
+        self.assertEqual(gear1, [['gears', 1]])
+        self.assertEqual([after['holds'], after['busy'], after['up']], [[], False, []])
+        self.assertEqual(go, [{'kind': 'go', 'at': 2410}])
+        # a second pair in a row: a bigger zap and knock, 2 gears
+        self.assertEqual([second['row'], second['gears'], second['beat']['big']], [2, 3, True])
+        self.assertAlmostEqual(knock2['by'], 0.182)
+        self.assertEqual([silent, fake_flip, fake_on_flip], [None, None, None])
+
+    def test_a_miss_and_his_swap_and_a_fake_caught(self):
+        res = self.run_beats(
+            "Math.random = () => 0;"
+            "state.boss = fresh('match', { row: 1 });"
+            "tap('c4', 'c7'); advance(BEAT.flip); const miss = pick();"
+            "advance(BEAT.miss.laugh); const back = pick();"
+            "advance(BEAT.miss.turn); const swap = pick(); const order = b().cards.map((c) => c.id); const stop = b().clock.events.slice();"
+            "advance(swapMs()); const done = pick();"
+            # a fake with its own word's picture
+            "tap('c5'); const at = now; tap('c4'); advance(BEAT.flip); const fake = pick(); const push = b().clock.events.slice(-1)[0];"
+            "advance(fakeMs()); const turned = pick(); advance(BEAT.fake.turn); const free = pick();"
+            "out([miss, back, swap, order, stop, done, fake, push, at, turned, free]);")
+        miss, back, swap, order, stop, done, fake, push, at, turned, free = res
+        self.assertEqual([miss['beat'], miss['row'], miss['busy']], [{'kind': 'miss', 'seq': 5}, 0, True])
+        self.assertEqual(back['up'], [])                       # the two turn back
+        self.assertEqual(swap['beat'], {'kind': 'swap', 'seq': 6, 'ids': ['c0', 'c1']})
+        self.assertEqual(order[:2], ['c1', 'c0'])              # in each other's places
+        self.assertEqual([swap['holds'], stop[-1]['kind']], [['swap'], 'stop'])
+        self.assertEqual([done['holds'], done['busy']], [[], False])
+        # the fake caught: red letters and the bubble (caught), the right
+        # word said as the fake's shake ends, he jumps ahead then
+        self.assertEqual(fake['beat'], {'kind': 'fake', 'seq': 9, 'id': 'c4', 'pic': 'c5', 'say': {'word': 'pig', 'audio': '/pig.mp3', 'at': 0.55}})
+        self.assertEqual([fake['caught'], fake['row'], fake['busy']], ['c4', 0, True])
+        self.assertEqual(push, {'kind': 'push', 'at': at + 450 + 550, 'by': 0.05})
+        self.assertEqual([turned['caught'], turned['up'], turned['busy']], [None, [], True])
+        self.assertEqual(free['busy'], False)
+        self.assertEqual(free['gone'], [])                     # the fake stays on the table
+
+    def test_the_last_pair_the_ending_and_the_win(self):
+        res = self.run_beats(
+            "state.boss = fresh('match', { found: 3, row: 1, gone: ['c0', 'c1', 'c2', 'c3', 'c5', 'c6'] });"
+            "advance(30000);"
+            "tap('c7', 'c8'); advance(BEAT.flip); const last = pick(); const rec = calls.slice(); const prog = state.progress;"
+            "advance(zapMs(true) + KNOCK.ms); const show = pick();"
+            "advance(BEAT.ending.show); const fix = pick();"
+            "advance(BEAT.ending.fix); const burst = pick();"
+            "advance(BEAT.ending.swell + BEAT.ending.drop); const won = pick();"
+            "advance(BEAT.ending.card); const card = pick();"
+            "out([last, rec, prog, show, fix, burst, won, card]);")
+        last, rec, prog, show, fix, burst, won, card = res
+        # beaten as the last pair is found: recorded, its gears and the win's
+        self.assertEqual(rec, [['gears', 4], ['record', 'animals', 3, True]])
+        self.assertEqual(prog, {'read': 2})
+        self.assertEqual([last['gears'], last['stars'], last['holds'], last['beat']['last'], last['beat']['big']],
+                         [4, 3, ['pair', 'end'], True, True])
+        # the fakes left turn up, one by one each fixes itself (the robot
+        # says its real word), the burst, the part in the window, the card
+        self.assertEqual([show['phase'], show['shown'], show['beat']['kind']], ['ending', ['c4'], 'show'])
+        self.assertEqual([fix['fixed'], fix['beat']], [['c4'], {'kind': 'fix', 'seq': 7, 'id': 'c4', 'say': {'word': 'pig', 'audio': '/pig.mp3', 'at': 0.5}}])
+        self.assertEqual([burst['phase'], burst['beat']['kind']], ['burst', 'burst'])
+        self.assertEqual([won['phase'], won['card']], ['won', False])
+        self.assertEqual(card['card'], True)
+
+    def test_stars_by_how_far_he_was(self):
+        res = self.run_beats(
+            "const stars = [];"
+            "for (const secs of [10, 60, 80]) { state.boss = fresh('match', { found: 3, gone: ['c0', 'c1', 'c2', 'c3', 'c5', 'c6'],"
+            " clock: startClock(now - secs * 1000, 100) }); tap('c7', 'c8'); advance(BEAT.flip); stars.push(b().stars); advance(20000); }"
+            "out(stars);")
+        self.assertEqual(res, [3, 2, 1])
+
+    def test_he_reaches_the_vent_the_loss(self):
+        res = self.run_beats(
+            "subs.push(armEscape);"
+            "setState({ boss: fresh('match', { gears: 2, clock: startClock(now - 98000, 100) }) });"
+            "advance(1000); const before = pick();"
+            "advance(1100); const esc = pick(); const rec = calls.slice();"
+            "advance(BEAT.escape.laugh + BEAT.escape.dive); const lost = pick();"
+            "advance(BEAT.escape.card); const card = pick();"
+            # a pair stops him: no escape while held, even past his time
+            "calls.length = 0; setState({ boss: fresh('match', { clock: startClock(now - 99000, 100) }) });"
+            "tap('c0', 'c1'); advance(5000); const held = [b().phase, calls.filter((c) => c[0] === 'record').length];"
+            "out([before, esc, rec, lost, card, held]);")
+        before, esc, rec, lost, card, held = res
+        self.assertEqual(before['phase'], 'play')
+        self.assertEqual([esc['phase'], esc['busy'], esc['beat']['kind'], esc['holds']], ['escape', True, 'escape', ['end']])
+        self.assertEqual(rec, [['record', 'animals', 3, False]])
+        self.assertEqual([lost['phase'], lost['card'], lost['gears']], ['lost', False, 2])   # the gears earned stay
+        self.assertTrue(card['card'])
+        self.assertEqual(held, ['play', 0])
+
+    def test_away_the_back_arrow_and_stale_timers(self):
+        res = self.run_beats(
+            "state.boss = fresh('match');"
+            "onBossAway(true); const away = [b().holds, b().clock.events.slice()]; onBossAway(false); const back = [b().holds, b().clock.events.slice(-1)];"
+            "state.boss = fresh('match', { phase: 'entrance', clock: null }); onBossAway(true); const entrance = b().holds;"
+            "state.boss = fresh('match'); tap('c0', 'c1'); leaveBoss(); const left = [state.screen, state.boss];"
+            "advance(10000); const stale = state.boss;"
+            "state.screen = 'boss'; state.boss = fresh('match', { busy: true }); tap('c0'); const busy = b().up;"
+            "state.boss = fresh('match', { phase: 'ending' }); tap('c0'); const ending = b().up;"
+            "state.boss = fresh('match', { gone: ['c0'] }); tap('c0'); const gone = b().up;"
+            "out([away, back, entrance, left, stale, busy, ending, gone]);")
+        away, back, entrance, left, stale, busy, ending, gone = res
+        self.assertEqual(away, [['away'], [{'kind': 'stop', 'at': 1000}]])
+        self.assertEqual(back, [[], [{'kind': 'go', 'at': 1000}]])
+        self.assertEqual(entrance, ['away'])
+        self.assertEqual(left, ['stages', None])
+        self.assertIsNone(stale)                               # the pair's timers found the boss gone
+        self.assertEqual([busy, ending, gone], [[], [], []])
+
+    def test_start_boss_deals_and_starts_the_clock_after_the_entrance(self):
+        main = self.code('main.js')
+        start = self.function('startBoss')
+        res = self.run_node(
+            "let now = 1000; const timers = []; const setTimeout = (fn, ms) => { timers.push({ fn, at: now + ms }); };"
+            "const performance = { now: () => now };"
+            "const advance = (ms) => { const end = now + ms; for (;;) { timers.sort((a, b) => a.at - b.at); const t = timers[0];"
+            " if (!t || t.at > end) break; timers.shift(); now = t.at; t.fn(); } now = end; };"
+            f"const data = {json.dumps(self.data('animals'))};"
+            "const fetch = async () => ({ json: async () => data });"
+            "const state = { screen: 'stages', theme: 'animals', startingRound: false, bossRuns: 4,"
+            " themes: [{ name: 'animals', words: Object.keys(data).map((word) => ({ word })) }] };"
+            "const setState = (p) => Object.assign(state, p);"
+            "const leaveRound = (p) => setState(p);"
+            "const progressFor = () => ({ solved: [], cleared: [3], bosses: [], bossLosses: { '3': 3 } });"
+            "const missedWords = () => ['shark'];"
+            "const { rulesOf, dealDeck, startClock, withEvent, entranceMs, BEAT } = B;"
+            "const { bossLossesOf } = P;"
+            + self.function('bossLater') + start +
+            "await startBoss({ name: 'animals', dataUrl: '/a.json' }, 3);"
+            "const s = state.boss;"
+            "const first = [state.screen, state.bossRuns, s.run, s.phase, s.busy, s.clock, s.rules, s.pairs, s.cards.length,"
+            " s.cards.some((c) => c.word === 'shark'), s.beat, state.startingRound];"
+            "s.holds = ['away'];"
+            "advance(entranceMs(s.cards.length)); const b = state.boss;"
+            "out([first, [b.phase, b.busy, b.clock.start, b.clock.secs, b.clock.events, b.beat]]);")
+        first, play = res
+        self.assertEqual(first[:5], ['boss', 5, 5, 'entrance', True])
+        self.assertIsNone(first[5])                            # no clock during the entrance
+        self.assertEqual(first[6], {'pairs': 6, 'fakes': 2, 'secs': 106.25, 'read': 'match', 'slower': 0.2})
+        self.assertEqual(first[7:], [5, 12, True, {'kind': 'entrance', 'seq': 1}, False])
+        # hidden during the entrance: he starts stopped
+        self.assertEqual(play, ['play', False, 5665, 106.25, [{'kind': 'stop', 'at': 5665}], {'kind': 'start', 'seq': 2}])
+        self.assertIn("if (state.startingRound) return;", start)
+        self.assertIn("if (state.screen !== from || state.theme !== name) {", start)
+
+    def test_main_wiring(self):
+        main = self.code('main.js')
+        self.assertIn("import { renderBoss, renderBossClock } from './bossview.js';", main)
+        self.assertIn("import { renderBossFx } from './bossfx.js';", main)
+        self.assertIn("import { thiefFace } from './thief.js';", main)
+        # subscribers: the boss screen, its motion after it, the escape timer
+        self.assertLess(main.index('subscribe((s) => renderBoss(s, BOSS_TAPS));'), main.index('subscribe(renderBossFx);'))
+        self.assertIn('subscribe(armEscape);', main)
+        self.assertLess(main.index('subscribe(renderBossFx);'), main.index('subscribe(renderSound);'))
+        self.assertIn('gsap.ticker.add(() => renderBossClock(state, performance.now(), bossTick));', main)
+        for line in ("$('boss-btn').addEventListener('click', onRoundBoss);", "$('boss-back-btn').addEventListener('click', onBossBack);",
+                     "$('boss-again-btn').addEventListener('click', onBossAgain);", 'onBossAway(document.hidden);'):
+            self.assertIn(line, main)
+        self.assertIn("if (state.screen === 'boss') {\n        leaveBoss();", self.function('onPlayBack'))
+        end = self.function('renderRoundEnd')
+        self.assertIn("bossBtn.hidden = !(state.round.justCleared && bossWaits(state, state.theme, state.round.stage));", end)
+        self.assertIn('startBoss(theme, state.round.stage);', self.function('onRoundBoss'))
+        self.assertIn('startBoss(theme, b.stage);', self.function('onBossAgain'))
+        # the clock is never a per-frame setState
+        self.assertNotIn('setState', self.code('bossview.js'))
+        self.assertNotIn('setState', self.code('bossfx.js'))
+        self.assertNotIn('setState', self.code('thief.js'))
+        # recorded once each way
+        self.assertEqual(main.count('recordBoss('), 2)
+        self.assertIn('recordBoss(b.theme, b.stage, true);', self.function('bossPair'))
+        self.assertIn('recordBoss(b.theme, b.stage, false);', self.function('bossEscape'))
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('\n    boss: null,\n', state)
+        self.assertIn('\n    bossRuns: 0,\n', state)
+        screens = (self.JS / 'screens.js').read_text()
+        self.assertIn("'boss': 'screen-play',", screens)
+        cogs = self.code('cogs.js')
+        self.assertIn("show('boss-gears', countText(state.gears));", cogs)
+        self.assertIn("show('boss-end-gears', `+${countText(state.boss.gears)}`);", cogs)
+
+    # --- audio.js ---
+
+    def test_the_boss_sounds(self):
+        res = self.run_node(
+            f"const A = await import('{(self.JS / 'audio.js').as_uri()}');"
+            "const names = (b, n) => A.bossSounds(b, n).map((x) => x[0]);"
+            "const made = []; const node = () => ({ connect() {}, start(t) { made.push(t); }, stop() {}, type: '',"
+            " frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} },"
+            " gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, Q: { value: 0 } });"
+            "const ctx = { sampleRate: 100, currentTime: 0, createOscillator: node, createGain: node, createBiquadFilter: node,"
+            " createBufferSource: node, createBuffer: () => ({ getChannelData: () => new Float32Array(100) }) };"
+            "const kit = A.sfxKit(ctx, node()); const counts = {};"
+            "for (const [name, fn] of Object.entries(A.BOSS_SFX)) { const before = made.length; fn(kit, 1); counts[name] = made.length - before; }"
+            "out([Object.keys(A.BOSS_SFX), counts, names({ kind: 'entrance' }, 3), A.bossSounds({ kind: 'pair', big: true }),"
+            " names({ kind: 'miss' }), names({ kind: 'swap' }), A.bossSounds({ kind: 'fake' }), names({ kind: 'fix' }), names({ kind: 'burst' }),"
+            " names({ kind: 'won' }), names({ kind: 'escape' }), names({ kind: 'flip' }), names({ kind: 'start' }), names(null),"
+            " A.bossFetches({ cards: [{ audio: '/a.mp3' }, { audio: '/a.mp3' }, { audio: null }, { audio: '/b.mp3' }] }), A.bossFetches(null)]);")
+        (names, counts, entrance, pair, miss, swap, fake, fix, burst, won, escape, flip, start, none, fetches, no_fetch) = res
+        # BACKLOG B-232's sounds, all made in code
+        for name in ('flip', 'drumroll', 'alarm', 'clank', 'cackle', 'tick', 'zap', 'hit', 'buzz', 'slide', 'boom', 'fanfare'):
+            self.assertIn(name, names, name)
+            self.assertGreater(counts[name], 0, name)
+        self.assertEqual(entrance, ['alarm', 'drumroll', 'whoosh', 'clank', 'cackle', 'flip', 'flip', 'flip'])
+        self.assertEqual(pair, [['chime', 0], ['zap', 0, True], ['hit', 0.48], ['gear', 0.48]])
+        self.assertEqual(miss, ['cackle', 'unflip'])
+        self.assertEqual(swap, ['whoosh', 'clank', 'slide'])
+        self.assertEqual(fake, [['buzz', 0], ['chime', 0.55], ['cackle', 0.55], ['unflip', 2.6]])
+        self.assertEqual([fix, burst, won, escape, flip, start, none], [['zap', 'hit'], ['swell', 'zap', 'boom', 'clank'], ['fanfare'],
+                                                                       ['cackle', 'escape'], ['flip'], [], []])
+        self.assertEqual([fetches, no_fetch], [['/a.mp3', '/b.mp3'], []])
+
+    def test_audio_wiring(self):
+        audio = self.code('audio.js')
+        self.assertIn("import { BEAT, ENTRANCE, zapMs, fakeMs } from './boss.js';", audio)
+        self.assertIn("boss: 'fx'", audio)
+        render = self.function('renderSound', 'audio.js')
+        self.assertIn('bossPlay(bossSounds(state.boss.beat, state.boss.cards.length));', render)
+        self.assertIn('bossSay(state.boss.beat.say);', render)
+        self.assertIn('if (prev.boss && (!boss || newBoss)) stopBoss();', render)
+        # muted: nothing; the robot's word as his voice ('word'), cutting his voice
+        self.assertIn('if (state.muted || !ctx || !schedule.length) return;', self.function('bossPlay', 'audio.js'))
+        say = self.function('bossSay', 'audio.js')
+        self.assertIn("start(buf, 'word', null, say.at || 0);", say)
+        self.assertLess(say.index('stopVoice();'), say.index("start(buf, 'word'"))
+        self.assertIn("onBoss ? bossFetches(s.boss) : []", self.function('loadWord', 'audio.js'))
+
+    # --- character.js ---
+
+    def test_the_robot_during_a_boss(self):
+        res = self.run_node(
+            f"const C = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const snap = (kind, seq, run = 1, screen = 'boss') => ({ ...C.NONE, screen, bossRun: screen === 'boss' ? run : null, bossSeq: seq, bossKind: kind });"
+            "const m = (a, b) => C.momentsFor(a, b);"
+            "const stages = { ...C.NONE, screen: 'stages' };"
+            "out([m(stages, snap('entrance', 1)), m(snap('entrance', 1), snap('entrance', 1)), m(snap('entrance', 1), snap('start', 2)),"
+            " ...['flip', 'pair', 'miss', 'swap', 'fake', 'show', 'fix', 'burst', 'won', 'escape', 'lost'].map((k) => m(snap('start', 2), snap(k, 3))),"
+            " m(snap('lost', 9), snap('entrance', 1, 2)), m(snap('pair', 3), stages),"
+            " C.snapshot({ screen: 'boss', current: { word: null }, round: { results: [], index: 0, size: 5 }, boss: { run: 3, beat: { kind: 'pair', seq: 7 } } }).bossKind,"
+            " ['bossIn', 'bossReady', 'bossPair', 'bossFix', 'bossOops', 'bossWon', 'bossLost'].map((x) => [C.MOMENTS[x].sound, C.linesOf(x)]),"
+            " C.MOMENTS.bossIn.steps[1]]);")
+        *moments, gone, kind, quiet, duck = res
+        self.assertEqual(moments, [['bossIn'], [], ['bossReady'], [], ['bossPair'], ['bossOops'], [], ['bossOops'], [], ['bossFix'], [],
+                                   ['bossWon'], ['bossLost'], [], ['bossIn']])
+        self.assertEqual(gone, [])
+        self.assertEqual(kind, 'pair')
+        self.assertEqual(quiet, [[None, []]] * 7)                  # no sound, no lines: his voice is the words
+        self.assertEqual(duck, {'at': 1.05, 'sink': 300, 'hands': 'rest', 'eyes': 'dots', 'brows': 'worried', 'look': [0, -12]})
+        robot = self.function('renderRobot', 'character.js')
+        self.assertIn('const wasOnPlay = onStage(prev.screen);', robot)
+        self.assertIn("const onStage = (screen) => screen === 'play' || screen === 'boss';", self.code('character.js'))
+
+    # --- bossview.js and thief.js ---
+
+    def test_the_cards_face(self):
+        res = self.run_node(
+            f"const V = await import('{(self.JS / 'bossview.js').as_uri()}');"
+            "const fake = { id: 'f', kind: 'fake', word: 'tiger', text: 'tgier' };"
+            "const word = { id: 'w', kind: 'word', word: 'cat', text: 'cat' }; const pic = { id: 'p', kind: 'pic', word: 'cat', text: null };"
+            "const boss = (o) => ({ up: [], caught: null, shown: [], fixed: [], ...o });"
+            "out([V.faceOf(word, boss()), V.faceOf(pic, boss()), V.faceOf(fake, boss()), V.faceOf(fake, boss({ caught: 'f' })),"
+            " V.faceOf(fake, boss({ shown: ['f'] })), V.faceOf(fake, boss({ shown: ['f'], fixed: ['f'] })),"
+            " [boss(), boss({ up: ['f'] }), boss({ caught: 'f' }), boss({ shown: ['f'] }), boss({ fixed: ['f'] })].map((b) => V.isUp(fake, b)),"
+            " V.splitAt('cat', null), V.splitAt('octopus', 4), V.splitAt('giraffe', null), V.splitAt('butterfly', 6), V.splitAt('helicopter', 99), V.LAMPS]);")
+        word, pic, plain, caught, shown, fixed, up, s1, s2, s3, s4, s5, lamps = res
+        self.assertEqual(word, {'text': 'cat', 'marks': []})
+        self.assertIsNone(pic)
+        self.assertEqual(plain, {'text': 'tgier', 'marks': []})   # a fake looks exactly like a word card
+        self.assertEqual(caught, {'text': 'tgier', 'marks': ['', 'bad', 'bad', '', '']})
+        self.assertEqual(shown, caught)
+        self.assertEqual(fixed, {'text': 'tiger', 'marks': ['', 'fix', 'fix', '', '']})
+        self.assertEqual(up, [False, True, True, True, True])
+        self.assertEqual([s1, s2, s3, s4, s5, lamps], [0, 4, 4, 6, 5, 12])
+
+    def test_the_thief_is_drawn_in_code(self):
+        thief = (self.JS / 'thief.js').read_text()
+        for part in ('t-pupil', 't-rim', 't-glass', 't-grille', 't-lamp', 't-key', 't-leg-l', 't-leg-r', 't-claw', 't-part',
+                     't-point', 't-spring', 't-squint', 't-dizzy', 'p-bell'):
+            self.assertIn(part, thief, part)
+        for fn in ('export function thiefSvg(', 'export function thiefFace(', 'export function partIcon(', 'export function ventSvg(',
+                   'export function windowSvg(', 'export function cardBackSvg('):
+            self.assertIn(fn, thief, fn)
+        self.assertNotRegex(thief, r'#[0-9a-fA-F]{3,6}\b')       # colours from game.css
+        self.assertNotRegex(self.code('thief.js'), r'(?m)^(let|var) ')
+        css = (self.ROOT / 'static' / 'css' / 'game.css').read_text()
+        for pose in ('.thief.is-walk .t-all', '.thief.is-laugh .t-squint', '.thief.is-hit .t-dizzy', '.thief.is-hit .t-spring',
+                     '.thief.is-swap .t-claw', '.thief.is-point .t-point'):
+            self.assertIn(pose, css, pose)
+
+    def test_the_template_and_css(self):
+        html = self.client.get('/').content.decode()
+        for id_ in ('boss', 'boss-pairs', 'boss-gears', 'boss-track', 'boss-lamps', 'boss-vent', 'boss-thief', 'boss-cards', 'boss-window',
+                    'boss-fx', 'boss-bubble', 'boss-end', 'boss-end-art', 'boss-stars', 'boss-end-gears', 'boss-back-btn', 'boss-again-btn', 'boss-btn'):
+            self.assertIn(f'id="{id_}"', html, id_)
+        play = html[html.index('<div id="screen-play"'):html.index('<div id="screen-round-end"')]
+        for id_ in ('boss', 'boss-window', 'boss-end'):
+            self.assertIn(f'id="{id_}"', play, id_)
+        self.assertRegex(html, r'<div class="actions">\s*<button id="themes-btn"[\s\S]*?<button id="boss-btn" class="panel-btn boss-btn" type="button" aria-label="Boss" hidden></button>\s*<button id="play-again-btn"')
+        # no English in the boss markup
+        boss = re.sub(r'<!--.*?-->', '', play[play.index('<div class="boss-dim"'):], flags=re.S)
+        self.assertNotRegex(re.sub(r'<[^>]+>', ' ', boss), r'[A-Za-z]')
+        css = re.sub(r'/\*.*?\*/', '', (self.ROOT / 'static' / 'css' / 'game.css').read_text(), flags=re.S)
+        for rule in ('body[data-screen="boss"] .boss {', 'body[data-screen="boss"] .play-back-btn {',
+                     'body[data-screen="boss"] #console-gears {', '.boss-card.is-up .bc-in {', '.bl.is-bad {', '.boss-lamp.is-red {',
+                     '.boss-vent.is-near .v-lamp {', '.station-badge {', '#screen-round-end .actions:has(#boss-btn:not([hidden])) {'):
+            self.assertIn(rule, css, rule)
+        reduced = css[css.rindex('@media (prefers-reduced-motion: reduce)'):]
+        for sel in ('.thief.is-walk .t-all', '.boss-alarm.is-on', '.bc-in'):
+            self.assertIn(sel, reduced, sel)
+        # one glyph per letter where single letters are coloured (review,
+        # B-232: Andika joins f and i into one "fi" glyph)
+        for sel in ('.boss-bubble {', '.bc-word {'):
+            body = css[css.index('\n' + sel):]
+            self.assertIn('font-variant-ligatures: none;', body[:body.index('}')], sel)
+        self.assertIn('display: inline-block;', css[css.index('\n.boss-bubble span {'):][:60])
+        self.assertIn('display: inline-block;', css[css.index('\n.bl {'):][:60])
+
+    # --- docs ---
+
+    def test_docs(self):
+        progression = (self.ROOT / 'PROGRESSION.md').read_text()
+        bosses = progression[progression.index('## Bosses'):progression.index('## Repetition and stickers')]
+        for phrase in ('The gate.', 'The next\n  stage opens only when the boss is beaten', '`bosses`', '`bossLosses`', 'nobody\n  loses an open stage',
+                       'The deck.', 'missed words of this stage first', '| 3 | 6 | 2 | 85 | only on a match |', '| long | 6 | 3 | 95 | only on a match |',
+                       'Win and lose.', 'under 45% of the track 3', '+2 for the win', 'at most 30% slower'):
+            self.assertIn(phrase, bosses, phrase)
+        self.assertIn("The stage's boss then opens, and the\nnext stage opens once the boss is beaten", progression)
+        self.assertNotIn('robot revealed does not count). The next stage then opens.', progression)
+        claude = (self.ROOT / 'CLAUDE.md').read_text()
+        for phrase in ('- Bosses (M7, B-232', '"bosses": [stage, ...], "bossLosses"', '`recordBoss`', '`afterBoss(progress, stage, won)`',
+                       '`stations(stages, progress)` (one `{ stage, cleared, beaten, boss, start, open }`', '  - The boss (B-232',
+                       '`boss.js` is the pure part', '`bossview.js` renders the screen', '`bossfx.js` is the only place a boss beat',
+                       '`thief.js` draws the thief', "`'boss'` shows `#screen-play`"):
+            self.assertIn(phrase, claude, phrase)
+        design = (self.ROOT / 'DESIGN.md').read_text()
+        self.assertIn('Exception (the boss, BACKLOG B-232)', design)
+        board = design[design.index('## Boss screen (BACKLOG B-232)'):design.index('## Screenshots')]
+        for phrase in ('**The thief:**', 'one big lens eye', 'a grille mouth', 'wind-up key', 'thin brass legs', 'a claw holding the stolen part',
+                       'Poses: sneak', 'burst (bolts, springs and his key fly apart)', '**The clock is the thief:**', '**Entrance:**',
+                       '**End card:**', '**Reduced motion:**'):
+            self.assertIn(phrase.replace('a grille', 'a brass grille'), board, phrase)
+        character = (self.ROOT / 'CHARACTER.md').read_text()
+        during = character[character.index('## During a boss (BACKLOG B-232)'):character.index('## Moment map')]
+        for phrase in ('his voice there is only the words', '| bossIn |', 'he ducks behind the console', '| bossPair | a pair | cheers'):
+            self.assertIn(phrase, during, phrase)

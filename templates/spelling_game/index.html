@@ -19,7 +19,7 @@
          (split-flap logo and counter) -->
     <link href="https://fonts.googleapis.com/css2?family=Andika:wght@700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=41">
+    <link rel="stylesheet" href="{% static 'css/game.css' %}?v=42">
 </head>
 <body>
     <!-- Header: the split-flap "flip" logo top-left and the mute toggle
@@ -219,6 +219,32 @@
         </div>
         <div id="letter-boxes" class="letter-boxes"></div>
         <div id="letter-tray" class="letter-tray"></div>
+        <!-- The boss (BACKLOG B-232, PROGRESSION.md "Bosses"): the thief
+             bot's screen is this scene with state.screen 'boss' (screens.js
+             shows #screen-play for it, CSS keyed on body[data-screen]
+             hides the TV picture, the plate, the rail, the bench, the
+             lever, the speaker and the gear counter, and shows these).
+             .boss-dim lights the lab dim red and its .boss-alarm turns the
+             alarm (under the robot and the console, clipped to the scene). #boss holds the pairs
+             found and the kid's gears (#boss-gears, cogs.js), the thief's
+             track (#boss-lamps, the lamps red behind him; #boss-vent, the
+             vent and its alarm lamp; #boss-thief, the thief drawn in code,
+             thief.js) and the card table (#boss-cards); bossview.js renders
+             them from state.boss, bossfx.js moves them. No text: the cards'
+             words are the target words; every label is aria only. -->
+        <div class="boss-dim" aria-hidden="true"><div class="boss-alarm"></div></div>
+        <div id="boss" class="boss" role="group" aria-label="Boss">
+            <div class="boss-hud">
+                <div id="boss-pairs" class="boss-pairs" role="img" aria-label="Pairs"></div>
+                <span id="boss-gears" class="gear-counter boss-gears" role="img" aria-label="gears"></span>
+            </div>
+            <div id="boss-track" class="boss-track" aria-hidden="true">
+                <div class="boss-rail"><div id="boss-lamps" class="boss-lamps"></div></div>
+                <div id="boss-vent" class="boss-vent"></div>
+                <div id="boss-thief" class="boss-thief"></div>
+            </div>
+            <div class="boss-table"><div id="boss-cards" class="boss-cards" role="group" aria-label="Cards"></div></div>
+        </div>
         <!-- Console (DESIGN "Controls and states", BACKLOG B-114): on its
              brass plate, left to right, the reset lever, the speaker and
              the check dome (also "next"). Each control stacks its image
@@ -326,6 +352,10 @@
                     </div>
                 </div>
             </div>
+            <!-- the boss's middle window (BACKLOG B-232; boss screen only,
+                 drawn in code, thief.js): the part drops into it when the
+                 thief is beaten -->
+            <div id="boss-window" class="boss-window" aria-hidden="true"></div>
             <button id="reset-btn" class="ctl" type="button" aria-label="Reset">
                 <span class="sprite">
                     <img class="lever-up" src="{% static 'images/ui/lever-up.webp' %}" alt="" />
@@ -347,6 +377,42 @@
                     <img class="dome-pressed" src="{% static 'images/ui/dome-pressed.webp' %}" alt="" />
                 </span>
             </button>
+        </div>
+        <!-- The boss's motion over the scene (bossfx.js: the zaps, sparks,
+             bolts and the part's flight), the bubble over a fake caught (the
+             right spelling, its fixed letters marked) and the end card
+             (BACKLOG B-232: the part, the stars and the gears won, or the
+             thief getting away; back to the stage map and play again, icons
+             only). -->
+        <svg id="boss-fx" class="boss-fx" aria-hidden="true"></svg>
+        <div id="boss-bubble" class="boss-bubble" aria-hidden="true" hidden></div>
+        <div id="boss-end" class="boss-end" hidden>
+            <div class="panel boss-end-card">
+                <div id="boss-end-art" class="boss-end-art" aria-hidden="true"></div>
+                <div id="boss-stars" class="stars boss-stars" role="img" aria-label="Stars">
+                    <span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
+                        <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
+                    </span>
+                    <span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
+                        <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
+                    </span>
+                    <span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
+                        <svg class="fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg>
+                    </span>
+                </div>
+                <p id="boss-end-gears" class="gear-counter boss-end-gears" role="img" aria-label="gears"></p>
+                <div class="actions">
+                    <button id="boss-back-btn" class="panel-btn" type="button" aria-label="Back">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19.5 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>
+                    </button>
+                    <button id="boss-again-btn" class="panel-btn" type="button" aria-label="Play again">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M19 12.5a7 7 0 1 1-2.6-5.5"/><path d="M19.6 3.2v6h-6z"/></svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -398,6 +464,10 @@
             <button id="themes-btn" class="panel-btn" type="button" aria-label="Themes">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.5"/></svg>
             </button>
+            <!-- the thief (BACKLOG B-232): a round that just cleared its
+                 stage offers its boss straight away (main.js shows it,
+                 its face drawn in code, thief.js) -->
+            <button id="boss-btn" class="panel-btn boss-btn" type="button" aria-label="Boss" hidden></button>
             <button id="play-again-btn" class="panel-btn" type="button" aria-label="Play again">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4.8v14.4a1 1 0 0 0 1.5.86l11.3-7.2a1 1 0 0 0 0-1.72L9.5 3.94A1 1 0 0 0 8 4.8z"/></svg>
             </button>

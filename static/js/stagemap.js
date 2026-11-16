@@ -11,16 +11,22 @@
 // amber, the button raised and glowing, tappable, the obvious start.
 // Not open yet: the bulb dark, the button dimmed and disabled. With every
 // stage cleared all bulbs are lit and the last station also gets the
-// raised glow. No text: the stage is only in aria-label.
+// raised glow. The bosses (BACKLOG B-232): a cleared stage whose boss is
+// not beaten yet shows the thief's face on its station's corner, pulsing,
+// and is the start (raised and glowing; the next stage stays closed until
+// he is beaten); a tap starts the boss. A beaten boss shows the part
+// there instead, and a tap replays the stage. The face and the part are
+// drawn in code (thief.js). No text: the stage is only in aria-label.
 //
 // Renders from state.theme (the theme whose map shows), state.themes (its
 // picture and `stages`) and state.progress (its cleared stages, through
 // progress.js stations); it never mutates state and keeps no module
 // state. A tap on an open station calls `onPick(stage)` (main.js
-// onStation, which starts the round).
+// onStation, which starts the round, or the boss).
 
 import { stations } from './progress.js';
 import { renderFlaps } from './flaps.js';
+import { thiefFace, partIcon } from './thief.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -54,9 +60,28 @@ function station(stage) {
 }
 
 // What a station says to a screen reader (never shown).
-function label({ stage, cleared, open }) {
+function label({ stage, cleared, open, boss }) {
+    if (boss) return `stage ${stage}: boss`;
     if (cleared) return `stage ${stage}: cleared`;
     return open ? `stage ${stage}: play` : `stage ${stage}: not open yet`;
+}
+
+// The station's corner badge (BACKLOG B-232): the thief's face while its
+// boss waits, the part once he is beaten, none before the stage is
+// cleared. Between the mark and the bulb (game.css places it on the
+// corner); made again only when what it shows changes (`data-badge`).
+function badge(btn, s) {
+    const want = s.boss ? 'thief' : s.beaten ? 'part' : '';
+    const el = [...btn.children].find((c) => c.className === 'station-badge') || null;
+    if ((el ? el.dataset.badge : '') === want) return;
+    if (el) btn.removeChild(el);
+    if (!want) return;
+    const made = document.createElement('span');
+    made.className = 'station-badge';
+    made.dataset.badge = want;
+    made.setAttribute('aria-hidden', 'true');
+    made.appendChild(want === 'thief' ? thiefFace() : partIcon());
+    btn.insertBefore(made, btn.lastElementChild);
 }
 
 export function renderStageMap(state, onPick) {
@@ -87,7 +112,8 @@ export function renderStageMap(state, onPick) {
         const current = s.start && !s.cleared;
         btn.className = ['station', 'panel',
             s.cleared ? 'is-cleared' : '', current ? 'is-current' : '',
-            s.start ? 'is-start' : '', s.open ? '' : 'is-closed'].filter(Boolean).join(' ');
+            s.start ? 'is-start' : '', s.open ? '' : 'is-closed', s.boss ? 'has-boss' : ''].filter(Boolean).join(' ');
+        badge(btn, s);
         btn.disabled = !s.open;
         btn.setAttribute('aria-label', label(s));
         btn.onclick = s.open ? () => onPick(s.stage) : null;
