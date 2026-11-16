@@ -131,7 +131,7 @@ a phone.
   (`screen-*`, `letter-boxes`, `letter-tray`, `word-counter`, `check-btn`,
   `play-again-btn`, `themes-btn`, `round-stars`, `round-score`, `round-new`, `round-words`,
   `stickers-btn`, `gallery-back-btn`, `gallery-empty`, `gallery-themes`,
-  `reset-btn`, `speak-btn`, `mute-btn`, `play-back-btn`, `stages-back-btn`, `stages-pic`, `stages-picture`, `stage-stations`, `player-cards`, `player-picker`, `picker-pics`, `picker-back-btn`, `player-btn`, `player-pic`, `player-namer`, `namer-pic`, `player-name`, `namer-back-btn`, `namer-ok-btn`, `player-label`, `theme-keys`, `round-key`) without a DECISIONS entry; card.js, controls.js, main.js, gallery.js and stagemap.js key on
+  `reset-btn`, `speak-btn`, `mute-btn`, `play-back-btn`, `stages-back-btn`, `stages-pic`, `stages-picture`, `stage-stations`, `player-cards`, `player-picker`, `picker-pics`, `picker-back-btn`, `player-btn`, `player-pic`, `player-namer`, `namer-pic`, `player-name`, `namer-back-btn`, `namer-ok-btn`, `player-label`, `theme-keys`, `round-key`, `tv-bulbs`, `round-spare`) without a DECISIONS entry; card.js, controls.js, main.js, gallery.js, stagemap.js and celebrate.js key on
   them. `next-btn` and `result-line` were removed by B-114 (the check dome is also next); `level-picker`, `level-easy`, `level-normal`, `level-hard` (and the nudge's `level-up-btn`) by B-215 (stages replace the level picker).
 - Sound files under `static/sounds/` are the character's voice. Play the
   ones that exist (except `celebration/tada.mp3`, unused since B-230); never add, trim or re-encode them in M1.
