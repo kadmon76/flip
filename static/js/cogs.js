@@ -12,7 +12,10 @@
 //     and the dome, the face of the boost button (BACKLOG B-219; on or
 //     off and its taps are boosttray.js's and main.js's): the kid's gears;
 //   - #round-gears, on the round-end screen: the round's gears as "+N"
-//     (gears.js roundGears over state.round.results).
+//     (gears.js roundGears over state.round.results);
+//   - #boss-gears, on the boss screen (BACKLOG B-232): the kid's gears,
+//     and #boss-end-gears, its end card: the boss's gears as "+N"
+//     (state.boss.gears).
 // It renders from state on every render and never mutates state.
 // celebrate.js flies small cogs (cog()) from the TV to the console's
 // counter on a correct word and, as they land, flips its count up
@@ -101,4 +104,8 @@ export function renderGears(state) {
     if (state.screen === 'theme') show('theme-gears', countText(state.gears));
     else if (state.screen === 'play') show('console-gears', countText(state.gears));
     else if (state.screen === 'round-end') show('round-gears', `+${roundGears(state.round.results)}`);
+    else if (state.screen === 'boss' && state.boss) {
+        show('boss-gears', countText(state.gears));
+        show('boss-end-gears', `+${countText(state.boss.gears)}`);
+    }
 }

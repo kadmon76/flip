@@ -74,6 +74,26 @@ slide, nothing else, except the small head-shake of "Speaker locked" (a ±4.5° 
 Pose and movement change together; never more than one change per 300ms.
 `prefers-reduced-motion`: pose swaps only, no sliding.
 
+## During a boss (BACKLOG B-232)
+The boss screen is the play scene, so he stands behind the console's left
+third as ever, alive (floating, blinking, talking with his voice). He is
+the kid's side against the thief, and his voice there is only the words
+he reads: the word's own clip, as his voice, when a word card is flipped
+on stages 1-2, on every pair, for a fake caught (the right word, never
+the fake) and for each fake that fixes itself at the end; no lines (boss
+lines come later as content). His moments (character.js, no sound, no
+lines):
+
+| Moment | When | Pose / movement |
+|---|---|---|
+| bossIn | the boss starts (the lights go red) | wide eyes, worried, a gasp and a pop; then, as the alarm turns, he ducks behind the console (sink 300) |
+| bossReady | the cards are dealt, the clock starts | pops back up, eyebrows set (frown), looking up at the table, then calm |
+| bossPair | a pair | cheers: happy eyes, a fist pump, a pop |
+| bossFix | a fake fixes itself at the end | happy, a small pop, pointing up at it |
+| bossOops | a miss, or a fake caught | puzzled, confused eyes, a shrug |
+| bossWon | the thief burst, the part in the window | two fists pumping, a double pop |
+| bossLost | the thief reached the vent | covers his eyes, then rest (never sad) |
+
 ## Moment map
 | Moment | Pose / movement | Sound | His lines (B-224) | How often | Says (B-226) |
 |---|---|---|---|---|---|

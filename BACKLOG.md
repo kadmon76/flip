@@ -717,3 +717,4 @@ Decided by the human on 2026-11-07: every stage ends with a boss that plays diff
 - On a slow network a first visit's greeting is silent: B-229 fetches nothing before the page is idle, and the first tap often comes earlier.
 - The robot has no moment of his own for the round's last bulb (a nervous peek) or for a spare bulb earned (B-231: his peek stays on the word's second miss, the spare pops in on the round end, where he is not drawn); both need a line pool.
 - A round left with the back button keeps the spare bulbs it turned off (B-231 records spares only at the round end, as B-201 records nothing for a round left); decide whether leaving should cost them.
+- His round-end line and key line play on over the theme screen when the kid taps "themes" during them (audio.js renderSound stops his voice only on a word key change, and the round end and the theme screen both have none); stop his voice on leaving the round end if that sounds wrong (B-230).

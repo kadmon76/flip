@@ -42,7 +42,16 @@
 //     design/reference/word-wins.html makes them (SFX), each at its time,
 //     and the chime at the win's `peak`. picture.js tells winSound which
 //     win it starts (main.js hands it over), the shared one (null: the
-//     chime at once) or the word's own.
+//     chime at once) or the word's own;
+//   - the boss's sounds (BACKLOG B-232, the thief bot): effects made in
+//     code as the mock design/reference/boss-thief.html makes them
+//     (BOSS_SFX: flip, unflip, alarm, drumroll, whoosh, clank, cackle,
+//     tick, zap, hit, buzz, swap slide, gear, boom, swell, fanfare,
+//     escape), each beat's at its times (bossSounds, boss.js's numbers),
+//     his ticking as bossview.js calls bossTick; and the robot's voice in
+//     a boss is only the words he reads (a beat's `say`: the word's own
+//     clip as his voice, fetched as the boss starts, bossFetches; no
+//     lines).
 // On iPhone the silent switch would mute all of the Web Audio sound: at
 // the first gesture the page asks to play like a media app
 // (navigator.audioSession, where there is one) and a silent clip made in
@@ -74,6 +83,7 @@
 
 import { state } from './state.js';
 import { snapshot, momentsFor, NONE, MOMENTS, PEEK, linesOf, letterGiven, picksFor, waitFor, startsOf, chatterOf, saysLine } from './character.js';
+import { BEAT, ENTRANCE, zapMs, fakeMs } from './boss.js';
 
 export const SOUND_BASE = '/static/sounds/';
 export const MUTED_KEY = 'flip.muted';
@@ -146,7 +156,7 @@ export const FILES = {
 // (B-227; made in code too), a word's own win's sounds (B-228, `sfx`;
 // made in code) and the round end's fanfare (B-230; made in code, before
 // his end line, not under it).
-export const CHANNEL = { correct: 'voice', error: 'voice', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', sfx: 'fx', fanfare: 'fx', word: 'voice', line: 'voice' };
+export const CHANNEL = { correct: 'voice', error: 'voice', swipe: 'fx', locked: 'voice', hiss: 'fx', chime: 'fx', sfx: 'fx', fanfare: 'fx', boss: 'fx', word: 'voice', line: 'voice' };
 
 // The TV's tune-in hiss (BACKLOG B-214, design/reference/tv-motion.html
 // hiss()): white noise `tail` s longer than the hiss, its first samples
@@ -401,6 +411,100 @@ export function winSounds(win) {
     const sfx = (Array.isArray(win.sfx) ? win.sfx : [])
         .filter((s) => Array.isArray(s) && hasOwn(SFX, s[0]) && typeof s[1] === 'number');
     return [...sfx, ['chime', win.peak]];
+}
+
+// --- The boss's sounds (BACKLOG B-232) ---
+
+// Every sound of the boss, made in code: name -> (kit, t, ...args), started
+// at context time `t` with sfxKit's tone and noise (one gain of SFX_GAIN,
+// the mock's master); the mock's recipes (design/reference/boss-thief.html
+// SFX) and numbers as they are.
+export const BOSS_SFX = {
+    flip(k, t) { k.noise(t, { dur: 0.08, peak: 0.18, f: 2500, q: 0.8 }); k.tone(t, { type: 'triangle', f0: 600, f1: 900, dur: 0.06, peak: 0.06 }); },
+    unflip(k, t) { k.noise(t, { dur: 0.07, peak: 0.12, f: 1500, q: 0.8 }); },
+    alarm(k, t) {
+        for (let i = 0; i < 4; i++) {
+            k.tone(t + i * 0.5, { type: 'square', f0: 660, dur: 0.24, peak: 0.05 });
+            k.tone(t + i * 0.5 + 0.25, { type: 'square', f0: 880, dur: 0.24, peak: 0.05 });
+        }
+    },
+    drumroll(k, t) {
+        for (let i = 0; i < 30; i++) k.noise(t + i * 0.045, { dur: 0.05, peak: 0.05 + i * 0.006, type: 'lowpass', f: 300 });
+        k.tone(t + 1.4, { f0: 70, f1: 40, dur: 0.5, peak: 0.6 });
+    },
+    whoosh(k, t) { k.noise(t, { dur: 0.5, peak: 0.25, f: 400, f1: 3000, q: 2 }); },
+    clank(k, t) { k.tone(t, { type: 'square', f0: 220, f1: 90, dur: 0.25, peak: 0.12 }); k.noise(t, { dur: 0.15, peak: 0.3, f: 2500, q: 3 }); },
+    cackle(k, t) {
+        [620, 700, 620, 700, 560].forEach((f, i) => k.tone(t + i * 0.09, { type: 'square', f0: f, f1: f * 0.7, dur: 0.07, peak: 0.06 }));
+        k.noise(t, { dur: 0.4, peak: 0.05, f: 3000, q: 4 });
+    },
+    tick(k, t) { k.tone(t, { type: 'square', f0: 1800, dur: 0.02, peak: 0.025 }); },
+    zap(k, t, big = false) {
+        k.tone(t, { type: 'sawtooth', f0: 2200, f1: 160, dur: big ? 0.6 : 0.35, peak: big ? 0.22 : 0.15 });
+        k.noise(t, { dur: big ? 0.5 : 0.25, peak: 0.18, type: 'highpass', f: 4000 });
+    },
+    hit(k, t) {
+        k.tone(t, { f0: 170, f1: 50, dur: 0.3, peak: 0.5 });
+        k.noise(t, { dur: 0.2, peak: 0.3, type: 'lowpass', f: 900 });
+        k.tone(t, { type: 'square', f0: 900, f1: 300, dur: 0.2, peak: 0.05 });
+    },
+    buzz(k, t) { k.tone(t, { type: 'sawtooth', f0: 140, dur: 0.35, peak: 0.12 }); k.tone(t, { type: 'sawtooth', f0: 147, dur: 0.35, peak: 0.1 }); },
+    slide(k, t) { k.noise(t, { dur: 0.35, peak: 0.12, f: 900, f1: 400, q: 1.5 }); },
+    gear(k, t) { k.tone(t, { type: 'triangle', f0: 1320, dur: 0.08, peak: 0.12 }); k.tone(t + 0.07, { type: 'triangle', f0: 1760, dur: 0.12, peak: 0.12 }); },
+    boom(k, t) {
+        k.noise(t, { dur: 0.5, peak: 0.6, type: 'lowpass', f: 800 });
+        k.tone(t, { f0: 120, f1: 30, dur: 0.6, peak: 0.5 });
+        [900, 1300, 700].forEach((f, i) => k.tone(t + 0.05 * i, { type: 'square', f0: f, f1: f / 3, dur: 0.3, peak: 0.05 }));
+    },
+    swell(k, t) { k.tone(t, { f0: 90, f1: 45, dur: 1.3, peak: 0.35, a: 0.4 }); k.noise(t, { dur: 1.3, peak: 0.12, f: 200, f1: 2500, q: 3 }); },
+    fanfare(k, t) {
+        [523, 659, 784].forEach((f, i) => k.tone(t + i * 0.12, { type: 'triangle', f0: f, dur: 0.2, peak: 0.2 }));
+        k.tone(t + 0.36, { type: 'triangle', f0: 1047, dur: 0.6, peak: 0.22 });
+    },
+    escape(k, t) { k.tone(t, { type: 'square', f0: 600, f1: 1600, dur: 0.5, peak: 0.06 }); k.noise(t, { dur: 0.6, peak: 0.2, f: 500, f1: 4000, q: 2 }); },
+};
+
+// A boss beat's sounds (pure): [[name, at (s from the beat), ...args]],
+// in time order, at the moments bossfx.js moves (boss.js BEAT, ENTRANCE):
+// the entrance's alarm and drumroll, his drop and clank and cackle, a flip
+// per card dealt (`cards`: how many); a card flipped; a pair's chime, zap,
+// hit and gear; a miss's cackle and the cards turning back; his swap's
+// whoosh, clank and slide; a fake's buzz, then the chime and his cackle,
+// then the cards turning back; the ending's flip and each fix's zap and
+// hit; the burst's swell, zap, boom and the part's clank; the win's
+// fanfare; his escape's cackle and dive. 'chime' is the win's (CHIME).
+export function bossSounds(beat, cards = 0) {
+    const sec = (ms) => Math.round(ms) / 1000;
+    const kind = beat && beat.kind;
+    const e = ENTRANCE;
+    if (kind === 'entrance') {
+        return [['alarm', e.alarm], ['drumroll', e.alarm], ['whoosh', e.drop], ['clank', e.land], ['cackle', e.point],
+            ...Array.from({ length: Math.max(0, cards) }, (_, i) => ['flip', Math.round((e.deal + i * e.every) * 1000) / 1000])];
+    }
+    if (kind === 'flip' || kind === 'show') return [['flip', 0]];
+    if (kind === 'pair') {
+        const z = sec(zapMs(!!beat.big));
+        return [['chime', 0], ['zap', 0, !!beat.big], ['hit', z], ['gear', z]];
+    }
+    if (kind === 'miss') return [['cackle', 0], ['unflip', sec(BEAT.miss.laugh)]];
+    if (kind === 'swap') return [['whoosh', 0], ['clank', sec(BEAT.miss.hop)], ['slide', sec(BEAT.miss.hop + BEAT.miss.lift)]];
+    if (kind === 'fake') return [['buzz', 0], ['chime', sec(BEAT.fake.shake)], ['cackle', sec(BEAT.fake.shake)], ['unflip', sec(fakeMs())]];
+    if (kind === 'fix') return [['zap', sec(BEAT.ending.zap), false], ['hit', sec(BEAT.ending.zap + 260)]];
+    if (kind === 'burst') {
+        const x = BEAT.ending;
+        return [['swell', 0], ['zap', 0, true], ['boom', sec(x.swell)], ['clank', sec(x.swell + x.drop)]];
+    }
+    if (kind === 'won') return [['fanfare', 0]];
+    if (kind === 'escape') return [['cackle', 0], ['escape', sec(BEAT.escape.laugh)]];
+    return [];
+}
+
+// The clips a boss fetches as it starts (pure): its words' own clips (the
+// cards' `audio`, each once), which the robot reads; nothing else of his
+// voice is said in a boss.
+export function bossFetches(boss) {
+    const cards = boss && Array.isArray(boss.cards) ? boss.cards : [];
+    return [...new Set(cards.map((c) => c && c.audio).filter((a) => typeof a === 'string' && a !== ''))];
 }
 
 // The silent clip that loops while the sound is on (BACKLOG B-227, the
@@ -766,7 +870,7 @@ let ctx = null;             // the AudioContext, made on the first gesture
 // (BACKLOG B-229: a clip a pool at first, one more after each play), and a
 // file two pools name ('hmm no' in error and locked) has one.
 const soundClips = new Map();
-const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214), the win's chime (B-227), a word's own win's sounds (B-228) and the round end's fanfare (B-230), { src, kind }
+const live = new Set();     // sources now playing (or due, B-224): the pooled clips, his new voice's (B-223, B-224), the TV's hiss (B-214), the win's chime (B-227), a word's own win's sounds (B-228), the round end's fanfare (B-230) and the boss's sounds (B-232), { src, kind }
 // When his voice last went quiet (BACKLOG B-226): the performance.now() ms
 // at which a clip of his voice last ended or was cut (-Infinity before he
 // ever spoke), for the quiet gap (character.js CHATTER.TALK_GAP, saysLine).
@@ -963,11 +1067,13 @@ function loadManifest() {
 // now, as it starts, ahead of any pool clip (wordFetches, RANK.word), so
 // they are ready at the TV's lock, at its check and when his letter
 // lands; the clips of the word before are let go (and leave the queue if
-// they have not started). Off the play screen, none.
+// they have not started). On the boss screen (BACKLOG B-232), the boss's
+// words' clips (bossFetches), which the robot reads. Elsewhere, none.
 function loadWord(s) {
     const { current } = s;
     const onWord = s.screen === 'play' && current && current.word;
-    const want = onWord ? wordFetches(listed, s.theme, current.word, current.audio) : [];
+    const onBoss = s.screen === 'boss' && s.boss;
+    const want = onWord ? wordFetches(listed, s.theme, current.word, current.audio) : onBoss ? bossFetches(s.boss) : [];
     for (const url of [...wordClips.keys()]) {
         if (want.includes(url)) continue;
         wordClips.delete(url);
@@ -1437,6 +1543,79 @@ function keepSfx(...sources) {
     }
 }
 
+// --- The boss (BACKLOG B-232) ---
+
+// Each source of the boss's sounds joins the playing ones as 'boss', so
+// the mute stops it, and so does leaving the boss or a new one (stopBoss).
+function keepBoss(...sources) {
+    for (const src of sources) {
+        const entry = { src, kind: 'boss' };
+        live.add(entry);
+        src.onended = () => live.delete(entry);
+    }
+}
+
+// Play `schedule` ([[name, at s, ...args]], bossSounds) from now: each of
+// BOSS_SFX at its time through one gain of SFX_GAIN, the chime (CHIME) at
+// its. Effects: they may overlap anything. Muted or before the first
+// gesture: nothing.
+function bossPlay(schedule) {
+    if (state.muted || !ctx || !schedule.length) return;
+    try {
+        if (ctx.state !== 'running') {
+            const p = ctx.resume();
+            if (p && p.catch) p.catch(() => {});
+        }
+        const t0 = ctx.currentTime || 0;
+        let kit = null;
+        for (const [name, at, ...args] of schedule) {
+            if (name === 'chime') {
+                chime(t0 + at);
+                continue;
+            }
+            if (!BOSS_SFX[name]) continue;
+            if (!kit) {
+                const out = ctx.createGain();
+                out.gain.value = SFX_GAIN;
+                out.connect(ctx.destination);
+                kit = sfxKit(ctx, out, keepBoss);
+            }
+            BOSS_SFX[name](kit, t0 + at, ...args);
+        }
+    } catch (e) {
+        // no sound here; the boss still plays
+    }
+}
+
+// His ticking as he walks (bossview.js calls it at his pace; faster near
+// the vent, `near`), on the boss screen only.
+export function bossTick(near = false) {
+    if (state.screen !== 'boss') return;
+    bossPlay([['tick', 0]]);
+}
+
+// The boss's sounds still playing or due stop (leaving the boss, a new
+// one).
+function stopBoss() {
+    for (const entry of [...live]) {
+        if (entry.kind === 'boss') stopSource(entry);
+    }
+}
+
+// The word the robot reads on a boss beat (`say`: { word, audio, at }):
+// the word's own clip as his voice (he talks with it), `at` s into the
+// beat, cutting his voice; skipped when its clip is not decoded yet (never
+// waited for), while the speaker's word plays, muted or before the first
+// gesture. A fake is never read (main.js never gives one a `say` of its
+// own spelling: a fake caught says its real word).
+function bossSay(say) {
+    if (!say || !say.audio || state.muted || !ctx || state.speaking) return;
+    const buf = bufferOf(say.audio);
+    if (!buf) return;
+    stopVoice();
+    start(buf, 'word', null, say.at || 0);
+}
+
 // This frame's samples of the robot's voice (bytes, 128 = silence), or
 // null while none of his clips plays (also while muted: nothing plays).
 // main.js passes it to character.js renderTalk every frame; the array is
@@ -1507,9 +1686,11 @@ function silence() {
 }
 
 // Memo of the last state heard (CLAUDE.md "Subscribers may keep a memo"):
-// its robot snapshot, to tell a moment from a re-render, and whether it
-// was muted. Overwritten on every setState; never read by another module.
-let last = { snap: NONE, muted: false };
+// its robot snapshot, to tell a moment from a re-render, whether it was
+// muted, and the boss (BACKLOG B-232) run and beat it heard (null off the
+// boss screen). Overwritten on every setState; never read by another
+// module.
+let last = { snap: NONE, muted: false, boss: null };
 
 // State subscriber: says what each state change's moments call for
 // (character.js's table; speak), on every screen (the round end's fanfare
@@ -1526,17 +1707,26 @@ let last = { snap: NONE, muted: false };
 export function renderSound(state) {
     const snap = snapshot(state);
     const prev = last;
-    last = { snap, muted: state.muted };
-    if (snap.key !== prev.snap.key) {
+    const boss = state.screen === 'boss' && state.boss ? { run: state.boss.run, seq: state.boss.beat.seq } : null;
+    last = { snap, muted: state.muted, boss };
+    const newBoss = !!boss && (!prev.boss || prev.boss.run !== boss.run);
+    if (snap.key !== prev.snap.key || newBoss || (!boss && prev.boss)) {
         stopVoice();
         loadWord(state);
     }
+    // a boss left or a new one: its sounds still playing or due stop
+    if (prev.boss && (!boss || newBoss)) stopBoss();
     pump();
     if (state.muted) {
         if (!prev.muted) silence();
         return;
     }
     if (prev.muted) keepAwake();
+    // a boss beat (BACKLOG B-232): its sounds and the word the robot reads
+    if (boss && (newBoss || prev.boss.seq !== boss.seq)) {
+        bossPlay(bossSounds(state.boss.beat, state.boss.cards.length));
+        bossSay(state.boss.beat.say);
+    }
     const moments = momentsFor(prev.snap, snap);
     if (!moments.length) return;
     // A moment the table marks `waitReady` (the greeting) comes with the

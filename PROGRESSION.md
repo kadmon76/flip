@@ -40,7 +40,8 @@ included. All numbers are first guesses to tune in play.
 
 **Clearing a stage.** A stage is cleared when every one of its words has
 been checked correct at least once (with or without help; a word the
-robot revealed does not count). The next stage then opens. A cleared
+robot revealed does not count). The stage's boss then opens, and the
+next stage opens once the boss is beaten (Bosses, below). A cleared
 stage stays cleared, even if more words are added to it later.
 
 **Rounds.** Rounds stay 5 words. A round of a stage takes, in this order:
@@ -54,6 +55,62 @@ fill the rest. The 5 are played in random order.
 
 **Replay.** The kid can play any cleared stage again, and the current
 one. A replay earns gears and stickers like any round.
+
+## Bosses
+Every stage ends with a boss, the thief bot (B-232, human 2026-11-07; the
+approved mock is `design/reference/boss-thief.html`): a memory game
+against the clock. Match each picture with its word before the thief
+walks his track to the vent with the stolen part. The boss trains
+reading the stage's words (the rounds train spelling them); its fake
+cards train telling a right spelling from an almost-right one.
+
+- **The gate.** A stage's boss opens once the stage is cleared. The next
+  stage opens only when the boss is beaten; theme keys are still earned on
+  clearing. Saved per player in progress.js (per theme `bosses`, the
+  stages whose boss is beaten, and `bossLosses` per stage). A save from
+  before the bosses counts its cleared stages' bosses as beaten (nobody
+  loses an open stage).
+- **Ways in.** On the stage map a cleared stage whose boss waits shows
+  the thief's face on its station, pulsing; a tap starts the boss (a
+  beaten one shows the part instead, and a tap replays the stage). The
+  round end of a round that just cleared a stage shows a thief button
+  that starts it at once; the kid can also leave and come back.
+- **The deck.** The stage's words, a picture card and a word card each:
+  the theme's missed words of this stage first, then the rest at random.
+  Plus fake word cards: a real word of the deck with a near spelling (two
+  neighbouring letters swapped, or a look-alike letter: c/k, s/z, b/d,
+  i/e, o/u and the like; the first letter kept; never a real word). Fakes
+  look exactly like word cards. Dealt face down in rows of 5.
+- **The table** (one table, starting values to tune in play):
+
+  | Stage | Pairs | Fakes | Seconds to the vent | The robot reads a word card |
+  | --- | --- | --- | --- | --- |
+  | 1 | 5 | 0 | 75 | when flipped |
+  | 2 | 5 | 0 | 70 | when flipped |
+  | 3 | 6 | 2 | 85 | only on a match |
+  | 4 | 6 | 2 | 80 | only on a match |
+  | 5 | 6 | 3 | 75 | only on a match |
+  | long | 6 | 3 | 95 | only on a match |
+
+  A stage with fewer words than its pairs uses all it has. The robot
+  reads with the word's own clip; a fake is never read.
+- **Play.** The kid flips two cards. A picture and its own word card: a
+  pair; the robot says the word, a zap knocks the thief back along his
+  track (two pairs in a row: further), the pair leaves the table. Any
+  other two: they turn back, and the thief swaps two face-down cards in
+  plain sight. A fake with its own word's picture: its wrong letters turn
+  red, a bubble shows the right spelling, the robot says the right word,
+  the thief jumps a step ahead; the fake stays on the table.
+- **The clock is the thief.** He walks his track at the stage's speed;
+  the lamps behind him turn red, the vent's alarm lamp flashes past three
+  quarters. When the last pair is found, the fakes still on the table are
+  shown and fix themselves, and he bursts.
+- **Win and lose.** Win: 1 to 3 stars by how far he was from the vent
+  (under 45% of the track 3, under 75% 2, else 1), gears 1 per pair, +1
+  for a second pair in a row, +2 for the win, the boss beaten. Lose (he
+  reaches the vent): the gears earned stay, nothing else is lost; a retry
+  is offered. After 2 losses on the same boss he walks 10% slower, 10% more
+  per further loss (at most 30% slower); beating him resets it.
 
 ## Repetition and stickers
 - **Missed words return** in the next rounds of their stage or a later

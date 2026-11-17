@@ -16,7 +16,12 @@
 // (BACKLOG B-219, boost.js, boosttray.js): the boost button, its tray and
 // the boost itself. The round's bulbs (bulbs.js, BACKLOG B-231): 3 and the
 // player's spare bulbs for the whole round, one off per wrong check; the
-// round ends when the last goes off; a perfect round earns a spare.
+// round ends when the last goes off; a perfect round earns a spare. The
+// boss at the end of every stage (BACKLOG B-232, boss.js; the thief bot,
+// a memory game against his clock): started from the stage map's station
+// of a cleared stage whose boss waits, or the round end's thief button;
+// its beats (flip, pair, miss and his swap, a fake caught, the ending,
+// his escape) are timers here, its screen bossview.js's and bossfx.js's.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -27,7 +32,7 @@ import { renderTv } from './tv.js';
 import { renderPicture } from './picture.js';
 import { winsUrl } from './wins.js';
 import { renderControls, domeAction, canReset, speakerAction, PRESS_MS } from './controls.js';
-import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine, winSound } from './audio.js';
+import { speakWord, stopWord, init as initAudio, renderSound, loadMuted, saveMuted, voiceWave, peekLine, winSound, bossTick } from './audio.js';
 import { starsFor } from './score.js';
 import { renderCelebrate } from './celebrate.js';
 import { add as addSticker, remove as removeSticker } from './stickers.js';
@@ -42,12 +47,17 @@ import { renderRobot, renderTalk, idleWait, nudgeWait, pressWait, pressDue, word
 import { stagesOf } from './stage.js';
 import { pickRound, makeWord, swapForStruggle } from './round.js';
 import { wordsFor as missedWords, record as recordMissed } from './missed.js';
-import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations } from './progress.js';
+import { forTheme as progressFor, currentStage, record as recordProgress, load as loadProgress, stations, recordBoss, bossLossesOf } from './progress.js';
 import { load as loadPlayers, add as addPlayer, select as selectPlayer, markTutored } from './players.js';
 import { renderCoach, resetCoach } from './coach.js';
 import { load as loadKeys, open as openTheme, record as recordKeys, isOpen, held as keysHeld } from './keys.js';
 import { load as loadSpares, record as recordBulbs, startBulbs, afterCheck, missKind, roundOver, BULBS } from './bulbs.js';
 import { renderLocks, padlock } from './locks.js';
+import { rulesOf, dealDeck, judge, swapPick, swapCards, startClock, withEvent, hold, release, thiefAt, reachesAt,
+    bossStars, pairGears, BOSS_GEARS, BEAT, KNOCK, PUSH, zapMs, pairMs, swapMs, fakeMs, entranceMs } from './boss.js';
+import { renderBoss, renderBossClock } from './bossview.js';
+import { renderBossFx } from './bossfx.js';
+import { thiefFace } from './thief.js';
 // The save modules' keys, for the first player to take over the saves
 // made before players existed (players.js add); each key stays named only
 // in its own module.
@@ -230,13 +240,17 @@ function onTheme(theme) {
 
 // A station: a round of its stage, if the stage is open (cleared, or the
 // theme's current stage; progress.js stations, from the same
-// state.progress the map shows). A not-open station is disabled anyway.
+// state.progress the map shows); a cleared stage whose boss is not beaten
+// yet starts its boss instead (BACKLOG B-232: the thief on its station).
+// A not-open station is disabled anyway.
 function onStation(stage) {
     if (state.screen !== 'stages') return;
     const theme = state.themes.find((t) => t.name === state.theme);
     if (!theme) return;
-    const open = stations(theme.stages, state.progress[theme.name]).some((s) => s.stage === stage && s.open);
-    if (open) startRound(theme, stage);
+    const station = stations(theme.stages, state.progress[theme.name]).find((s) => s.stage === stage && s.open);
+    if (!station) return;
+    if (station.boss) startBoss(theme, stage);
+    else startRound(theme, stage);
 }
 
 // The theme's wins file (BACKLOG B-228: each word's own win, wins.js), at
@@ -285,8 +299,10 @@ async function startRound({ name, dataUrl }, chosen = null) {
     // for the round): the stage picked on the stage map (a cleared stage,
     // replayed, or the current one), else the theme's current stage, the
     // first of the stages its data has words in that the kid has not
-    // cleared (progress.js currentStage; all cleared: the last one), so
-    // after a clear, play again starts the next one. A replay of a
+    // cleared, or whose boss is not beaten yet (BACKLOG B-232: the boss
+    // guards the next stage; progress.js currentStage; all done: the last
+    // one), so after a clear, play again replays the stage until its boss
+    // is beaten, then starts the next one. A replay of a
     // cleared stage records its solved words at the round end and clears
     // nothing new (progress.js afterRound). Its rules (stage.js
     // stageRules) start every word of the round (round.js makeWord): on
@@ -734,6 +750,11 @@ function renderRoundEnd(state) {
         star.classList.toggle('earned', i < stars);
     });
     $('round-spare').hidden = !state.round.spareEarned;
+    // the thief (BACKLOG B-232): a round that just cleared its stage
+    // offers its boss straight away, his face drawn in code (made once)
+    const bossBtn = $('boss-btn');
+    bossBtn.hidden = !(state.round.justCleared && bossWaits(state, state.theme, state.round.stage));
+    if (!bossBtn.hidden && !bossBtn.firstElementChild) bossBtn.appendChild(thiefFace());
     renderStageBulbs($('round-stages'), stagesOf(state.data), state.round.cleared || []);
     renderFlaps($('round-score'), `${correct} / ${size}`);
     const fresh = results.filter((r) => r.correct && r.newSticker).length;
@@ -783,8 +804,10 @@ function renderRoundEnd(state) {
 // New round in the same theme: new random words, the round's bulbs (its
 // spares too, BACKLOG B-231) and results reset by startRound, at the theme's current stage (progress.js
 // currentStage, BACKLOG B-216), so after a round that cleared its stage
-// it is the next one; also after a replay of a cleared stage (B-217
-// leaves play again as B-216 made it). Falls back to the theme screen if
+// it is that stage again until its boss is beaten (BACKLOG B-232: the
+// round end's thief button starts the boss), then the next one; also
+// after a replay of a cleared stage (B-217 leaves play again as B-216
+// made it). Falls back to the theme screen if
 // the theme is somehow missing from state.themes.
 function onPlayAgain() {
     const theme = state.themes.find((t) => t.name === state.theme);
@@ -835,11 +858,297 @@ function leaveRound(patch) {
 // checks the screen, the idle timer ends off the play screen, and the
 // robot drops his waiting steps when the screen changes (character.js).
 function onPlayBack() {
+    if (state.screen === 'boss') {
+        leaveBoss();
+        return;
+    }
     if (state.screen !== 'play') return;
     for (const r of state.round.results) {
         if (r && r.correct && r.newSticker) removeSticker(state.theme, r.word);
     }
     leaveRound({ screen: 'stages' });
+}
+
+// --- The boss: the thief bot (BACKLOG B-232, PROGRESSION.md "Bosses") ---
+
+// Whether the boss of `theme`'s `stage` waits (its stage cleared, its boss
+// not beaten yet; progress.js stations), from state.progress.
+function bossWaits(s, theme, stage) {
+    const t = (s.themes || []).find((x) => x.name === theme);
+    return !!t && stations(t.stages, (s.progress || {})[theme]).some((x) => x.stage === stage && x.boss);
+}
+
+// What the robot says reading a card (audio.js: the word's own clip, his
+// voice), `at` seconds into its beat.
+const sayOf = (card, at = 0) => ({ word: card.word, audio: card.audio, at });
+
+// `fn` after `ms`, if the boss and its beat are still the ones playing
+// now (a beat a newer one replaced, his escape, leaving the boss: nothing).
+// Nothing is kept outside state: the run and the beat live in the timer's
+// own closure, as armIdle's word does.
+function bossLater(ms, fn) {
+    const { run, beat } = state.boss;
+    const seq = beat.seq;
+    setTimeout(() => {
+        const b = state.boss;
+        if (state.screen === 'boss' && b && b.run === run && b.beat.seq === seq) fn();
+    }, ms);
+}
+
+// The boss of `stage` in `theme` (a station of a cleared stage whose boss
+// waits, the round end's thief button, play again on its end card): the
+// theme's data file, the deck (boss.js dealDeck: the stage's words, its
+// missed words first, its fakes; rulesOf, slower after losses, progress.js
+// bossLossesOf), then the boss screen at once with its entrance; his clock
+// starts once the cards are dealt (entranceMs). A round in play is
+// dropped as the back arrow drops it (leaveRound). One start at a time,
+// as startRound (`startingRound`); a kid who left meanwhile starts none.
+async function startBoss({ name, dataUrl }, stage) {
+    if (state.startingRound) return;
+    const from = state.screen;
+    setState({ startingRound: true });
+    let data;
+    try {
+        data = await fetch(dataUrl).then((r) => r.json());
+    } catch (e) {
+        setState({ startingRound: false });
+        throw e;
+    }
+    if (state.screen !== from || state.theme !== name) {
+        setState({ startingRound: false });
+        return;
+    }
+    const rules = rulesOf(stage, bossLossesOf(progressFor(name), stage));
+    const known = (state.themes || []).flatMap((t) => (t.words || []).map((w) => w.word));
+    const deck = dealDeck(data, stage, missedWords(name), known, rules);
+    const run = (state.bossRuns || 0) + 1;
+    leaveRound({
+        screen: 'boss',
+        theme: name,
+        bossRuns: run,
+        startingRound: false,
+        boss: {
+            run, theme: name, stage, rules, cards: deck.cards, pairs: deck.pairs,
+            phase: 'entrance', busy: true, holds: [], clock: null,
+            up: [], gone: [], found: 0, row: 0, gears: 0,
+            caught: null, shown: [], fixed: [], stars: 0, card: false,
+            beat: { kind: 'entrance', seq: 1 },
+        },
+    });
+    bossLater(entranceMs(deck.cards.length), () => {
+        const b = state.boss;
+        const now = performance.now();
+        const clock = startClock(now, b.rules.secs);
+        setState({ boss: { ...b, phase: 'play', busy: false, clock: b.holds.length ? withEvent(clock, 'stop', now) : clock,
+            beat: { kind: 'start', seq: b.beat.seq + 1 } } });
+    });
+}
+
+// A card tapped: it flips (two at most; not while a beat plays). On
+// stages 1-2 (rules.read 'flip') the robot reads a word card as it flips;
+// a fake is never read. Two up: they are judged BEAT.flip later.
+function onBossCard(id) {
+    const b = state.boss;
+    if (state.screen !== 'boss' || !b || b.phase !== 'play' || b.busy) return;
+    if (b.up.includes(id) || b.gone.includes(id) || b.up.length >= 2) return;
+    const card = b.cards.find((c) => c.id === id);
+    if (!card) return;
+    const up = [...b.up, id];
+    const two = up.length === 2;
+    const say = card.kind === 'word' && b.rules.read === 'flip' ? sayOf(card) : null;
+    setState({ boss: { ...b, up, busy: two, beat: { kind: 'flip', seq: b.beat.seq + 1, id, say } } });
+    if (two) bossLater(BEAT.flip, judgeBoss);
+}
+
+// The two cards up (boss.js judge): a pair, a fake caught or a miss.
+function judgeBoss() {
+    const b = state.boss;
+    const [a, c] = b.up.map((id) => b.cards.find((x) => x.id === id));
+    const kind = judge(a, c);
+    const seq = b.beat.seq + 1;
+    if (kind === 'pair') bossPair(b, a, c, seq);
+    else if (kind === 'fake') bossFake(b, a.kind === 'fake' ? a : c, a.kind === 'fake' ? c : a, seq);
+    else bossMiss(b, seq);
+}
+
+// A pair: the robot says the word, the zap flies (bossfx.js) and he is
+// knocked back as it lands (a 'knock' dated then; boss.js thiefAt), further
+// for a second pair in a row; the pair leaves the table; its gears now
+// (gears.js add: boss.js pairGears). He stops for the beat and walks on
+// after it (hold, release). The last pair: he is beaten, recorded now
+// (progress.js recordBoss, so leaving during the ending keeps it) with the
+// win's gears and the stars by where he was (bossStars), then the ending.
+function bossPair(b, a, c, seq) {
+    const now = performance.now();
+    const row = b.row + 1;
+    const found = b.found + 1;
+    const last = found >= b.pairs;
+    const big = row >= 2 || last;
+    const ms = zapMs(big);
+    const earned = pairGears(row) + (last ? BOSS_GEARS.win : 0);
+    let next = hold({ ...b, found, row, gone: [...b.gone, a.id, c.id], gears: b.gears + earned }, 'pair', now);
+    next = { ...next, clock: withEvent(next.clock, 'knock', now + ms, KNOCK.by * (big ? KNOCK.big : 1)) };
+    const patch = { gears: addGears(earned) };
+    if (last) {
+        next = hold({ ...next, stars: bossStars(thiefAt(b.clock, now).p) }, 'end', now);
+        recordBoss(b.theme, b.stage, true);
+        patch.progress = loadProgress();
+    }
+    setState({ ...patch, boss: { ...next, beat: { kind: 'pair', seq, ids: [a.id, c.id], big, last, say: sayOf(a.kind === 'word' ? a : c) } } });
+    if (last) bossLater(ms + KNOCK.ms, bossEnding);
+    else bossLater(pairMs(big), () => setState({ boss: { ...release(state.boss, 'pair', performance.now()), up: [], busy: false } }));
+}
+
+// A fake with its own word's picture: its wrong letters red, the bubble
+// with the right spelling (bossview.js), the robot says the right word,
+// he laughs and jumps ahead (a 'push' as the fake's shake ends); then the
+// two cards turn back, the fake stays on the table.
+function bossFake(b, fake, pic, seq) {
+    const f = BEAT.fake;
+    const clock = withEvent(b.clock, 'push', performance.now() + f.shake, PUSH.by);
+    setState({ boss: { ...b, row: 0, caught: fake.id, clock,
+        beat: { kind: 'fake', seq, id: fake.id, pic: pic.id, say: sayOf(fake, f.shake / 1000) } } });
+    bossLater(fakeMs(), () => {
+        setState({ boss: { ...state.boss, caught: null, up: [] } });
+        bossLater(f.turn, () => setState({ boss: { ...state.boss, busy: false } }));
+    });
+}
+
+// Any other two: he laughs, they turn back, then he hops onto the table
+// and swaps two face-down cards in plain sight (boss.js swapPick: none
+// when fewer than 3 are face down), stopped meanwhile.
+function bossMiss(b, seq) {
+    const m = BEAT.miss;
+    setState({ boss: { ...b, row: 0, beat: { kind: 'miss', seq } } });
+    bossLater(m.laugh, () => {
+        setState({ boss: { ...state.boss, up: [] } });
+        bossLater(m.turn, () => {
+            const w = state.boss;
+            const pick = swapPick(w.cards, w.up, w.gone);
+            if (!pick) {
+                setState({ boss: { ...w, busy: false } });
+                return;
+            }
+            const next = hold({ ...w, cards: swapCards(w.cards, pick[0], pick[1]) }, 'swap', performance.now());
+            setState({ boss: { ...next, beat: { kind: 'swap', seq: w.beat.seq + 1, ids: pick } } });
+            bossLater(swapMs(), () => setState({ boss: { ...release(state.boss, 'swap', performance.now()), busy: false } }));
+        });
+    });
+}
+
+// The end (BACKLOG B-232): the fakes still on the table turn face up
+// together, their wrong letters red; one by one each fixes itself (its
+// letters, the robot says the word, it zaps him); then the final big zap,
+// he bursts, the part drops into the console's window ('won'), and the end
+// card. With no fakes left, straight to the final zap.
+function bossEnding() {
+    const b = state.boss;
+    const fakes = b.cards.filter((c) => c.kind === 'fake' && !b.gone.includes(c.id)).map((c) => c.id);
+    setState({ boss: { ...b, phase: 'ending', up: [], caught: null, shown: fakes, beat: { kind: 'show', seq: b.beat.seq + 1 } } });
+    if (fakes.length) bossLater(BEAT.ending.show, () => bossFix(fakes, 0));
+    else bossBurst();
+}
+
+function bossFix(fakes, i) {
+    const b = state.boss;
+    const card = b.cards.find((c) => c.id === fakes[i]);
+    setState({ boss: { ...b, fixed: [...b.fixed, card.id],
+        beat: { kind: 'fix', seq: b.beat.seq + 1, id: card.id, say: sayOf(card, BEAT.ending.swap / 1000) } } });
+    bossLater(BEAT.ending.fix, () => (i + 1 < fakes.length ? bossFix(fakes, i + 1) : bossBurst()));
+}
+
+function bossBurst() {
+    const b = state.boss;
+    const e = BEAT.ending;
+    setState({ boss: { ...b, phase: 'burst', beat: { kind: 'burst', seq: b.beat.seq + 1 } } });
+    bossLater(e.swell + e.drop, () => {
+        const w = state.boss;
+        setState({ boss: { ...w, phase: 'won', beat: { kind: 'won', seq: w.beat.seq + 1 } } });
+        bossLater(e.card, () => setState({ boss: { ...state.boss, card: true } }));
+    });
+}
+
+// He reached the vent: he dives in with the part. Lost (progress.js
+// recordBoss: one more loss; the gears earned stay), the end card offers
+// a retry.
+function bossEscape() {
+    const b = state.boss;
+    const e = BEAT.escape;
+    recordBoss(b.theme, b.stage, false);
+    setState({ progress: loadProgress(), boss: { ...hold(b, 'end', performance.now()), phase: 'escape', busy: true, up: [], caught: null,
+        beat: { kind: 'escape', seq: b.beat.seq + 1 } } });
+    bossLater(e.laugh + e.dive, () => {
+        const w = state.boss;
+        setState({ boss: { ...w, phase: 'lost', beat: { kind: 'lost', seq: w.beat.seq + 1 } } });
+        bossLater(e.card, () => setState({ boss: { ...state.boss, card: true } }));
+    });
+}
+
+// Memo (CLAUDE.md "Subscribers may keep a memo"): the boss clock this
+// subscriber last heard, so only a new one arms the escape timer.
+// Overwritten on every setState; never read by another module.
+let clockHeard = null;
+
+// The escape timer: on every new clock of a boss in play (he started,
+// stopped, walked on, was knocked back or pushed), when he would reach
+// the vent if nothing else happened (boss.js reachesAt); then, if that
+// clock is still the boss's and he is there (thiefAt), his escape. A new
+// clock arms its own; nothing else is kept outside state.
+function armEscape(s) {
+    const b = s.screen === 'boss' ? s.boss : null;
+    const clock = b && b.phase === 'play' ? b.clock : null;
+    if (clock === clockHeard) return;
+    clockHeard = clock;
+    if (!clock) return;
+    const wait = () => {
+        const w = state.boss;
+        if (state.screen !== 'boss' || !w || w.clock !== clock || w.phase !== 'play') return;
+        const now = performance.now();
+        if (thiefAt(clock, now).p >= 1) {
+            bossEscape();
+            return;
+        }
+        const at = reachesAt(clock, now);
+        if (at !== null) setTimeout(wait, Math.max(16, at - now));
+    };
+    const at = reachesAt(clock, performance.now());
+    if (at !== null) setTimeout(wait, Math.max(16, at - performance.now()));
+}
+
+// The page hidden (another app, the phone locked): the thief stops until
+// it shows again (hold 'away'), so a boss is never lost away from it.
+function onBossAway(hidden) {
+    const b = state.boss;
+    if (state.screen !== 'boss' || !b || (b.phase !== 'entrance' && b.phase !== 'play')) return;
+    const now = performance.now();
+    setState({ boss: hidden ? hold(b, 'away', now) : release(b, 'away', now) });
+}
+
+// Back to the theme's stage map (the header's back arrow, the end card's
+// back): the boss dropped, nothing recorded that was not already (a win
+// or a loss is recorded as it happens; the gears earned stay).
+function leaveBoss() {
+    setState({ screen: 'stages', boss: null });
+}
+
+function onBossBack() {
+    if (state.screen === 'boss') leaveBoss();
+}
+
+// The end card's play again: the same boss again, a new deck.
+function onBossAgain() {
+    const b = state.boss;
+    if (state.screen !== 'boss' || !b || !b.card) return;
+    const theme = state.themes.find((t) => t.name === b.theme);
+    if (theme) startBoss(theme, b.stage);
+}
+
+// The round end's thief button: the boss of the stage the round just
+// cleared.
+function onRoundBoss() {
+    if (state.screen !== 'round-end') return;
+    const theme = state.themes.find((t) => t.name === state.theme);
+    if (theme) startBoss(theme, state.round.stage);
 }
 
 // --- Header: the mute toggle (BACKLOG B-108, B-108b) ---
@@ -878,6 +1187,8 @@ function onGalleryBack() {
 
 // The taps the boost tray hands back (boosttray.js).
 const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };
+// The boss screen's card taps (bossview.js).
+const BOSS_TAPS = { onCard: onBossCard };
 
 subscribe(renderScreens);
 subscribe((s) => renderStart(s, START));   // after renderScreens: focuses the name field once it shows
@@ -897,6 +1208,9 @@ subscribe(renderLocks);       // after the theme cards and the round-end render,
 subscribe(renderGears);       // before celebrate.js, which flies cogs to the console's counter
 subscribe(renderGallery);
 subscribe((s) => renderStageMap(s, onStation));
+subscribe((s) => renderBoss(s, BOSS_TAPS));   // the boss screen (BACKLOG B-232)
+subscribe(renderBossFx);      // after the boss render: its beats' motion
+subscribe(armEscape);         // the thief reaching the vent
 subscribe(renderCelebrate);   // after the card and round-end renders: keys off their DOM
 subscribe(renderMute);
 subscribe(renderSound);       // the robot's clips (character.js's table) and the mute
@@ -905,6 +1219,10 @@ subscribe(renderSound);       // the robot's clips (character.js's table) and th
 // analyser samples of the clip he is saying, or null, to character.js.
 // Render input only, never state.
 gsap.ticker.add(() => renderTalk(voiceWave()));
+// Every frame on the boss screen, the thief's place from his clock (BACKLOG
+// B-232: a pure function of time, boss.js thiefAt; never a setState), the
+// lamps behind him and his ticking (audio.js bossTick).
+gsap.ticker.add(() => renderBossClock(state, performance.now(), bossTick));
 
 $('check-btn').addEventListener('click', onDome);
 $('reset-btn').addEventListener('click', onLever);
@@ -922,6 +1240,9 @@ $('namer-back-btn').addEventListener('click', onNameBack);
 $('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onNameOk(); } });
 $('play-back-btn').addEventListener('click', onPlayBack);
 $('console-gears').addEventListener('click', onBoost);
+$('boss-btn').addEventListener('click', onRoundBoss);
+$('boss-back-btn').addEventListener('click', onBossBack);
+$('boss-again-btn').addEventListener('click', onBossAgain);
 $('boost-scrim').addEventListener('click', onBoostClose);
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
@@ -962,7 +1283,10 @@ window.addEventListener('resize', () => {
 // The picture's life (picture.js, BACKLOG B-221) and its win (B-222,
 // B-228) stop while the page is hidden; the life starts again when it
 // shows.
-document.addEventListener('visibilitychange', () => renderPicture(state, winSound));
+document.addEventListener('visibilitychange', () => {
+    renderPicture(state, winSound);
+    onBossAway(document.hidden);
+});
 
 // Dev hook for tools/shot.mjs --eval only: lets a screenshot script drive
 // screens through setState. Nothing in the game reads window.flip.
