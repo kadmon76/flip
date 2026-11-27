@@ -666,6 +666,19 @@ Decided by the human on 2026-11-07: every stage ends with a boss that plays diff
   - Docs: PROGRESSION.md (a "Bosses" section: the gate, the deck, the table, win and lose); CLAUDE.md (the new modules in the architecture list, `bosses`/`bossLosses` in progress.js's bullet, the boss screen, "Product rules"); DESIGN.md (the boss screen, the thief); CHARACTER.md (the robot during a boss: ducks at the entrance, cheers on pairs, says only the words).
   - Screenshots at 360x740: the entrance (thief pointing along the lit track), mid-boss with the thief half way (red lamps behind him), the swap on the table, a fake caught (red letters and the bubble), the ending's fakes being fixed, the win card, the lose card, the stage map with a boss station and a beaten one, the round end with the thief button. Checklist passes.
 
+### B-234 Boss: tap a flipped word card again to call it a fake
+- why: playing the boss, the human found that a kid who flips a word card first and sees it is misspelled ("brid") has to waste his second flip on it. A second tap on that first card says "this one is spelled wrong" (human, 2026-11-27, his design: no new button, so nothing on screen gives a fake away).
+- acceptance:
+  - **When it applies.** Only on the first of the two cards (one card up), only a word card (a real word card or a fake: they look the same), only on a stage whose boss deals fakes (`BOSS` `fakes` > 0: stages 3, 4, 5, long). The second card of a pair plays as today. A second tap on a picture card, on stages 1–2, or while a beat plays does nothing.
+  - **Accidental double taps.** A second tap that comes less than `RETAP_MS` (500 ms, a starting value the human tunes, logged in DECISIONS) after the card's flip is ignored, so a fast double-tap never costs a turn.
+  - **It really is a fake: caught.** The fake's wrong letters turn red, then it fixes itself (the ending's fix: wrong letters spin out, the right ones drop in teal), the robot says the right word (the word's own clip; the fake itself is never read), the card glows and fires a small zap that knocks the thief back (`KNOCK.by`, the small one), +1 gear (`BOSS_GEARS.catch`, a starting value). Then the card leaves the table (into `gone`) and the kid flips again. The thief stops during the beat, as for a pair. A caught fake is not shown again at the end (only the fakes still on the table are). It does not change the pair streak (`row`).
+  - **It was spelled right: the second flip is given up.** It plays exactly like a miss (`bossMiss`): he laughs, the card turns back, he swaps two face-down cards. This keeps a free peek from paying off.
+  - **Pure parts in boss.js, tested through `node`:** `canDecline(boss, id, now)` (the rules above: one card up, a word or fake card, the stage has fakes, not within `RETAP_MS` of its flip, not busy) and `declineOf(card)` (`'caught'` for a fake, `'forfeit'` for a real word card); the caught beat's numbers in `BEAT` (reuse the ending's `fix` timings where they fit). The flip's time is kept in `state.boss` (state.js names the field), never on the DOM.
+  - **Wiring.** main.js `onBossCard`: a tap on the card already up goes through `canDecline`/`declineOf` to a new `bossCatch` beat or to `bossMiss`; bossview.js and bossfx.js play the caught beat (reuse the ending's fix motion and the small zap); audio.js plays its sounds (the fix's and the zap's, made in code; the mute stops them); character.js: the robot cheers as for a pair (`bossPair`), no new lines.
+  - Untouched: the deck, the table's numbers, a fake flipped second with its own picture (the bubble and the push, as today), win and lose, stars, the gate.
+  - Docs: PROGRESSION.md "Bosses" "Play" gets the second-tap rule; CLAUDE.md's boss bullet names `canDecline`, `declineOf`, `RETAP_MS`, `bossCatch`.
+  - Screenshots at 360x740: a fake turned up first, the caught beat (red letters, then fixed and the zap), the table after it left; a real word card tapped twice (the miss and the swap). Checklist passes.
+
 ## M8 — More than one game
 Decided by the human on 2026-11-26/27: even with the bosses the game feels repetitive, so a round can play one of several games, all inside Flip, on the same words, bulbs, gears, missed words, stage progress, bosses and machine parts. One game for the whole round; a round's game is random among the games the player has unlocked. Spelling games count toward clearing a stage; recognition games earn gears but don't. Bosses stay as they are, and each stage's boss still wins its machine part, whichever games the stage's rounds played.
 
@@ -695,6 +708,7 @@ A game whose words are the solved words only plays when the player has enough of
   - Screenshots at 360x740: `play-empty.png`, `play-long.png` and `round-end.png`, the same as before this item. Checklist passes.
 
 ## Later / not now
+- Boss: show the kid once that a second tap calls a fake (the robot's ghost mitten taps a word card twice the first time a boss deals fakes); B-234 ships without it.
 - Robot says the chunks of a broken word ("heli… copter!") while the brass joint glows; needs the new voice clips (B-213 ships without it).
 - Picture peek: once the data carries `face`, the face peeks every 3–7s (B-221, B-222 leave it out; a win's second frame is B-228's, from the wins file's `frame`, e.g. the bat).
 - Slow say boost (PROGRESSION.md): the robot says the word in parts; needs the new voice clips.
