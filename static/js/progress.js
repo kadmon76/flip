@@ -1,6 +1,8 @@
 // progress.js — how far the kid got in each theme (BACKLOG B-216,
-// PROGRESSION.md "Stages"): the words checked correct at least once
-// (`solved`), the stages cleared (`cleared`) and, since BACKLOG B-232
+// PROGRESSION.md "Stages"): the words checked correct at least once in
+// a spelling game (`solved`; a recognition game's results, `counts:
+// false`, are not solved, BACKLOG B-233), the stages cleared (`cleared`)
+// and, since BACKLOG B-232
 // (PROGRESSION.md "Bosses"), the stages whose boss (the thief bot) is
 // beaten (`bosses`) and the bosses lost per stage since (`bossLosses`),
 // per theme, so the stage map shows which stages are open (stations,
@@ -176,10 +178,12 @@ export function currentStage(data, progress) {
 
 // A theme's progress after a finished round of `stage` (pure):
 // `progress` is the theme's { solved, cleared } before it, `data` the
-// theme's data file, `results` the round's [{ word, correct }]
+// theme's data file, `results` the round's [{ word, correct, counts? }]
 // (state.round.results). Every word checked correct this round joins
 // `solved` (with the robot's help too; a word the robot revealed is not
-// correct, so it does not). `stage` joins `cleared` once every one of its
+// correct, so it does not), except a word of a recognition game
+// (`counts: false`, BACKLOG B-233, games.js resultOf): it is not solved,
+// so it cannot clear a stage. `stage` joins `cleared` once every one of its
 // words in `data` is solved; a stage with no word in `data` is never
 // cleared. A cleared stage stays cleared, also when the data later adds
 // words to it, and solved words stay solved; the bosses beaten and lost
@@ -191,7 +195,7 @@ export function afterRound(progress, data, stage, results) {
     const before = clean(progress) || empty();
     const solved = [...before.solved];
     for (const r of Array.isArray(results) ? results : []) {
-        if (r && r.correct === true && typeof r.word === 'string' && r.word !== '' && !solved.includes(r.word)) {
+        if (r && r.correct === true && r.counts !== false && typeof r.word === 'string' && r.word !== '' && !solved.includes(r.word)) {
             solved.push(r.word);
         }
     }

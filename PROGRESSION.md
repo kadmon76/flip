@@ -112,6 +112,44 @@ cards train telling a right spelling from an almost-right one.
   is offered. After 2 losses on the same boss he walks 10% slower, 10% more
   per further loss (at most 30% slower); beating him resets it.
 
+## Games
+A round plays one game for all of its words (B-233, M8; human
+2026-11-26/27), on the same words, bulbs, gears, missed words, stage
+progress and bosses. The games and the stage each opens with (`games.js`
+`GAMES`; only classic is built, each game joins the table when it is
+built, and build order is not unlock order):
+
+| Opens with stage | Game | Kind | Counts toward clearing | Words |
+| --- | --- | --- | --- | --- |
+| 1 | classic (today's) | spelling | yes | the round's |
+| 2 | runner, gates mode | recognition | no | the round's |
+| 3 | screw puzzle | spelling | yes | the round's |
+| 4 | sorting bins | recognition | no | solved words, across themes |
+| 5 | runner, letters mode | spelling | yes | the round's, solved words first |
+| long | merge sorting | recognition | no | solved words, across themes |
+
+- **Unlocking.** A game is unlocked once its stage is open (cleared, or
+  the current stage) in any theme, so it unlocks once, not per theme.
+- **The pick.** As a round starts: a recognition game with chance
+  `RECOGNITION_SHARE` (0.25), one of the unlocked ones at random, but
+  never right after a recognition round (recognition rounds must not slow
+  the way to the next machine part); otherwise a spelling game: classic,
+  or with chance `OTHER_SHARE` (0.5) another unlocked spelling game at
+  random, never the same one as the round before (with only that one,
+  the round is classic). With only classic unlocked, every round is
+  classic. A game playing the solved words is left out while the player
+  has fewer than its `minWords` solved words. The first word's tutorial
+  is always classic. The last round's game is kept per player
+  (`lastgame.js`), so the rules hold across reloads. Both shares are
+  starting values to tune in play.
+- **What counts.** Every game writes a word's result the same way and
+  ends its round the same way. A recognition game's results do not count:
+  its words are not solved (so they cannot clear a stage) and earn no
+  sticker, and a missed word it gets right stays missed (recognizing a
+  word is not spelling it; it comes back in a spelling game). Its gears,
+  bulbs, stars and misses are as in any round. Bosses stay as they are,
+  whichever games a stage's rounds played.
+
 ## Repetition and stickers
 - **Missed words return** in the next rounds of their stage or a later
   one (`missed.js`; see "Rounds").

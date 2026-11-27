@@ -15,7 +15,10 @@
 // main.js records a round when it ends (the round-end screen): a word not
 // checked correct (revealed, or a word left without a result, which
 // onNext counts as wrong) goes to the end of the list, a word checked
-// correct comes out. A round left with the back button (B-201) keeps no
+// correct comes out, except in a recognition game (`counts: false`,
+// BACKLOG B-233, games.js resultOf): recognizing a word is not spelling
+// it, so a word on the list stays there, in its place, and comes back in
+// a spelling game. A round left with the back button (B-201) keeps no
 // results, so it records nothing.
 
 import { keyOf } from './players.js';
@@ -77,14 +80,17 @@ export function wordsFor(theme) {
 }
 
 // A theme's list after a round (pure): `results` is the round's
-// [{ word, correct }] (state.round.results). In round order, each word
-// comes out of the list, and a word not checked correct goes back in at
-// the end (the newest miss). Words the round did not play keep their
-// place. Returns a new array; `words` is not changed.
+// [{ word, correct, counts? }] (state.round.results). In round order, each
+// word comes out of the list, and a word not checked correct goes back in
+// at the end (the newest miss); a word checked correct in a recognition
+// game (`counts: false`, BACKLOG B-233) keeps its place, as words the
+// round did not play keep theirs. Returns a new array; `words` is not
+// changed.
 export function afterRound(words, results) {
     let list = Array.isArray(words) ? [...words] : [];
     for (const r of Array.isArray(results) ? results : []) {
         if (!r || typeof r.word !== 'string' || r.word === '') continue;
+        if (r.correct && r.counts === false) continue;
         list = list.filter((w) => w !== r.word);
         if (!r.correct) list.push(r.word);
     }

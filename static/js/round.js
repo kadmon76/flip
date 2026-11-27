@@ -26,7 +26,8 @@ export function shuffle(arr, rand = Math.random) {
 // The words of a round of `stage`: `size` names from `data` (a theme's
 // data file, { "cat": { image, audio, stage }, ... }), in random order
 // (BACKLOG B-216, PROGRESSION.md "Rounds"). `solved` is the theme's
-// solved words (progress.js, the words checked correct at least once).
+// solved words (progress.js, the words checked correct at least once in
+// a spelling game, BACKLOG B-233).
 // In this order, each group at random: the stage's words (the entries
 // whose `stage` is `stage`) not yet solved; then its solved words; then
 // the words of the theme's earlier stages, the nearest stage first (the
