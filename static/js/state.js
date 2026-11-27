@@ -66,7 +66,10 @@ export const state = {
     // theme's earlier stages after three not clean in a row (BACKLOG
     // B-220, round.js swapForStruggle).
     words: [],
-    // results[i] = { word, correct, clean, boosted?, newSticker? }: clean
+    // results[i] = { word, correct, clean, boosted?, newSticker?, counts? }:
+    // written by main.js settle for every game (BACKLOG B-233); counts:
+    // false on a word of a recognition game (games.js resultOf: not
+    // solved, no sticker, kept on the missed list); clean
     // (BACKLOG B-218, gears.js isClean) when checked correct on the first
     // check with no boost; boosted (BACKLOG B-219, every checked word) when
     // the word took a boost (boost.js isBoosted); newSticker on a correct
@@ -89,8 +92,12 @@ export const state = {
     // started with, 3 and the player's spare bulbs (up to 5), as many as
     // the TV shows; spareEarned (bulbs.js record, at the round end): a
     // perfect round brought a new spare bulb (main.js shows it beside the
-    // stars, celebrate.js pops it in).
-    round: { index: 0, size: 5, stage: null, bulbs: 3, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },
+    // stars, celebrate.js pops it in). game (BACKLOG B-233): the game the
+    // round plays, a games.js GAMES id picked by main.js startRound
+    // (games.js pickGame; the tutorial word's round is classic) and fixed
+    // for the round; main.js PLAYS and character.js GAME_MOMENTS play it;
+    // null while no round is in play.
+    round: { index: 0, size: 5, stage: null, bulbs: 3, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false, game: null },
     // A round is being set up: true from a tap that starts one (a station
     // on the stage map, play again) until main.js startRound has the theme's data file
     // and shows the round, or finds the kid has left the screen the tap came

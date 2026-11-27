@@ -3169,7 +3169,7 @@ class PlayBackTests(TestCase):
         leave = self.function('leaveRound')
         self.assertLess(leave.index('stopWord();'), leave.index('setState({'))
         self.assertLess(leave.index('...patch,'), leave.index('data: null,'))
-        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },',
+        for decl in ('data: null,', 'words: [],', 'results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false, game: null },',
                      'current: { word: null,', 'speaking: false,', 'pressed: null,', 'idleBeat: null,'):
             self.assertIn(decl, leave, decl)
 
@@ -3289,7 +3289,7 @@ class StageTests(TestCase):
         self.assertNotRegex(state, r'\n    level:')
         self.assertNotRegex(state, r'\n    streak:')
         self.assertIn('\n    round: { index: 0, size: 5, stage: null, bulbs: 3, results: [], cleared: [], justCleared: false, keyEarned: false,'
-                      ' spareEarned: false },', state)
+                      ' spareEarned: false, game: null },', state)
         # lockedTaps stays (the robot's head-shake; B-219 adds to it)
         self.assertRegex(state, r'\n    lockedTaps: 0,')
 
@@ -3358,16 +3358,20 @@ class StageTests(TestCase):
         start = self.main_function('startRound')
         self.assertIn("import { stagesOf } from './stage.js';", (self.JS / 'main.js').read_text())
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false,'
-                      ' spareEarned: false },', start)
-        self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
+                      ' spareEarned: false, game },', start)
+        # each word starts through the round's game (BACKLOG B-233,
+        # main.js PLAYS: classic's is makeWord with the round's stage)
+        self.assertIn('current: playOf(game).word(words[0], stage),', start)
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
-        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', self.main_function('onNext'))
+        self.assertIn('current: playOf(round.game).word(words[nextIndex], state.round.stage),', self.main_function('onNext'))
+        self.assertIn('word: (entry, stage) => makeWord(entry, stage, newTileId),', self.code('main.js'))
         # nothing else writes a round's stage; leaving a round clears it
         main = self.code('main.js')
         self.assertEqual(len(re.findall(r'\bstage(: [^,}]+)?, bulbs(: [^,}]+)?, results:', main)), 2)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage: null, bulbs: BULBS, results: [], cleared: [], justCleared: false,'
-                      ' keyEarned: false, spareEarned: false },', self.main_function('leaveRound'))
-        for name in ('onCheck', 'onNext'):
+                      ' keyEarned: false, spareEarned: false, game: null },', self.main_function('leaveRound'))
+        # onCheck's results go through the game slot's settle (BACKLOG B-233)
+        for name in ('settle', 'onNext'):
             self.assertIn('...round', self.main_function(name), name)
 
     def test_a_round_being_started_takes_no_second_tap(self):
@@ -3759,11 +3763,13 @@ class StageStartTests(TestCase):
         self.assertNotIn('shuffle', main)
         start = self.function('startRound')
         self.assertIn('pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)', start)
-        self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
+        # through the round's game (BACKLOG B-233, main.js PLAYS)
+        self.assertIn('current: playOf(game).word(words[0], stage),', start)
         self.assertIn('round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false,'
-                      ' spareEarned: false },', start)
+                      ' spareEarned: false, game },', start)
         nxt = self.function('onNext')
-        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', nxt)
+        self.assertIn('current: playOf(round.game).word(words[nextIndex], state.round.stage),', nxt)
+        self.assertIn('word: (entry, stage) => makeWord(entry, stage, newTileId),', self.code('main.js'))
 
     def test_the_reveal_keeps_a_locked_letter_locked(self):
         # the reveal moved to drag.js with B-207 (a pure transition)
@@ -4523,7 +4529,9 @@ class HintTests(TestCase):
         # the result is the letters against the word, the sticker added
         # before the misses are looked at
         self.assertIn("const correct = answer === current.word;", check)
-        self.assertLess(check.index('addSticker('), check.index("} else if (kind === 'reveal') {"))
+        # (through the game slot's settle since BACKLOG B-233)
+        self.assertLess(check.index('settle('), check.index("} else if (kind === 'reveal') {"))
+        self.assertIn('addSticker(', self.function('settle', 'main.js'))
         # the reveal keeps a right slot's object (so the hint letter stays
         # locked and marked through it); drag.js since B-207
         self.assertIn('return p && p.letter === ch ? { ...p } : null;', self.function('revealed', 'drag.js'))
@@ -5223,9 +5231,11 @@ class MissedWordsTests(TestCase):
         # runs onCheck through node)
         main = self.code('main.js')
         self.assertEqual(main.count('addSticker('), 1)
-        check = self.function('onCheck')
-        branch = check[check.index('if (correct) {'):check.index("} else if (kind === 'reveal') {")]
-        self.assertIn('results[round.index].newSticker = clean && addSticker(state.theme, current.word);', branch)
+        # through the game slot's settle (BACKLOG B-233), on a correct word
+        # only; a recognition game's word (counts: false) earns none
+        settle = self.function('settle')
+        self.assertLess(settle.index('if (!result.correct) return'), settle.index('addSticker('))
+        self.assertIn("result.newSticker = result.clean && result.counts !== false && addSticker(state.theme, result.word);", settle)
         self.assertNotIn('missed', self.code('stickers.js'))
 
 
@@ -5899,7 +5909,8 @@ class LongWordTests(TestCase):
     def test_main_reads_the_break_from_the_data(self):
         start = self.function('startRound', 'main.js')
         self.assertIn('.map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));', start)
-        self.assertIn('current: makeWord(words[0], stage, newTileId),', start)
+        self.assertIn('current: playOf(game).word(words[0], stage),', start)
+        self.assertIn('word: (entry, stage) => makeWord(entry, stage, newTileId),', self.code('main.js'))
         self.assertIn('        break: null,', (self.JS / 'state.js').read_text())
         self.assertIn('break: brk,', self.function('makeWord', 'round.js'))
 
@@ -7588,6 +7599,7 @@ class StruggleSwapTests(TestCase):
         data = self.full()
         res = self.run_node(
             f"const data = {json.dumps(data)}; const solved = {json.dumps(self.FULL[1] + self.FULL[2])};"
+            f"const {{ resultOf }} = await import('{(self.JS / 'games.js').as_uri()}');"
             "const play = (stage, w, results) => {"
             "  const state = { theme: 'animals', data, words: entries(data, w), gears: 0,"
             "    round: { index: 2, size: 5, stage, results }, current: { word: w[2], status: 'revealed' } };"
@@ -7600,6 +7612,7 @@ class StruggleSwapTests(TestCase):
             "  const addGears = () => 0; const GEARS = { round: 2 }; const newTileId = () => 't';"
             "  state.lives = 3; const roundOver = (b, i, n) => !(b > 0) || i + 1 >= n; const recordBulbs = () => ({ spares: 0, earned: false });"
             "  const makeWord = (e, st) => ({ word: e.word, stage: st, status: 'playing' });"
+            "  const playOf = () => ({ word: (e, st) => makeWord(e, st, newTileId) });"
             f"  {nxt}"
             "  onNext();"
             "  return { sets, asked, same: state.words === before, words: names(state.words), current: state.current,"
@@ -7637,7 +7650,7 @@ class StruggleSwapTests(TestCase):
         self.assertLess(other, call)
         branch = nxt[call:]
         self.assertLess(branch.index('setState({'), branch.index('            words,\n'))
-        self.assertIn('current: makeWord(words[nextIndex], state.round.stage, newTileId),', branch)
+        self.assertIn('current: playOf(round.game).word(words[nextIndex], state.round.stage),', branch)
         for name in ('startRound', 'onCheck', 'onPlayAgain', 'onPlayBack', 'leaveRound'):
             self.assertNotIn('swapForStruggle', self.function(name), name)
         # the kid isn't told: no other module knows of it (no moment, sound,
@@ -8175,6 +8188,10 @@ class StageMapTests(TestCase):
             "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; const needsTutorial = () => false;"
             "const loadSpares = () => 0; const startBulbs = (n) => 3 + n;"
             "const loadWins = () => Promise.resolve(null);"
+            # the round's game (BACKLOG B-233): games.js, the last game stood in
+            f"const {{ unlocked: unlockedGames, playable, pickGame, CLASSIC }} = await import('{(self.JS / 'games.js').as_uri()}');"
+            "const loadLastGame = () => null; const recordGame = () => {};"
+            "const playOf = () => ({ word: (e, st) => makeWord(e, st, newTileId) });"
             + start +
             "const go = async (from, theme, leave, stage = 1) => {"
             " Object.assign(state, { screen: from, theme, startingRound: false, round: null });"
@@ -8409,6 +8426,8 @@ class GearsTests(TestCase):
         const addGears = (n) => { calls.push(['gears', n]); stored += n; return stored; };
         const { isClean, wordGears, GEARS } = G;
         const { isBoosted } = await import('BOOST');
+        // the game slot's result (BACKLOG B-233): main.js settle, games.js resultOf
+        const { resultOf } = await import('GAMESJS');
         const checkedWrong = (c) => ({ ...c, status: 'wrong' });
         const giveHint = (c) => c; const afterHint = (c) => c; const revealed = (c) => ({ ...c, status: 'revealed' });
         const armNudge = () => {}; const tutorialSeen = () => {};
@@ -8424,7 +8443,8 @@ class GearsTests(TestCase):
 
     def run_check(self, body):
         return self.run_node(self.CHECK.replace('BOOST', (self.JS / 'boost.js').as_uri()).replace('BULBS', (self.JS / 'bulbs.js').as_uri())
-                             + self.function('onCheck') + body)
+                             .replace('GAMESJS', (self.JS / 'games.js').as_uri())
+                             + self.function('settle') + self.function('onCheck') + body)
 
     def test_a_clean_word_earns_its_sticker_and_two_gears_at_its_check(self):
         res = self.run_check(
@@ -8464,6 +8484,8 @@ class GearsTests(TestCase):
             "const recordMissed = () => {}; const recordProgress = () => ({ progress: { cleared: [] }, justCleared: false }); const recordKeys = () => ({ ring: {}, earned: false });"
             "const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};"
             "const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't';"
+            "const playOf = () => ({ word: (e, st) => makeWord(e, st, newTileId) });"
+            f"const {{ resultOf }} = await import('{(self.JS / 'games.js').as_uri()}');"
             "const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });"
             f"const {{ roundOver }} = await import('{(self.JS / 'bulbs.js').as_uri()}'); state.lives = 3;"
             "const recordBulbs = () => ({ spares: 0, earned: false });"
@@ -8493,7 +8515,7 @@ class GearsTests(TestCase):
     def test_state_keeps_the_count(self):
         state = (self.JS / 'state.js').read_text()
         self.assertIn('\n    gears: 0,', state)
-        self.assertIn('results[i] = { word, correct, clean, boosted?, newSticker? }', state)
+        self.assertIn('results[i] = { word, correct, clean, boosted?, newSticker?, counts? }', state)
 
     # --- cogs.js: the counters, with a stand-in DOM ---
 
@@ -9087,9 +9109,12 @@ class BoostTests(TestCase):
         main = self.code('main.js')
         self.assertIn("import { boostOn, offered, pickable, canAfford, giveLetter, cleanUp, isBoosted, COSTS } from './boost.js';", main)
         self.assertIn("import { renderBoost } from './boosttray.js';", main)
-        self.assertIn("$('console-gears').addEventListener('click', onBoost);", main)
-        self.assertIn("$('boost-scrim').addEventListener('click', onBoostClose);", main)
-        self.assertIn('const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };', main)
+        # through the round's game (BACKLOG B-233, main.js tap and PLAYS)
+        self.assertIn("$('console-gears').addEventListener('click', () => tap('boost'));", main)
+        self.assertIn("$('boost-scrim').addEventListener('click', () => tap('boostClose'));", main)
+        self.assertIn("const BOOST_TAPS = { onPick: (kind) => tap('boostPick', kind), onSlot: (index) => tap('boostSlot', index) };", main)
+        for line in ('boost: onBoost,', 'boostPick: onBoostPick,', 'boostSlot: onBoostSlot,', 'boostClose: onBoostClose,'):
+            self.assertIn(line, main[main.index('const PLAYS = {'):main.index('\n};\n', main.index('const PLAYS = {'))], line)
         # the tray is placed after the card is drawn and before feedback.js
         # pops it open
         card = main.index('subscribe(renderCard);')
@@ -9101,7 +9126,7 @@ class BoostTests(TestCase):
         self.assertIn('const boosted = isBoosted(current);', check)
         # the word's own wrong checks (BACKLOG B-231: the bulbs are the round's)
         self.assertIn('const clean = isClean(correct, misses, boosted);', check)
-        self.assertIn('results[round.index] = { word: current.word, correct, clean, boosted };', check)
+        self.assertIn('const settled = settle({ word: current.word, correct, clean, boosted });', check)
         # the tray closes with a new word, a new round and leaving the round
         for name in ('startRound', 'onNext', 'leaveRound'):
             self.assertIn('boostMenu: null,', self.function(name), name)
@@ -13918,7 +13943,9 @@ class RoundBulbsTests(TestCase):
     """
 
     def run_check(self, body):
-        return self.run_node(self.CHECK + self.function('onCheck') + body)
+        # the game slot's result (BACKLOG B-233): main.js settle, games.js resultOf
+        games = f"const {{ resultOf }} = await import('{(self.JS / 'games.js').as_uri()}');"
+        return self.run_node(self.CHECK + games + self.function('settle') + self.function('onCheck') + body)
 
     def test_each_wrong_check_turns_a_round_bulb_off_and_the_words_own_rules_stay(self):
         res = self.run_check(
@@ -13955,12 +13982,13 @@ class RoundBulbsTests(TestCase):
         const loadProgress = () => ({}); const stopWord = () => {}; const armIdle = () => {};
         const addGears = (n) => { calls.push(['gears', n]); return n; }; const GEARS = { round: 2 };
         const makeWord = (w) => ({ word: w.word, status: 'playing' }); const newTileId = () => 't';
+        const playOf = () => ({ word: (e, st) => makeWord(e, st, newTileId) });
         const swapForStruggle = (words) => words; const progressFor = () => ({ solved: [], cleared: [] });
     """
 
     def test_the_last_bulb_ends_the_round_after_its_word(self):
         res = self.run_node(
-            self.NEXT + self.function('onNext') +
+            self.NEXT + f"const {{ resultOf }} = await import('{(self.JS / 'games.js').as_uri()}');" + self.function('onNext') +
             "onNext({ pressed: null });"
             "const ended = [state.screen, state.round.results.map((r) => r.word), state.round.spareEarned, calls.slice()];"
             # bulbs left: the next word, the bulbs not refilled
@@ -14905,3 +14933,426 @@ class BossTests(TestCase):
         during = character[character.index('## During a boss (BACKLOG B-232)'):character.index('## Moment map')]
         for phrase in ('his voice there is only the words', '| bossIn |', 'he ducks behind the console', '| bossPair | a pair | cheers'):
             self.assertIn(phrase, during, phrase)
+
+
+class GamesTests(TestCase):
+    """The game slot (BACKLOG B-233, PROGRESSION.md "Games"): games.js's
+    pure part (the table, unlocked, playable, pickGame with its two shares,
+    resultOf), lastgame.js's store (`flip.lastgame.v1`, per player),
+    progress.js and missed.js with a recognition game's `counts: false`
+    results, main.js's slot (startRound's game, settle, onNext, PLAYS and
+    the taps) and character.js's moments per game, all through node; the
+    wiring checked in the source."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    JS = ROOT / 'static' / 'js'
+
+    # A stand-in table with M8's kinds of games (only classic is built):
+    # spelling games and recognition games, one playing the solved words.
+    TABLE = """
+        const TABLE = [
+            { id: 'classic', unlockStage: 1, spelling: true, words: 'round' },
+            { id: 'gates', unlockStage: 2, spelling: false, words: 'round' },
+            { id: 'screws', unlockStage: 3, spelling: true, words: 'round' },
+            { id: 'bins', unlockStage: 4, spelling: false, words: 'solved', minWords: 20 },
+            { id: 'letters', unlockStage: 5, spelling: true, words: 'round' },
+        ];
+        const ALL = TABLE.map((g) => g.id);
+        // a seeded random (mulberry32), so the runs are the same every time
+        const seeded = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        const never = () => { throw new Error('no draw expected'); };
+        const draws = (list) => { let i = 0; const r = () => list[i++]; r.count = () => i; return r; };
+        const STAGES = [1, 2, 3, 4, 5, 'long'];
+        const THEMES = [{ name: 'animals', stages: STAGES }, { name: 'food', stages: STAGES }];
+        const prog = (cleared = [], bosses = cleared, solved = []) => ({ solved, cleared, bosses, bossLosses: {} });
+    """
+
+    def run_node(self, body):
+        if shutil.which('node') is None:
+            self.skipTest('node not installed')
+        script = (
+            "const out = (v) => console.log(JSON.stringify(v));"
+            "const store = new Map(); let writes = 0; const THROW = { get: false, set: false };"
+            "globalThis.localStorage = { getItem: (k) => { if (THROW.get) throw new Error('blocked'); return store.has(k) ? store.get(k) : null; },"
+            " setItem: (k, v) => { if (THROW.set) throw new Error('quota'); writes++; store.set(k, String(v)); }, removeItem: (k) => store.delete(k) };"
+            f"const G = await import('{(self.JS / 'games.js').as_uri()}');"
+            f"const L = await import('{(self.JS / 'lastgame.js').as_uri()}');"
+            f"const P = await import('{(self.JS / 'players.js').as_uri()}');"
+            + self.TABLE + body
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def code(self, name):
+        return re.sub(r'/\*.*?\*/|//[^\n]*', '', (self.JS / name).read_text(), flags=re.S)
+
+    def function(self, name, file='main.js'):
+        js = self.code(file)
+        start = re.search(rf'\n(export )?(async )?function {name}\(', js).start()
+        return js[start:js.index('\n}\n', start) + 2]
+
+    # --- games.js: the table ---
+
+    def test_the_table_has_only_classic_and_the_shares_are_the_starting_values(self):
+        res = self.run_node("out([G.GAMES, G.CLASSIC, G.RECOGNITION_SHARE, G.OTHER_SHARE,"
+                            " G.gameOf('classic'), G.gameOf('nope'), G.isRecognition('classic'), G.isRecognition(null),"
+                            " G.isRecognition('gates', TABLE), G.isRecognition('screws', TABLE)]);")
+        self.assertEqual(res, [[{'id': 'classic', 'unlockStage': 1, 'spelling': True, 'words': 'round'}], 'classic', 0.25, 0.5,
+                               {'id': 'classic', 'unlockStage': 1, 'spelling': True, 'words': 'round'}, None, False, False, True, False])
+
+    # --- games.js: the pick ---
+
+    def test_with_only_classic_unlocked_it_is_always_classic_and_nothing_is_drawn(self):
+        res = self.run_node(
+            "out([G.pickGame(['classic'], null, never), G.pickGame(['classic'], 'classic', never), G.pickGame([], 'gates', never, TABLE),"
+            " G.pickGame(null, null, never), G.pickGame(['classic', 'nope'], null, never, TABLE),"
+            # the real table: whatever the progress, only classic today
+            " G.pickGame(G.playable(G.unlocked({ animals: prog([1, 2, 3, 4, 5]) }, THEMES), {}), null, never),"
+            " Array.from({ length: 50 }, () => G.pickGame(['classic'])).every((g) => g === 'classic')]);")
+        self.assertEqual(res, ['classic'] * 6 + [True])
+
+    def test_both_shares_over_seeded_runs(self):
+        res = self.run_node(
+            "const share = (last, seed) => { const r = seeded(seed); const n = {}; const N = 20000;"
+            " for (let i = 0; i < N; i++) { const g = G.pickGame(ALL, last, r, TABLE); n[g] = (n[g] || 0) + 1; }"
+            " return Object.fromEntries(ALL.map((id) => [id, (n[id] || 0) / N])); };"
+            "out([share('classic', 1), share(null, 2), share('screws', 3), share('gates', 4), share('bins', 5)]);")
+        after_classic, after_none, after_screws, after_gates, after_bins = res
+
+        def near(got, want, label):
+            for id_, p in want.items():
+                self.assertAlmostEqual(got[id_], p, delta=0.015, msg=f'{label} {id_}: {got}')
+        # a recognition game 1 in 4 (RECOGNITION_SHARE), each of them alike;
+        # else a spelling game: classic, or 1 in 2 (OTHER_SHARE) another one
+        want = {'classic': 0.375, 'screws': 0.1875, 'letters': 0.1875, 'gates': 0.125, 'bins': 0.125}
+        near(after_classic, want, 'after classic')
+        near(after_none, want, 'first round')
+        # never the same game other than classic twice: after screws, the
+        # other spelling game takes its share
+        near(after_screws, {'classic': 0.375, 'screws': 0, 'letters': 0.375, 'gates': 0.125, 'bins': 0.125}, 'after screws')
+        # never two recognition rounds in a row: after one, a spelling game
+        for label, got in (('after gates', after_gates), ('after bins', after_bins)):
+            near(got, {'classic': 0.5, 'screws': 0.25, 'letters': 0.25, 'gates': 0, 'bins': 0}, label)
+
+    def test_never_two_recognition_rounds_in_a_row_nor_the_same_other_game_twice(self):
+        res = self.run_node(
+            "const r = seeded(7); let last = null; const seq = [];"
+            "for (let i = 0; i < 5000; i++) { last = G.pickGame(ALL, last, r, TABLE); seq.push(last); }"
+            "const rec = (g) => G.isRecognition(g, TABLE);"
+            "const pairs = seq.slice(1).map((g, i) => [seq[i], g]);"
+            "out([pairs.filter(([a, b]) => rec(a) && rec(b)).length,"
+            " pairs.filter(([a, b]) => a === b && a !== 'classic').length,"
+            " pairs.filter(([a, b]) => a === 'classic' && b === 'classic').length > 0,"
+            # over many rounds: 1 in 4 of the rounds after a spelling round, so 1 in 5 in all
+            " seq.filter(rec).length / seq.length,"
+            # step by step, with the draws given
+            " G.pickGame(['classic', 'screws'], 'screws', never, TABLE), G.pickGame(['classic', 'screws'], 'classic', () => 0, TABLE),"
+            " G.pickGame(['classic', 'gates'], 'gates', never, TABLE), G.pickGame(['classic', 'gates'], 'classic', () => 0, TABLE),"
+            " (() => { const d = draws([0.25]); return [G.pickGame(['classic', 'gates'], 'classic', d, TABLE), d.count()]; })(),"
+            " (() => { const d = draws([0.3, 0.1]); return [G.pickGame(['classic', 'gates', 'screws'], 'classic', d, TABLE), d.count()]; })(),"
+            " (() => { const d = draws([0.3, 0.5]); return [G.pickGame(['classic', 'gates', 'screws'], 'classic', d, TABLE), d.count()]; })(),"
+            " (() => { const d = draws([0.2]); return [G.pickGame(['gates', 'bins'], null, d, TABLE), d.count()]; })()]);")
+        two_rec, same_other, classic_twice, rec_share, *steps = res
+        self.assertEqual(two_rec, 0)
+        self.assertEqual(same_other, 0)
+        self.assertTrue(classic_twice)                      # classic may come again and again
+        self.assertAlmostEqual(rec_share, 0.2, delta=0.02)
+        self.assertEqual(steps, ['classic', 'screws', 'classic', 'gates', ['classic', 1], ['screws', 2], ['classic', 2], ['bins', 1]])
+
+    # --- games.js: unlocked and playable ---
+
+    def test_a_game_unlocks_once_its_stage_is_open_in_any_theme(self):
+        res = self.run_node(
+            "const u = (progress, themes = THEMES) => G.unlocked(progress, themes, TABLE);"
+            "out([u({}), u(null), u({ animals: prog([1, 2, 3]) }, []), u({}, [null, { name: 3 }, { name: 'animals' }]),"
+            # stage 1 cleared, its boss not beaten: stage 2 is not open yet (the boss guards it)
+            " u({ animals: prog([1], []) }),"
+            # its boss beaten: stage 2 opens, and with it the game of stage 2
+            " u({ animals: prog([1]) }),"
+            # a save from before the bosses counts its cleared stages' bosses as beaten
+            " u({ animals: { solved: [], cleared: [1] } }),"
+            # across themes: food's stage 3 is enough, animals' progress or not
+            " u({ animals: {}, food: prog([1, 2]) }), u({ animals: prog([1, 2]), food: {} }),"
+            # every stage up to 5 open (5 the current one): every game
+            " u({ food: prog([1, 2, 3, 4]) }),"
+            # the real table: classic only, whatever the progress
+            " G.unlocked({ animals: prog([1, 2, 3, 4, 5, 'long']) }, THEMES)]);")
+        self.assertEqual(res, [
+            ['classic'], ['classic'], ['classic'], ['classic'],
+            ['classic'],
+            ['classic', 'gates'],
+            ['classic', 'gates'],
+            ['classic', 'gates', 'screws'], ['classic', 'gates', 'screws'],
+            ['classic', 'gates', 'screws', 'bins', 'letters'],
+            ['classic'],
+        ])
+
+    def test_a_solved_game_is_left_out_below_its_min_words(self):
+        res = self.run_node(
+            "const words = (n, p = 'w') => Array.from({ length: n }, (_, i) => p + i);"
+            "const pl = (progress) => G.playable(ALL, progress, TABLE);"
+            "out([pl({}), pl({ animals: prog([], [], words(10)), food: prog([], [], words(9, 'f')) }),"
+            " pl({ animals: prog([], [], words(10)), food: prog([], [], words(10, 'f')) }),"
+            # a theme's word counts once
+            " pl({ animals: prog([], [], [...words(19), 'w0']) }),"
+            # a 'solved' game with no minWords never plays; unknown ids are left out
+            " G.playable(['classic', 'bins', 'nope'], { animals: prog([], [], words(99)) },"
+            "   [TABLE[0], { id: 'bins', unlockStage: 4, spelling: false, words: 'solved' }]),"
+            # and the pick never draws it while it is left out
+            " (() => { const r = seeded(3); const ok = G.playable(['classic', 'bins'], {}, TABLE);"
+            "   return Array.from({ length: 500 }, () => G.pickGame(ok, null, r, TABLE)).includes('bins'); })()]);")
+        no_words = [i for i in ['classic', 'gates', 'screws', 'letters']]
+        self.assertEqual(res, [no_words, no_words, ['classic', 'gates', 'screws', 'bins', 'letters'], no_words, ['classic'], False])
+
+    # --- games.js: the result ---
+
+    def test_a_recognition_games_result_does_not_count(self):
+        res = self.run_node(
+            "const f = { word: 'cat', correct: true, clean: true, boosted: false };"
+            "const a = G.resultOf('classic', f); const b = G.resultOf('gates', f, TABLE); const c = G.resultOf('screws', f, TABLE);"
+            "const d = G.resultOf(null, f); const e = G.resultOf('gates', f);"
+            "out([a, b, c, d, e, a !== f, f]);")
+        f = {'word': 'cat', 'correct': True, 'clean': True, 'boosted': False}
+        self.assertEqual(res, [f, {**f, 'counts': False}, f, f, f, True, f])
+
+    def test_games_js_is_pure(self):
+        code = self.code('games.js')
+        for word in ('document', 'window', 'localStorage', 'setState', 'state.', 'Math.random()'):
+            self.assertNotIn(word, code, word)
+        self.assertNotRegex(code, r'\n(let|var) ')
+        self.assertIn("import { stations } from './progress.js';", code)
+
+    # --- lastgame.js: the store ---
+
+    def test_the_last_game_is_kept_per_player_clean_on_read_and_written_only_on_change(self):
+        res = self.run_node(
+            "const none = [L.load(), writes];"
+            "L.record('classic'); const plain = [store.get('flip.lastgame.v1'), L.load(), writes];"
+            "P.add('fox', [], 'Noa'); const mine0 = L.load(); L.record('classic'); const w1 = writes;"
+            "L.record('classic'); const w2 = writes;"
+            "L.record('nope'); L.record(3); L.record(null); L.record(''); const w3 = writes;"
+            "const keys = [...store.keys()].filter((k) => k.startsWith('flip.lastgame')).sort();"
+            "const reads = ['{bad', '\"nope\"', '3', 'null', '\"classic\"'].map((v) => (store.set('flip.lastgame.v1@p1', v), L.load()));"
+            "THROW.get = true; const blocked = L.load(); L.record('classic'); THROW.get = false;"
+            "store.delete('flip.lastgame.v1@p1'); THROW.set = true; L.record('classic'); const quota = L.load(); THROW.set = false;"
+            "out([none, plain, mine0, w2 - w1, w3 - w2, keys, reads, blocked, quota, L.KEY]);")
+        self.assertEqual(res, [[None, 0], ['"classic"', 'classic', 1], None, 0, 0,
+                               ['flip.lastgame.v1', 'flip.lastgame.v1@p1'], [None, None, None, None, 'classic'], None, None,
+                               'flip.lastgame.v1'])
+
+    def test_only_lastgame_js_names_its_key(self):
+        for path in sorted(self.JS.glob('*.js')):
+            text = path.read_text()
+            if path.name == 'lastgame.js':
+                self.assertIn("export const KEY = 'flip.lastgame.v1';", text)
+                self.assertIn('keyOf(KEY)', text)
+                self.assertNotIn('document', self.code('lastgame.js'))
+            else:
+                self.assertNotIn('flip.lastgame', text, path.name)
+
+    # --- progress.js and missed.js: a recognition game's results ---
+
+    def test_progress_does_not_solve_a_word_that_does_not_count(self):
+        res = self.run_node(
+            f"const PR = await import('{(self.JS / 'progress.js').as_uri()}');"
+            "const data = { cat: { stage: 1 }, dog: { stage: 1 }, pig: { stage: 2 } };"
+            "const rec = (word) => ({ word, correct: true, clean: true, counts: false });"
+            "const spell = (word) => ({ word, correct: true, clean: true });"
+            "const a = PR.afterRound(prog(), data, 1, [rec('cat'), spell('dog')]);"
+            "const b = PR.afterRound(a.progress, data, 1, [rec('cat')]);"
+            "const c = PR.afterRound(b.progress, data, 1, [spell('cat')]);"
+            # recorded: a round of recognition only writes nothing
+            "PR.record('animals', data, 1, [rec('cat'), rec('dog')]); const w = writes;"
+            "out([a, b, c, w, PR.load()]);")
+        a, b, c, w, stored = res
+        self.assertEqual(a, {'progress': {'solved': ['dog'], 'cleared': [], 'bosses': [], 'bossLosses': {}}, 'justCleared': False})
+        self.assertEqual(b, {'progress': {'solved': ['dog'], 'cleared': [], 'bosses': [], 'bossLosses': {}}, 'justCleared': False})
+        # the stage clears only once a spelling game solves its last word
+        self.assertEqual(c, {'progress': {'solved': ['dog', 'cat'], 'cleared': [1], 'bosses': [], 'bossLosses': {}}, 'justCleared': True})
+        self.assertEqual([w, stored], [0, {}])
+
+    def test_a_missed_word_right_in_a_recognition_game_stays_missed(self):
+        res = self.run_node(
+            f"const M = await import('{(self.JS / 'missed.js').as_uri()}');"
+            "out([M.afterRound(['cat', 'dog', 'hen'], [{ word: 'cat', correct: true, counts: false }, { word: 'pig', correct: false, counts: false },"
+            "   { word: 'dog', correct: true }, { word: 'fox', correct: true, counts: false }]),"
+            # a miss in a recognition game is a miss like any other
+            " M.afterRound(['cat', 'dog'], [{ word: 'cat', correct: false, counts: false }])]);")
+        self.assertEqual(res, [['cat', 'hen', 'pig'], ['dog', 'cat']])
+
+    # --- main.js: the slot ---
+
+    def test_settle_writes_every_games_result_and_a_recognition_word_earns_gears_but_no_sticker(self):
+        res = self.run_node(
+            f"const GR = await import('{(self.JS / 'gears.js').as_uri()}'); const {{ wordGears }} = GR;"
+            "const state = { theme: 'animals', gears: 0, round: null };"
+            "const calls = []; let stored = 0;"
+            "const addSticker = (t, w) => { calls.push(['sticker', w]); return true; };"
+            "const addGears = (n) => { calls.push(['gears', n]); stored += n; return stored; };"
+            "const resultOf = (g, f) => G.resultOf(g, f, TABLE);"
+            + self.function('settle') +
+            "const go = (game, fields, index = 0) => { calls.length = 0;"
+            " state.round = { index, size: 5, results: [{ word: 'old' }], game }; const before = state.round;"
+            " const patch = settle(fields); return [Object.keys(patch).sort(), patch.round.results, patch.gears, calls.slice(), before.results.length]; };"
+            "const f = (word, correct, clean, boosted = false) => ({ word, correct, clean, boosted });"
+            "out([go('classic', f('cat', true, true)), go('classic', f('dog', true, false)), go('classic', f('pig', false, false), 1),"
+            " go('gates', f('hen', true, true)), go('gates', f('fox', true, false)), go('gates', f('cow', false, false), 1)]);")
+        clean, after_miss, wrong, rec_clean, rec_miss, rec_wrong = res
+        # classic exactly as before the slot: its fields, the sticker for a
+        # clean word, the word's gears (1, and 1 more when clean)
+        self.assertEqual(clean, [['gears', 'round'], [{'word': 'cat', 'correct': True, 'clean': True, 'boosted': False, 'newSticker': True}],
+                                 2, [['sticker', 'cat'], ['gears', 2]], 1])
+        self.assertEqual(after_miss, [['gears', 'round'], [{'word': 'dog', 'correct': True, 'clean': False, 'boosted': False, 'newSticker': False}],
+                                      3, [['gears', 1]], 1])
+        self.assertEqual(wrong, [['round'], [{'word': 'old'}, {'word': 'pig', 'correct': False, 'clean': False, 'boosted': False}], None, [], 1])
+        # a recognition game's word: counts: false, its gears as usual, no sticker
+        self.assertEqual(rec_clean, [['gears', 'round'], [{'word': 'hen', 'correct': True, 'clean': True, 'boosted': False, 'counts': False,
+                                                           'newSticker': False}], 5, [['gears', 2]], 1])
+        self.assertEqual(rec_miss[1:4], [[{'word': 'fox', 'correct': True, 'clean': False, 'boosted': False, 'counts': False, 'newSticker': False}],
+                                         6, [['gears', 1]]])
+        self.assertEqual(rec_wrong[1:4], [[{'word': 'old'}, {'word': 'cow', 'correct': False, 'clean': False, 'boosted': False, 'counts': False}],
+                                          None, []])
+
+    def test_settle_keeps_exactly_classics_fields(self):
+        # a game that leaves out clean or boosted gets false; anything else
+        # it gives is not kept (the result has the fields classic writes)
+        res = self.run_node(
+            f"const {{ wordGears }} = await import('{(self.JS / 'gears.js').as_uri()}');"
+            "const state = { theme: 'animals', gears: 0, round: { index: 0, size: 5, results: [], game: 'classic' } };"
+            "const addSticker = () => true; const addGears = (n) => n; const resultOf = (g, f) => G.resultOf(g, f, TABLE);"
+            + self.function('settle') +
+            "out([settle({ word: 'cat', correct: true }).round.results[0], settle({ word: 'dog', correct: false, extra: 1, counts: true }).round.results[0]]);")
+        self.assertEqual(res, [{'word': 'cat', 'correct': True, 'clean': False, 'boosted': False, 'newSticker': False},
+                               {'word': 'dog', 'correct': False, 'clean': False, 'boosted': False}])
+
+    def test_onnext_gives_a_word_left_without_a_result_one_as_its_game_writes_it(self):
+        res = self.run_node(
+            "const state = { theme: 'animals', data: {}, gears: 0, lives: 3, words: [{ word: 'cat' }, { word: 'dog' }],"
+            " round: null, current: { word: 'cat', status: 'revealed' } };"
+            "const setState = (p) => Object.assign(state, p);"
+            "const stopWord = () => {}; const armIdle = () => {}; const newTileId = () => 't';"
+            "const roundOver = () => false; const swapForStruggle = (w) => w; const progressFor = () => ({ solved: [] });"
+            "const made = []; const playOf = (game) => ({ word: (e, stage) => { made.push([game, e.word, stage]); return { word: e.word }; } });"
+            "const resultOf = (g, f) => G.resultOf(g, f, TABLE);"
+            + self.function('onNext') +
+            "const go = (game) => { state.current = { word: 'cat', status: 'revealed' };"
+            " state.round = { index: 0, size: 2, stage: 3, results: [], game }; onNext(); return state.round.results[0]; };"
+            "out([go('classic'), go('gates'), made]);")
+        self.assertEqual(res, [{'word': 'cat', 'correct': False, 'clean': False},
+                               {'word': 'cat', 'correct': False, 'clean': False, 'counts': False},
+                               [['classic', 'dog', 3], ['gates', 'dog', 3]]])
+
+    def test_startround_names_the_rounds_game_and_records_it(self):
+        start = self.function('startRound')
+        res = self.run_node(
+            "const state = { screen: 'stages', theme: 'animals', startingRound: false, roundsStarted: 0, round: null,"
+            " progress: { animals: prog([1]) }, themes: THEMES };"
+            "const setState = (p) => Object.assign(state, p);"
+            "let arrive = null; globalThis.fetch = () => new Promise((r) => { arrive = () => r({ json: () => ({ cat: { stage: 1 } }) }); });"
+            "const progressFor = () => ({ solved: [], cleared: [] }); const currentStage = () => 1; const missedWords = () => [];"
+            "const pickRound = () => ['cat']; const newTileId = () => 't1';"
+            "const stopWord = () => {}; const armIdle = () => {}; const ROUND_SIZE = 5; let tutor = false; const needsTutorial = () => tutor;"
+            "const loadSpares = () => 0; const startBulbs = (n) => 3 + n; const loadWins = () => Promise.resolve(null);"
+            "const asked = []; const recorded = []; let last = 'screws';"
+            "const unlockedGames = (p, t) => { asked.push(['unlocked', Object.keys(p), t.length]); return G.unlocked(p, t, TABLE); };"
+            "const playable = (ids, p) => { asked.push(['playable', ids]); return G.playable(ids, p, TABLE); };"
+            "const pickGame = (ids, l) => { asked.push(['pick', ids, l]); return G.pickGame(ids, l, () => 0, TABLE); };"
+            "const loadLastGame = () => last; const recordGame = (g) => recorded.push(g); const CLASSIC = 'classic';"
+            "const playOf = (game) => ({ word: (e, stage) => ({ word: e.word, stage, game }) });"
+            + start +
+            "const go = async (leave = () => {}) => { asked.length = 0; recorded.length = 0;"
+            " Object.assign(state, { screen: 'stages', theme: 'animals', startingRound: false, round: null, current: null, tutorial: null });"
+            " const p = startRound({ name: 'animals', dataUrl: '/a.json' }, 1); leave(); arrive(); await p;"
+            " return [state.round && state.round.game, state.current && state.current.game, state.tutorial, asked.slice(), recorded.slice()]; };"
+            "const picked = await go();"
+            "tutor = true; const tutorial = await go(); tutor = false;"
+            "const left = await go(() => setState({ screen: 'theme', theme: null }));"
+            "out([picked, tutorial, left]);")
+        picked, tutorial, left = res
+        # the player's unlocked games (by state.progress and state.themes),
+        # playable, then the pick with the last round's game; the round and
+        # its first word are the game's, and it is recorded as the last
+        self.assertEqual(picked, ['gates', 'gates', False,
+                                  [['unlocked', ['animals'], 2], ['playable', ['classic', 'gates']], ['pick', ['classic', 'gates'], 'screws']],
+                                  ['gates']])
+        # the tutorial word's round is classic, no pick
+        self.assertEqual(tutorial, ['classic', 'classic', True, [], ['classic']])
+        # the kid left while the data file was on its way: no round, nothing recorded
+        self.assertEqual(left, [None, None, None, [], []])
+        guard = start.index('if (state.screen !== from || state.theme !== name) {')
+        self.assertLess(guard, start.index('recordGame(game);'))
+        self.assertIn('const game = tutorial ? CLASSIC : pickGame(playable(unlockedGames(state.progress, state.themes), state.progress), loadLastGame());',
+                      start)
+
+    def test_every_game_has_its_play_and_its_moments_and_the_taps_go_to_the_rounds_game(self):
+        ids = self.run_node("out(G.GAMES.map((g) => g.id));")
+        main = self.code('main.js')
+        plays = main[main.index('const PLAYS = {'):main.index('\n};\n', main.index('const PLAYS = {'))]
+        character = self.code('character.js')
+        moments = re.search(r'const GAME_MOMENTS = \{([^}]*)\};', character).group(1)
+        for id_ in ids:
+            self.assertIn(f'\n    {id_}: {{', plays, id_)
+            self.assertRegex(moments, rf'\b{id_}: ', id_)
+        self.assertIn('word: (entry, stage) => makeWord(entry, stage, newTileId),', plays)
+        for line in ('dome: onDome,', 'lever: onLever,', 'speak: onSpeak,', 'boost: onBoost,', 'boostPick: onBoostPick,',
+                     'boostSlot: onBoostSlot,', 'boostClose: onBoostClose,'):
+            self.assertIn(line, plays, line)
+        self.assertIn('const play = playOf(state.round.game);', self.function('tap'))
+        self.assertIn('return PLAYS[game] || PLAYS[CLASSIC];', self.function('playOf'))
+        for button, name in (('check-btn', 'dome'), ('reset-btn', 'lever'), ('speak-btn', 'speak'), ('console-gears', 'boost'),
+                             ('boost-scrim', 'boostClose')):
+            self.assertIn(f"$('{button}').addEventListener('click', () => tap('{name}'));", main, button)
+        for name in ('onDome', 'onLever', 'onSpeak', 'onBoost', 'onBoostClose', 'onBoostPick', 'onBoostSlot'):
+            self.assertEqual(len(re.findall(rf'\b{name}\b(?!\()', main.replace(f'function {name}(', ''))), 1, name)
+        # the result is written only by settle and onNext's fallback, both through resultOf
+        self.assertEqual(main.count('resultOf('), 2)
+        self.assertEqual(len(re.findall(r'results\[round\.index\] = ', main)), 2)
+        self.assertIn('const settled = settle({ word: current.word, correct, clean, boosted });', self.function('onCheck'))
+        # the boss is untouched: leaving a round for it clears the game
+        self.assertNotIn('game', self.function('startBoss').replace('leaveRound', ''))
+        self.assertIn('game: null },', self.function('leaveRound'))
+
+    def test_the_robots_moments_are_the_rounds_games(self):
+        res = self.run_node(
+            f"const c = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const put = (s) => s.split('').map((ch, i) => (ch === '-' ? null : { letter: ch, tileId: 't' + i }));"
+            "const st = (game, o = {}) => ({ screen: 'play', roundsStarted: 1, idleBeat: null, lastInput: 0, lives: 3, tuned: true,"
+            " round: { index: 0, size: 5, results: [], ...(game === undefined ? {} : { game }) },"
+            " current: { word: 'cat', status: 'playing', placed: put('---') }, ...o });"
+            "const steps = (g) => [[{ screen: 'stages', roundsStarted: 0, round: { index: 0, size: 5, results: [] }, current: { word: null, placed: [] } }, st(g)],"
+            " [st(g), st(g, { current: { word: 'cat', status: 'playing', placed: put('c--') } })],"
+            " [st(g), st(g, { lives: 2, current: { word: 'cat', status: 'wrong', misses: 1, placed: put('tac') } })],"
+            " [st(g), st(g, { round: { index: 0, size: 5, results: [{ word: 'cat', correct: true }], game: g },"
+            "   current: { word: 'cat', status: 'correct', placed: put('cat') } })]];"
+            "const of = (g) => steps(g).map(([a, b]) => c.momentsFor(c.snapshot(a), c.snapshot(b)));"
+            "out([of('classic'), of(undefined), of(null), c.snapshot(st('classic')).game, c.snapshot(st(undefined)).game]);")
+        classic, none, null, game, no_game = res
+        self.assertEqual(classic, [['roundStart', 'picture'], ['blockPlaced'], ['wrong'], ['correct']])
+        self.assertEqual(none, classic)
+        self.assertEqual(null, classic)
+        self.assertEqual([game, no_game], ['classic', None])
+        character = self.code('character.js')
+        self.assertIn('return (GAME_MOMENTS[now.game] || GAME_MOMENTS.classic)(prev, now);', self.function('momentsFor', 'character.js'))
+        self.assertIn('game: round.game || null,', self.function('snapshot', 'character.js'))
+        self.assertIn('const GAME_MOMENTS = { classic: classicMoments };', character)
+
+    def test_state_names_the_rounds_game(self):
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('spareEarned: false, game: null },', state)
+        self.assertIn('counts? }', state)
+
+    def test_docs(self):
+        progression = (self.ROOT / 'PROGRESSION.md').read_text()
+        games = progression[progression.index('## Games'):progression.index('## Repetition and stickers')]
+        for phrase in ('| 1 | classic (today\'s) | spelling | yes | the round\'s |', '| 2 | runner, gates mode | recognition | no |',
+                       '**Unlocking.**', 'in any theme', '**The pick.**', '`RECOGNITION_SHARE` (0.25)', 'never right after a recognition round',
+                       '`OTHER_SHARE` (0.5)', 'never the same one as the round before', '`minWords`', 'tutorial\n  is always classic',
+                       '`lastgame.js`', '**What counts.**', 'cannot clear a stage', 'a missed word it gets right stays missed'):
+            self.assertIn(phrase, games, phrase)
+        claude = (self.ROOT / 'CLAUDE.md').read_text()
+        for phrase in ('  - `games.js` is the game slot\'s pure part (B-233', '`state.round.game`', '`pickGame(unlocked, last, rand)`',
+                       '`resultOf(game, fields)`', '`PLAYS`', '`settle`', '`GAME_MOMENTS`',
+                       '  - `lastgame.js` is the only place localStorage `flip.lastgame.v1`', '- Games (M8, B-233', '(`round.game`)'):
+            self.assertIn(phrase, claude, phrase)

@@ -103,8 +103,9 @@ export function spend(n) {
 // word's own wrong checks, `current.misses`; since BACKLOG B-231 the
 // bulbs are the round's, so they no longer count them), and with no
 // boost (BACKLOG B-219: main.js passes boost.js isBoosted). Only a clean
-// word earns its sticker
-// (stickers.js add) and the clean gear.
+// word earns the clean gear, and its sticker (stickers.js add, main.js
+// settle) unless its result has `counts: false` (a recognition game's,
+// BACKLOG B-233).
 export function isClean(correct, wrongChecks, boosted = false) {
     return correct === true && wrongChecks === 0 && !boosted;
 }

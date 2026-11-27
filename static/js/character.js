@@ -934,6 +934,9 @@ export function snapshot(state) {
     return {
         screen,
         round: state.roundsStarted,
+        // the round's game (BACKLOG B-233, games.js), whose moments he
+        // plays on the play screen (GAME_MOMENTS); null with no round
+        game: round.game || null,
         key: onWord ? `${wordKey(state)}:${current.word}` : null,
         status: onWord ? current.status : null,
         // the round's bulbs still lit (BACKLOG B-231) and the word's own
@@ -991,11 +994,9 @@ function bossMoments(prev, now) {
 }
 
 // The moments between two snapshots, in the order they happen; [] when
-// nothing he reacts to changed. A new word's picture is shown when the TV
-// has tuned in to it (BACKLOG B-214: tv.js's tune-in locks, about a
-// second after the word came): "Picture shown" comes then, not with the
-// word, so he looks up at the picture and not at the snow. A new round
-// starts with his wave at once.
+// nothing he reacts to changed. On the play screen they are the round's
+// game's (BACKLOG B-233: GAME_MOMENTS by the snapshot's `game`; only
+// classic's for now).
 export function momentsFor(prev, now) {
     // the boss (BACKLOG B-232): his moments on its beats only
     if (now.screen === 'boss') return now.bossRun === null ? [] : bossMoments(prev, now);
@@ -1009,6 +1010,16 @@ export function momentsFor(prev, now) {
         return now.keyEarned ? [end, 'keyEarned'] : [end];
     }
     if (!now.key) return [];
+    return (GAME_MOMENTS[now.game] || GAME_MOMENTS.classic)(prev, now);
+}
+
+// Classic's moments on the play screen (BACKLOG B-233: reached through
+// GAME_MOMENTS), between two snapshots of a word in play. A new word's
+// picture is shown when the TV has tuned in to it (BACKLOG B-214: tv.js's
+// tune-in locks, about a second after the word came): "Picture shown"
+// comes then, not with the word, so he looks up at the picture and not at
+// the snow. A new round starts with his wave at once.
+function classicMoments(prev, now) {
     // the tutorial's first word: his drag line in place of the round's
     // wave line and the picture's look (coach.js shows the mitten)
     const look = now.tutor === 'drag' ? 'tutorialDrag' : 'picture';
@@ -1055,6 +1066,12 @@ export function momentsFor(prev, now) {
     }
     return [];
 }
+
+// The robot's moments on the play screen per game of games.js GAMES
+// (BACKLOG B-233), by the snapshot's `game`; a snapshot with none (no
+// round named its game) reads as classic's. Every game has an entry; a
+// later game adds its own.
+const GAME_MOMENTS = { classic: classicMoments };
 
 // Whether a block went into a slot between two snapshots' `placed`
 // (tile ids per slot, '-' for an empty one): some slot now holds a block

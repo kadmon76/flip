@@ -22,6 +22,11 @@
 // of a cleared stage whose boss waits, or the round end's thief button;
 // its beats (flip, pair, miss and his swap, a fake caught, the ending,
 // his escape) are timers here, its screen bossview.js's and bossfx.js's.
+// The game slot (BACKLOG B-233, games.js; PROGRESSION.md "Games"): a
+// round plays one game, picked as it starts (round.game); the play
+// screen's taps and each word's start reach it through PLAYS, and every
+// game writes a word's result through settle and ends the round through
+// onNext. Only classic is built.
 
 import { state, setState, subscribe } from './state.js';
 import { renderScreens } from './screens.js';
@@ -58,6 +63,8 @@ import { rulesOf, dealDeck, judge, swapPick, swapCards, startClock, withEvent, h
 import { renderBoss, renderBossClock } from './bossview.js';
 import { renderBossFx } from './bossfx.js';
 import { thiefFace } from './thief.js';
+import { unlocked as unlockedGames, playable, pickGame, resultOf, CLASSIC } from './games.js';
+import { load as loadLastGame, record as recordGame } from './lastgame.js';
 // The save modules' keys, for the first player to take over the saves
 // made before players existed (players.js add); each key stays named only
 // in its own module.
@@ -318,6 +325,19 @@ async function startRound({ name, dataUrl }, chosen = null) {
     // second row (round.js makeWord, layout.js slotLayout).
     const progress = progressFor(name);
     const stage = chosen === null ? currentStage(data, progress) : chosen;
+    // The round's game (BACKLOG B-233, games.js pickGame; PROGRESSION.md
+    // "Games"), fixed for the round (round.game): mostly classic, now and
+    // then another game the player has unlocked (games.js unlocked, by the
+    // stages open in any theme, state.progress; playable), never two
+    // recognition rounds in a row and never the same game other than
+    // classic twice (the last round's game, lastgame.js, kept per player
+    // and recorded now). The tutorial word's round is always classic. The
+    // game's first word starts through the slot (PLAYS); a game whose words
+    // are the solved words ('solved') brings its own words with its item:
+    // only classic, a 'round' game, is built.
+    const tutorial = needsTutorial();
+    const game = tutorial ? CLASSIC : pickGame(playable(unlockedGames(state.progress, state.themes), state.progress), loadLastGame());
+    recordGame(game);
     const words = pickRound(data, ROUND_SIZE, stage, missedWords(name), progress.solved)
         .map((word) => ({ word, image: data[word].image, audio: data[word].audio, break: data[word].break }));
     // The round's bulbs (BACKLOG B-231, bulbs.js startBulbs): 3 and the
@@ -331,9 +351,9 @@ async function startRound({ name, dataUrl }, chosen = null) {
         wins,
         words,
         screen: 'play',
-        round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },
-        current: makeWord(words[0], stage, newTileId),
-        tutorial: needsTutorial(),
+        round: { index: 0, size: ROUND_SIZE, stage, bulbs, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false, game },
+        current: playOf(game).word(words[0], stage),
+        tutorial,
         lives: bulbs,
         pressed: null,
         speaking: false,
@@ -347,6 +367,67 @@ async function startRound({ name, dataUrl }, chosen = null) {
         startingRound: false,
     });
     armIdle();
+}
+
+// --- The game slot (BACKLOG B-233, games.js) ---
+
+// What each game of games.js GAMES plays: how a word of it starts
+// (`word(entry, stage)`: its `current`) and the play screen's taps it
+// handles. Only classic for now: its words are round.js makeWord's, its
+// taps the console's (the dome, the lever, the speaker) and the boosts'
+// (the boost button, its tray, its glowing slots and its scrim). Every
+// game of GAMES has an entry; a later game adds its own.
+const PLAYS = {
+    classic: {
+        word: (entry, stage) => makeWord(entry, stage, newTileId),
+        dome: onDome,
+        lever: onLever,
+        speak: onSpeak,
+        boost: onBoost,
+        boostPick: onBoostPick,
+        boostSlot: onBoostSlot,
+        boostClose: onBoostClose,
+    },
+};
+
+// The play of `game` (PLAYS); classic's for a game it has no entry for,
+// and with no round in play (round.game null), where its taps find no
+// round and do nothing, as before the slot.
+function playOf(game) {
+    return PLAYS[game] || PLAYS[CLASSIC];
+}
+
+// A tap on the play screen, handed to the round's game (round.game):
+// its handler `name` with `args`, if it has one.
+function tap(name, ...args) {
+    const play = playOf(state.round.game);
+    if (play[name]) play[name](...args);
+}
+
+// The one way every game writes a word's result (BACKLOG B-233): into
+// round.results at the round's index (a wrong check's result is replaced
+// by the word's next check), made by games.js resultOf from exactly
+// classic's fields (word, correct, clean, boosted; a game that gives no
+// `clean` or `boosted` gets false; a recognition game's result also gets
+// counts: false). A correct word earns what it
+// always did, now: its sticker when it is clean and counts (stickers.js
+// add, PROGRESSION.md "Repetition and stickers": newSticker, true only if
+// the book did not have it yet; never for a word that took a miss or a
+// boost, BACKLOG B-218, B-219, nor for a recognition game's) and its gears
+// (gears.js wordGears: 1, and 1 more when clean, a recognition game's
+// too), so a round left with the back button keeps them (B-201 takes back
+// only its stickers). Returns the patch for the game's own setState: the
+// round with its results and, on a correct word, the gear count after
+// them (celebrate.js flies cogs to it). Every game then ends the word
+// with onNext, which ends the round as it always did (bulbs.js roundOver).
+function settle({ word, correct, clean = false, boosted = false }) {
+    const { round } = state;
+    const results = [...round.results];
+    const result = resultOf(round.game, { word, correct, clean, boosted });
+    results[round.index] = result;
+    if (!result.correct) return { round: { ...round, results } };
+    result.newSticker = result.clean && result.counts !== false && addSticker(state.theme, result.word);
+    return { round: { ...round, results }, gears: addGears(wordGears(result)) };
 }
 
 // --- Play screen: the console (DESIGN "Controls and states") ---
@@ -400,23 +481,24 @@ function onSpeak() {
 // `extra` is merged into the result's setState (the dome passes
 // `pressed: null`).
 function onCheck(extra = {}) {
-    const { current, round, lives } = state;
+    const { current, lives } = state;
     if (!current.placed.every(Boolean)) return;
     if (current.status !== 'playing') return;
 
     const answer = current.placed.map((p) => p.letter).join('');
     const correct = answer === current.word;
-    const results = [...round.results];
     // clean (BACKLOG B-218, gears.js isClean): checked correct on the
     // word's first check (none of the word's own wrong checks yet,
     // `current.misses`; the round's bulbs are counted apart, BACKLOG
     // B-231), with no boost; boosted (BACKLOG B-219, boost.js isBoosted):
     // the word took a boost, so it still counts for its stage and earns
-    // its correct-word gear, but no clean gear and no sticker.
+    // its correct-word gear, but no clean gear and no sticker. The result
+    // goes into round.results through the slot's settle (BACKLOG B-233),
+    // which on a correct word also adds its sticker and its gears.
     const misses = current.misses || 0;
     const boosted = isBoosted(current);
     const clean = isClean(correct, misses, boosted);
-    results[round.index] = { word: current.word, correct, clean, boosted };
+    const settled = settle({ word: current.word, correct, clean, boosted });
     // A wrong check (BACKLOG B-231, bulbs.js): one of the round's bulbs
     // goes off (afterCheck; none on the tutorial word) and the word counts
     // one more miss of its own; what it does to the word (missKind) is the
@@ -428,21 +510,13 @@ function onCheck(extra = {}) {
     const kind = correct ? null : missKind(missed, left);
 
     if (correct) {
-        // Only a clean word goes into the sticker book (PROGRESSION.md
-        // "Repetition and stickers"; stickers.js add is not called for a
-        // word solved after a miss, which still counts for its stage).
-        // newSticker is true only if the book did not have the word yet.
-        // The word's gears (gears.js wordGears: 1, and 1 more when clean)
-        // are added now, so a round left with the back button keeps them
-        // (B-201 takes back only its stickers); state.gears is the count
-        // after them, which celebrate.js flies cogs to.
-        results[round.index].newSticker = clean && addSticker(state.theme, current.word);
-        const gears = addGears(wordGears(results[round.index]));
-        setState({ round: { ...round, results }, current: { ...current, status: 'correct' }, gears, ...extra });
+        // settle added the word's sticker (only a clean word's) and its
+        // gears; state.gears is the count after them.
+        setState({ ...settled, current: { ...current, status: 'correct' }, ...extra });
         tutorialSeen();
         armNudge();
     } else if (kind === 'reveal') {
-        setState({ lives: left, round: { ...round, results }, current: { ...revealed(current), misses: missed }, ...extra });
+        setState({ lives: left, ...settled, current: { ...revealed(current), misses: missed }, ...extra });
         tutorialSeen();
         armNudge();
     } else {
@@ -455,7 +529,7 @@ function onCheck(extra = {}) {
         // found right, the ones the lever keeps (drag.js checkedWrong,
         // BACKLOG B-215b).
         const checked = { ...checkedWrong(current), misses: missed };
-        setState({ lives: left, round: { ...round, results }, current: kind === 'hint' ? giveHint(checked) : checked, ...extra });
+        setState({ lives: left, ...settled, current: kind === 'hint' ? giveHint(checked) : checked, ...extra });
         // With extras his letter can finish the word, in place of an extra
         // letter (BACKLOG B-207, drag.js afterHint): the word then reopens
         // and the dome lights at once. Its own setState, after the
@@ -473,8 +547,10 @@ function onCheck(extra = {}) {
 // result by then; one without would count as wrong. The word clip stops
 // with its word. At the round end the theme's missed words are recorded (missed.js,
 // BACKLOG B-208): the words not checked correct are remembered, the ones
-// checked correct come out; and so is its progress (progress.js, BACKLOG
-// B-216): the words checked correct are solved, and the round's stage is
+// checked correct come out (not in a recognition game, BACKLOG B-233:
+// its results have counts: false); and so is its progress (progress.js,
+// BACKLOG B-216): the words checked correct are solved (again not a
+// recognition game's), and the round's stage is
 // cleared once all its words are; the round keeps the theme's cleared
 // stages and whether this round cleared its own, for the round-end's
 // stage bulbs, and state.progress is read again for the theme cards and
@@ -494,11 +570,14 @@ function onCheck(extra = {}) {
 // recorded before its end), in the same setState as the next word, with
 // no sign to the kid. Not on stage 1, nor when no earlier word is solved.
 // The words swapped out have no result, so the round end records nothing
-// about them: they stay unsolved and come back in a later round.
+// about them: they stay unsolved and come back in a later round. Every
+// game ends its words and its round here (BACKLOG B-233): a word without
+// a result gets one as settle makes it (games.js resultOf), and the next
+// word starts through the round's game (PLAYS).
 function onNext(extra = {}) {
     const { round, current } = state;
     const results = [...round.results];
-    if (!results[round.index]) results[round.index] = { word: current.word, correct: false, clean: false };
+    if (!results[round.index]) results[round.index] = resultOf(round.game, { word: current.word, correct: false, clean: false });
 
     stopWord();
     const nextIndex = round.index + 1;
@@ -529,7 +608,7 @@ function onNext(extra = {}) {
         setState({
             words,
             round: { ...round, index: nextIndex, results },
-            current: makeWord(words[nextIndex], state.round.stage, newTileId),
+            current: playOf(round.game).word(words[nextIndex], state.round.stage),
             tutorial: false,
             speaking: false,
             lastInput: performance.now(),
@@ -831,7 +910,7 @@ function leaveRound(patch) {
         data: null,
         wins: null,
         words: [],
-        round: { index: 0, size: ROUND_SIZE, stage: null, bulbs: BULBS, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false },
+        round: { index: 0, size: ROUND_SIZE, stage: null, bulbs: BULBS, results: [], cleared: [], justCleared: false, keyEarned: false, spareEarned: false, game: null },
         current: { word: null, image: null, audio: null, placed: [], tray: [], status: 'playing' },
         pressed: null,
         speaking: false,
@@ -1185,8 +1264,9 @@ function onGalleryBack() {
 
 // --- Wiring ---
 
-// The taps the boost tray hands back (boosttray.js).
-const BOOST_TAPS = { onPick: onBoostPick, onSlot: onBoostSlot };
+// The taps the boost tray hands back (boosttray.js), for the round's
+// game (tap, BACKLOG B-233).
+const BOOST_TAPS = { onPick: (kind) => tap('boostPick', kind), onSlot: (index) => tap('boostSlot', index) };
 // The boss screen's card taps (bossview.js).
 const BOSS_TAPS = { onCard: onBossCard };
 
@@ -1224,9 +1304,11 @@ gsap.ticker.add(() => renderTalk(voiceWave()));
 // lamps behind him and his ticking (audio.js bossTick).
 gsap.ticker.add(() => renderBossClock(state, performance.now(), bossTick));
 
-$('check-btn').addEventListener('click', onDome);
-$('reset-btn').addEventListener('click', onLever);
-$('speak-btn').addEventListener('click', onSpeak);
+// The play screen's console taps go to the round's game (tap, BACKLOG
+// B-233).
+$('check-btn').addEventListener('click', () => tap('dome'));
+$('reset-btn').addEventListener('click', () => tap('lever'));
+$('speak-btn').addEventListener('click', () => tap('speak'));
 $('play-again-btn').addEventListener('click', onPlayAgain);
 $('themes-btn').addEventListener('click', onThemes);
 $('stickers-btn').addEventListener('click', onStickers);
@@ -1239,11 +1321,11 @@ $('namer-ok-btn').addEventListener('click', onNameOk);
 $('namer-back-btn').addEventListener('click', onNameBack);
 $('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onNameOk(); } });
 $('play-back-btn').addEventListener('click', onPlayBack);
-$('console-gears').addEventListener('click', onBoost);
+$('console-gears').addEventListener('click', () => tap('boost'));
 $('boss-btn').addEventListener('click', onRoundBoss);
 $('boss-back-btn').addEventListener('click', onBossBack);
 $('boss-again-btn').addEventListener('click', onBossAgain);
-$('boost-scrim').addEventListener('click', onBoostClose);
+$('boost-scrim').addEventListener('click', () => tap('boostClose'));
 // Any touch, click or key counts as input for the idle timer (capture:
 // seen before a block or a control handles it).
 document.addEventListener('pointerdown', onInput, true);
