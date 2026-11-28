@@ -144,6 +144,7 @@ No other colours without a DECISIONS entry. Tints within ±15% allowed.
   the shapes beginners write. 30px+ on 52px blocks. Lowercase default;
   an uppercase option is a display setting only (data unchanged).
 - Flip counter and logo: **Courier Prime Bold**, cream on charcoal flaps.
+- Text that colours or marks single letters in separate spans sets `font-variant-ligatures: none` and gives each letter its own box (Andika joins fi/fl/ff into one glyph).
 - No other text on screen (see "Words on screen").
 
 ## Words on screen
