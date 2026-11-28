@@ -3896,14 +3896,16 @@ body[data-screen="boss"] #screen-play .console::after {
     transition: color 0.2s;
 }
 
-/* a fake caught or shown at the end: its wrong letters red, wavy-lined */
+/* a fake caught, shown at the end or called out by a second tap (BACKLOG
+   B-234): its wrong letters red, wavy-lined */
 .bl.is-bad {
     color: var(--error);
     text-decoration: underline wavy var(--error);
     text-underline-offset: 3px;
 }
 
-/* a fake fixed at the end: the right letters it got in teal */
+/* a fake fixed (at the end, or called out by a second tap): the right
+   letters it got in teal */
 .bl.is-fix {
     color: var(--teal);
 }

@@ -47,7 +47,8 @@
 //     code as the mock design/reference/boss-thief.html makes them
 //     (BOSS_SFX: flip, unflip, alarm, drumroll, whoosh, clank, cackle,
 //     tick, zap, hit, buzz, swap slide, gear, boom, swell, fanfare,
-//     escape), each beat's at its times (bossSounds, boss.js's numbers),
+//     escape), each beat's at its times (bossSounds, boss.js's numbers;
+//     also a fake called out by a second tap, BACKLOG B-234),
 //     his ticking as bossview.js calls bossTick; and the robot's voice in
 //     a boss is only the words he reads (a beat's `say`: the word's own
 //     clip as his voice, fetched as the boss starts, bossFetches; no
@@ -471,8 +472,11 @@ export const BOSS_SFX = {
 // hit and gear; a miss's cackle and the cards turning back; his swap's
 // whoosh, clank and slide; a fake's buzz, then the chime and his cackle,
 // then the cards turning back; the ending's flip and each fix's zap and
-// hit; the burst's swell, zap, boom and the part's clank; the win's
-// fanfare; his escape's cackle and dive. 'chime' is the win's (CHIME).
+// hit; a fake called out by a second tap (BACKLOG B-234): the chime as
+// its letters turn red (as a pair's), then the fix's zap and hit, with
+// the gear's ding as its gear comes (as a pair's); the burst's swell,
+// zap, boom and the part's clank; the win's fanfare; his escape's cackle
+// and dive. 'chime' is the win's (CHIME).
 export function bossSounds(beat, cards = 0) {
     const sec = (ms) => Math.round(ms) / 1000;
     const kind = beat && beat.kind;
@@ -490,6 +494,11 @@ export function bossSounds(beat, cards = 0) {
     if (kind === 'swap') return [['whoosh', 0], ['clank', sec(BEAT.miss.hop)], ['slide', sec(BEAT.miss.hop + BEAT.miss.lift)]];
     if (kind === 'fake') return [['buzz', 0], ['chime', sec(BEAT.fake.shake)], ['cackle', sec(BEAT.fake.shake)], ['unflip', sec(fakeMs())]];
     if (kind === 'fix') return [['zap', sec(BEAT.ending.zap), false], ['hit', sec(BEAT.ending.zap + 260)]];
+    if (kind === 'catch') return [['chime', 0]];
+    if (kind === 'catchFix') {
+        const hit = sec(BEAT.ending.zap + zapMs(false));
+        return [['zap', sec(BEAT.ending.zap), false], ['hit', hit], ['gear', hit]];
+    }
     if (kind === 'burst') {
         const x = BEAT.ending;
         return [['swell', 0], ['zap', 0, true], ['boom', sec(x.swell)], ['clank', sec(x.swell + x.drop)]];

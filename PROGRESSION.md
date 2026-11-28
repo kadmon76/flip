@@ -101,6 +101,17 @@ cards train telling a right spelling from an almost-right one.
   plain sight. A fake with its own word's picture: its wrong letters turn
   red, a bubble shows the right spelling, the robot says the right word,
   the thief jumps a step ahead; the fake stays on the table.
+  A second tap on the first card up, a word card, calls it a fake (B-234;
+  no new button, so nothing on screen gives a fake away). Only on the
+  stages whose boss deals fakes (stages 3 to 5 and long); a second tap on
+  a picture card, on stages 1-2 or while a beat plays does nothing, and
+  one less than 500 ms after the flip (`RETAP_MS`) is ignored, so a fast
+  double-tap never costs a turn. A fake: caught; its wrong letters turn
+  red, it fixes itself as at the end, the robot says the right word, it
+  zaps the thief back (the small knock-back), +1 gear, and it leaves the
+  table (it is not shown at the end); he stops meanwhile, as for a pair,
+  and the pairs in a row stay. A real word card: the second flip is given
+  up, as a miss (he laughs, it turns back, he swaps two cards).
 - **The clock is the thief.** He walks his track at the stage's speed;
   the lamps behind him turn red, the vent's alarm lamp flashes past three
   quarters. When the last pair is found, the fakes still on the table are

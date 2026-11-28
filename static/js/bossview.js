@@ -2,7 +2,8 @@
 // PROGRESSION.md "Bosses"; the mock is design/reference/boss-thief.html):
 // the pairs found, the card table (#boss-cards: each card face down, face
 // up, gone, a fake caught with its wrong letters red, a fake shown or
-// fixed at the end), the bubble over a fake caught (the right spelling,
+// fixed at the end or called out by a second tap, BACKLOG B-234), the
+// bubble over a fake caught (the right spelling,
 // its fixed letters marked), the thief's track (#boss-lamps, #boss-vent,
 // #boss-thief), the console's window with the part once he is beaten, the
 // lab dimmed red, and the end card (#boss-end: the part, the stars and
@@ -12,7 +13,8 @@
 //
 // renderBoss(state, taps) is a subscriber: it builds the table once per
 // boss (state.boss.run) and updates it in place on every render; a tap on
-// a card calls taps.onCard(id) (main.js onBossCard). renderBossClock(state,
+// a card calls taps.onCard(id) (main.js onBossCard; also a second tap on
+// the card up, which may call it a fake, BACKLOG B-234). renderBossClock(state,
 // now, onTick) runs every frame (main.js, gsap.ticker): the thief's place
 // on his track is a pure function of time (boss.js thiefAt), so the clock
 // is never a per-frame setState; it places him, turns the lamps behind
@@ -80,8 +82,9 @@ export function splitAt(text, brk) {
 
 // What a card shows face up (pure): { text, marks } for a word card or a
 // fake (marks per letter: 'bad' for a fake's wrong letters while it is
-// caught or shown at the end, 'fix' for the letters a fixed fake got
-// right, which then shows its real word); null for a picture card.
+// caught or shown, at the end or called out by a second tap (BACKLOG
+// B-234), 'fix' for the letters a fixed fake got right, which then shows
+// its real word); null for a picture card.
 export function faceOf(card, boss) {
     if (!card || card.kind === 'pic') return null;
     if (card.kind === 'fake') {
@@ -93,7 +96,8 @@ export function faceOf(card, boss) {
 }
 
 // Whether a card shows its face (pure): flipped up, a fake caught, the
-// fakes shown and fixed at the end.
+// fakes shown and fixed at the end (and a fake called out by a second
+// tap, BACKLOG B-234, which is up anyway).
 export function isUp(card, boss) {
     return boss.up.includes(card.id) || boss.caught === card.id
         || (boss.shown || []).includes(card.id) || (boss.fixed || []).includes(card.id);
@@ -184,7 +188,10 @@ export function renderBoss(state, taps = {}) {
         el.classList.toggle('is-up', isUp(card, boss));
         el.classList.toggle('is-gone', gone);
         el.classList.toggle('is-fixed', (boss.fixed || []).includes(card.id));
-        el.disabled = boss.phase !== 'play' || boss.busy || gone || boss.up.includes(card.id);
+        // the card up stays tappable: a second tap on it may call it a
+        // fake (BACKLOG B-234; main.js onBossCard decides, boss.js
+        // canDecline), so a picture, a real word and a fake look the same
+        el.disabled = boss.phase !== 'play' || boss.busy || gone;
         const face = faceOf(card, boss);
         if (face) {
             const key = `${face.text}|${face.marks.join(',')}`;
