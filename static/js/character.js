@@ -529,7 +529,8 @@ export const MOMENTS = {
     // have no lines and no sound. bossIn: the lights go red, he gasps, then
     // ducks behind the console as the alarm turns (boss.js ENTRANCE.duck);
     // bossReady: the cards are dealt, he pops back up, set to go; bossPair:
-    // a pair, he cheers (a fist pump, happy eyes); bossFix: a fake fixes
+    // a pair, or a fake called out by a second tap (BACKLOG B-234), he
+    // cheers (a fist pump, happy eyes); bossFix: a fake fixes
     // itself at the end, glad, pointing up at it; bossOops: a miss or a
     // fake caught, puzzled, a shrug; bossWon: the thief burst, two fists
     // and a double pop; bossLost: the thief got away, he covers his eyes,
@@ -982,10 +983,13 @@ export function snapshot(state) {
 
 // The robot's moment on a boss beat (BACKLOG B-232; pure): a new boss, he
 // ducks (bossIn); the cards dealt (the 'start' beat), he pops up; a pair,
-// he cheers; a fake fixed, glad; a miss or a fake caught, puzzled; the
-// thief burst, two fists; his escape, he covers his eyes. Other beats
-// (a flip, his swap, the ending's show, the burst, lost): nothing.
-const BOSS_MOMENTS = { start: 'bossReady', pair: 'bossPair', fix: 'bossFix', miss: 'bossOops', fake: 'bossOops', won: 'bossWon', escape: 'bossLost' };
+// he cheers; a fake called out by a second tap (BACKLOG B-234, the
+// 'catch' beat), he cheers as for a pair; a fake fixed, glad; a miss
+// (also a real word card called a fake, which plays as one) or a fake
+// caught, puzzled; the thief burst, two fists; his escape, he covers his
+// eyes. Other beats (a flip, his swap, the ending's show, a called fake's
+// fix, the burst, lost): nothing.
+const BOSS_MOMENTS = { start: 'bossReady', pair: 'bossPair', catch: 'bossPair', fix: 'bossFix', miss: 'bossOops', fake: 'bossOops', won: 'bossWon', escape: 'bossLost' };
 
 function bossMoments(prev, now) {
     if (prev.screen !== 'boss' || prev.bossRun !== now.bossRun) return ['bossIn'];

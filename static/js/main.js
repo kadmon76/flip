@@ -20,8 +20,9 @@
 // boss at the end of every stage (BACKLOG B-232, boss.js; the thief bot,
 // a memory game against his clock): started from the stage map's station
 // of a cleared stage whose boss waits, or the round end's thief button;
-// its beats (flip, pair, miss and his swap, a fake caught, the ending,
-// his escape) are timers here, its screen bossview.js's and bossfx.js's.
+// its beats (flip, pair, miss and his swap, a fake caught, a fake called
+// out by a second tap (BACKLOG B-234), the ending, his escape) are timers
+// here, its screen bossview.js's and bossfx.js's.
 // The game slot (BACKLOG B-233, games.js; PROGRESSION.md "Games"): a
 // round plays one game, picked as it starts (round.game); the play
 // screen's taps and each word's start reach it through PLAYS, and every
@@ -58,7 +59,7 @@ import { renderCoach, resetCoach } from './coach.js';
 import { load as loadKeys, open as openTheme, record as recordKeys, isOpen, held as keysHeld } from './keys.js';
 import { load as loadSpares, record as recordBulbs, startBulbs, afterCheck, missKind, roundOver, BULBS } from './bulbs.js';
 import { renderLocks, padlock } from './locks.js';
-import { rulesOf, dealDeck, judge, swapPick, swapCards, startClock, withEvent, hold, release, thiefAt, reachesAt,
+import { rulesOf, dealDeck, judge, canDecline, declineOf, swapPick, swapCards, startClock, withEvent, hold, release, thiefAt, reachesAt,
     bossStars, pairGears, BOSS_GEARS, BEAT, KNOCK, PUSH, zapMs, pairMs, swapMs, fakeMs, entranceMs } from './boss.js';
 import { renderBoss, renderBossClock } from './bossview.js';
 import { renderBossFx } from './bossfx.js';
@@ -1009,7 +1010,7 @@ async function startBoss({ name, dataUrl }, stage) {
         boss: {
             run, theme: name, stage, rules, cards: deck.cards, pairs: deck.pairs,
             phase: 'entrance', busy: true, holds: [], clock: null,
-            up: [], gone: [], found: 0, row: 0, gears: 0,
+            up: [], upAt: null, gone: [], found: 0, row: 0, gears: 0,
             caught: null, shown: [], fixed: [], stars: 0, card: false,
             beat: { kind: 'entrance', seq: 1 },
         },
@@ -1023,19 +1024,32 @@ async function startBoss({ name, dataUrl }, stage) {
     });
 }
 
-// A card tapped: it flips (two at most; not while a beat plays). On
-// stages 1-2 (rules.read 'flip') the robot reads a word card as it flips;
-// a fake is never read. Two up: they are judged BEAT.flip later.
+// A card tapped: it flips (two at most; not while a beat plays), and the
+// time of its flip is kept (upAt). On stages 1-2 (rules.read 'flip') the
+// robot reads a word card as it flips; a fake is never read. Two up: they
+// are judged BEAT.flip later. A second tap on the first card up calls it
+// a fake (BACKLOG B-234, boss.js canDecline: a word card, on a stage that
+// deals fakes, not a fast double-tap; anything else does nothing): a fake
+// is caught (bossCatch), a real word card gives up the second flip and
+// plays as a miss (bossMiss).
 function onBossCard(id) {
     const b = state.boss;
     if (state.screen !== 'boss' || !b || b.phase !== 'play' || b.busy) return;
-    if (b.up.includes(id) || b.gone.includes(id) || b.up.length >= 2) return;
+    const now = performance.now();
+    if (b.up.includes(id)) {
+        if (!canDecline(b, id, now)) return;
+        const card = b.cards.find((c) => c.id === id);
+        if (declineOf(card) === 'caught') bossCatch(b, card, b.beat.seq + 1);
+        else bossMiss({ ...b, busy: true }, b.beat.seq + 1);
+        return;
+    }
+    if (b.gone.includes(id) || b.up.length >= 2) return;
     const card = b.cards.find((c) => c.id === id);
     if (!card) return;
     const up = [...b.up, id];
     const two = up.length === 2;
     const say = card.kind === 'word' && b.rules.read === 'flip' ? sayOf(card) : null;
-    setState({ boss: { ...b, up, busy: two, beat: { kind: 'flip', seq: b.beat.seq + 1, id, say } } });
+    setState({ boss: { ...b, up, upAt: now, busy: two, beat: { kind: 'flip', seq: b.beat.seq + 1, id, say } } });
     if (two) bossLater(BEAT.flip, judgeBoss);
 }
 
@@ -1093,9 +1107,34 @@ function bossFake(b, fake, pic, seq) {
     });
 }
 
+// A fake called out by a second tap (BACKLOG B-234): its wrong letters
+// turn red (shown) and the robot cheers as for a pair; BEAT.catch.red
+// later it fixes itself as at the end (fixed: the ending's fix), the
+// robot says the right word (its own clip; the fake is never read), it
+// glows and fires the small zap that knocks him back (a 'knock' of
+// KNOCK.by dated as the zap lands), and its gear now (BOSS_GEARS.catch);
+// it leaves the table (gone: not shown again at the end, never swapped)
+// and the kid flips again. He stops for the beat (hold 'catch'), as for
+// a pair; the pairs in a row (row) stay as they are.
+function bossCatch(b, card, seq) {
+    const c = BEAT.catch;
+    const e = BEAT.ending;
+    const next = hold({ ...b, busy: true, shown: [...b.shown, card.id] }, 'catch', performance.now());
+    setState({ boss: { ...next, beat: { kind: 'catch', seq, id: card.id } } });
+    bossLater(c.red, () => {
+        const w = state.boss;
+        const clock = withEvent(w.clock, 'knock', performance.now() + e.zap + zapMs(false), KNOCK.by);
+        setState({ gears: addGears(BOSS_GEARS.catch), boss: { ...w, clock, fixed: [...w.fixed, card.id], gone: [...w.gone, card.id],
+            gears: w.gears + BOSS_GEARS.catch, beat: { kind: 'catchFix', seq: w.beat.seq + 1, id: card.id, say: sayOf(card, e.swap / 1000) } } });
+        bossLater(c.leave + c.off, () => setState({ boss: { ...release(state.boss, 'catch', performance.now()), up: [], busy: false } }));
+    });
+}
+
 // Any other two: he laughs, they turn back, then he hops onto the table
 // and swaps two face-down cards in plain sight (boss.js swapPick: none
-// when fewer than 3 are face down), stopped meanwhile.
+// when fewer than 3 are face down), stopped meanwhile. Also a real word
+// card called a fake by a second tap (BACKLOG B-234): the second flip is
+// given up, exactly as a miss.
 function bossMiss(b, seq) {
     const m = BEAT.miss;
     setState({ boss: { ...b, row: 0, beat: { kind: 'miss', seq } } });

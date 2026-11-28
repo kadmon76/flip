@@ -5,14 +5,17 @@
 // and a word card each, plus fake word cards (a near spelling), dealt face
 // down in rows of ROW; the kid flips two cards at a time and matches each
 // picture with its word before the thief walks his track to the vent with
-// the stolen part. The clock is the thief: his place on the track is a
+// the stolen part (on a stage with fakes a second tap on the first card
+// up, a word card, calls it a fake instead, BACKLOG B-234). The clock is the thief: his place on the track is a
 // pure function of time (thiefAt), from the boss's start and its events
 // (he stops, walks on, is knocked back by a pair, jumps ahead on a fake).
 //
 // This module is the pure part: the stage table (BOSS, rulesOf), the deck
 // (dealDeck: pairs, the theme's missed words of the stage first, fakes),
 // the fake maker (fakesOf, fakeOf) and the letter diff (diffSpan,
-// letterMarks), the pair check (judge), the swap (swapPick, swapCards),
+// letterMarks), the pair check (judge), the second tap on a word card
+// that calls it a fake (canDecline, declineOf, RETAP_MS; BACKLOG B-234),
+// the swap (swapPick, swapCards),
 // the clock (startClock, withEvent, hold, release, thiefAt, reachesAt,
 // tickEvery, lampsBehind), stars and gears (bossStars, pairGears,
 // BOSS_GEARS), the slower walk after losses (slowerBy) and the beats'
@@ -208,6 +211,38 @@ export function judge(a, b) {
     return 'miss';
 }
 
+// A second tap on the first card up calls it a fake (BACKLOG B-234): a
+// second tap that comes less than RETAP_MS after its flip is ignored, so
+// a fast double-tap never costs a turn (a starting value the human tunes).
+export const RETAP_MS = 500;
+
+// Whether a tap on the card `id` at `now` (performance.now() ms) calls it
+// a fake (pure): the boss is in play and no beat plays (not busy), it is
+// the only card up, a word card (a real one or a fake: they look the
+// same), on a stage whose boss deals fakes (its rules' `fakes` > 0), and
+// at least RETAP_MS after its flip (`upAt`). Anything else: false (a
+// picture card, stages 1-2, a beat playing, a fast double-tap).
+export function canDecline(boss, id, now) {
+    if (!boss || boss.phase !== 'play' || boss.busy) return false;
+    if (!Array.isArray(boss.up) || boss.up.length !== 1 || boss.up[0] !== id) return false;
+    if ((boss.gone || []).includes(id)) return false;
+    if (!boss.rules || !(boss.rules.fakes > 0)) return false;
+    const card = (boss.cards || []).find((c) => c.id === id);
+    if (!card || (card.kind !== 'word' && card.kind !== 'fake')) return false;
+    return typeof boss.upAt === 'number' && typeof now === 'number' && now - boss.upAt >= RETAP_MS;
+}
+
+// What a word card called a fake turns out to be (pure): 'caught' for a
+// fake (it fixes itself, zaps him, leaves the table), 'forfeit' for a
+// real word card (the second flip is given up: it plays as a miss); null
+// for anything else.
+export function declineOf(card) {
+    if (!card) return null;
+    if (card.kind === 'fake') return 'caught';
+    if (card.kind === 'word') return 'forfeit';
+    return null;
+}
+
 // The two cards the thief swaps after a miss (pure): two different face
 // down cards on the table (not in `up`, not `gone`), picked at random, as
 // [id, id]; null when fewer than 3 are face down (as the mock: nothing to
@@ -235,8 +270,9 @@ export function swapCards(cards, a, b) {
 
 // Gears (BACKLOG B-232; gears.js add, as they are earned): `pair` for a
 // pair, `row` more for a pair that is the second (or later) in a row,
-// `win` for beating him.
-export const BOSS_GEARS = { pair: 1, row: 1, win: 2 };
+// `win` for beating him, `catch` for a fake called out by a second tap
+// (BACKLOG B-234, a starting value the human tunes).
+export const BOSS_GEARS = { pair: 1, row: 1, win: 2, catch: 1 };
 
 // The gears of a pair that makes `row` pairs in a row (pure).
 export function pairGears(row) {
@@ -384,6 +420,13 @@ export function lampsBehind(p, n) {
 //     into the console's window (`drop`), and the end card `card` later.
 //   - escape: he laughs (`laugh`), dives into the vent (`dive`), the end
 //     card `card` later.
+//   - catch (BACKLOG B-234, a fake called out by a second tap; the
+//     ending's numbers where they fit): its wrong letters red for `red`
+//     (the ending's `show`), then it fixes itself as at the end (its
+//     letters `ending.swap`, the robot says the word then, its small zap
+//     at `ending.zap`, knocking him back as it lands), it leaves the
+//     table `leave` after the fix starts (`off` long), and the kid plays
+//     on: `leave` + `off` after the fix starts, the ending's `fix`.
 export const BEAT = {
     flip: 450,
     zap: { small: 260, big: 480 },
@@ -392,6 +435,7 @@ export const BEAT = {
     fake: { shake: 550, bubble: 1800, fade: 250, turn: 350 },
     ending: { show: 700, fix: 1500, swap: 500, zap: 700, swell: 900, drop: 1000, card: 1200 },
     escape: { laugh: 400, dive: 700, card: 500 },
+    catch: { red: 700, leave: 1000, off: 500 },
 };
 
 // The zap's flight for a pair (ms): big for a second pair in a row or the

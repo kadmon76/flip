@@ -11,7 +11,9 @@
 // his swap (he hops onto the table, grabs two face-down cards, slides
 // them to each other's places, hops back), a fake caught (it shakes, the
 // bubble pops up, he laughs), a fake fixed at the end (its wrong letters
-// spin out and the right ones drop in, it zaps him), the burst (the final
+// spin out and the right ones drop in, it zaps him), a fake called out by
+// a second tap (BACKLOG B-234: once its letters are red, the same fix and
+// small zap, then it leaves the table as a pair does), the burst (the final
 // big zap, he swells and bursts into bolts and springs and his key, the
 // part drops into the console's window) and his escape (he laughs and
 // dives into the vent). Its numbers are boss.js's BEAT and ENTRANCE, which
@@ -62,6 +64,7 @@ export function renderBossFx(state) {
     else if (beat.kind === 'swap') swap(beat);
     else if (beat.kind === 'fake') fake(beat);
     else if (beat.kind === 'fix') fix(boss, beat);
+    else if (beat.kind === 'catchFix') catchFix(boss, beat);
     else if (beat.kind === 'burst') burst();
     else if (beat.kind === 'escape') escape();
 }
@@ -251,16 +254,21 @@ function pair(boss, beat) {
         smoke(t.x, t.y - 30);
         shake(beat.big ? 12 : 6);
     });
-    const reduced = reducedMotion();
     for (const id of beat.ids || []) {
         const el = cardEl(id);
-        if (!el) continue;
-        el.animate(reduced
-            ? [{ visibility: 'visible', opacity: 1 }, { visibility: 'visible', opacity: 0 }]
-            : [{ visibility: 'visible', transform: 'none', opacity: 1 }, { visibility: 'visible', transform: 'scale(1.15)', opacity: 1, offset: 0.3 },
-                { visibility: 'visible', transform: 'scale(.3) translateY(80px)', opacity: 0 }],
-        { duration: 500, delay: ms, easing: 'ease-in', fill: 'backwards' });
+        if (el) offTable(el, ms, 500);
     }
+}
+
+// A card leaves the table, `delay` from now, `ms` long: it swells and
+// drops off (reduced motion: it fades). It is already gone in state
+// (hidden), so it shows until then (fill backwards) and no longer.
+function offTable(el, delay, ms) {
+    el.animate(reducedMotion()
+        ? [{ visibility: 'visible', opacity: 1 }, { visibility: 'visible', opacity: 0 }]
+        : [{ visibility: 'visible', transform: 'none', opacity: 1 }, { visibility: 'visible', transform: 'scale(1.15)', opacity: 1, offset: 0.3 },
+            { visibility: 'visible', transform: 'scale(.3) translateY(80px)', opacity: 0 }],
+    { duration: ms, delay, easing: 'ease-in', fill: 'backwards' });
 }
 
 // He hops onto the table above the two cards (`beat.ids`, already in each
@@ -338,9 +346,10 @@ function fake(beat) {
     later(f.shake, () => pose('laugh', 900, beat.seq), beat.seq);
 }
 
-// A fake fixes itself at the end: over its right word (the render), its
-// old spelling spins its wrong letters out while the right ones drop in;
-// then it zaps him.
+// A fake fixes itself at the end (or called out by a second tap, BACKLOG
+// B-234: catchFix): over its right word (the render), its old spelling
+// spins its wrong letters out while the right ones drop in; then it zaps
+// him.
 function fix(boss, beat) {
     const e = BEAT.ending;
     const reduced = reducedMotion();
@@ -376,6 +385,16 @@ function fix(boss, beat) {
         zap({ x: from.x, y: from.top }, thiefPoint(), false, 260);
         later(260, () => pose('hit', 450));
     }, beat.seq);
+}
+
+// A fake called out by a second tap (BACKLOG B-234), once its letters
+// have been red (the render, the 'catch' beat): it fixes itself and zaps
+// him as a fake fixed at the end does (his knock-back is his clock), then
+// it leaves the table (BEAT.catch).
+function catchFix(boss, beat) {
+    fix(boss, beat);
+    const el = cardEl(beat.id);
+    if (el) offTable(el, BEAT.catch.leave, BEAT.catch.off);
 }
 
 // The final big zap: he swells and bursts, the part drops into the

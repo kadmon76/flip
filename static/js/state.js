@@ -224,17 +224,26 @@ export const state = {
     //     'burst' (the final zap), 'won' (the part in the console's
     //     window), 'escape' (he reached the vent), 'lost';
     //   busy: a beat plays, taps do nothing; up: the cards face up (two at
-    //     most); gone: the pairs off the table; found, row (pairs in a
+    //     most); upAt: when the last card up was flipped (performance.now()
+    //     ms; null before any), so a second tap on the first card up that
+    //     comes within boss.js RETAP_MS of its flip is ignored (BACKLOG
+    //     B-234, boss.js canDecline); gone: the pairs off the table, and
+    //     the fakes called out by a second tap; found, row (pairs in a
     //     row), gears (earned this boss, added to state.gears as earned);
-    //   holds: what stops him ('pair', 'swap', 'away', 'end'; boss.js hold,
+    //   holds: what stops him ('pair', 'swap', 'away', 'end', 'catch' (a
+    //     fake called out, BACKLOG B-234); boss.js hold,
     //     release) and clock: his walk (boss.js startClock: { start, secs,
     //     events }; his place is boss.js thiefAt of it and the time, never
     //     a per-frame setState); null until the cards are dealt;
-    //   caught: the fake caught now (its red letters, the bubble), shown:
-    //     the fakes turned up at the end, fixed: the ones fixed so far;
+    //   caught: the fake caught now with its own picture (its red letters,
+    //     the bubble), shown: the fakes whose wrong letters show red (turned
+    //     up at the end, or one called out by a second tap, BACKLOG B-234),
+    //     fixed: the ones fixed so far (at the end, or called out);
     //   beat: the last beat ({ kind, seq, ... }: 'entrance', 'start',
-    //     'flip', 'pair', 'miss', 'swap', 'fake', 'show', 'fix', 'burst',
-    //     'won', 'escape', 'lost'; `say`: the word the robot reads, audio.js);
+    //     'flip', 'pair', 'miss', 'swap', 'fake', 'catch' and 'catchFix' (a
+    //     fake called out by a second tap: its red letters, then its fix,
+    //     BACKLOG B-234), 'show', 'fix', 'burst', 'won', 'escape', 'lost';
+    //     `say`: the word the robot reads, audio.js);
     //     bossfx.js, audio.js and character.js play each one once;
     //   stars (a win's, boss.js bossStars), card: the end card shows.
     boss: null,

@@ -8498,9 +8498,11 @@ class GearsTests(TestCase):
         # a word left without a check counts as missed, not clean
         self.assertEqual(results[1], {'word': 'dog', 'correct': False, 'clean': False})
         main = self.code('main.js')
-        # (and a boss's pairs and win, B-232, as they are earned: bossPair)
-        self.assertEqual(main.count('addGears('), 3)
+        # (and a boss's pairs and win, B-232, as they are earned: bossPair;
+        # and a fake called out by a second tap, B-234: bossCatch)
+        self.assertEqual(main.count('addGears('), 4)
         self.assertIn('const patch = { gears: addGears(earned) };', self.function('bossPair'))
+        self.assertIn('setState({ gears: addGears(BOSS_GEARS.catch), boss:', self.function('bossCatch'))
         self.assertIn("import { load as loadGears, add as addGears, spend as spendGears, isClean, wordGears, GEARS } from './gears.js';", main)
         self.assertIn('setState({ gears: loadGears() });', main)
         self.assertLess(nxt.index('recordProgress('), nxt.index('gears: addGears(GEARS.round),'))
@@ -14363,7 +14365,7 @@ class BossTests(TestCase):
         res = self.run_node(
             "out([[0, 0.3, 0.449, 0.45, 0.6, 0.749, 0.75, 0.99, 1, NaN].map(B.bossStars), B.STARS_AT, B.BOSS_GEARS,"
             " [1, 2, 3, 5].map(B.pairGears)]);")
-        self.assertEqual(res, [[3, 3, 3, 2, 2, 2, 1, 1, 1, 1], [0.45, 0.75], {'pair': 1, 'row': 1, 'win': 2}, [1, 2, 2, 2]])
+        self.assertEqual(res, [[3, 3, 3, 2, 2, 2, 1, 1, 1, 1], [0.45, 0.75], {'pair': 1, 'row': 1, 'win': 2, 'catch': 1}, [1, 2, 2, 2]])
 
     # --- boss.js: the clock ---
 
@@ -14543,13 +14545,13 @@ class BossTests(TestCase):
         const recordBoss = (t, s, won) => { calls.push(['record', t, s, won]); };
         const loadProgress = () => ({ read: calls.length });
         const { BEAT, KNOCK, PUSH, zapMs, pairMs, swapMs, fakeMs, judge, hold, release, withEvent, thiefAt, reachesAt, bossStars,
-            pairGears, BOSS_GEARS, swapPick, swapCards, startClock, entranceMs } = B;
+            pairGears, BOSS_GEARS, swapPick, swapCards, startClock, entranceMs, canDecline, declineOf, RETAP_MS } = B;
         const mk = (id, kind, word, text = null) => ({ id, kind, word, text, audio: '/' + word + '.mp3' });
         const CARDS = [mk('c0', 'pic', 'cat'), mk('c1', 'word', 'cat', 'cat'), mk('c2', 'pic', 'dog'), mk('c3', 'word', 'dog', 'dog'),
             mk('c4', 'fake', 'pig', 'pgi'), mk('c5', 'pic', 'pig'), mk('c6', 'word', 'pig', 'pig'), mk('c7', 'pic', 'hen'),
             mk('c8', 'word', 'hen', 'hen')];
         const fresh = (read = 'flip', o = {}) => ({ run: 1, theme: 'animals', stage: 3, rules: { pairs: 4, fakes: 1, secs: 100, read },
-            cards: CARDS, pairs: 4, phase: 'play', busy: false, holds: [], clock: startClock(now, 100), up: [], gone: [], found: 0, row: 0,
+            cards: CARDS, pairs: 4, phase: 'play', busy: false, holds: [], clock: startClock(now, 100), up: [], upAt: null, gone: [], found: 0, row: 0,
             gears: 0, caught: null, shown: [], fixed: [], stars: 0, card: false, beat: { kind: 'start', seq: 2 }, ...o });
         const b = () => state.boss;
         const pick = () => ({ phase: b().phase, busy: b().busy, up: b().up, gone: b().gone, found: b().found, row: b().row, gears: b().gears,
@@ -14558,7 +14560,7 @@ class BossTests(TestCase):
     """
 
     def run_beats(self, body):
-        names = ('bossLater', 'onBossCard', 'judgeBoss', 'bossPair', 'bossFake', 'bossMiss', 'bossEnding', 'bossFix', 'bossBurst',
+        names = ('bossLater', 'onBossCard', 'judgeBoss', 'bossPair', 'bossFake', 'bossCatch', 'bossMiss', 'bossEnding', 'bossFix', 'bossBurst',
                  'bossEscape', 'armEscape', 'onBossAway', 'leaveBoss')
         main = self.code('main.js')
         say = re.search(r'\nconst sayOf = [^\n]*\n', main).group(0)
@@ -14933,6 +14935,199 @@ class BossTests(TestCase):
         during = character[character.index('## During a boss (BACKLOG B-232)'):character.index('## Moment map')]
         for phrase in ('his voice there is only the words', '| bossIn |', 'he ducks behind the console', '| bossPair | a pair | cheers'):
             self.assertIn(phrase, during, phrase)
+
+
+    # --- BACKLOG B-234: a second tap on a flipped word card calls it a fake ---
+
+    def test_can_decline_and_decline_of(self):
+        res = self.run_node(
+            "const c = (id, kind, word, text = null) => ({ id, kind, word, text });"
+            "const pic = c('p', 'pic', 'cat'), word = c('w', 'word', 'cat', 'cat'), fake = c('f', 'fake', 'cat', 'cta');"
+            "const boss = (o = {}) => ({ phase: 'play', busy: false, rules: B.rulesOf(3), cards: [pic, word, fake], up: ['f'], upAt: 1000, gone: [], ...o });"
+            "const at = 1000 + B.RETAP_MS;"
+            "out([B.RETAP_MS,"
+            # a word card, a real one or a fake, alone up, after RETAP_MS
+            " B.canDecline(boss(), 'f', at), B.canDecline(boss({ up: ['w'] }), 'w', at), B.canDecline(boss(), 'f', at + 60000),"
+            # a picture card; a fast double-tap; the stages with no fakes
+            " B.canDecline(boss({ up: ['p'] }), 'p', at), B.canDecline(boss(), 'f', at - 1), B.canDecline(boss({ upAt: at }), 'f', at),"
+            " [1, 2, 3, 4, 5, 'long'].map((s) => B.canDecline(boss({ rules: B.rulesOf(s) }), 'f', at)),"
+            " B.canDecline(boss({ rules: { ...B.rulesOf(3), fakes: 0 } }), 'f', at),"
+            # a beat playing, not in play, two up, none up, another card, gone, no flip time, no boss
+            " B.canDecline(boss({ busy: true }), 'f', at), B.canDecline(boss({ phase: 'ending' }), 'f', at),"
+            " B.canDecline(boss({ phase: 'entrance' }), 'f', at), B.canDecline(boss({ up: ['p', 'f'] }), 'f', at),"
+            " B.canDecline(boss({ up: [] }), 'f', at), B.canDecline(boss(), 'w', at), B.canDecline(boss({ gone: ['f'] }), 'f', at),"
+            " B.canDecline(boss({ upAt: null }), 'f', at), B.canDecline(boss(), 'f', undefined), B.canDecline(null, 'f', at),"
+            " B.canDecline(boss({ cards: [] }), 'f', at), B.canDecline(boss({ rules: null }), 'f', at),"
+            " [fake, word, pic, null, undefined].map(B.declineOf)]);")
+        (retap, fake, real, later, picture, quick, same_ms, stages, no_fakes, busy, ending, entrance, two, none, other, gone,
+         no_time, no_now, no_boss, no_card, no_rules, kinds) = res
+        self.assertEqual(retap, 500)
+        self.assertEqual([fake, real, later], [True, True, True])
+        self.assertEqual([picture, quick, same_ms], [False, False, False])
+        # only on the stages whose boss deals fakes (BOSS fakes > 0)
+        self.assertEqual(stages, [False, False, True, True, True, True])
+        self.assertFalse(no_fakes)
+        self.assertEqual([busy, ending, entrance, two, none, other, gone, no_time, no_now, no_boss, no_card, no_rules], [False] * 12)
+        self.assertEqual(kinds, ['caught', 'forfeit', None, None, None])
+
+    def test_the_caught_beats_numbers(self):
+        res = self.run_node("out([B.BEAT.catch, B.BEAT.ending, B.zapMs(false), B.BOSS_GEARS.catch, B.KNOCK.by]);")
+        catch, ending, small, gear, knock = res
+        self.assertEqual(catch, {'red': 700, 'leave': 1000, 'off': 500})
+        # the ending's fix timings where they fit: red as long as the
+        # ending's show, the whole fix as long as one of the ending's
+        self.assertEqual(catch['red'], ending['show'])
+        self.assertEqual(catch['leave'] + catch['off'], ending['fix'])
+        # it leaves the table after its zap has landed
+        self.assertGreater(catch['leave'], ending['zap'] + small)
+        self.assertEqual([gear, knock], [1, 0.13])
+
+    def test_a_second_tap_on_a_fake_catches_it(self):
+        res = self.run_beats(
+            "state.boss = fresh('match', { row: 1, clock: startClock(now - 50000, 100) });"
+            "tap('c4'); const first = pick(); const upAt = b().upAt;"
+            # a fast double-tap is ignored
+            "advance(100); tap('c4'); const quick = pick();"
+            "advance(RETAP_MS); const at = now; tap('c4'); const red = pick(); const stop = b().clock.events.slice(-1)[0];"
+            # a tap while the beat plays does nothing
+            "tap('c4'); tap('c0'); const busy = [b().up, b().beat.seq];"
+            "advance(BEAT.catch.red); const fixed = pick(); const knock = b().clock.events.slice(-1)[0]; const gears = calls.slice();"
+            "const p0 = Math.round(thiefAt(b().clock, now).p * 1000) / 1000;"
+            "advance(BEAT.catch.leave + BEAT.catch.off); const done = pick(); const go = b().clock.events.slice(-1)[0];"
+            "const p1 = Math.round(thiefAt(b().clock, now).p * 1000) / 1000;"
+            # the kid flips again: a pair, as ever
+            "tap('c0', 'c1'); advance(BEAT.flip); const pair = pick();"
+            "out([first, upAt, quick, at, red, stop, busy, fixed, knock, gears, p0, done, go, p1, pair]);")
+        first, up_at, quick, at, red, stop, busy, fixed, knock, gears, p0, done, go, p1, pair = res
+        self.assertEqual([first['up'], first['busy'], first['beat']], [['c4'], False, {'kind': 'flip', 'seq': 3, 'id': 'c4', 'say': None}])
+        self.assertEqual(up_at, 1000)                          # the flip's time, in state
+        self.assertEqual(quick, first)                         # within RETAP_MS: nothing
+        # caught: its wrong letters red (shown), the robot cheers (the
+        # 'catch' beat), he stops, as for a pair; the pairs in a row stay
+        self.assertEqual(red['beat'], {'kind': 'catch', 'seq': 4, 'id': 'c4'})
+        self.assertEqual([red['shown'], red['fixed'], red['up'], red['busy'], red['holds'], red['row'], red['gone'], red['caught']],
+                         [['c4'], [], ['c4'], True, ['catch'], 1, [], None])
+        self.assertEqual(stop, {'kind': 'stop', 'at': at})
+        self.assertEqual(busy, [['c4'], 4])
+        # then it fixes itself, the robot says the right word (never the
+        # fake) as its letters settle, its small zap knocks him back as it
+        # lands, its gear now; it is off the table (gone)
+        self.assertEqual(fixed['beat'], {'kind': 'catchFix', 'seq': 5, 'id': 'c4', 'say': {'word': 'pig', 'audio': '/pig.mp3', 'at': 0.5}})
+        self.assertEqual([fixed['fixed'], fixed['gone'], fixed['gears'], fixed['row'], fixed['holds'], fixed['busy']],
+                         [['c4'], ['c4'], 1, 1, ['catch'], True])
+        self.assertEqual(knock, {'kind': 'knock', 'at': at + 700 + 700 + 260, 'by': 0.13})
+        self.assertEqual(gears, [['gears', 1]])
+        self.assertEqual(p0, 0.506)                            # stopped at the second tap
+        # the beat over: he walks on from where the knock left him, the kid plays
+        self.assertEqual([done['up'], done['busy'], done['holds'], done['row'], done['found'], done['gone']], [[], False, [], 1, 0, ['c4']])
+        self.assertEqual(go, {'kind': 'go', 'at': at + 700 + 1500})
+        self.assertEqual(p1, 0.376)
+        self.assertEqual([pair['beat']['kind'], pair['row'], pair['beat']['big'], pair['gears']], ['pair', 2, True, 3])
+
+    def test_a_caught_fake_is_not_shown_again_at_the_end(self):
+        res = self.run_beats(
+            "state.boss = fresh('match', { found: 3, row: 1, gone: ['c0', 'c1', 'c2', 'c3', 'c5', 'c6'] });"
+            "tap('c4'); advance(RETAP_MS); tap('c4'); advance(BEAT.catch.red + BEAT.catch.leave + BEAT.catch.off);"
+            "const cards = b().cards.map((c) => c.id).join();"
+            "tap('c7', 'c8'); advance(BEAT.flip); const last = pick(); advance(zapMs(true) + KNOCK.ms); const end = pick();"
+            "out([last, end, cards === CARDS.map((c) => c.id).join()]);")
+        last, end, same_table = res
+        self.assertEqual([last['row'], last['beat']['big'], last['gears']], [2, True, 1 + 2 + 2])
+        # no fake left on the table: straight to the final zap
+        self.assertEqual([end['shown'], end['phase'], end['beat']['kind']], [[], 'burst', 'burst'])
+        self.assertTrue(same_table)
+
+    def test_a_second_tap_on_a_real_word_card_plays_as_a_miss(self):
+        res = self.run_beats(
+            "Math.random = () => 0;"
+            # a second tap on a real word card
+            "state.boss = fresh('match', { row: 1 });"
+            "tap('c6'); advance(RETAP_MS); const at = now; tap('c6'); const miss = pick();"
+            "advance(BEAT.miss.laugh); const back = pick();"
+            "advance(BEAT.miss.turn); const swap = pick(); const order = b().cards.map((c) => c.id);"
+            "advance(swapMs()); const done = pick(); const gear = calls.length;"
+            # and a miss of two cards, from the same table, for comparison
+            "now = 1000; timers.length = 0; state.boss = fresh('match', { row: 1 });"
+            "tap('c6', 'c0'); advance(BEAT.flip); const two = [pick()];"
+            "advance(BEAT.miss.laugh); two.push(pick()); advance(BEAT.miss.turn); two.push(pick()); advance(swapMs()); two.push(pick());"
+            "out([miss, back, swap, order, done, gear, two]);")
+        miss, back, swap, order, done, gear, two = res
+        # he laughs (the 'miss' beat), the card turns back, he swaps two
+        # face-down cards: exactly a miss; the pairs in a row are broken
+        self.assertEqual([miss['beat'], miss['row'], miss['busy'], miss['up']], [{'kind': 'miss', 'seq': 4}, 0, True, ['c6']])
+        self.assertEqual([back['up'], back['busy']], [[], True])
+        self.assertEqual([swap['beat']['kind'], swap['holds']], ['swap', ['swap']])
+        self.assertEqual(order[:2], ['c1', 'c0'])
+        self.assertEqual([done['holds'], done['busy'], done['gone'], done['gears'], done['shown'], done['fixed'], gear],
+                         [[], False, [], 0, [], [], 0])
+        self.assertEqual([x['beat']['kind'] for x in two], ['miss', 'miss', 'swap', 'swap'])
+        self.assertEqual([[x['row'], x['busy'], x['holds']] for x in (miss, back, swap, done)],
+                         [[x['row'], x['busy'], x['holds']] for x in two])
+
+    def test_a_second_tap_that_does_nothing(self):
+        res = self.run_beats(
+            "const again = (o, id) => { now = 1000; timers.length = 0; state.boss = fresh('match', o); tap(id); advance(RETAP_MS + 100);"
+            " const before = JSON.stringify(pick()); tap(id); advance(5000); return JSON.stringify(pick()) === before; };"
+            "out([again({}, 'c0'),"                                   # a picture card
+            " again({ rules: B.rulesOf(1) }, 'c6'), again({ rules: B.rulesOf(2) }, 'c4'),"   # stages 1-2
+            " again({ rules: B.rulesOf(1) }, 'c4'),"
+            " again({}, 'c6')]);")                                    # stage 3, a real word: not nothing
+        picture, stage1, stage2, stage1_fake, real = res
+        self.assertEqual([picture, stage1, stage2, stage1_fake], [True, True, True, True])
+        self.assertFalse(real)
+
+    def test_the_caught_beat_wiring(self):
+        main = self.code('main.js')
+        self.assertIn("import { rulesOf, dealDeck, judge, canDecline, declineOf,", main)
+        card = self.function('onBossCard')
+        self.assertIn('if (!canDecline(b, id, now)) return;', card)
+        self.assertIn("if (declineOf(card) === 'caught') bossCatch(b, card, b.beat.seq + 1);", card)
+        self.assertIn('else bossMiss({ ...b, busy: true }, b.beat.seq + 1);', card)
+        self.assertIn('upAt: now', card)
+        self.assertIn('up: [], upAt: null, gone: [],', self.function('startBoss'))
+        catch = self.function('bossCatch')
+        self.assertIn("'catch', performance.now()", catch)
+        self.assertIn("release(state.boss, 'catch', performance.now())", catch)
+        self.assertIn('addGears(BOSS_GEARS.catch)', catch)
+        self.assertNotIn('row', catch)                         # the pairs in a row stay
+        # the card up stays tappable (a picture, a word and a fake alike)
+        self.assertIn("el.disabled = boss.phase !== 'play' || boss.busy || gone;", self.code('bossview.js'))
+        fx = self.code('bossfx.js')
+        self.assertIn("else if (beat.kind === 'catchFix') catchFix(boss, beat);", fx)
+        self.assertIn('fix(boss, beat);', self.function('catchFix', 'bossfx.js'))
+        self.assertIn('offTable(el, BEAT.catch.leave, BEAT.catch.off);', self.function('catchFix', 'bossfx.js'))
+        self.assertIn('if (el) offTable(el, ms, 500);', self.function('pair', 'bossfx.js'))
+        state = (self.JS / 'state.js').read_text()
+        self.assertIn('upAt: when the last card up was flipped', state)
+        self.assertIn("'catch' and 'catchFix'", state)
+
+    def test_the_caught_beats_sounds_and_the_robot(self):
+        res = self.run_node(
+            f"const A = await import('{(self.JS / 'audio.js').as_uri()}');"
+            f"const C = await import('{(self.JS / 'character.js').as_uri()}');"
+            "const snap = (kind, seq) => ({ ...C.NONE, screen: 'boss', bossRun: 1, bossSeq: seq, bossKind: kind });"
+            "out([A.bossSounds({ kind: 'catch', id: 'c4' }), A.bossSounds({ kind: 'catchFix', id: 'c4' }),"
+            " C.momentsFor(snap('flip', 3), snap('catch', 4)), C.momentsFor(snap('catch', 4), snap('catchFix', 5)),"
+            " C.momentsFor(snap('flip', 3), snap('miss', 4))]);")
+        catch, fix, cheer, quiet, oops = res
+        # the chime as its letters turn red; the fix's zap and hit, the
+        # gear's ding as its gear comes (made in code, the mute stops them)
+        self.assertEqual(catch, [['chime', 0]])
+        self.assertEqual(fix, [['zap', 0.7, False], ['hit', 0.96], ['gear', 0.96]])
+        # the robot cheers as for a pair; no new lines
+        self.assertEqual([cheer, quiet, oops], [['bossPair'], [], ['bossOops']])
+
+    def test_the_second_tap_docs(self):
+        progression = (self.ROOT / 'PROGRESSION.md').read_text()
+        bosses = progression[progression.index('## Bosses'):progression.index('## Games')]
+        play = bosses[bosses.index('- **Play.**'):bosses.index('- **The clock is the thief.**')]
+        for phrase in ('A second tap on the first card up', 'B-234', 'stages 3 to 5 and long', 'less than 500 ms', 'caught', '+1 gear',
+                       'not shown at the end', 'given up', 'as a miss'):
+            self.assertIn(phrase, ' '.join(play.split()), phrase)
+        claude = ' '.join((self.ROOT / 'CLAUDE.md').read_text().split())
+        bullet = claude[claude.index('- The boss (B-232'):claude.index('- `feedback.js` is the only place')]
+        for phrase in ('`canDecline(boss, id, now)`', '`declineOf(card)`', '`RETAP_MS`', '`bossCatch`', '`upAt`', "`'catch'`", '`BOSS_GEARS.catch`'):
+            self.assertIn(phrase, bullet, phrase)
 
 
 class GamesTests(TestCase):
